@@ -35,7 +35,7 @@ const VerificationCodeInput = () => {
     }
   };
 
-  const handlePaste = (e: { preventDefault: () => void; clipboardData: { getData: (arg0: string) => string | any[]; }; }) => {
+  const handlePaste = (e: { preventDefault: () => void; clipboardData: { getData: (arg0: string) => string; }; }) => {
     e.preventDefault();
     const pastedData = e.clipboardData.getData('text').slice(0, 6) as string;
     
