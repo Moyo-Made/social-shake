@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -14,6 +13,9 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
+import { Button } from "./ui/button";
+import Link from "next/link";
+import { FaArrowRight } from "react-icons/fa6";
 
 const BrandProfileForm = () => {
 	const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -68,7 +70,7 @@ const BrandProfileForm = () => {
 					<div className="space-y-4">
 						<div className="space-y-2">
 							<Label className="text-sm md:text-base font-medium">
-								What's the name of your brand or company?
+								What&#39;s the name of your brand or company?
 							</Label>
 							<Input placeholder="Social Shake" />
 						</div>
@@ -249,7 +251,57 @@ const BrandProfileForm = () => {
 									/>
 								</div>
 							</RadioGroup>
+							<div className="space-y-2">
+								<Label className="text-sm md:text-base font-medium">
+									Social Media Handles
+								</Label>
+								<div className="relative">
+									<Image
+										src="/icons/tiktok.png"
+										alt="Tiktok"
+										width={4}
+										height={4}
+										className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4"
+									/>
+									<Input placeholder="social_shake" className="pl-8" />
+								</div>
+								<div className="relative">
+									<Image
+										src="/icons/ig.png"
+										alt="Instagram"
+										width={4}
+										height={4}
+										className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4"
+									/>
+									<Input placeholder="social_shake" className="pl-8" />
+								</div>
+								<div className="relative">
+									<Image
+										src="/icons/facebook.svg"
+										alt="Facebook"
+										width={4}
+										height={4}
+										className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4"
+									/>
+									<Input placeholder="social_shake" className="pl-8" />
+								</div>
+							</div>
+							<div className="space-y-2">
+								<Label className="text-sm md:text-base font-medium">
+									Who is your target audience?
+								</Label>
+								<Input placeholder="Tech Enthusiasts" type="text" />
+							</div>
 						</div>
+					</div>
+					{/* Submit Button */}
+					<div className="flex justify-end">
+						<Button className="flex justify-end bg-[#FD5C02] hover:bg-orange-600 text-white text-[17px] py-5 font-normal">
+							<Link href="/signup-complete" className="flex">
+								<p>Submit Registration</p>{" "}
+								<FaArrowRight className="w-5 h-5 ml-2 mt-1" />
+							</Link>
+						</Button>
 					</div>
 				</div>
 			</div>
