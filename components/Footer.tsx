@@ -13,7 +13,7 @@ const Footer = () => {
 					<div className="flex space-x-3 md:space-x-5">
 						<Link href="">
 							<Image
-								src="/icons/ig.png"
+								src="/icons/ig.svg"
 								alt="Instagram"
 								width={20}
 								height={20}
@@ -24,7 +24,7 @@ const Footer = () => {
 						</Link>
 						<Link href="">
 							<Image
-								src="/icons/tiktok.png"
+								src="/icons/tiktok.svg"
 								alt="Tiktok"
 								width={20}
 								height={20}

@@ -257,7 +257,7 @@ const BrandProfileForm = () => {
 								</Label>
 								<div className="relative">
 									<Image
-										src="/icons/tiktok.png"
+										src="/icons/tiktok.svg"
 										alt="Tiktok"
 										width={4}
 										height={4}
@@ -267,7 +267,7 @@ const BrandProfileForm = () => {
 								</div>
 								<div className="relative">
 									<Image
-										src="/icons/ig.png"
+										src="/icons/ig.svg"
 										alt="Instagram"
 										width={4}
 										height={4}
