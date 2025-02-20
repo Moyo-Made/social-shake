@@ -8,7 +8,7 @@ const Navbar = () => {
 		<nav className="w-full px-4 md:px-12 lg:px-16 py-4 flex justify-between items-center">
 			<Link href="/" className="flex items-center">
 				<Image
-					src="/images/logo.png"
+					src="/images/logo.svg"
 					alt="Social Shake logo"
 					width={100}
 					height={100}

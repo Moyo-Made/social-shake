@@ -31,7 +31,7 @@ const CreateAccount = () => {
 					<CardHeader className="space-y-3 items-center text-center">
 						<div className="w-32 h-8 mb-8">
 							<Image
-								src="/images/logo.png"
+								src="/images/logo.svg"
 								alt="Social Shake logo"
 								width={110}
 								height={110}
