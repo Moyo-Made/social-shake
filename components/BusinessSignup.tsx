@@ -20,7 +20,7 @@ const BusinessSignup = () => {
 
 			{/* Signup Card */}
 			<div className="relative flex items-center justify-center px-4 mt-6 xl:mt-12 font-satoshi">
-				<Card className="w-full max-w-xl bg-white backdrop-blur-sm px-[20px] py-[6px] md:px-[30px] md:py-[10px] lg:px-[50px] lg:py-[20px]">
+				<Card className="w-full max-w-xl bg-white border-2 border-[#FFBF9B] backdrop-blur-sm px-[20px] py-[6px] md:px-[30px] md:py-[5px] lg:px-[50px] lg:py-[5px]">
 					<CardHeader className="space-y-3 items-center text-center">
 						<div className="w-32 h-8 mb-8">
 							<Image
@@ -46,7 +46,7 @@ const BusinessSignup = () => {
 							</Link>
 						</div>
 					</CardHeader>
-					<CardContent className="space-y-4">
+					<CardContent className="space-y-3">
 						<Button className="w-full bg-[#FD5C02] hover:bg-orange-600 text-white text-base md:text-[17px] py-5 font-normal">
 							<Link href="/create-account" className="flex items-center justify-center gap-2">
 								Sign up with Email
@@ -84,7 +84,7 @@ const BusinessSignup = () => {
 							/>
 							Sign up with Facebook
 						</Button>
-						<p className="text-sm md:text-base text-center text-[#000] pt-4">
+						<p className="text-sm md:text-base text-center text-[#000] pt-2">
 							By signing up, you confirm that you have read and agree to our{" "}
 							<Link href="#" className="text-[#FD5C02] hover:underline">
 								Privacy Policy

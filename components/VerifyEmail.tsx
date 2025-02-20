@@ -59,6 +59,8 @@ const VerificationCodeInput = () => {
   };
 
   return (
+    <div className='relative min-h-[80vh] overflow-y-hidden'>
+			<div className="w-full border-t border-[#1A1A1A]" />
     <Card className="w-full max-w-md mx-auto mt-10 lg:mt-16 font-satoshi">
       <CardHeader className="space-y-1 text-center">
         <div className="mx-auto bg-white border border-gray-200 w-12 h-12 rounded-lg flex items-center justify-center">
@@ -98,6 +100,7 @@ const VerificationCodeInput = () => {
         </Button>
       </CardContent>
     </Card>
+    </div>
   );
 };
 

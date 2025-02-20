@@ -23,7 +23,7 @@ const Login = () => {
 
 			{/* Login Card */}
 			<div className="relative flex items-center justify-center px-4 py-6 xl:py-12 font-satoshi">
-				<Card className="w-full max-w-xl bg-white backdrop-blur-sm px-[2px] py-[6px] md:px-[30px] md:py-[10px] lg:px-[50px] lg:py-[20px]">
+				<Card className="w-full max-w-xl bg-white border-2 border-[#FFBF9B] backdrop-blur-sm px-[2px] py-[6px] md:px-[30px] md:py-[5px] lg:px-[50px] lg:py-[5px]">
 					<CardHeader className="space-y-3 items-center text-center">
 						<div className="w-32 h-8 mb-8">
 							<Image
@@ -76,7 +76,10 @@ const Login = () => {
 
 						{/* Submit Button */}
 						<Button className="w-full bg-[#FD5C02] hover:bg-orange-600 text-white text-[17px] py-5 font-normal">
-							Create Account <FaArrowRight className="w-5 h-5 ml-2 mt-1" />
+							<Link href="/account-successfully-created" className="flex">
+								<p>Create Account</p>{" "}
+								<FaArrowRight className="w-5 h-5 ml-2 mt-1" />
+							</Link>
 						</Button>
 
 						<Link

@@ -5,7 +5,7 @@ import React from "react";
 const Footer = () => {
 	return (
 		<div>
-			<footer className="fixed bottom-0 w-full py-4 bg-white">
+			<footer className="bottom-0 w-full py-4 bg-white">
 				<div className="container mx-0 lg:mx-auto px-4 flex justify-between items-center">
 					<p className="text-sm md:text-base text-[#000]">
 					© 2025 Social Shake. All rights reserved.
