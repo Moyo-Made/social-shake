@@ -1,10 +1,14 @@
-import React from "react";
+
+
+import React, { useState } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader } from "./ui/card";
 import Image from "next/image";
 import Link from "next/link";
 
 const BusinessSignup = () => {
+	
+
 	return (
 		<main className="relative overflow-hidden min-h-screen">
 			<div className="absolute inset-0">
@@ -41,14 +45,20 @@ const BusinessSignup = () => {
 							<p className="text-gray-600 font-medium text-sm md:text-base">
 								Already have an account?
 							</p>
-							<Link href="/login" className="text-[#FD5C02] hover:underline font-medium text-sm md:text-base">
+							<Link
+								href="/login"
+								className="text-[#FD5C02] hover:underline font-medium text-sm md:text-base"
+							>
 								Log in
 							</Link>
 						</div>
 					</CardHeader>
 					<CardContent className="space-y-3">
 						<Button className="w-full bg-[#FD5C02] hover:bg-orange-600 text-white text-base md:text-[17px] py-5 font-normal">
-							<Link href="/create-account" className="flex items-center justify-center gap-2">
+							<Link
+								href="/create-account"
+								className="flex items-center justify-center gap-2"
+							>
 								Sign up with Email
 								<Image
 									src="/icons/email.svg"
@@ -95,6 +105,8 @@ const BusinessSignup = () => {
 							</Link>
 						</p>
 					</CardContent>
+
+					
 				</Card>
 			</div>
 		</main>

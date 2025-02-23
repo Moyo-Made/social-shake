@@ -1,52 +1,54 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import localFont from 'next/font/local'
+import localFont from "next/font/local";
+import Providers from "@/components/Providers";
 
-const inter = Inter({ 
-  subsets: ['latin'],
-  variable: '--font-inter'
-})
+const inter = Inter({
+	subsets: ["latin"],
+	variable: "--font-inter",
+});
 
 const satoshi = localFont({
-  src: [
-    {
-      path: '../public/fonts/Satoshi-Regular.otf',
-      weight: '400',
-      style: 'normal',
-    },
-    {
-      path: '../public/fonts/Satoshi-Medium.otf',
-      weight: '500',
-      style: 'normal',
-    },
-    {
-      path: '../public/fonts/Satoshi-Bold.otf',
-      weight: '700',
-      style: 'normal',
-    }
-  ],
-  variable: '--font-satoshi'
-})
-
+	src: [
+		{
+			path: "../public/fonts/Satoshi-Regular.otf",
+			weight: "400",
+			style: "normal",
+		},
+		{
+			path: "../public/fonts/Satoshi-Medium.otf",
+			weight: "500",
+			style: "normal",
+		},
+		{
+			path: "../public/fonts/Satoshi-Bold.otf",
+			weight: "700",
+			style: "normal",
+		},
+	],
+	variable: "--font-satoshi",
+});
 
 export const metadata: Metadata = {
-  title: "Social Shake",
-  description: "",
+	title: "Social Shake",
+	description: "",
 };
 
 export default function RootLayout({
-  children,
+	children,
 }: Readonly<{
-  children: React.ReactNode;
+	children: React.ReactNode;
 }>) {
-  return (
-    <html lang="en">
-      <body
-        className={`${inter.variable} ${satoshi.variable}`}
-      >
-        {children}
-      </body>
-    </html>
-  );
+	return (
+		
+		<html lang="en">
+			<body className={`${inter.variable} ${satoshi.variable}`}>
+				<Providers>
+				{children}
+				</Providers>
+			</body>
+		</html>
+		
+	);
 }
