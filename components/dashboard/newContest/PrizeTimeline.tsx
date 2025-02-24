@@ -153,7 +153,7 @@ const ContestDurationSection: React.FC<ContestDurationProps> = ({
 								)}
 							</Button>
 						</PopoverTrigger>
-						<PopoverContent className="w-auto p-0">
+						<PopoverContent className="bg-[#f7f7f7] w-auto p-0">
 							<Calendar
 								mode="single"
 								selected={startDate}
@@ -170,19 +170,20 @@ const ContestDurationSection: React.FC<ContestDurationProps> = ({
 						<PopoverTrigger asChild>
 							<Button
 								variant="outline"
-								className="w-[240px] justify-start text-left font-normal"
+								className=" w-[240px] justify-start text-left font-normal"
 							>
 								<CalendarIcon className="mr-2 h-4 w-4" />
 								{endDate ? format(endDate, "PPP") : <span>Pick a date</span>}
 							</Button>
 						</PopoverTrigger>
-						<PopoverContent className="w-auto p-0">
+						<PopoverContent className="bg-[#f7f7f7] w-auto p-0">
 							<Calendar
 								mode="single"
 								selected={endDate}
 								onSelect={setEndDate}
 								initialFocus
 								disabled={(date) => (startDate ? date < startDate : false)}
+							
 							/>
 						</PopoverContent>
 					</Popover>
