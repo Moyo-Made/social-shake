@@ -131,7 +131,7 @@ const Review: React.FC<ContestDisplayProps> = ({ contestData }) => {
           </div>
           
           <div className="grid grid-cols-3 gap-4">
-            <div className="font-medium text-gray-600">Client's Script</div>
+            <div className="font-medium text-gray-600">Client&#39;s Script</div>
             <div className="col-span-2 bg-gray-100 p-3 rounded-lg flex items-center">
              
               {data.clientScript}
