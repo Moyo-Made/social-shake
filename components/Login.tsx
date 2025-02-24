@@ -47,7 +47,7 @@ const Login = () => {
 
       router.push("/dashboard");
     } catch (error) {
-      setError("An error occurred. Please try again.");
+      console.error("An error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }

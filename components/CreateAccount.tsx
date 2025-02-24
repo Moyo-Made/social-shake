@@ -1,42 +1,42 @@
 "use client";
 
 import Link from "next/link";
-import React, { useState } from "react";
+import React from "react";
 import { Card, CardContent, CardHeader } from "./ui/card";
 import Image from "next/image";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { FaArrowRight, FaArrowLeft } from "react-icons/fa6";
 import { Button } from "./ui/button";
-import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
+// import { useRouter } from "next/navigation";
+// import { signIn } from "next-auth/react";
 
 // Define interface for form data
-interface SignupFormData {
-	firstName: string;
-	lastName: string;
-	email: string;
-	password: string;
-}
+// interface SignupFormData {
+// 	firstName: string;
+// 	lastName: string;
+// 	email: string;
+// 	password: string;
+// }
 
 const CreateAccount = () => {
-	const router = useRouter();
-	const [isLoading, setIsLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const [formData, setFormData] = useState<SignupFormData>({
-		firstName: "",
-		lastName: "",
-		email: "",
-		password: "",
-	});
+	// const router = useRouter();
+	// const [isLoading, setIsLoading] = useState(false);
+	// const [error, setError] = useState<string | null>(null);
+	// const [formData, setFormData] = useState<SignupFormData>({
+	// 	firstName: "",
+	// 	lastName: "",
+	// 	email: "",
+	// 	password: "",
+	// });
 
-	// Handle input change
-	const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		setFormData({
-			...formData,
-			[e.target.id]: e.target.value,
-		});
-	};
+	// // Handle input change
+	// const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+	// 	setFormData({
+	// 		...formData,
+	// 		[e.target.id]: e.target.value,
+	// 	});
+	// };
 	
 	// const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
 	// 	e.preventDefault();
@@ -141,8 +141,8 @@ const CreateAccount = () => {
 									<Input
 										id="firstName"
 										type="text"
-										value={formData.firstName}
-										onChange={handleChange}
+										// value={formData.firstName}
+										// onChange={handleChange}
 										placeholder="Enter your first name"
 										className="w-full placeholder:text-sm md:placeholder:text-base md:py-5"
 									/>
@@ -157,8 +157,8 @@ const CreateAccount = () => {
 									<Input
 										id="lastName"
 										type="text"
-										value={formData.lastName}
-										onChange={handleChange}
+										// value={formData.lastName}
+										// onChange={handleChange}
 										placeholder="Enter your last name"
 										className="w-full placeholder:text-sm md:placeholder:text-base md:py-5"
 									/>
@@ -176,8 +176,8 @@ const CreateAccount = () => {
 								<Input
 									id="email"
 									type="email"
-									value={formData.email}
-									onChange={handleChange}
+									// value={formData.email}
+									// onChange={handleChange}
 									placeholder="Enter your business email"
 									className="w-full placeholder:text-sm md:placeholder:text-base md:py-5"
 								/>
@@ -194,8 +194,8 @@ const CreateAccount = () => {
 								<Input
 									id="password"
 									type="password"
-									value={formData.password}
-									onChange={handleChange}
+									// value={formData.password}
+									// onChange={handleChange}
 									placeholder="Create a password"
 									className="w-full placeholder:text-sm md:placeholder:text-base md:py-5"
 									minLength={8}
@@ -210,14 +210,13 @@ const CreateAccount = () => {
 							
 							<Button
 								type="submit"
-								disabled={isLoading}
-								className={`w-full bg-[#FD5C02] hover:bg-orange-600 text-white text-[17px] py-5 font-normal ${
-									isLoading ? "opacity-50 cursor-not-allowed" : ""
-								}`}
+								// disabled={isLoading}
+								className={`w-full bg-[#FD5C02] hover:bg-orange-600 text-white text-[17px] py-5 font-normal
+								`}
 							>
 								
 								<span>
-									{isLoading ? "Creating Account..." : "Create Account"}
+									Create Account
 								</span>{" "}
 								<FaArrowRight className="w-5 h-5 ml-2 mt-1" />
 							</Button>
@@ -228,11 +227,11 @@ const CreateAccount = () => {
 									Account created successfully! Redirecting to dashboard...
 								</div>
 							)} */}
-							{error && (
+							{/* {error && (
 								<div className="mt-4 p-3 bg-red-100 text-red-700 rounded border border-red-300">
 									{error}
 								</div>
-							)}
+							)} */}
 							<p className="text-sm md:text-base text-center text-[#000] pt-4">
 								By signing up, you confirm that you have read and agree to our{" "}
 								<Link href="#" className="text-[#FD5C02] underline">

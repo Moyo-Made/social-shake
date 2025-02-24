@@ -90,9 +90,9 @@ export default function ContestForm() {
 								Contest Rules
 							</label>
 							<Textarea
-								className="mt-1"
+								className="mt-1 placeholder:w-[300px]"
 								rows={5}
-								placeholder="• Content must meet all brand guidelines (duration, aspect ratio, tone).&#10;• Only original content will be accepted—no copyrighted material."
+								placeholder="• Content must meet all brand guidelines (duration, aspect ratio, tone). • Only original content will be accepted—no copyrighted material."
 							/>
 							<ul className="list-disc pl-5 text-sm text-gray-600">
 								<li>
