@@ -13,8 +13,8 @@ import Link from "next/link";
 
 const Login = () => {
   // const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoading] = useState(false);
+  const [error] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
