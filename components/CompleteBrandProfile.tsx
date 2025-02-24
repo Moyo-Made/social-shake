@@ -22,7 +22,7 @@ const BrandProfileForm = () => {
 	const [dragActive, setDragActive] = useState(false);
 	const [selected, setSelected] = useState("");
 
-	const handleDrag = (e: {
+ const handleDrag = (e: {
 		preventDefault: () => void;
 		stopPropagation: () => void;
 		type: string;
