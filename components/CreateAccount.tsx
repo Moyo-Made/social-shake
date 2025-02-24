@@ -38,46 +38,46 @@ const CreateAccount = () => {
 		});
 	};
 	
-	const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
-		e.preventDefault();
-		setIsLoading(true);
-		setError(null);
+	// const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
+	// 	e.preventDefault();
+	// 	setIsLoading(true);
+	// 	setError(null);
 	
-		// Validate form data
-		if (!formData.email || !formData.password || !formData.firstName || !formData.lastName) {
-			setError("All fields are required");
-			setIsLoading(false);
-			return;
-		}
+	// 	// Validate form data
+	// 	if (!formData.email || !formData.password || !formData.firstName || !formData.lastName) {
+	// 		setError("All fields are required");
+	// 		setIsLoading(false);
+	// 		return;
+	// 	}
 	
-		try {
-			const result = await signIn("credentials", {
-				email: formData.email,
-				password: formData.password,
-				firstName: formData.firstName,
-				lastName: formData.lastName,
-				isSignUp: "true",
-				redirect: false,
-				callbackUrl: "/dashboard"
-			});
+	// 	try {
+	// 		const result = await signIn("credentials", {
+	// 			email: formData.email,
+	// 			password: formData.password,
+	// 			firstName: formData.firstName,
+	// 			lastName: formData.lastName,
+	// 			isSignUp: "true",
+	// 			redirect: false,
+	// 			callbackUrl: "/dashboard"
+	// 		});
 	
-			console.log("SignIn result:", result);
+	// 		console.log("SignIn result:", result);
 	
-			if (result?.error) {
-				setError(result.error);
-				return;
-			}
+	// 		if (result?.error) {
+	// 			setError(result.error);
+	// 			return;
+	// 		}
 	
-			if (result?.ok) {
-				router.push("/dashboard");
-			}
-		} catch (error: any) {
-			console.error("Signup error:", error);
-			setError(error.message || "Failed to create account");
-		} finally {
-			setIsLoading(false);
-		}
-	};
+	// 		if (result?.ok) {
+	// 			router.push("/dashboard");
+	// 		}
+	// 	} catch (error: any) {
+	// 		console.error("Signup error:", error);
+	// 		setError(error.message || "Failed to create account");
+	// 	} finally {
+	// 		setIsLoading(false);
+	// 	}
+	// };
 
 	return (
 		<main className="relative min-h-screen overflow-y-auto">

@@ -46,8 +46,8 @@ const Login = () => {
       }
 
       router.push("/dashboard");
-    } catch (error: any) {
-      setError(error.message);
+    } catch (error) {
+      setError("An error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -80,7 +80,7 @@ const Login = () => {
               Welcome Back
             </h1>
             <p className="w-full mb-5 text-sm md:text-base text-[#000] font-normal">
-              Log in to connect with creators and track your brand's success.
+              Log in to connect with creators and track your brand&#39;s success.
             </p>
           </CardHeader>
 
