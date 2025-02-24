@@ -1,11 +1,38 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Textarea } from "@/components/ui/textarea";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { HelpCircle, Plus, Trash2 } from "lucide-react";
 import React, { useState } from "react";
 
 const Requirements = () => {
 	const [selected, setSelected] = useState("");
+	const [links, setLinks] = useState([""]);
+
+	const addNewLink = () => {
+		setLinks([...links, ""]);
+	};
+
+	const removeLink = (index: number) => {
+		if (index === 0) return;
+		const newLinks = links.filter((_, i) => i !== index);
+		setLinks(newLinks);
+	};
+
+	const updateLink = (index: number, value: string) => {
+		const newLinks = [...links];
+		newLinks[index] = value;
+		setLinks(newLinks);
+	};
 	return (
 		<div className="flex flex-col space-y-5">
 			<div className="flex flex-col">
@@ -104,7 +131,9 @@ const Requirements = () => {
 							id="client-script"
 							className="data-[state=checked]:bg-[#FD5C02] border border-gray-100 text-white"
 						/>
-						<Label htmlFor="client-script" className="text-[#1A1A1A]">Client&#39;s Script</Label>
+						<Label htmlFor="client-script" className="text-[#1A1A1A]">
+							Client&#39;s Script
+						</Label>
 					</div>
 
 					<div
@@ -116,9 +145,82 @@ const Requirements = () => {
 							id="creator-script"
 							className="data-[state=checked]:bg-[#FD5C02] border border-gray-100 text-white"
 						/>
-						<Label htmlFor="creator-script" className="text-[#1A1A1A]">Creator&#39;s Script</Label>
+						<Label htmlFor="creator-script" className="text-[#1A1A1A]">
+							Creator&#39;s Script
+						</Label>
 					</div>
 				</RadioGroup>
+
+				<div className="mt-2">
+					<Label className="text-[15px]">Write your Script</Label>
+					<Textarea
+						className="mt-1 placeholder:text-[#667085] font-normal"
+						rows={5}
+						placeholder="We’re looking for an energetic and engaging TikTok ad for XYZ Shoes. Highlight comfort and style, and encourage users to try them out!"
+					/>
+				</div>
+			</div>
+
+			<div className="space-y-4">
+				<Label className="text-base">Links of Contents you like</Label>
+
+				{links.map((link, index) => (
+					<div key={index} className="flex gap-2">
+						<Input
+							type="text"
+							value={link}
+							onChange={(e) => updateLink(index, e.target.value)}
+							placeholder="https://vt.tiktok.com/ZS6KEanvB/"
+							className="flex-1"
+						/>
+						<div className="flex gap-2">
+							{index === links.length - 1 && (
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									onClick={addNewLink}
+								>
+									<Plus className="h-4 w-4" />
+								</Button>
+							)}
+							{index !== 0 && (
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									onClick={() => removeLink(index)}
+								>
+									<Trash2 className="h-4 w-4" />
+								</Button>
+							)}
+						</div>
+					</div>
+				))}
+			</div>
+
+			<div className="space-y-2">
+				<Label className="text-base">Brand Assets</Label>
+				<div className="flex gap-2">
+					<Input
+						type="text"
+						placeholder="https://drive.google.com/file/d/1l31B5fb21SJf5P9LWNKW-pAF7kN7knTX/view?usp=sharing"
+					/>
+					
+					<TooltipProvider>
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<Button variant="ghost" size="icon">
+									<HelpCircle className="h-4 w-4" />
+								</Button>
+							</TooltipTrigger>
+							<TooltipContent>
+								<p>Paste the Link of a folder containing your brand assets</p>
+							</TooltipContent>
+						</Tooltip>
+					</TooltipProvider>
+				</div>
+				<p className="text-sm text-[#475467]">Paste the Link of a folder containing your brand assets</p>
 			</div>
 		</div>
 	);
