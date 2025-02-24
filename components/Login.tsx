@@ -8,11 +8,11 @@ import { Input } from "./ui/input";
 import { FaArrowRight } from "react-icons/fa6";
 import { Label } from "./ui/label";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+// import { signIn } from "next-auth/react";
+// import { useRouter } from "next/navigation";
 
 const Login = () => {
-  const router = useRouter();
+  // const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -27,31 +27,31 @@ const Login = () => {
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
+  // const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  //   e.preventDefault();
+  //   setIsLoading(true);
+  //   setError(null);
 
-    try {
-      const result = await signIn("credentials", {
-        email: formData.email,
-        password: formData.password,
-        isSignUp: "false",
-        redirect: false,
-      });
+  //   try {
+  //     const result = await signIn("credentials", {
+  //       email: formData.email,
+  //       password: formData.password,
+  //       isSignUp: "false",
+  //       redirect: false,
+  //     });
 
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
+  //     if (result?.error) {
+  //       setError(result.error);
+  //       return;
+  //     }
 
-      router.push("/dashboard");
-    } catch (error) {
-      console.error("An error occurred. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  //     router.push("/dashboard");
+  //   } catch (error) {
+  //     setError("An error occurred. Please try again.");
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
 
   return (
     <main className="relative overflow-hidden min-h-screen">
@@ -85,7 +85,7 @@ const Login = () => {
           </CardHeader>
 
           <CardContent className="space-y-3 md:space-y-4">
-            <form onSubmit={handleSubmit}>
+            <form >
               <div className="space-y-1">
                 <Label htmlFor="email" className="text-sm md:text-lg font-medium">
                   Email*
@@ -121,10 +121,10 @@ const Login = () => {
                   isLoading ? "opacity-50 cursor-not-allowed" : ""
                 }`}
               >
-                <span className="flex items-center">
-                  {isLoading ? "Logging in..." : "Log In"}
+                <Link href="/" className="flex items-center">
+                  Log in
                   <FaArrowRight className="w-5 h-5 ml-2" />
-                </span>
+                </Link>
               </Button>
 
               {error && (

@@ -251,6 +251,3 @@ const CreateAccount = () => {
 };
 
 export default CreateAccount;
-function validateForm() {
-	throw new Error("Function not implemented.");
-}
