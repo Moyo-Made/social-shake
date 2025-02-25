@@ -12,7 +12,7 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { HelpCircle, Plus, Trash2 } from "lucide-react";
-import React, { useEffect } from "react";
+import React from "react";
 import { useContestForm } from "./ContestFormContext";
 
 const Requirements = () => {

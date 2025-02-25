@@ -110,7 +110,7 @@ export const ContestFormProvider: React.FC<{children: React.ReactNode}> = ({ chi
       
       // Convert File object to a string representation of the filename
       if (formData.basic.thumbnail) {
-        // @ts-ignore - we're just saving the filename for display purposes
+        // @ts-expect-error - we're just saving the filename for display purposes
         dataToSave.basic.thumbnailName = formData.basic.thumbnail.name;
       }
       
