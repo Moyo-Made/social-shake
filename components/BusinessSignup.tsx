@@ -7,8 +7,6 @@ import Image from "next/image";
 import Link from "next/link";
 
 const BusinessSignup = () => {
-	
-
 	return (
 		<main className="relative overflow-hidden min-h-screen">
 			<div className="absolute inset-0">

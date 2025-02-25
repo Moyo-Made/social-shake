@@ -34,7 +34,7 @@ const SignUpComplete = () => {
 						<Button className="w-full bg-[#FD5C02] hover:bg-orange-600 text-white text-[17px] py-5 font-normal">
 							<Link href="/dashboard" className="flex">
 								<p>Explore Dashboard</p>{" "}
-								<FaArrowRight className="w-5 h-5 ml-2 mt-1" />
+								<FaArrowRight className="w-5 h-5 ml-2 mt-1.5" />
 							</Link>
 						</Button>
 					</CardContent>

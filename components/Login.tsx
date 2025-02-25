@@ -123,7 +123,7 @@ const Login = () => {
               >
                 <Link href="/" className="flex items-center">
                   Log in
-                  <FaArrowRight className="w-5 h-5 ml-2" />
+                  <FaArrowRight className="w-5 h-5 ml-2 mt-0.5" />
                 </Link>
               </Button>
 
