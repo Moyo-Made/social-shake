@@ -1,5 +1,4 @@
-
-export type CriteriaType = 'views' | 'likes' | 'impressions';
+export type CriteriaType = "views" | "likes" | "impressions";
 
 export interface PrizePoolProps {
   totalBudget: number;

@@ -12,27 +12,50 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { HelpCircle, Plus, Trash2 } from "lucide-react";
-import React, { useState } from "react";
+import React, { useEffect } from "react";
+import { useContestForm } from "./ContestFormContext";
 
 const Requirements = () => {
-	const [selected, setSelected] = useState("");
-	const [links, setLinks] = useState([""]);
+	const { formData, updateRequirementsData } = useContestForm();
+	const { whoCanJoin, duration, videoType, script, contentLinks, brandAssets } = formData.requirements;
+
+	const updateWhoCanJoin = (value: string) => {
+		updateRequirementsData({ whoCanJoin: value });
+	};
+
+	const updateDuration = (value: string) => {
+		updateRequirementsData({ duration: value });
+	};
+
+	const updateVideoType = (value: string) => {
+		updateRequirementsData({ videoType: value });
+	};
+
+	const updateScript = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+		updateRequirementsData({ script: e.target.value });
+	};
 
 	const addNewLink = () => {
-		setLinks([...links, ""]);
+		const newLinks = [...contentLinks, ""];
+		updateRequirementsData({ contentLinks: newLinks });
 	};
 
 	const removeLink = (index: number) => {
 		if (index === 0) return;
-		const newLinks = links.filter((_, i) => i !== index);
-		setLinks(newLinks);
+		const newLinks = contentLinks.filter((_, i) => i !== index);
+		updateRequirementsData({ contentLinks: newLinks });
 	};
 
 	const updateLink = (index: number, value: string) => {
-		const newLinks = [...links];
+		const newLinks = [...contentLinks];
 		newLinks[index] = value;
-		setLinks(newLinks);
+		updateRequirementsData({ contentLinks: newLinks });
 	};
+
+	const updateBrandAssets = (e: React.ChangeEvent<HTMLInputElement>) => {
+		updateRequirementsData({ brandAssets: e.target.value });
+	};
+
 	return (
 		<div className="flex flex-col space-y-5">
 			<div className="flex flex-col">
@@ -44,13 +67,13 @@ const Requirements = () => {
 
 				<RadioGroup
 					className="flex flex-wrap gap-3 mt-2"
-					value={selected}
-					onValueChange={setSelected}
+					value={whoCanJoin}
+					onValueChange={updateWhoCanJoin}
 				>
 					<div
 						className="flex items-center space-x-2 cursor-pointer text-[#667085] border-[#667085] border px-4 py-2 rounded-md data-[state=checked]:bg-[#FD5C02] data-[state=checked]:text-white data-[state=checked]:border-none"
 						data-state={
-							selected === "allow-applications" ? "checked" : "unchecked"
+							whoCanJoin === "allow-applications" ? "checked" : "unchecked"
 						}
 					>
 						<RadioGroupItem
@@ -64,7 +87,7 @@ const Requirements = () => {
 					<div
 						className="flex items-center space-x-2 cursor-pointer text-[#667085] border border-[#667085] px-4 py-2 rounded-md data-[state=checked]:bg-[#FD5C02] data-[state=checked]:text-white data-[state=checked]:border-none"
 						data-state={
-							selected === "allow-all-creators" ? "checked" : "unchecked"
+							whoCanJoin === "allow-all-creators" ? "checked" : "unchecked"
 						}
 					>
 						<RadioGroupItem
@@ -81,12 +104,12 @@ const Requirements = () => {
 				<Label className="text-base">Duration ?</Label>
 				<RadioGroup
 					className="flex flex-wrap gap-3 mt-2"
-					value={selected}
-					onValueChange={setSelected}
+					value={duration}
+					onValueChange={updateDuration}
 				>
 					<div
 						className="flex items-center space-x-2 cursor-pointer text-[#667085] border-[#667085] border px-4 py-2 rounded-md data-[state=checked]:bg-[#FD5C02] data-[state=checked]:text-white data-[state=checked]:border-none"
-						data-state={selected === "15-seconds" ? "checked" : "unchecked"}
+						data-state={duration === "15-seconds" ? "checked" : "unchecked"}
 					>
 						<RadioGroupItem value="15-seconds" id="15-seconds" className="" />
 						<Label htmlFor="15-seconds">15 Seconds</Label>
@@ -94,7 +117,7 @@ const Requirements = () => {
 
 					<div
 						className="flex items-center space-x-2 cursor-pointer text-[#667085] border-[#667085] border px-4 py-2 rounded-md data-[state=checked]:bg-[#FD5C02] data-[state=checked]:text-white data-[state=checked]:border-none"
-						data-state={selected === "30-seconds" ? "checked" : "unchecked"}
+						data-state={duration === "30-seconds" ? "checked" : "unchecked"}
 					>
 						<RadioGroupItem value="30-seconds" id="30-seconds" className="" />
 						<Label htmlFor="30-seconds">30 Seconds</Label>
@@ -102,7 +125,7 @@ const Requirements = () => {
 
 					<div
 						className="flex items-center space-x-2 cursor-pointer text-[#667085] border-[#667085] border px-4 py-2 rounded-md data-[state=checked]:bg-[#FD5C02] data-[state=checked]:text-white data-[state=checked]:border-none"
-						data-state={selected === "60-seconds" ? "checked" : "unchecked"}
+						data-state={duration === "60-seconds" ? "checked" : "unchecked"}
 					>
 						<RadioGroupItem value="60-seconds" id="60-seconds" className="" />
 						<Label htmlFor="60-seconds">60 Seconds</Label>
@@ -119,12 +142,12 @@ const Requirements = () => {
 
 				<RadioGroup
 					className="flex flex-wrap gap-3 mt-2"
-					value={selected}
-					onValueChange={setSelected}
+					value={videoType}
+					onValueChange={updateVideoType}
 				>
 					<div
 						className="flex items-center space-x-2 cursor-pointer text-[#000]"
-						data-state={selected === "client-script" ? "checked" : "unchecked"}
+						data-state={videoType === "client-script" ? "checked" : "unchecked"}
 					>
 						<RadioGroupItem
 							value="client-script"
@@ -138,7 +161,7 @@ const Requirements = () => {
 
 					<div
 						className="flex items-center space-x-2 cursor-pointer"
-						data-state={selected === "creator-script" ? "checked" : "unchecked"}
+						data-state={videoType === "creator-script" ? "checked" : "unchecked"}
 					>
 						<RadioGroupItem
 							value="creator-script"
@@ -156,7 +179,9 @@ const Requirements = () => {
 					<Textarea
 						className="mt-1 placeholder:text-[#667085] font-normal"
 						rows={5}
-						placeholder="We’re looking for an energetic and engaging TikTok ad for XYZ Shoes. Highlight comfort and style, and encourage users to try them out!"
+						placeholder="We're looking for an energetic and engaging TikTok ad for XYZ Shoes. Highlight comfort and style, and encourage users to try them out!"
+						value={script}
+						onChange={updateScript}
 					/>
 				</div>
 			</div>
@@ -164,7 +189,7 @@ const Requirements = () => {
 			<div className="space-y-4">
 				<Label className="text-base">Links of Contents you like</Label>
 
-				{links.map((link, index) => (
+				{contentLinks.map((link, index) => (
 					<div key={index} className="flex gap-2">
 						<Input
 							type="text"
@@ -174,7 +199,7 @@ const Requirements = () => {
 							className="flex-1"
 						/>
 						<div className="flex gap-2">
-							{index === links.length - 1 && (
+							{index === contentLinks.length - 1 && (
 								<Button
 									type="button"
 									variant="ghost"
@@ -205,6 +230,8 @@ const Requirements = () => {
 					<Input
 						type="text"
 						placeholder="https://drive.google.com/file/d/1l31B5fb21SJf5P9LWNKW-pAF7kN7knTX/view?usp=sharing"
+						value={brandAssets}
+						onChange={updateBrandAssets}
 					/>
 					
 					<TooltipProvider>

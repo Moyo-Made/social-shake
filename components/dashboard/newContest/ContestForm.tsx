@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-
 import Image from "next/image";
 import Basic from "./Basic";
 import Requirements from "./Requirements";
@@ -10,10 +9,16 @@ import PrizeTimeline from "./PrizeTimeline";
 import Review from "./Review";
 import { MdOutlinePayment } from "react-icons/md";
 import { useRouter } from "next/navigation";
+import { ContestFormProvider, useContestForm } from "./ContestFormContext";
+import { CheckCircle2 } from "lucide-react";
 
-export default function ContestForm() {
+// Inner component that uses the context
+const ContestFormContent = () => {
 	const [step, setStep] = useState(1);
 	const router = useRouter();
+	const { saveDraft, draftSaved, formData } = useContestForm();
+
+	const { prizeTimeline } = formData;
 
 	const handleSubmit = () => {
 		router.push("/payment-successful");
@@ -69,12 +74,23 @@ export default function ContestForm() {
 				</div>
 			)}
 			<div className="flex justify-between">
-				<Button
-					onClick={() => {}}
-					className="mt-4 bg-gray-500 hover:bg-gray-600 px-4 py-2 text-white text-base"
-				>
-					Save Draft
-				</Button>
+				<div className="relative">
+					<Button
+						onClick={saveDraft}
+						className="mt-4 bg-gray-500 hover:bg-gray-600 px-4 py-2 text-white text-base"
+					>
+						Save Draft
+					</Button>
+
+					{draftSaved && (
+						<div className="absolute -top-8 left-0 px-3 py-1 bg-green-100 border border-green-300 rounded-md flex items-center gap-1">
+							<CheckCircle2 className="w-4 h-4 text-green-500" />
+							<span className="text-sm text-green-600">
+								Draft saved successfully!
+							</span>
+						</div>
+					)}
+				</div>
 
 				<div className="flex gap-2">
 					{step > 1 && (
@@ -98,11 +114,20 @@ export default function ContestForm() {
 							onClick={handleSubmit}
 							className="mt-4 bg-[#000] hover:bg-[#141414] text-white text-base py-2 font-normal"
 						>
-							<MdOutlinePayment size={30} /> Pay $1500
+							<MdOutlinePayment size={30} /> Pay $
+							{prizeTimeline.totalBudget.toLocaleString()}
 						</Button>
 					)}
 				</div>
 			</div>
 		</div>
+	);
+};
+
+export default function ContestForm() {
+	return (
+		<ContestFormProvider>
+			<ContestFormContent />
+		</ContestFormProvider>
 	);
 }
