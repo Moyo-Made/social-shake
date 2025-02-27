@@ -82,7 +82,7 @@ const NewContestSideNavLayout: React.FC<{ children: React.ReactNode }> = ({ chil
       <h1 className="text-xl font-semibold">New Contest</h1>
       <div className="flex items-center space-x-4">
         <Image src="/icons/notification.svg" alt="Notifications" width={20} height={20} />
-        <div className="w-8 h-8 bg-orange-500 rounded-full"></div>
+        <Image src="/icons/profile-icon.svg" alt="Profile" width={30} height={30} />
       </div>
     </header>
     <div className="flex-1 w-full overflow-y-auto">

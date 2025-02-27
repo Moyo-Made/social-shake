@@ -33,7 +33,7 @@ const PaymentSuccessful = () => {
 					<CardContent>
 						{/* Submit Button */}
 						<Button className="flex justify-center items-center bg-[#FD5C02] hover:bg-orange-600 text-white text-[17px] py-5 font-normal mx-auto">
-							<Link href="/complete-profile" className="flex">
+							<Link href="/dashboard/contests" className="flex">
 								<p>View Contest</p>{" "}
 								<FaArrowRight className="w-5 h-5 ml-2 mt-1.5" />
 							</Link>
