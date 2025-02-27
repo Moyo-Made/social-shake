@@ -149,7 +149,7 @@ export default function ContestDetailPage() {
 
 							<div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
 								<h3 className="text-base text-[#667085] mb-2">
-									Client's Script
+									Client&apos;s Script
 								</h3>
 								<div className="space-y-2">
 									{contestData.clientScript.map((line, index) => (

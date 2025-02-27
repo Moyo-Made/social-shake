@@ -129,7 +129,7 @@ const ContestDashboard = () => {
 	// Initialize filtered contests with all contests
 	useEffect(() => {
 		setFilteredContests(initialContests);
-	}, []);
+	});
 
 	return (
 		<div className="bg-orange-50 p-4 min-h-screen">

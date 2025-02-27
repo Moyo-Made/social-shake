@@ -8,14 +8,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table";
 import { Check, Search } from "lucide-react";
 
 const Applications = () => {
@@ -95,7 +87,7 @@ const Applications = () => {
 	const handleSort = (value: React.SetStateAction<string>) => {
 		setSortOrder(value);
 
-		let sortedCreators = [...creators];
+		const sortedCreators = [...creators];
 
 		if (value === "date-asc") {
 			sortedCreators.sort(
