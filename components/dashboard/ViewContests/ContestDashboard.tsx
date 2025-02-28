@@ -72,11 +72,6 @@ const ContestDashboard = () => {
 		},
 	];
 
-	// Apply filters whenever any filter changes
-	useEffect(() => {
-		applyFilters();
-	});
-
 	// Function to apply all filters
 	const applyFilters = () => {
 		let result = [...initialContests];
