@@ -1,6 +1,7 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 
 interface MenuItemProps {
 	icon: React.ReactNode;
@@ -142,6 +143,22 @@ const SideNav: React.FC = () => {
 					}
 					text="Help & Support"
 				/>
+				<div className="flex items-center justify-between text-white pt-3">
+					<div className="flex items-center gap-3">
+						<div className="h-10 w-10 overflow-hidden ">
+							<img
+								src="/icons/social-shake-profile.svg"
+								alt="Social Shake Profile"
+								className="w-full h-full object-cover"
+							/>
+						</div>
+						<div>
+							<h2 className="text-base font-bold">Social Shake</h2>
+							<p className="text-gray-300 text-sm">sociashake@gmail.com</p>
+						</div>
+					</div>
+					<ChevronDown className="h-4 w-4 text-gray-300" />
+				</div>
 			</div>
 		</div>
 	);
@@ -163,12 +180,15 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 							width={20}
 							height={20}
 						/>
-						<Image
-							src="/icons/profile-icon.svg"
-							alt="Profile"
-							width={30}
-							height={30}
-						/>
+						<div className="flex gap-2">
+							<Image
+								src="/icons/profile-icon.svg"
+								alt="Profile"
+								width={30}
+								height={30}
+							/>
+							<ChevronDown className="h-4 w-4 text-gray-600 mt-1.5" />
+						</div>
 					</div>
 				</header>
 				<div className="flex-1 flex items-center justify-center w-full">

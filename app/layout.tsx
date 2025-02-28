@@ -40,14 +40,10 @@ export default function RootLayout({
 	children: React.ReactNode;
 }>) {
 	return (
-		
 		<html lang="en">
 			<body className={`${inter.variable} ${satoshi.variable}`}>
-
 				{children}
-s
 			</body>
 		</html>
-		
 	);
 }

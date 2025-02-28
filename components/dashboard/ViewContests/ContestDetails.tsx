@@ -6,6 +6,8 @@ import { CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import Applications from "./Applications";
+import AnalyticsDashboard from "./Metrics";
+import Leaderboard from "./Leaderboard";
 
 export default function ContestDetailPage() {
 	const [activeTab, setActiveTab] = useState("contest-overview");
@@ -60,9 +62,7 @@ export default function ContestDetailPage() {
 			</div>
 
 			<div className="flex gap-6 mb-6 mt-10">
-				<div
-					className="flex flex-col w-full"
-				>
+				<div className="flex flex-col w-full">
 					<div className="flex gap-2 mb-6">
 						<div className="flex items-center gap-1">
 							<span className="text-base text-[#FD5C02]">Start Date:</span>
@@ -82,7 +82,6 @@ export default function ContestDetailPage() {
 						defaultValue="contest-overview"
 						className=""
 						onValueChange={(value) => setActiveTab(value)}
-						
 					>
 						<TabsList className="grid grid-cols-4 mb-8 bg-transparent p-0 gap-0 w-[85%]">
 							<TabsTrigger
@@ -189,17 +188,15 @@ export default function ContestDetailPage() {
 						</TabsContent>
 
 						<TabsContent value="applications" className="w-full">
-							<div className="text-center text-gray-500">
-								<Applications />
-							</div>
+							<Applications />
 						</TabsContent>
 
 						<TabsContent value="available-metrics">
-							<div className="p-8 text-center text-gray-500">Coming Soon</div>
+							<AnalyticsDashboard />
 						</TabsContent>
 
 						<TabsContent value="leaderboard">
-							<div className="p-8 text-center text-gray-500">Coming Soon</div>
+							<Leaderboard />
 						</TabsContent>
 					</Tabs>
 				</div>
