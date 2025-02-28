@@ -346,7 +346,7 @@ My videos maintain a balance between being entertaining and informative, which h
 					<h3 className="text-lg font-medium mb-4">Confirm Rejection</h3>
 					<p className="text-gray-600 mb-6">
 						Are you sure you want to reject this application? The creator will
-						be notified, and they won't be able to participate in the contest.
+						be notified, and they won&apos;t be able to participate in the contest.
 					</p>
 					<div className="flex justify-end space-x-3">
 						<Button

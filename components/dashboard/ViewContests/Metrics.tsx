@@ -1,9 +1,6 @@
 import React, { useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-	LineChart,
-	Line,
 	XAxis,
 	YAxis,
 	ResponsiveContainer,
@@ -12,7 +9,6 @@ import {
 	Area,
 	CartesianGrid,
 } from "recharts";
-import { Users, Eye, Heart, MessageCircle } from "lucide-react";
 import Image from "next/image";
 
 export default function AnalyticsDashboard() {
