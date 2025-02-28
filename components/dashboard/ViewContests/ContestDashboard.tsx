@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, SetStateAction } from "react";
+import { useState, SetStateAction } from "react";
 import { Search } from "lucide-react";
 import {
 	Select,
