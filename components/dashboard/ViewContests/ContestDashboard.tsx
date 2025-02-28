@@ -6,9 +6,9 @@ import {
 	Select,
 	SelectItem,
 	SelectTrigger,
+	SelectContent,
 	SelectValue,
 } from "@/components/ui/select";
-import { SelectContent } from "@radix-ui/react-select";
 import { Input } from "@/components/ui/input";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
