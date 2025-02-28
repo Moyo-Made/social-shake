@@ -126,11 +126,6 @@ const ContestDashboard = () => {
 		setSearchTerm(e.target.value);
 	};
 
-	// Initialize filtered contests with all contests
-	useEffect(() => {
-		setFilteredContests(initialContests);
-	});
-
 	return (
 		<div className="bg-orange-50 p-4 min-h-screen">
 			{/* Header with search and filters */}
@@ -337,7 +332,7 @@ const ContestDashboard = () => {
 						</Link>
 					))
 				) : (
-					<div className="col-span-2 text-center py-8 bg-white rounded-lg">
+					<div className="col-span-2 text-center py-8 rounded-lg">
 						<p className="text-gray-500">No contests match your filters</p>
 					</div>
 				)}
