@@ -10,6 +10,7 @@ const defaultFormData: ContestFormData = {
     description: "",
     rules: "",
     thumbnail: null,
+    contestType: "leaderboard"
   },
   requirements: {
     whoCanJoin: "allow-applications",
@@ -27,6 +28,7 @@ const defaultFormData: ContestFormData = {
     endDate: undefined,
     criteria: "views",
   },
+  contestType: undefined
 };
 
 // Create the context

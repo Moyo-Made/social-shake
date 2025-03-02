@@ -1,6 +1,7 @@
 import React from "react";
 import { ArrowRight } from "lucide-react";
 import Image from "next/image";
+import CountdownTimer from "./CountdownTimer";
 
 const Leaderboard = () => {
 	// Mock data for top contestants
@@ -60,8 +61,12 @@ const Leaderboard = () => {
 		3: { cardBg: "#F7E6D8", borderColor: "#CF9C69" },
 	};
 
+	 const contestEndDate = "2025-03-20T12:00:00"; 
+// "2023-12-31T23:59:59Z"
+
 	return (
 		<div className="w-full max-w-4xl mx-auto">
+			<CountdownTimer targetDate={contestEndDate}  />
 			{/* Top 3 Cards Section */}
 			<div className="flex flex-wrap justify-center gap-4 mb-6">
 				{topContestants.map((contestant) => (

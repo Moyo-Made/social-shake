@@ -31,6 +31,7 @@ const ContestDashboard = () => {
 			startDate: "March 20, 2025",
 			endDate: "March 26, 2026",
 			rankingMethod: "Total Likes",
+			contestType: "Leaderboard",
 			contestants: 20,
 			metrics: { views: "1.1k", likes: 304, comments: 50 },
 		},
@@ -42,6 +43,7 @@ const ContestDashboard = () => {
 			startDate: "Not Set",
 			endDate: "Not Set",
 			rankingMethod: "Not Set",
+			contestType: "Leaderboard",
 			contestants: "-",
 			metrics: { views: 0, likes: 0, comments: 0 },
 		},
@@ -53,6 +55,7 @@ const ContestDashboard = () => {
 			startDate: "March 20, 2025",
 			endDate: "March 26, 2025",
 			rankingMethod: "Impressions",
+			contestType: "Leaderboard",
 			contestants: 33,
 			metrics: { views: "20.2k", likes: "4.2k", comments: 200 },
 		},
@@ -64,6 +67,7 @@ const ContestDashboard = () => {
 			startDate: "March 20, 2025",
 			endDate: "March 26, 2025",
 			rankingMethod: "Impressions",
+			contestType: "Leaderboard",
 			applicationType: "Applications",
 			applications: 10,
 			metrics: { views: 0, likes: 0, comments: 0 },
@@ -130,7 +134,7 @@ const ContestDashboard = () => {
 	}, [searchTerm, statusFilter, budgetFilter, rankingFilter]);
 
 	return (
-		<div className="bg-orange-50 p-4 min-h-screen">
+		<div className="bg-orange-50 p-4 min-h-screen w-full">
 			{/* Header with search and filters */}
 			<div className="flex justify-between mb-4">
 				<div className="relative">
@@ -282,8 +286,8 @@ const ContestDashboard = () => {
 
 								<div className="grid grid-cols-3 gap-4 mt-3">
 									<div>
-										<p className="text-xs text-[#475467]">Ranking Method</p>
-										<p className="text-sm">{contest.rankingMethod}</p>
+										<p className="text-xs text-[#475467]">Contest Type</p>
+										<p className="text-sm">{contest.contestType}</p>
 									</div>
 									<div>
 										<p className="text-xs text-[#475467]">

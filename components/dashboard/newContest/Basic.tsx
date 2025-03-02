@@ -13,10 +13,17 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 import React, { useState, useEffect } from "react";
 import { useContestForm } from "./ContestFormContext";
+import ContestTypeSelector from "./ContestType";
 
 const Basic = () => {
 	const { formData, updateBasicData } = useContestForm();
 	const { contestName, industry, description, rules, thumbnail } = formData.basic;
+
+	const handleContestTypeSelect = (type: "leaderboard" | "gmv") => {
+        if (updateBasicData) {
+            updateBasicData({ contestType: type });
+        }
+    };
 	
 	const [selectedFile, setSelectedFile] = useState<File | null>(thumbnail);
 	const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -88,7 +95,7 @@ const Basic = () => {
 
 	return (
 		<div>
-			<label className="block text-sm font-medium text-gray-700">
+			<label className="block text-base font-medium text-gray-700">
 				Contest Name
 			</label>
 			<Input 
@@ -97,8 +104,13 @@ const Basic = () => {
 				value={contestName}
 				onChange={handleNameChange}
 			/>
+			
+			<ContestTypeSelector 
+          onTypeSelect={handleContestTypeSelect} 
+          defaultSelected={formData.contestType} 
+        />
 
-			<label className="block text-sm font-medium text-gray-700 mt-4">
+			<label className="block text-base font-medium text-gray-700 mt-4 mb-1">
 				Contest Industry
 			</label>
 			<Select value={industry} onValueChange={handleIndustryChange}>
@@ -113,7 +125,7 @@ const Basic = () => {
 				</SelectContent>
 			</Select>
 
-			<label className="block text-sm font-medium text-gray-700 mt-4">
+			<label className="block text-base font-medium text-gray-700 mt-4">
 				Contest Description
 			</label>
 			<Textarea
@@ -124,7 +136,7 @@ const Basic = () => {
 				onChange={handleDescriptionChange}
 			/>
 
-			<label className="block text-sm font-medium text-gray-700 mt-4">
+			<label className="block text-base font-medium text-gray-700 mt-4">
 				Contest Rules
 			</label>
 			<Textarea
@@ -135,7 +147,7 @@ const Basic = () => {
 				onChange={handleRulesChange}
 			/>
 
-			<label className="block text-sm font-medium text-gray-700 mt-4">
+			<label className="block text-base font-medium text-gray-700 mt-4 mb-1">
 				Contest Thumbnail
 			</label>
 			<div

@@ -61,79 +61,9 @@ const PrizeTimeline = () => {
 	return (
 		<div className="max-w-[44rem] mx-auto">
 			<div className="space-y-6">
-				{/* Prize Pool Section */}
+				{/* Contest Duration*/}
 				<div className="border border-[#FFBF9B] rounded-xl p-6">
-					<h2 className="text-xl font-semibold mb-4">Prize Pool</h2>
-					<div className="flex gap-10">
-						<div className="space-y-4 flex-1">
-							<div>
-								<Label>Total Budget & Prize Pool</Label>
-								<Input
-									type="number"
-									min={1500}
-									value={totalBudget}
-									onChange={handleTotalBudgetChange}
-									placeholder="$ 1,500.00"
-									className="mt-2"
-								/>
-								<p className="text-sm text-gray-500 mt-1">
-									This is the total amount you intend to spend (Min: $1,500)
-								</p>
-							</div>
-							<div>
-								<Label>How many Winners?</Label>
-								<Input
-									type="number"
-									min={1}
-									max={5}
-									value={winnerCount}
-									onChange={handleWinnerCountChange}
-									className="w-20 mt-2"
-								/>
-							</div>
-						</div>
-						<div className="space-y-4 flex-1">
-							<Label>Prize Breakdown</Label>
-							{positions.slice(0, winnerCount).map((value, index) => (
-								<div key={index} className="flex items-center gap-2">
-									<span className="w-24">
-										{index + 1}
-										{index === 0
-											? "st"
-											: index === 1
-											? "nd"
-											: index === 2
-											? "rd"
-											: "th"}{" "}
-										Position:
-									</span>
-									<span className="font-medium">$</span>
-									<Input
-										type="number"
-										value={value}
-										onChange={(e) =>
-											handlePositionChange(index, e.target.value)
-										}
-										className="w-24"
-										placeholder={`${
-											index === 0
-												? "1000"
-												: index === 1
-												? "300"
-												: index === 2
-												? "100"
-												: "50"
-										}`}
-									/>
-								</div>
-							))}
-						</div>
-					</div>
-				</div>
-
-				{/* Timeline Section */}
-				<div className="border border-[#FFBF9B] rounded-xl p-6">
-					<h2 className="text-xl font-semibold mb-4">Timeline</h2>
+					<h2 className="text-lg font-medium mb-4">Contest Duration</h2>
 					<div className="flex flex-col gap-5">
 						<div className="space-x-10 flex">
 							<div>
@@ -237,8 +167,90 @@ const PrizeTimeline = () => {
 										<RadioGroupItem value="impressions" id="impressions" />
 										<Label htmlFor="impressions">Impressions</Label>
 									</div>
+
+									<div
+										className="flex items-center space-x-2 cursor-pointer text-[#667085] border-[#667085] border px-4 py-2 rounded-md data-[state=checked]:bg-[#FD5C02] data-[state=checked]:text-white data-[state=checked]:border-none"
+										data-state={
+											criteria === "gmv-sales" ? "checked" : "unchecked"
+										}
+									>
+										<RadioGroupItem value="gmv-sales" id="gmv-sales" />
+										<Label htmlFor="gmv-sales">GMV Sales</Label>
+									</div>
 								</RadioGroup>
 							</div>
+						</div>
+					</div>
+				</div>
+
+				{/* Total Budget & Prize Pool */}
+				<div className="border border-[#FFBF9B] rounded-xl p-6">
+					<div className="flex gap-20">
+						<div className="space-y-4 flex-1">
+							<div>
+								<Label className="text-base text-[#1A1A1A]">
+									Total Budget & Prize Pool
+								</Label>
+								<Input
+									type="number"
+									min={1500}
+									value={totalBudget}
+									onChange={handleTotalBudgetChange}
+									placeholder="$ 1,500.00"
+									className="w-full mt-2"
+								/>
+								<p className="text-sm text-gray-500 mt-1">
+									This is the total amount you intend to spend (Min: $1,500)
+								</p>
+							</div>
+							<div className="flex gap-2 items-center">
+								<Label className="text-base text-[#1A1A1A]">
+									How many Winners?
+								</Label>
+								<Input
+									type="number"
+									min={1}
+									max={5}
+									value={winnerCount}
+									onChange={handleWinnerCountChange}
+									className="w-20"
+								/>
+							</div>
+						</div>
+						<div className="space-y-4 flex-1">
+							{positions.slice(0, winnerCount).map((value, index) => (
+								<div key={index} className="flex items-center gap-2">
+									<span className="w-24">
+										{index + 1}
+										{index === 0
+											? "st"
+											: index === 1
+											? "nd"
+											: index === 2
+											? "rd"
+											: "th"}{" "}
+										Position:
+									</span>
+									<span className="font-medium">$</span>
+									<Input
+										type="number"
+										value={value}
+										onChange={(e) =>
+											handlePositionChange(index, e.target.value)
+										}
+										className="w-24"
+										placeholder={`${
+											index === 0
+												? "1000"
+												: index === 1
+												? "300"
+												: index === 2
+												? "100"
+												: "50"
+										}`}
+									/>
+								</div>
+							))}
 						</div>
 					</div>
 				</div>

@@ -8,6 +8,7 @@ import { useState } from "react";
 import Applications from "./Applications";
 import AnalyticsDashboard from "./Metrics";
 import Leaderboard from "./Leaderboard";
+import { Button } from "@/components/ui/button";
 
 export default function ContestDetailPage() {
 	const [activeTab, setActiveTab] = useState("contest-overview");
@@ -46,7 +47,7 @@ export default function ContestDetailPage() {
 	};
 
 	return (
-		<div className="container px-5 py-6 max-w-6xl bg-white border border-[#FFD9C3] rounded-lg mx-6 my-5">
+		<div className="container px-5 py-6 max-w-6xl bg-white border border-[#FFD9C3] rounded-lg mx-6 my-5 relative">
 			<div className="mb-6 relative">
 				<div className="flex gap-3">
 					<h1 className="text-2xl font-bold">{contestData.title}</h1>
@@ -83,7 +84,7 @@ export default function ContestDetailPage() {
 						className=""
 						onValueChange={(value) => setActiveTab(value)}
 					>
-						<TabsList className="grid grid-cols-4 mb-8 bg-transparent p-0 gap-0 w-[85%]">
+						<TabsList className="grid grid-cols-4 mb-8 bg-transparent p-0 gap-0 w-[85%] ">
 							<TabsTrigger
 								value="contest-overview"
 								className="data-[state=active]:bg-[#FFF4EE] data-[state=active]:border-b-2 data-[state=active]:border-[#FC52E4] data-[state=active]:text-[#FD5C02] data-[state=inactive]:text-[#667085] rounded-none py-3"
@@ -201,15 +202,25 @@ export default function ContestDetailPage() {
 					</Tabs>
 				</div>
 
-				{activeTab === "contest-overview" && (
-					<div className="w-96">
-						<Card className="bg-[#1A1A1A] text-white py-3 h-36 flex justify-center mt-20 ml-5">
+				{/* Right column with fixed width */}
+				<div className=" relative">
+					{/* Position the Message Participants button */}
+					<div className="absolute top-0 right-0">
+						<Link href="/dashboard/messages">
+							<Button className="bg-[#FD5C02] text-white text-base px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors">
+								Message Participants
+							</Button>
+						</Link>
+					</div>
+					
+					{activeTab === "contest-overview" && (
+						<Card className="bg-[#1A1A1A] text-white py-3 w-56 h-36 flex justify-center mt-20  ">
 							<h3 className="text-lg font-medium text-center">
 								Prize Breakdown
 							</h3>
 						</Card>
-					</div>
-				)}
+					)}
+				</div> 
 			</div>
 		</div>
 	);
