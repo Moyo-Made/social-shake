@@ -1,7 +1,9 @@
-import React from "react";
+"use client";
+
+import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 interface MenuItemProps {
 	icon: React.ReactNode;
@@ -9,6 +11,10 @@ interface MenuItemProps {
 	active?: boolean;
 	badge?: string;
 	href: string;
+	subItems?: Array<{
+		href: string;
+		text: string;
+	}>;
 }
 
 const MenuItem: React.FC<MenuItemProps> = ({
@@ -17,7 +23,55 @@ const MenuItem: React.FC<MenuItemProps> = ({
 	active = false,
 	badge,
 	href,
+	subItems,
 }) => {
+	const [isOpen, setIsOpen] = useState(false);
+	const hasSubItems = subItems && subItems.length > 0;
+
+	const toggleDropdown = () => {
+		if (hasSubItems) {
+			setIsOpen(!isOpen);
+		}
+	};
+
+	if (hasSubItems) {
+		return (
+			<div>
+				<div
+					onClick={toggleDropdown}
+					className={`flex items-center space-x-3 px-4 py-2 rounded-lg cursor-pointer font-satoshi
+          ${active ? "bg-orange-500" : "hover:bg-gray-700"}`}
+				>
+					{icon}
+					<span>{text}</span>
+					{badge && (
+						<span className="bg-red-500 text-xs px-2 py-0.5 rounded-full ml-auto mr-2">
+							{badge}
+						</span>
+					)}
+					{isOpen ? (
+						<ChevronDown className="h-4 w-4 ml-auto mt-px" />
+					) : (
+						<ChevronRight className="h-4 w-4 ml-auto mt-px" />
+					)}
+				</div>
+				{isOpen && (
+					<div className="mt-1">
+						{subItems.map((item, index) => (
+							<Link
+								key={index}
+								href={item.href}
+								className="flex items-center space-x-3 px-4 py-2 ml-4 rounded-lg cursor-pointer font-satoshi hover:bg-gray-700"
+							>
+								<span>{item.text}</span>
+							</Link>
+						))}
+					</div>
+				)}
+			</div>
+		);
+	}
+
 	return (
 		<Link
 			href={href}
@@ -89,6 +143,10 @@ const SideNav: React.FC = () => {
 							/>
 						}
 						text="Creators"
+						subItems={[
+							{ href: "/dashboard/creators/all", text: "All creators" },
+							{ href: "/dashboard/creators/saved", text: "Saved creators" },
+						]}
 					/>
 					<MenuItem
 						href="/dashboard/messages"

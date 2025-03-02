@@ -1,12 +1,20 @@
-import React from "react";
+"use client";
+
+import React, { useState } from "react";
 import Image from "next/image";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import Link from "next/link";
 
 interface MenuItemProps {
 	icon: React.ReactNode;
 	text: string;
 	active?: boolean;
 	badge?: string;
+	href: string;
+	subItems?: Array<{
+		href: string;
+		text: string;
+	}>;
 }
 
 const MenuItem: React.FC<MenuItemProps> = ({
@@ -14,11 +22,61 @@ const MenuItem: React.FC<MenuItemProps> = ({
 	text,
 	active = false,
 	badge,
+	href,
+	subItems,
 }) => {
+	const [isOpen, setIsOpen] = useState(false);
+	const hasSubItems = subItems && subItems.length > 0;
+
+	const toggleDropdown = () => {
+		if (hasSubItems) {
+			setIsOpen(!isOpen);
+		}
+	};
+
+	if (hasSubItems) {
+		return (
+			<div>
+				<div
+					onClick={toggleDropdown}
+					className={`flex items-center space-x-3 px-4 py-2 rounded-lg cursor-pointer font-satoshi
+          ${active ? "bg-orange-500" : "hover:bg-gray-700"}`}
+				>
+					{icon}
+					<span>{text}</span>
+					{badge && (
+						<span className="bg-red-500 text-xs px-2 py-0.5 rounded-full ml-auto mr-2">
+							{badge}
+						</span>
+					)}
+					{isOpen ? (
+						<ChevronDown className="h-4 w-4 ml-auto mt-px" />
+					) : (
+						<ChevronRight className="h-4 w-4 ml-auto mt-px" />
+					)}
+				</div>
+				{isOpen && (
+					<div className="mt-1">
+						{subItems.map((item, index) => (
+							<Link
+								key={index}
+								href={item.href}
+								className="flex items-center space-x-3 px-4 py-2 ml-4 rounded-lg cursor-pointer font-satoshi hover:bg-gray-700"
+							>
+								<span>{item.text}</span>
+							</Link>
+						))}
+					</div>
+				)}
+			</div>
+		);
+	}
+
 	return (
-		<div
+		<Link
+			href={href}
 			className={`flex items-center space-x-3 px-4 py-2 rounded-lg cursor-pointer font-satoshi
-	  ${active ? "bg-orange-500" : "hover:bg-gray-700"}`}
+      ${active ? "bg-orange-500" : "hover:bg-gray-700"}`}
 		>
 			{icon}
 			<span>{text}</span>
@@ -27,7 +85,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
 					{badge}
 				</span>
 			)}
-		</div>
+		</Link>
 	);
 };
 
@@ -37,6 +95,7 @@ const NewContestSideNav: React.FC = () => {
 			<nav className="p-4 mt-9">
 				<div className="space-y-2">
 					<MenuItem
+						href="/dashboard"
 						icon={
 							<Image
 								src="/icons/dashboard.svg"
@@ -48,6 +107,7 @@ const NewContestSideNav: React.FC = () => {
 						text="Dashboard"
 					/>
 					<MenuItem
+						href="/projects"
 						icon={
 							<Image
 								src="/icons/projects.svg"
@@ -59,6 +119,7 @@ const NewContestSideNav: React.FC = () => {
 						text="Projects"
 					/>
 					<MenuItem
+						href="/dashboard/contests"
 						icon={
 							<Image
 								src="/icons/contests.svg"
@@ -71,6 +132,7 @@ const NewContestSideNav: React.FC = () => {
 						active
 					/>
 					<MenuItem
+						href="/dashboard/creators"
 						icon={
 							<Image
 								src="/icons/creators.svg"
@@ -80,8 +142,13 @@ const NewContestSideNav: React.FC = () => {
 							/>
 						}
 						text="Creators"
+						subItems={[
+							{ href: "/dashboard/creators/all", text: "All creators" },
+							{ href: "/dashboard/creators/saved", text: "Saved creators" },
+						]}
 					/>
 					<MenuItem
+						href="/dashboard/messages"
 						icon={
 							<Image
 								src="/icons/messages.svg"
@@ -94,6 +161,7 @@ const NewContestSideNav: React.FC = () => {
 						badge="1"
 					/>
 					<MenuItem
+						href="/dashboard/transactions"
 						icon={
 							<Image
 								src="/icons/transactions.svg"
@@ -109,6 +177,7 @@ const NewContestSideNav: React.FC = () => {
 
 			<div className="p-4 space-y-2">
 				<MenuItem
+					href="/dashboard/settings"
 					icon={
 						<Image
 							src="/icons/settings.svg"
@@ -120,6 +189,7 @@ const NewContestSideNav: React.FC = () => {
 					text="Settings"
 				/>
 				<MenuItem
+					href="/dashboard/help"
 					icon={
 						<Image
 							src="/icons/help-icon.svg"
