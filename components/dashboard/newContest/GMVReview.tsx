@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, Edit } from "lucide-react";
+import { Edit } from "lucide-react";
 import { useContestForm } from "./ContestFormContext";
 import { format } from "date-fns";
 import Link from "next/link";
@@ -39,19 +39,6 @@ const GMVReview = () => {
 	// Format dates
 	const formatDate = (date: Date | undefined): string => {
 		return date ? format(date, "MMMM d, yyyy") : "Not set";
-	};
-
-	// Navigate between incentives
-	const handleNextIncentive = () => {
-		setCurrentIncentiveIndex((prev) => 
-			(prev + 1) % (incentives?.length || 1)
-		);
-	};
-
-	const handlePrevIncentive = () => {
-		setCurrentIncentiveIndex((prev) => 
-			prev === 0 ? (incentives?.length || 1) - 1 : prev - 1
-		);
 	};
 
 	// Render current incentive

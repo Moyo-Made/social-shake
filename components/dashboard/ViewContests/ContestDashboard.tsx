@@ -126,12 +126,12 @@ const ContestDashboard = () => {
 	// Initialize filtered contests with all contests
 	useEffect(() => {
 		setFilteredContests(initialContests);
-	}, []);
+	});
 
 	// Apply filters whenever any filter changes
 	useEffect(() => {
 		applyFilters();
-	}, [searchTerm, statusFilter, budgetFilter, rankingFilter]);
+	});
 
 	return (
 		<div className="bg-orange-50 p-4 min-h-screen w-full">
