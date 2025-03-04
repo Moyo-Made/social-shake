@@ -11,7 +11,7 @@ const GMVReview = () => {
 	const { formData } = useContestForm();
 	const { basic, requirements, prizeTimeline } = formData;
 	const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-	const [currentIncentiveIndex, setCurrentIncentiveIndex] = useState(0);
+	const [currentIncentiveIndex] = useState(0);
 	type Incentive = {
 		name?: string;
 		worth?: number;
