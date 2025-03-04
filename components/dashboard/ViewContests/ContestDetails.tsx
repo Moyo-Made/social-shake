@@ -9,9 +9,16 @@ import Applications from "./Applications";
 import AnalyticsDashboard from "./Metrics";
 import Leaderboard from "./Leaderboard";
 import { Button } from "@/components/ui/button";
+import { useContestForm } from "../newContest/ContestFormContext";
+import GMVMetrics from "./GMVMetrics";
+import GMVData from "./GMVData";
+
 
 export default function ContestDetailPage() {
 	const [activeTab, setActiveTab] = useState("contest-overview");
+
+	const { formData } = useContestForm();
+    const contestType = formData.basic.contestType || "leaderboard";
 
 	// Mock data
 	const contestData = {
@@ -107,7 +114,8 @@ export default function ContestDetailPage() {
 								value="leaderboard"
 								className="data-[state=active]:bg-[#FFF4EE] data-[state=active]:border-b-2 data-[state=active]:border-[#FC52E4] data-[state=active]:text-[#FD5C02] data-[state=inactive]:text-[#667085] rounded-none py-3"
 							>
-								Leaderboard
+								{contestType === "leaderboard" ? "Leaderboard" : "GMV Data"}
+								
 							</TabsTrigger>
 						</TabsList>
 
@@ -192,12 +200,22 @@ export default function ContestDetailPage() {
 							<Applications />
 						</TabsContent>
 
+						{/* Dynamic Metrics Tab */}
 						<TabsContent value="available-metrics">
-							<AnalyticsDashboard />
+							{contestType === "leaderboard" ? (
+								<AnalyticsDashboard />
+							) : (
+								<GMVMetrics />
+							)}
 						</TabsContent>
 
+						{/* Dynamic Leaderboard Tab */}
 						<TabsContent value="leaderboard">
-							<Leaderboard />
+							{contestType === "leaderboard" ? (
+								<Leaderboard />
+							) : (
+								<GMVData />
+							)}
 						</TabsContent>
 					</Tabs>
 				</div>

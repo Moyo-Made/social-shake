@@ -3,6 +3,14 @@
 import { BasicFormData, ContestFormData, PrizeTimelineFormData, RequirementsFormData } from "@/types/contestFormData";
 import React, { createContext, useContext, useState, useEffect } from "react";
 
+// Update the type for Incentive to match our previous implementation
+export type Incentive = {
+  name: string;
+  worth: number;
+  description: string;
+  length: number;
+};
+
 const defaultFormData: ContestFormData = {
   basic: {
     contestName: "",
@@ -32,12 +40,13 @@ const defaultFormData: ContestFormData = {
   incentives: []
 };
 
-// Create the context
+// Update the context type to include incentives method
 interface ContestFormContextType {
   formData: ContestFormData;
   updateBasicData: (data: Partial<BasicFormData>) => void;
   updateRequirementsData: (data: Partial<RequirementsFormData>) => void;
   updatePrizeTimelineData: (data: Partial<PrizeTimelineFormData>) => void;
+  updateIncentivesData: (incentives: Incentive[]) => void;
   saveDraft: () => void;
   draftSaved: boolean;
   setDraftSaved: (saved: boolean) => void;
@@ -106,6 +115,15 @@ export const ContestFormProvider: React.FC<{children: React.ReactNode}> = ({ chi
     setDraftSaved(false);
   };
 
+  // New method to update incentives
+  const updateIncentivesData = (incentives: Incentive[]) => {
+    setFormData(prev => ({
+      ...prev,
+      incentives,
+    }));
+    setDraftSaved(false);
+  };
+
   const saveDraft = () => {
     try {
       // Create a copy of formData that we can safely stringify
@@ -135,6 +153,7 @@ export const ContestFormProvider: React.FC<{children: React.ReactNode}> = ({ chi
       updateBasicData,
       updateRequirementsData,
       updatePrizeTimelineData,
+      updateIncentivesData,
       saveDraft,
       draftSaved,
       setDraftSaved

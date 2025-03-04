@@ -61,12 +61,12 @@ const Leaderboard = () => {
 		3: { cardBg: "#F7E6D8", borderColor: "#CF9C69" },
 	};
 
-	 const contestEndDate = "2025-03-20T12:00:00"; 
-// "2023-12-31T23:59:59Z"
+	const contestEndDate = "2025-03-20T12:00:00";
+	// "2023-12-31T23:59:59Z"
 
 	return (
 		<div className="w-full max-w-4xl mx-auto">
-			<CountdownTimer targetDate={contestEndDate}  />
+			<CountdownTimer targetDate={contestEndDate} />
 			{/* Top 3 Cards Section */}
 			<div className="flex flex-wrap justify-center gap-4 mb-6">
 				{topContestants.map((contestant) => (
@@ -100,28 +100,40 @@ const Leaderboard = () => {
 
 						{/* Details Section */}
 						<div
-						className="pt-3"
+							className="pt-3"
 							style={{
 								backgroundColor: positionStyles[contestant.position].cardBg,
 							}}
 						>
 							<div className="pt-3 pb-1 text-center">
-								<h3 className="font-bold text-[#101828] text-lg">{contestant.fullName}</h3>
+								<div className="flex items-center justify-center gap-2">
+
+								<h3 className="font-bold text-[#101828] text-lg">
+									{contestant.fullName} 
+								</h3>
+								<Image src="/icons/message.svg" alt="Message" width={20} height={20}/>
+								</div>
 								<p className="text-sm text-[#667085]">{contestant.username}</p>
 							</div>
 
 							<div className="flex justify-between px-4 py-2 text-center">
 								<div className="flex-1">
 									<p className="text-sm text-[#667085]">Views</p>
-									<p className="font-semibold text-[#101828]">{contestant.views}</p>
+									<p className="font-semibold text-[#101828]">
+										{contestant.views}
+									</p>
 								</div>
 								<div className="flex-1">
 									<p className="text-sm text-[#667085]">Likes</p>
-									<p className="font-semibold text-[#101828]">{contestant.likes}</p>
+									<p className="font-semibold text-[#101828]">
+										{contestant.likes}
+									</p>
 								</div>
 								<div className="flex-1">
 									<p className="text-sm text-[#667085]">Comments</p>
-									<p className="font-semibold text-[#101828]">{contestant.comments}</p>
+									<p className="font-semibold text-[#101828]">
+										{contestant.comments}
+									</p>
 								</div>
 							</div>
 						</div>

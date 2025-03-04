@@ -19,7 +19,7 @@ const GMVReview = () => {
 		items?: string[];
 	};
 
-	const incentives: Incentive[] = formData.incentives || [];
+	const incentives: Incentive [] = formData.incentives || [];
 
 	// Create a preview URL when a thumbnail is available
 	React.useEffect(() => {
@@ -64,54 +64,7 @@ const GMVReview = () => {
 			);
 		}
 
-		const currentIncentive = incentives[currentIncentiveIndex];
-
-		return (
-			<div className="relative">
-				{/* Incentive Navigation */}
-				{incentives.length > 1 && (
-					<div className="absolute top-0 right-0 flex items-center">
-						<button 
-							onClick={handlePrevIncentive} 
-							className="mr-2 text-gray-500 hover:text-gray-700"
-						>
-							<ChevronLeft className="h-5 w-5" />
-						</button>
-						<button 
-							onClick={handleNextIncentive} 
-							className="text-gray-500 hover:text-gray-700"
-						>
-							<ChevronRight className="h-5 w-5" />
-						</button>
-					</div>
-				)}
-
-							Incentive Worth: ${currentIncentive.worth?.toLocaleString() ?? "N/A"}
-				<div className="space-y-2">
-					<div>
-						<div className="font-semibold">
-							{currentIncentive.name || "Untitled Incentive"}
-						</div>
-						<div className="text-gray-600">
-							Incentive Worth: ${currentIncentive.worth?.toLocaleString() || "N/A"}
-						</div>
-					</div>
-					
-					<div className="text-sm text-gray-500 mt-2">
-						{currentIncentive.description || "No description provided"}
-						
-						{currentIncentive.items && currentIncentive.items.length > 0 && (
-							<ul className="list-disc list-inside mt-1">
-								{currentIncentive.items.map((item, index) => (
-									<li key={index}>{item}</li>
-								))}
-							</ul>
-						)}
-					</div>
-				</div>
-			</div>
-		);
-	};
+	}
 
 	return (
 		<div className="flex flex-col gap-6 max-w-4xl mx-auto border border-[#FFBF9B] rounded-xl p-6">

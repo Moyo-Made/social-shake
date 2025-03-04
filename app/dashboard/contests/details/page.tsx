@@ -1,3 +1,4 @@
+import { ContestFormProvider } from "@/components/dashboard/newContest/ContestFormContext";
 import SideNavLayout from "@/components/dashboard/SideNav";
 import ContestDetailPage from "@/components/dashboard/ViewContests/ContestDetails";
 import React from "react";
@@ -5,7 +6,9 @@ import React from "react";
 const page = () => {
 	return (
 		<SideNavLayout>
-			<ContestDetailPage />
+			<ContestFormProvider>
+				<ContestDetailPage />
+			</ContestFormProvider>
 		</SideNavLayout>
 	);
 };
