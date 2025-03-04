@@ -1,16 +1,25 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Image from "next/image";
-import { Edit } from "lucide-react";
+import { ChevronLeft, ChevronRight, Edit } from "lucide-react";
 import { useContestForm } from "./ContestFormContext";
 import { format } from "date-fns";
 import Link from "next/link";
 
-const Review = () => {
+const GMVReview = () => {
 	const { formData } = useContestForm();
 	const { basic, requirements, prizeTimeline } = formData;
-	const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
+	const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+	const [currentIncentiveIndex, setCurrentIncentiveIndex] = useState(0);
+	type Incentive = {
+		name?: string;
+		worth?: number;
+		description?: string;
+		items?: string[];
+	};
+
+	const incentives: Incentive[] = formData.incentives || [];
 
 	// Create a preview URL when a thumbnail is available
 	React.useEffect(() => {
@@ -26,25 +35,82 @@ const Review = () => {
 		return () => URL.revokeObjectURL(objectUrl);
 	}, [basic.thumbnail]);
 
-	// Format prize breakdown
-	const prizeBreakdown = prizeTimeline.positions
-		.slice(0, prizeTimeline.winnerCount)
-		.map((amount, index) => ({
-			position: `${index + 1}${getSuffix(index + 1)} Position`,
-			amount,
-		}));
-
-	// Get the ordinal suffix for position numbers
-	function getSuffix(num: number): string {
-		if (num === 1) return "st";
-		if (num === 2) return "nd";
-		if (num === 3) return "rd";
-		return "th";
-	}
 
 	// Format dates
 	const formatDate = (date: Date | undefined): string => {
 		return date ? format(date, "MMMM d, yyyy") : "Not set";
+	};
+
+	// Navigate between incentives
+	const handleNextIncentive = () => {
+		setCurrentIncentiveIndex((prev) => 
+			(prev + 1) % (incentives?.length || 1)
+		);
+	};
+
+	const handlePrevIncentive = () => {
+		setCurrentIncentiveIndex((prev) => 
+			prev === 0 ? (incentives?.length || 1) - 1 : prev - 1
+		);
+	};
+
+	// Render current incentive
+	const renderCurrentIncentive = () => {
+		if (!incentives || incentives.length === 0) {
+			return (
+				<div className="text-gray-500">
+					No incentives have been added yet.
+				</div>
+			);
+		}
+
+		const currentIncentive = incentives[currentIncentiveIndex];
+
+		return (
+			<div className="relative">
+				{/* Incentive Navigation */}
+				{incentives.length > 1 && (
+					<div className="absolute top-0 right-0 flex items-center">
+						<button 
+							onClick={handlePrevIncentive} 
+							className="mr-2 text-gray-500 hover:text-gray-700"
+						>
+							<ChevronLeft className="h-5 w-5" />
+						</button>
+						<button 
+							onClick={handleNextIncentive} 
+							className="text-gray-500 hover:text-gray-700"
+						>
+							<ChevronRight className="h-5 w-5" />
+						</button>
+					</div>
+				)}
+
+							Incentive Worth: ${currentIncentive.worth?.toLocaleString() ?? "N/A"}
+				<div className="space-y-2">
+					<div>
+						<div className="font-semibold">
+							{currentIncentive.name || "Untitled Incentive"}
+						</div>
+						<div className="text-gray-600">
+							Incentive Worth: ${currentIncentive.worth?.toLocaleString() || "N/A"}
+						</div>
+					</div>
+					
+					<div className="text-sm text-gray-500 mt-2">
+						{currentIncentive.description || "No description provided"}
+						
+						{currentIncentive.items && currentIncentive.items.length > 0 && (
+							<ul className="list-disc list-inside mt-1">
+								{currentIncentive.items.map((item, index) => (
+									<li key={index}>{item}</li>
+								))}
+							</ul>
+						)}
+					</div>
+				</div>
+			</div>
+		);
 	};
 
 	return (
@@ -198,43 +264,18 @@ const Review = () => {
 				</div>
 			</div>
 
-			{/* Prizes & Timeline Section */}
+			
+			{/* Incentives & Timeline Section */}
+
 			<div className="">
 				<div className="flex justify-between items-center mb-4">
-					<h2 className="text-xl font-semibold">Prizes & Timeline</h2>
+					<h2 className="text-xl font-semibold">Incentives & Timeline</h2>
 					<button className="text-gray-500">
 						<Edit className="h-5 w-5" />
 					</button>
 				</div>
 
 				<div className="space-y-4">
-					<div className="grid grid-cols-3 gap-4">
-						<div className="font-medium text-gray-600">
-							Total Budget & Prize Pool
-						</div>
-						<div className="col-span-2">
-							${prizeTimeline.totalBudget.toLocaleString()}
-						</div>
-					</div>
-
-					<div className="grid grid-cols-3 gap-4">
-						<div className="font-medium text-gray-600">Number of Winners</div>
-						<div className="col-span-2">
-							{prizeTimeline.winnerCount} Winners
-						</div>
-					</div>
-
-					<div className="grid grid-cols-3 gap-4">
-						<div className="font-medium text-gray-600">Prize Breakdown</div>
-						<div className="col-span-2 space-y-1">
-							{prizeBreakdown.map((prize, index) => (
-								<div key={index}>
-									{prize.position}: ${prize.amount}
-								</div>
-							))}
-						</div>
-					</div>
-
 					<div className="grid grid-cols-3 gap-4">
 						<div className="font-medium text-gray-600">Contest Start Date</div>
 						<div className="col-span-2">
@@ -249,22 +290,22 @@ const Review = () => {
 						</div>
 					</div>
 
+					{/* Incentive Section */}
 					<div className="grid grid-cols-3 gap-4">
 						<div className="font-medium text-gray-600">
-							Leaderboard Criteria
+							Incentive {currentIncentiveIndex + 1}
 						</div>
 						<div className="col-span-2">
-							{prizeTimeline.criteria === "views"
-								? "Views"
-								: prizeTimeline.criteria === "likes"
-								? "Likes"
-								: "Engagement Rate"}
+							{renderCurrentIncentive()}
 						</div>
 					</div>
+
+					
 				</div>
 			</div>
 		</div>
 	);
-};
+}
 
-export default Review;
+
+export default GMVReview;

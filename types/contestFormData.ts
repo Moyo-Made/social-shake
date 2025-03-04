@@ -1,7 +1,7 @@
 
 export interface BasicFormData {
 	contestName: string;
-	contestType: "leaderboard" | "gmv";
+	contestType: ContestType;
 	industry: string;
 	description: string;
 	rules: string;
@@ -25,10 +25,11 @@ export interface BasicFormData {
 	endDate: Date | undefined;
 	criteria: string;
   }
-  
+
   export type ContestType = "leaderboard" | "gmv";
 
   export interface ContestFormData {
+	incentives: never[];
 	contestType: ContestType | undefined;
 	basic: BasicFormData;
 	requirements: RequirementsFormData;

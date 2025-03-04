@@ -227,7 +227,7 @@ const NewContestSideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 	return (
 		<div className="flex min-h-screen">
 			<NewContestSideNav />
-			<div className="flex-1 flex flex-col bg-gray-100 font-satoshi">
+			<div className="flex-1 flex flex-col bg-[#FFF9F6] font-satoshi">
 				<header className="bg-white p-4 w-full flex justify-between items-center border-b border-[#FD5C02]">
 					<h1 className="text-xl font-semibold">New Contest</h1>
 					<div className="flex items-center space-x-4">

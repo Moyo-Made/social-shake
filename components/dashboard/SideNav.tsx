@@ -1,14 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { usePathname } from "next/navigation";
 
 interface MenuItemProps {
 	icon: React.ReactNode;
 	text: string;
-	active?: boolean;
 	badge?: string;
 	href: string;
 	subItems?: Array<{
@@ -20,16 +20,32 @@ interface MenuItemProps {
 const MenuItem: React.FC<MenuItemProps> = ({
 	icon,
 	text,
-	active = false,
 	badge,
 	href,
 	subItems,
 }) => {
+	const pathname = usePathname();
 	const [isOpen, setIsOpen] = useState(false);
 	const hasSubItems = subItems && subItems.length > 0;
 
-	const toggleDropdown = () => {
+	// Modified isActive condition to handle special case for contests
+	const isActive =
+		pathname === href ||
+		(pathname.startsWith(href + "/") && href !== "/dashboard") ||
+		(href === "/dashboard/contests" && pathname === "/dashboard/contests/new-contest");
+
+	const hasActiveSubItem =
+		hasSubItems && subItems.some((item) => pathname === item.href);
+
+	useEffect(() => {
+		if (hasActiveSubItem) {
+			setIsOpen(true);
+		}
+	}, [pathname, hasActiveSubItem]);
+
+	const toggleDropdown = (e: React.MouseEvent) => {
 		if (hasSubItems) {
+			e.preventDefault();
 			setIsOpen(!isOpen);
 		}
 	};
@@ -40,10 +56,12 @@ const MenuItem: React.FC<MenuItemProps> = ({
 				<div
 					onClick={toggleDropdown}
 					className={`flex items-center space-x-3 px-4 py-2 rounded-lg cursor-pointer font-satoshi
-          ${active ? "bg-orange-500" : "hover:bg-gray-700"}`}
+          ${
+						isActive || hasActiveSubItem ? "bg-orange-500" : "hover:bg-gray-700"
+					}`}
 				>
 					{icon}
-					<span>{text}</span>
+					<span className="ml-3">{text}</span>
 					{badge && (
 						<span className="bg-red-500 text-xs px-2 py-0.5 rounded-full ml-auto mr-2">
 							{badge}
@@ -57,15 +75,19 @@ const MenuItem: React.FC<MenuItemProps> = ({
 				</div>
 				{isOpen && (
 					<div className="mt-1">
-						{subItems.map((item, index) => (
-							<Link
-								key={index}
-								href={item.href}
-								className="flex items-center space-x-3 px-4 py-2 ml-4 rounded-lg cursor-pointer font-satoshi hover:bg-gray-700"
-							>
-								<span>{item.text}</span>
-							</Link>
-						))}
+						{subItems.map((item, index) => {
+							const isSubItemActive = pathname === item.href;
+							return (
+								<Link
+									key={index}
+									href={item.href}
+									className={`flex items-center space-x-3 px-4 py-2 ml-4 rounded-lg cursor-pointer font-satoshi 
+									${isSubItemActive ? "bg-orange-500" : "hover:bg-gray-700"}`}
+								>
+									<span>{item.text}</span>
+								</Link>
+							);
+						})}
 					</div>
 				)}
 			</div>
@@ -76,10 +98,10 @@ const MenuItem: React.FC<MenuItemProps> = ({
 		<Link
 			href={href}
 			className={`flex items-center space-x-3 px-4 py-2 rounded-lg cursor-pointer font-satoshi
-      ${active ? "bg-orange-500" : "hover:bg-gray-700"}`}
+      ${isActive ? "bg-orange-500" : "hover:bg-gray-700"}`}
 		>
 			{icon}
-			<span>{text}</span>
+			<span className="ml-3">{text}</span>
 			{badge && (
 				<span className="bg-red-500 text-xs px-2 py-0.5 rounded-full ml-auto">
 					{badge}
@@ -130,7 +152,6 @@ const SideNav: React.FC = () => {
 							/>
 						}
 						text="Contests"
-						active
 					/>
 					<MenuItem
 						href="/dashboard/creators"
@@ -222,15 +243,54 @@ const SideNav: React.FC = () => {
 	);
 };
 
+// Configuration for page titles based on routes
+const getPageTitle = (pathname: string): string => {
+	// You can expand this object with all your routes that need specific titles
+	const routeTitles: Record<string, string> = {
+		"/dashboard": "Dashboard",
+		"/projects": "Projects",
+		"/dashboard/contests": "Contests",
+		"/dashboard/contests/new-contest": "New Contest",
+		"/dashboard/contests/edit": "Edit Contest",
+		"/dashboard/creators": "Creators",
+		"/dashboard/creators/all": "All Creators",
+		"/dashboard/creators/saved": "Saved Creators",
+		"/dashboard/messages": "Messages",
+		"/dashboard/transactions": "Transactions",
+		"/dashboard/settings": "Settings",
+		"/dashboard/help": "Help & Support",
+	};
+
+	// Check for exact match first
+	if (routeTitles[pathname]) {
+		return routeTitles[pathname];
+	}
+
+	// More specific matching for different route sections
+	if (pathname.startsWith("/dashboard/contests/")) {
+		return "Contests";
+	}
+
+	if (pathname.startsWith("/dashboard/creators/")) {
+		return "Creators";
+	}
+
+	// Default fallback
+	return "Dashboard";
+};
+
 const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 	children,
 }) => {
+	const pathname = usePathname();
+	const pageTitle = getPageTitle(pathname);
+
 	return (
 		<div className="flex min-h-screen">
 			<SideNav />
-			<div className="flex-1 flex flex-col items-center justify-center bg-gray-100 font-satoshi ">
+			<div className="flex-1 flex flex-col items-center justify-center bg-[#FFF9F6] font-satoshi ">
 				<header className="bg-white p-4 w-full flex justify-between items-center border-b border-[#FD5C02]">
-					<h1 className="text-xl font-semibold">Contests</h1>
+					<h1 className="text-xl font-semibold">{pageTitle}</h1>
 					<div className="flex items-center space-x-4">
 						<Image
 							src="/icons/notification.svg"

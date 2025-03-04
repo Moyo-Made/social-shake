@@ -2,12 +2,11 @@ import React from "react";
 import Image from "next/image";
 import { Button } from "../ui/button";
 import Link from "next/link";
-import SideNavLayout from "./SideNav";
 
 const EmptyContest = () => {
 	return (
-    <SideNavLayout>
-		<div className="font-satoshi">
+
+		<div className="font-satoshi ">
 			<main className="p-6 mt-12">
 				<div className="flex flex-col justify-center items-center max-w-md mx-auto text-center">
 					<Image
@@ -30,7 +29,7 @@ const EmptyContest = () => {
 				</div>
 			</main>
 		</div>
-    </SideNavLayout>
+
 	);
 };
 

@@ -59,7 +59,7 @@ const PrizeTimeline = () => {
 	};
 
 	return (
-		<div className="max-w-[44rem] mx-auto">
+		<div className="max-w-[44rem] mx-auto bg-white">
 			<div className="space-y-6">
 				{/* Contest Duration*/}
 				<div className="border border-[#FFBF9B] rounded-xl p-6">

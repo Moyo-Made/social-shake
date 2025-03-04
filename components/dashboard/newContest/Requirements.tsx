@@ -57,7 +57,7 @@ const Requirements = () => {
 	};
 
 	return (
-		<div className="flex flex-col space-y-5">
+		<div className="flex flex-col space-y-5 bg-white px-8 py-6 border border-[#FFBF9B] rounded-lg">
 			<div className="flex flex-col">
 				<Label className="text-base">Who Can Join Your Contest ?</Label>
 				<span className="text-sm text-[#1A1A1A] mt-1 italic">

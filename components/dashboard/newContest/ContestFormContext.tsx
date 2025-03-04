@@ -28,7 +28,8 @@ const defaultFormData: ContestFormData = {
     endDate: undefined,
     criteria: "views",
   },
-  contestType: undefined
+  contestType: "leaderboard",
+  incentives: []
 };
 
 // Create the context
