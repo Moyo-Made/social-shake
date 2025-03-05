@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, SetStateAction, useEffect } from "react";
+import { useState, SetStateAction, useEffect, useCallback } from "react";
 import { Search } from "lucide-react";
 import {
 	Select,
@@ -77,7 +77,8 @@ const ContestDashboard = () => {
 	];
 
 	// Function to apply all filters
-	const applyFilters = () => {
+	// Memoized filter function to prevent unnecessary re-renders
+	const applyFilters = useCallback(() => {
 		let result = [...initialContests];
 
 		// Apply search filter
@@ -118,22 +119,17 @@ const ContestDashboard = () => {
 		}
 
 		setFilteredContests(result);
-	};
+	}, [initialContests, searchTerm, statusFilter, budgetFilter, rankingFilter]);
+
+	// Effect to apply filters when dependencies change
+	useEffect(() => {
+		applyFilters();
+	}, [applyFilters]);
 
 	// Handle search input change
 	const handleSearch = (e: { target: { value: SetStateAction<string> } }) => {
 		setSearchTerm(e.target.value);
 	};
-
-	// Initialize filtered contests with all contests
-	useEffect(() => {
-		setFilteredContests(initialContests);
-	}, [initialContests]);
-
-	// Apply filters whenever any filter changes
-	useEffect(() => {
-		applyFilters();
-	}, [applyFilters]);
 
 	return (
 		<div className="bg-orange-50 p-4 min-h-screen w-full">
