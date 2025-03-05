@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, SetStateAction, useCallback } from "react";
+import { useState, SetStateAction, useCallback, useEffect } from "react";
 import { Search } from "lucide-react";
 import {
 	Select,
@@ -16,9 +16,9 @@ import Link from "next/link";
 
 const ContestDashboard = () => {
 	const [searchTerm, setSearchTerm] = useState("");
-	const [statusFilter, setStatusFilter] = useState("");
-	const [budgetFilter, setBudgetFilter] = useState("");
-	const [rankingFilter, setRankingFilter] = useState("");
+	const [statusFilter, setStatusFilter] = useState<string | null>(null);
+	const [budgetFilter, setBudgetFilter] = useState<string | null>(null);
+	const [rankingFilter, setRankingFilter] = useState<string | null>(null);
 	const [filteredContests, setFilteredContests] = useState<typeof initialContests>([]);
 
 	// Sample data for contests
@@ -74,6 +74,11 @@ const ContestDashboard = () => {
 		},
 	];
 
+	// Use useEffect to apply filters whenever filter states change
+	useEffect(() => {
+		applyFilters();
+	}, [searchTerm, statusFilter, budgetFilter, rankingFilter]);
+
 	const applyFilters = useCallback(() => {
 		let result = [...initialContests];
 	
@@ -85,12 +90,12 @@ const ContestDashboard = () => {
 		}
 	
 		// Apply status filter
-		if (statusFilter && statusFilter !== "all-status") {
+		if (statusFilter) {
 		  result = result.filter((contest) => contest.status === statusFilter);
 		}
 	
 		// Apply budget filter
-		if (budgetFilter && budgetFilter !== "all-budget") {
+		if (budgetFilter) {
 		  result = result.filter((contest) => {
 			const budget = contest.totalBudget;
 			if (budgetFilter === "low") return budget < 1000;
@@ -101,7 +106,7 @@ const ContestDashboard = () => {
 		}
 	
 		// Apply ranking filter
-		if (rankingFilter && rankingFilter !== "all-ranking") {
+		if (rankingFilter) {
 		  result = result.filter((contest) => {
 			// Handle "Not Set" case
 			if (contest.rankingMethod === "Not Set") return false;
@@ -116,29 +121,29 @@ const ContestDashboard = () => {
 	
 		setFilteredContests(result);
 	  }, [initialContests, searchTerm, statusFilter, budgetFilter, rankingFilter]);
-	
 
 	// Handle search input change
 	const handleSearch = (e: { target: { value: SetStateAction<string> } }) => {
 		setSearchTerm(e.target.value);
-		applyFilters();
 	};
 
-	 // Modify onValueChange for each filter to call applyFilters
+	 // Modify onValueChange for each filter
 	 const handleStatusFilterChange = (value: string) => {
-		setStatusFilter(value);
-		applyFilters();
+		setStatusFilter(value === "all-status" ? null : value);
 	  };
 	
 	  const handleBudgetFilterChange = (value: string) => {
-		setBudgetFilter(value);
-		applyFilters();
+		setBudgetFilter(value === "all-budget" ? null : value);
 	  };
 	
 	  const handleRankingFilterChange = (value: string) => {
-		setRankingFilter(value);
-		applyFilters();
+		setRankingFilter(value === "all-ranking" ? null : value);
 	  };
+
+	// On component mount, set initial filtered contests to all contests
+	useEffect(() => {
+		setFilteredContests(initialContests);
+	}, []);
 
 	return (
 		<div className="bg-orange-50 p-4 min-h-screen w-full">
@@ -157,7 +162,10 @@ const ContestDashboard = () => {
 
 				<div className="flex gap-2">
 					<div className="relative">
-						<Select value={statusFilter} onValueChange={handleStatusFilterChange}>
+						<Select 
+							value={statusFilter || ""} 
+							onValueChange={handleStatusFilterChange}
+						>
 							<SelectTrigger className="w-full bg-white md:w-32">
 								<SelectValue placeholder="Status" />
 							</SelectTrigger>
@@ -172,7 +180,10 @@ const ContestDashboard = () => {
 					</div>
 
 					<div className="relative">
-						<Select value={budgetFilter} onValueChange={handleBudgetFilterChange}>
+						<Select 
+							value={budgetFilter || ""} 
+							onValueChange={handleBudgetFilterChange}
+						>
 							<SelectTrigger className="w-full bg-white md:w-40">
 								<SelectValue placeholder="Total Budget" />
 							</SelectTrigger>
@@ -186,7 +197,10 @@ const ContestDashboard = () => {
 					</div>
 
 					<div className="relative">
-						<Select value={rankingFilter} onValueChange={handleRankingFilterChange}>
+						<Select 
+							value={rankingFilter || ""} 
+							onValueChange={handleRankingFilterChange}
+						>
 							<SelectTrigger className="w-full bg-white md:w-40">
 								<SelectValue placeholder="Ranking Method" />
 							</SelectTrigger>

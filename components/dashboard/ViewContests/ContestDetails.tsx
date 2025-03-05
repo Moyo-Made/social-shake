@@ -19,6 +19,7 @@ export default function ContestDetailPage() {
 
 	const { formData } = useContestForm();
     const contestType = formData.basic.contestType || "leaderboard";
+	console.log("Contest Type in Detail Page:", contestType);
 
 	// Mock data
 	const contestData = {
