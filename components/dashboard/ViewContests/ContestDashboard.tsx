@@ -19,7 +19,9 @@ const ContestDashboard = () => {
 	const [statusFilter, setStatusFilter] = useState("");
 	const [budgetFilter, setBudgetFilter] = useState("");
 	const [rankingFilter, setRankingFilter] = useState("");
-	const [filteredContests, setFilteredContests] = useState<typeof initialContests>([]);
+	const [filteredContests, setFilteredContests] = useState<
+		typeof initialContests
+	>([]);
 
 	// Sample data for contests
 	const initialContests = [
@@ -126,12 +128,12 @@ const ContestDashboard = () => {
 	// Initialize filtered contests with all contests
 	useEffect(() => {
 		setFilteredContests(initialContests);
-	});
+	}, [initialContests]);
 
 	// Apply filters whenever any filter changes
 	useEffect(() => {
 		applyFilters();
-	});
+	}, [applyFilters]);
 
 	return (
 		<div className="bg-orange-50 p-4 min-h-screen w-full">
