@@ -123,7 +123,24 @@ const ContestDashboard = () => {
 	// Handle search input change
 	const handleSearch = (e: { target: { value: SetStateAction<string> } }) => {
 		setSearchTerm(e.target.value);
+		applyFilters();
 	};
+
+	  // Modify onValueChange for each filter to call applyFilters
+	  const handleStatusFilterChange = (value: string) => {
+		setStatusFilter(value);
+		applyFilters();
+	  };
+
+	const handleBudgetFilterChange = (value: string) => {
+		setBudgetFilter(value);
+		applyFilters();
+	  };
+	
+	  const handleRankingFilterChange = (value: string) => {
+		setRankingFilter(value);
+		applyFilters();
+	  };
 
 	return (
 		<div className="bg-orange-50 p-4 min-h-screen w-full">
@@ -142,7 +159,7 @@ const ContestDashboard = () => {
 
 				<div className="flex gap-2">
 					<div className="relative">
-						<Select value={statusFilter} onValueChange={setStatusFilter}>
+						<Select value={statusFilter} onValueChange={handleStatusFilterChange}>
 							<SelectTrigger className="w-full bg-white md:w-32">
 								<SelectValue placeholder="Status" />
 							</SelectTrigger>
@@ -157,7 +174,7 @@ const ContestDashboard = () => {
 					</div>
 
 					<div className="relative">
-						<Select value={budgetFilter} onValueChange={setBudgetFilter}>
+						<Select value={budgetFilter} onValueChange={handleBudgetFilterChange}>
 							<SelectTrigger className="w-full bg-white md:w-40">
 								<SelectValue placeholder="Total Budget" />
 							</SelectTrigger>
@@ -171,7 +188,7 @@ const ContestDashboard = () => {
 					</div>
 
 					<div className="relative">
-						<Select value={rankingFilter} onValueChange={setRankingFilter}>
+						<Select value={rankingFilter} onValueChange={handleRankingFilterChange}>
 							<SelectTrigger className="w-full bg-white md:w-40">
 								<SelectValue placeholder="Ranking Method" />
 							</SelectTrigger>
