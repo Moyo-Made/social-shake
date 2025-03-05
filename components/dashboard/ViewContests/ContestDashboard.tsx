@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, SetStateAction, useEffect, useCallback } from "react";
+import { useState, SetStateAction, useCallback } from "react";
 import { Search } from "lucide-react";
 import {
 	Select,
@@ -76,55 +76,49 @@ const ContestDashboard = () => {
 		},
 	];
 
-	// Function to apply all filters
-	// Memoized filter function to prevent unnecessary re-renders
-	const applyFilters = useCallback(() => {
+	 // Memoized filter function to prevent unnecessary re-renders
+	 const applyFilters = useCallback(() => {
 		let result = [...initialContests];
-
+	
 		// Apply search filter
 		if (searchTerm) {
-			result = result.filter((contest) =>
-				contest.title.toLowerCase().includes(searchTerm.toLowerCase())
-			);
+		  result = result.filter((contest) =>
+			contest.title.toLowerCase().includes(searchTerm.toLowerCase())
+		  );
 		}
-
+	
 		// Apply status filter
 		if (statusFilter && statusFilter !== "all-status") {
-			result = result.filter((contest) => contest.status === statusFilter);
+		  result = result.filter((contest) => contest.status === statusFilter);
 		}
-
+	
 		// Apply budget filter
 		if (budgetFilter && budgetFilter !== "all-budget") {
-			result = result.filter((contest) => {
-				const budget = contest.totalBudget;
-				if (budgetFilter === "low") return budget < 1000;
-				if (budgetFilter === "medium") return budget >= 1000 && budget <= 5000;
-				if (budgetFilter === "high") return budget > 5000;
-				return true;
-			});
+		  result = result.filter((contest) => {
+			const budget = contest.totalBudget;
+			if (budgetFilter === "low") return budget < 1000;
+			if (budgetFilter === "medium") return budget >= 1000 && budget <= 5000;
+			if (budgetFilter === "high") return budget > 5000;
+			return true;
+		  });
 		}
-
+	
 		// Apply ranking filter
 		if (rankingFilter && rankingFilter !== "all-ranking") {
-			result = result.filter((contest) => {
-				// Handle "Not Set" case
-				if (contest.rankingMethod === "Not Set") return false;
-
-				// Match exact ranking method or check if it contains the filter term
-				return (
-					contest.rankingMethod === rankingFilter ||
-					contest.rankingMethod.includes(rankingFilter)
-				);
-			});
+		  result = result.filter((contest) => {
+			// Handle "Not Set" case
+			if (contest.rankingMethod === "Not Set") return false;
+	
+			// Match exact ranking method or check if it contains the filter term
+			return (
+			  contest.rankingMethod === rankingFilter ||
+			  contest.rankingMethod.includes(rankingFilter)
+			);
+		  });
 		}
-
+	
 		setFilteredContests(result);
-	}, [initialContests, searchTerm, statusFilter, budgetFilter, rankingFilter]);
-
-	// Effect to apply filters when dependencies change
-	useEffect(() => {
-		applyFilters();
-	}, [applyFilters]);
+	  }, [initialContests, searchTerm, statusFilter, budgetFilter, rankingFilter]);
 
 	// Handle search input change
 	const handleSearch = (e: { target: { value: SetStateAction<string> } }) => {
