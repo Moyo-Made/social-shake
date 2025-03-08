@@ -1,83 +1,162 @@
 "use client";
 
 import Link from "next/link";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "./ui/card";
 import Image from "next/image";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { FaArrowRight, FaArrowLeft } from "react-icons/fa6";
 import { Button } from "./ui/button";
-// import { useRouter } from "next/navigation";
-// import { signIn } from "next-auth/react";
-
-// Define interface for form data
-// interface SignupFormData {
-// 	firstName: string;
-// 	lastName: string;
-// 	email: string;
-// 	password: string;
-// }
+import { useAuth } from "@/context/AuthContext";
 
 const CreateAccount = () => {
-	// const router = useRouter();
-	// const [isLoading, setIsLoading] = useState(false);
-	// const [error, setError] = useState<string | null>(null);
-	// const [formData, setFormData] = useState<SignupFormData>({
-	// 	firstName: "",
-	// 	lastName: "",
-	// 	email: "",
-	// 	password: "",
-	// });
+	const { signup, error: authError, loading, clearError } = useAuth();
+	const [formData, setFormData] = useState({
+		firstName: "",
+		lastName: "",
+		email: "",
+		password: "",
+	});
+	const [formError, setFormError] = useState<string | null>(null);
+	const [fieldErrors, setFieldErrors] = useState<{
+		firstName?: string;
+		lastName?: string;
+		email?: string;
+		password?: string;
+	}>({});
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
-	// // Handle input change
-	// const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-	// 	setFormData({
-	// 		...formData,
-	// 		[e.target.id]: e.target.value,
-	// 	});
-	// };
-	
-	// const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
-	// 	e.preventDefault();
-	// 	setIsLoading(true);
-	// 	setError(null);
-	
-	// 	// Validate form data
-	// 	if (!formData.email || !formData.password || !formData.firstName || !formData.lastName) {
-	// 		setError("All fields are required");
-	// 		setIsLoading(false);
-	// 		return;
-	// 	}
-	
-	// 	try {
-	// 		const result = await signIn("credentials", {
-	// 			email: formData.email,
-	// 			password: formData.password,
-	// 			firstName: formData.firstName,
-	// 			lastName: formData.lastName,
-	// 			isSignUp: "true",
-	// 			redirect: false,
-	// 			callbackUrl: "/dashboard"
-	// 		});
-	
-	// 		console.log("SignIn result:", result);
-	
-	// 		if (result?.error) {
-	// 			setError(result.error);
-	// 			return;
-	// 		}
-	
-	// 		if (result?.ok) {
-	// 			router.push("/dashboard");
-	// 		}
-	// 	} catch (error: any) {
-	// 		console.error("Signup error:", error);
-	// 		setError(error.message || "Failed to create account");
-	// 	} finally {
-	// 		setIsLoading(false);
-	// 	}
-	// };
+	// Map auth errors to form errors when they occur
+	useEffect(() => {
+		if (authError) {
+			// Map Firebase error messages to user-friendly messages and fields
+			let errorMessage = authError;
+			
+			if (authError.includes("email-already-in-use")) {
+				errorMessage = "This email address is already in use. Please use a different email or login.";
+				setFieldErrors(prev => ({
+					...prev,
+					email: "This email address is already in use."
+				}));
+			} else if (authError.includes("invalid-email")) {
+				errorMessage = "Please enter a valid email address.";
+				setFieldErrors(prev => ({
+					...prev,
+					email: "Please enter a valid email address."
+				}));
+			} else if (authError.includes("weak-password")) {
+				errorMessage = "Your password is too weak. Please choose a stronger password.";
+				setFieldErrors(prev => ({
+					...prev,
+					password: "Please choose a stronger password."
+				}));
+			}
+			
+			setFormError(errorMessage);
+			setIsSubmitting(false);
+		}
+	}, [authError]);
+
+	// Clear form errors when inputs change
+	const handleChange = (e: { target: { id: any; value: any } }) => {
+		const { id, value } = e.target;
+		setFormData({
+			...formData,
+			[id]: value,
+		});
+		
+		// Clear field-specific error when that field changes
+		if (fieldErrors[id as keyof typeof fieldErrors]) {
+			setFieldErrors(prev => ({
+				...prev,
+				[id]: undefined,
+			}));
+		}
+		
+		// Clear general error message when any field changes
+		if (formError) {
+			setFormError(null);
+		}
+		
+		// Clear auth errors when form changes
+		if (authError) {
+			clearError();
+		}
+	};
+
+	const validateForm = (): boolean => {
+		const errors: {
+			firstName?: string;
+			lastName?: string;
+			email?: string;
+			password?: string;
+		} = {};
+		let isValid = true;
+
+		// Validate first name
+		if (!formData.firstName.trim()) {
+			errors.firstName = "First name is required";
+			isValid = false;
+		}
+
+		// Validate last name
+		if (!formData.lastName.trim()) {
+			errors.lastName = "Last name is required";
+			isValid = false;
+		}
+
+		// Validate email
+		if (!formData.email.trim()) {
+			errors.email = "Email is required";
+			isValid = false;
+		} else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+			errors.email = "Email is invalid";
+			isValid = false;
+		}
+
+		// Validate password
+		if (!formData.password) {
+			errors.password = "Password is required";
+			isValid = false;
+		} else if (formData.password.length < 8) {
+			errors.password = "Password must be at least 8 characters long";
+			isValid = false;
+		}
+
+		setFieldErrors(errors);
+		return isValid;
+	};
+
+	const handleSubmit = async (e: { preventDefault: () => void }) => {
+		e.preventDefault();
+
+		// Clear previous errors
+		setFormError(null);
+		clearError();
+		
+		// Validate the form
+		if (!validateForm()) {
+			return;
+		}
+
+		// Set submitting state to show loading UI
+		setIsSubmitting(true);
+
+		try {
+			// Attempt to sign up
+			await signup(formData.email, formData.password);
+			// If successful, the auth context will handle navigation
+		} catch (err: any) {
+			// This catches any errors not handled by the auth context
+			console.error("Signup error:", err);
+			setFormError(err.message || "An error occurred during signup");
+			setIsSubmitting(false);
+		}
+	};
+
+	// Use combined loading state from auth and local form state
+	const isLoading = loading || isSubmitting;
 
 	return (
 		<main className="relative min-h-screen overflow-y-auto">
@@ -128,7 +207,7 @@ const CreateAccount = () => {
 					</CardHeader>
 
 					<CardContent className="space-y-3 md:space-y-4">
-						<form>
+						<form onSubmit={handleSubmit} noValidate>
 							{/* Name Fields Row */}
 							<div className="grid grid-cols-2 gap-4">
 								<div className="space-y-1">
@@ -141,11 +220,17 @@ const CreateAccount = () => {
 									<Input
 										id="firstName"
 										type="text"
-										// value={formData.firstName}
-										// onChange={handleChange}
+										value={formData.firstName}
+										onChange={handleChange}
 										placeholder="Enter your first name"
-										className="w-full placeholder:text-sm md:placeholder:text-base md:py-5"
+										className={`w-full placeholder:text-sm md:placeholder:text-base md:py-5 ${
+											fieldErrors.firstName ? "border-red-500 focus:ring-red-500" : ""
+										}`}
+										required
 									/>
+									{fieldErrors.firstName && (
+										<p className="text-red-500 text-sm mt-1">{fieldErrors.firstName}</p>
+									)}
 								</div>
 								<div className="space-y-1">
 									<Label
@@ -157,11 +242,17 @@ const CreateAccount = () => {
 									<Input
 										id="lastName"
 										type="text"
-										// value={formData.lastName}
-										// onChange={handleChange}
+										value={formData.lastName}
+										onChange={handleChange}
 										placeholder="Enter your last name"
-										className="w-full placeholder:text-sm md:placeholder:text-base md:py-5"
+										className={`w-full placeholder:text-sm md:placeholder:text-base md:py-5 ${
+											fieldErrors.lastName ? "border-red-500 focus:ring-red-500" : ""
+										}`}
+										required
 									/>
+									{fieldErrors.lastName && (
+										<p className="text-red-500 text-sm mt-1">{fieldErrors.lastName}</p>
+									)}
 								</div>
 							</div>
 
@@ -176,11 +267,17 @@ const CreateAccount = () => {
 								<Input
 									id="email"
 									type="email"
-									// value={formData.email}
-									// onChange={handleChange}
+									value={formData.email}
+									onChange={handleChange}
 									placeholder="Enter your business email"
-									className="w-full placeholder:text-sm md:placeholder:text-base md:py-5"
+									className={`w-full placeholder:text-sm md:placeholder:text-base md:py-5 ${
+										fieldErrors.email ? "border-red-500 focus:ring-red-500" : ""
+									}`}
+									required
 								/>
+								{fieldErrors.email && (
+									<p className="text-red-500 text-sm mt-1">{fieldErrors.email}</p>
+								)}
 							</div>
 
 							{/* Password Field */}
@@ -194,44 +291,42 @@ const CreateAccount = () => {
 								<Input
 									id="password"
 									type="password"
-									// value={formData.password}
-									// onChange={handleChange}
+									value={formData.password}
+									onChange={handleChange}
 									placeholder="Create a password"
-									className="w-full placeholder:text-sm md:placeholder:text-base md:py-5"
+									className={`w-full placeholder:text-sm md:placeholder:text-base md:py-5 ${
+										fieldErrors.password ? "border-red-500 focus:ring-red-500" : ""
+									}`}
 									minLength={8}
+									required
 								/>
-								<p className="text-gray-600 text-sm md:text-base font-normal pt-px">
-									Must be at least 8 characters.
-								</p>
+								{fieldErrors.password ? (
+									<p className="text-red-500 text-sm mt-1">{fieldErrors.password}</p>
+								) : (
+									<p className="text-gray-600 text-sm md:text-base font-normal pt-px">
+										Must be at least 8 characters.
+									</p>
+								)}
 							</div>
 
 							{/* Submit Button */}
-							<Link href="/account-successfully-created">
-							
 							<Button
 								type="submit"
-								// disabled={isLoading}
-								className={`w-full bg-[#FD5C02] hover:bg-orange-600 text-white text-[17px] py-5 font-normal
-								`}
+								disabled={isLoading}
+								className={`w-full bg-[#FD5C02] hover:bg-orange-600 text-white text-[17px] py-5 font-normal ${
+									isLoading ? "opacity-50 cursor-not-allowed" : ""
+								}`}
 							>
-								
-								<span>
-									Create Account
-								</span>{" "}
-								<FaArrowRight className="w-5 h-5 mt-0.5" />
+								{isLoading ? (
+									"Creating account..."
+								) : (
+									<>
+										Create Account{" "}
+										<FaArrowRight className="w-5 h-5 ml-2 mt-0.5" />
+									</>
+								)}
 							</Button>
-							</Link>
 
-							{/* {success && (
-								<div className="mt-4 p-3 bg-green-100 text-green-700 rounded border border-green-300">
-									Account created successfully! Redirecting to dashboard...
-								</div>
-							)} */}
-							{/* {error && (
-								<div className="mt-4 p-3 bg-red-100 text-red-700 rounded border border-red-300">
-									{error}
-								</div>
-							)} */}
 							<p className="text-sm md:text-base text-center text-[#000] pt-4">
 								By signing up, you confirm that you have read and agree to our{" "}
 								<Link href="#" className="text-[#FD5C02] underline">
