@@ -12,7 +12,7 @@ interface BrandProfileDropdownProps {
 		brandName?: string;
 		logoUrl?: string;
 		industry?: string;
-		email?: string;
+		email?: string;          
 	};
 	loading: boolean;
 	dropdownPosition?: "header" | "sidenav";

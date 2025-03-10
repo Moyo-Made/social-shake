@@ -143,7 +143,7 @@ const ContestDashboard = () => {
 	// On component mount, set initial filtered contests to all contests
 	useEffect(() => {
 		setFilteredContests(initialContests);
-	}, []);
+	}, [initialContests],);
 
 	return (
 		<div className="bg-orange-50 p-4 min-h-screen w-full">
