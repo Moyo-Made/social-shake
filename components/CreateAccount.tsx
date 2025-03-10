@@ -59,7 +59,7 @@ const CreateAccount = () => {
 	}, [authError]);
 
 	// Clear form errors when inputs change
-	const handleChange = (e: { target: { id: any; value: any } }) => {
+	const handleChange = (e: { target: { id: string; value: string } }) => {
 		const { id, value } = e.target;
 		setFormData({
 			...formData,
@@ -147,10 +147,14 @@ const CreateAccount = () => {
 			// Attempt to sign up
 			await signup(formData.email, formData.password);
 			// If successful, the auth context will handle navigation
-		} catch (err: any) {
+		} catch (err: unknown) {
 			// This catches any errors not handled by the auth context
 			console.error("Signup error:", err);
-			setFormError(err.message || "An error occurred during signup");
+			if (err instanceof Error) {
+				setFormError(err.message || "An error occurred during signup");
+			} else {
+				setFormError("An error occurred during signup");
+			}
 			setIsSubmitting(false);
 		}
 	};

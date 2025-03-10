@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, SetStateAction, useCallback, useEffect } from "react";
+import { useState, SetStateAction, useCallback, useEffect, useMemo } from "react";
 import { Search } from "lucide-react";
 import {
 	Select,
@@ -22,7 +22,7 @@ const ContestDashboard = () => {
 	const [filteredContests, setFilteredContests] = useState<typeof initialContests>([]);
 
 	// Sample data for contests
-	const initialContests = [
+	const initialContests = useMemo(() => [
 		{
 			id: 1,
 			status: "Active",
@@ -72,7 +72,7 @@ const ContestDashboard = () => {
 			applications: 10,
 			metrics: { views: 0, likes: 0, comments: 0 },
 		},
-	];
+	], []);
 
 	// Use useEffect to apply filters whenever filter states change
 	useEffect(() => {
