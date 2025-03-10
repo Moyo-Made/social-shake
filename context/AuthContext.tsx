@@ -60,10 +60,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 		setLoading(true);
 		try {
 			await signInWithEmailAndPassword(auth, email, password);
-			router.push("/dashboard"); // Redirect to dashboard after login
-		} catch (err: any) {
+			router.push("/account-successfully-created");
+		} catch (err) {
 			console.error(err);
-			setError(err.message || "Failed to login");
+			if (err instanceof Error) {
+				setError(err.message || "Failed to login");
+			} else {
+				setError("Failed to login");
+			}
 		} finally {
 			setLoading(false);
 		}
@@ -73,10 +77,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 		setLoading(true);
 		try {
 			await createUserWithEmailAndPassword(auth, email, password);
-			router.push("/account-successfully-created"); // Redirect to create profile
-		} catch (err: any) {
+			router.push("/account-successfully-created");
+		} catch (err) {
 			console.error(err);
-			setError(err.message || "Failed to create account");
+			if (err instanceof Error) {
+				setError(err.message || "Failed to create account");
+			} else {
+				setError("Failed to create account");
+			}
 		} finally {
 			setLoading(false);
 		}
@@ -87,10 +95,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 		const provider = new GoogleAuthProvider();
 		try {
 			await signInWithPopup(auth, provider);
-			router.push("/dashboard");
-		} catch (err: any) {
+			router.push("/account-successfully-created");
+		} catch (err) {
 			console.error(err);
-			setError(err.message || "Failed to login with Google");
+			if (err instanceof Error) {
+				setError(err.message || "Failed to login with Google");
+			} else {
+				setError("Failed to login with Google");
+			}
 		} finally {
 			setLoading(false);
 		}
@@ -101,10 +113,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 		const provider = new FacebookAuthProvider();
 		try {
 			await signInWithPopup(auth, provider);
-			router.push("/dashboard");
-		} catch (err: any) {
+			router.push("/account-successfully-created");
+		} catch (err) {
 			console.error(err);
-			setError(err.message || "Failed to login with Facebook");
+			if (err instanceof Error) {
+				setError(err.message || "Failed to login with Facebook");
+			} else {
+				setError("Failed to login with Facebook");
+			}
 		} finally {
 			setLoading(false);
 		}
@@ -115,9 +131,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 		try {
 			await signOut(auth);
 			router.push("/login");
-		} catch (err: any) {
+		} catch (err) {
 			console.error(err);
-			setError(err.message || "Failed to logout");
+			if (err instanceof Error) {
+				setError(err.message || "Failed to logout");
+			} else {
+				setError("Failed to logout");
+			}
 		} finally {
 			setLoading(false);
 		}
