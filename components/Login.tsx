@@ -127,7 +127,7 @@ const Login = () => {
       // Attempt to log in
       await login(formData.email, formData.password);
       // If successful, the auth context will handle navigation
-    } catch (err: any) {
+    } catch (err: unknown) {
       // This catches any errors not handled by the auth context
       console.error("Login error:", err);
       setFormError("We're having trouble signing you in. Please try again.");
@@ -244,7 +244,7 @@ const Login = () => {
             
             <div className="flex justify-center space-x-1">
               <p className="text-gray-600 font-medium text-sm md:text-base">
-                Don't have an account?
+                Don&apos;t have an account?
               </p>
               <Link
                 href="/signup"

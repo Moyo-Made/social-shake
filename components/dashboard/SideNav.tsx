@@ -5,6 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useBrandProfile } from "@/hooks/useBrandProfile";
+import BrandProfileDropdown from "@/components/BrandProfileDropdown";
 
 interface MenuItemProps {
 	icon: React.ReactNode;
@@ -32,7 +34,8 @@ const MenuItem: React.FC<MenuItemProps> = ({
 	const isActive =
 		pathname === href ||
 		(pathname.startsWith(href + "/") && href !== "/dashboard") ||
-		(href === "/dashboard/contests" && pathname === "/dashboard/contests/new-contest");
+		(href === "/dashboard/contests" &&
+			pathname === "/dashboard/contests/new-contest");
 
 	const hasActiveSubItem =
 		hasSubItems && subItems.some((item) => pathname === item.href);
@@ -112,6 +115,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
 };
 
 const SideNav: React.FC = () => {
+	const { brandProfile, loading } = useBrandProfile();
 	return (
 		<div className="w-64 bg-[#1A1A1A] text-white min-h-screen flex flex-col justify-between font-satoshi">
 			<nav className="p-4 mt-9">
@@ -223,20 +227,13 @@ const SideNav: React.FC = () => {
 					text="Help & Support"
 				/>
 				<div className="flex items-center justify-between text-white pt-3">
-					<div className="flex items-center gap-3">
-						<div className="h-10 w-10 overflow-hidden ">
-							<img
-								src="/icons/social-shake-profile.svg"
-								alt="Social Shake Profile"
-								className="w-full h-full object-cover"
-							/>
-						</div>
-						<div>
-							<h2 className="text-base font-bold">Social Shake</h2>
-							<p className="text-gray-300 text-sm">sociashake@gmail.com</p>
-						</div>
-					</div>
-					<ChevronDown className="h-4 w-4 text-gray-300" />
+					{brandProfile ? (
+						<BrandProfileDropdown
+							brandProfile={brandProfile}
+							loading={loading}
+							dropdownPosition="sidenav"
+						/>
+					) : null}
 				</div>
 			</div>
 		</div>
@@ -284,6 +281,7 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 }) => {
 	const pathname = usePathname();
 	const pageTitle = getPageTitle(pathname);
+	const { brandProfile, loading } = useBrandProfile();
 
 	return (
 		<div className="flex min-h-screen">
@@ -291,22 +289,21 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 			<div className="flex-1 flex flex-col items-center justify-center bg-[#FFF9F6] font-satoshi ">
 				<header className="bg-white p-4 w-full flex justify-between items-center border-b border-[#FD5C02]">
 					<h1 className="text-xl font-semibold">{pageTitle}</h1>
-					<div className="flex items-center space-x-4">
+					<div className="flex items-center">
 						<Image
 							src="/icons/notification.svg"
 							alt="Notifications"
 							width={20}
 							height={20}
+							className="mr-4"
 						/>
-						<div className="flex gap-2">
-							<Image
-								src="/icons/profile-icon.svg"
-								alt="Profile"
-								width={30}
-								height={30}
+						{brandProfile && (
+							<BrandProfileDropdown
+								brandProfile={brandProfile}
+								loading={loading}
+								dropdownPosition="header"
 							/>
-							<ChevronDown className="h-4 w-4 text-gray-600 mt-1.5" />
-						</div>
+						)}
 					</div>
 				</header>
 				<div className="flex-1 flex items-center justify-center w-full">
