@@ -1,21 +1,17 @@
-import { ContestFormProvider } from "@/components/dashboard/newContest/ContestFormContext";
-import SideNavLayout from "@/components/dashboard/SideNav";
-import ContestDetailPage from "@/components/dashboard/ViewContests/ContestDetails";
-import React from "react";
+import ContestDetailsPage from '@/components/dashboard/ViewContests/ContestDetailsPage'
+import React from 'react'
 
-interface PageParams {
-	contestId: string;
-  }
-
- const page = ({ params }: { params: PageParams }) => {
-	const { contestId } = params;
-  return (
-    <SideNavLayout>
-      <ContestFormProvider>
-        <ContestDetailPage contestId={contestId} />
-      </ContestFormProvider>
-    </SideNavLayout>
-  );
+interface PageProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  params: any; // Replace 'any' with the appropriate type if known
 }
 
-export default page;
+const Page: React.FC<PageProps> = ({ params }) => {
+  return (
+    <div>
+      <ContestDetailsPage params={params} />
+    </div>
+  )
+}
+
+export default Page
