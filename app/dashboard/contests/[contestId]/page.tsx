@@ -3,7 +3,13 @@ import SideNavLayout from "@/components/dashboard/SideNav";
 import ContestDetailPage from "@/components/dashboard/ViewContests/ContestDetails";
 import React from "react";
 
-export default function Page({ params }: { params: { contestId: string } }) {
+interface PageProps {
+  params: {
+    contestId: string;
+  };
+}
+
+export default function Page({ params }: PageProps) {
   return (
     <SideNavLayout>
       <ContestFormProvider>
