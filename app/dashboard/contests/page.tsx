@@ -2,12 +2,18 @@ import SideNavLayout from "@/components/dashboard/SideNav";
 import ContestDashboard from "@/components/dashboard/ViewContests/ContestDashboard";
 import React from "react";
 
-const page = ({contestId} : { contestId: string }) => {
-	return (
-		<SideNavLayout>
-			<ContestDashboard userId={contestId} />
-		</SideNavLayout>
-	);
+interface PageParams {
+  contestId: string;
+}
+
+const Page = ({ params }: { params: PageParams }) => {
+  const { contestId } = params;
+  
+  return (
+    <SideNavLayout>
+      <ContestDashboard userId={contestId} />
+    </SideNavLayout>
+  );
 };
 
-export default page;
+export default Page;
