@@ -56,13 +56,7 @@ interface Contest {
   };
 }
 
-interface ContestDashboardProps {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    userId: any;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const ContestDashboard: React.FC<ContestDashboardProps> = ({ userId }) => {
+const ContestDashboard = () => {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
