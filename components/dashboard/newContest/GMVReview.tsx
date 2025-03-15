@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
-import { Edit } from "lucide-react";
+import { Edit, ChevronLeft, ChevronRight } from "lucide-react";
 import { useContestForm } from "./ContestFormContext";
 import { format } from "date-fns";
 import Link from "next/link";
@@ -11,7 +11,8 @@ const GMVReview = () => {
 	const { formData } = useContestForm();
 	const { basic, requirements, prizeTimeline } = formData;
 	const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-	const [currentIncentiveIndex] = useState(0);
+	const [currentIncentiveIndex, setCurrentIncentiveIndex] = useState(0);
+	
 	type Incentive = {
 		name?: string;
 		worth?: number;
@@ -19,7 +20,7 @@ const GMVReview = () => {
 		items?: string[];
 	};
 
-	const incentives: Incentive [] = formData.incentives || [];
+	const incentives: Incentive[] = formData.incentives || [];
 
 	// Create a preview URL when a thumbnail is available
 	React.useEffect(() => {
@@ -35,10 +36,22 @@ const GMVReview = () => {
 		return () => URL.revokeObjectURL(objectUrl);
 	}, [basic.thumbnail]);
 
-
 	// Format dates
 	const formatDate = (date: Date | undefined): string => {
 		return date ? format(date, "MMMM d, yyyy") : "Not set";
+	};
+
+	// Navigation functions for incentives
+	const goToPreviousIncentive = () => {
+		if (currentIncentiveIndex > 0) {
+			setCurrentIncentiveIndex(currentIncentiveIndex - 1);
+		}
+	};
+
+	const goToNextIncentive = () => {
+		if (currentIncentiveIndex < incentives.length - 1) {
+			setCurrentIncentiveIndex(currentIncentiveIndex + 1);
+		}
 	};
 
 	// Render current incentive
@@ -50,8 +63,54 @@ const GMVReview = () => {
 				</div>
 			);
 		}
-
-	}
+  
+		const currentIncentive = incentives[currentIncentiveIndex];
+		if (!currentIncentive) {
+			return (
+				<div className="text-gray-500">
+					Incentive not found.
+				</div>
+			);
+		}
+  
+		// Format the worth value as currency
+		const formattedWorth = currentIncentive.worth 
+			? `$${currentIncentive.worth.toLocaleString()} GMV` 
+			: "Not specified";
+  
+		// Parse description items if they exist
+		const descriptionItems = currentIncentive.description 
+			? currentIncentive.description.split(',').map(item => item.trim())
+			: [];
+		
+		return (
+			<div className="space-y-3">
+				<div className="grid grid-cols-2 gap-4">
+					<div>
+						<div className="font-medium text-gray-600">Incentive Name:</div>
+						<div>{currentIncentive.name || "Not specified"}</div>
+					</div>
+					<div>
+						<div className="font-medium text-gray-600">Milestone to Qualify:</div>
+						<div>{formattedWorth}</div>
+					</div>
+				</div>
+				
+				<div>
+					<div className="font-medium text-gray-600">Incentive Details:</div>
+					{descriptionItems.length > 0 ? (
+						<ul className="list-disc pl-5 mt-1">
+							{descriptionItems.map((item, index) => (
+								<li key={index}>{item}</li>
+							))}
+						</ul>
+					) : (
+						<div className="text-gray-500">No details provided</div>
+					)}
+				</div>
+			</div>
+		);
+	};
 
 	return (
 		<div className="flex flex-col gap-6 max-w-4xl mx-auto border border-[#FFBF9B] rounded-xl p-6">
@@ -191,7 +250,7 @@ const GMVReview = () => {
 							{requirements.brandAssets ? (
 								<Link
 									href={requirements.brandAssets}
-                  target="_blank"
+                  					target="_blank"
 									className="text-orange-500 truncate block hover:underline"
 								>
 									{requirements.brandAssets}
@@ -230,22 +289,39 @@ const GMVReview = () => {
 						</div>
 					</div>
 
-					{/* Incentive Section */}
+					{/* Incentive Section with Navigation */}
 					<div className="grid grid-cols-3 gap-4">
-						<div className="font-medium text-gray-600">
-							Incentive {currentIncentiveIndex + 1}
+						<div className="font-medium text-gray-600 flex items-center">
+							<div>
+								Incentive {incentives.length > 0 ? currentIncentiveIndex + 1 : 0} of {incentives.length}
+							</div>
+							{incentives.length > 1 && (
+								<div className="flex ml-2">
+									<button 
+										onClick={goToPreviousIncentive}
+										disabled={currentIncentiveIndex === 0}
+										className={`p-1 rounded ${currentIncentiveIndex === 0 ? 'text-gray-300' : 'text-gray-600 hover:bg-gray-100'}`}
+									>
+										<ChevronLeft className="h-4 w-4" />
+									</button>
+									<button 
+										onClick={goToNextIncentive}
+										disabled={currentIncentiveIndex === incentives.length - 1}
+										className={`p-1 rounded ${currentIncentiveIndex === incentives.length - 1 ? 'text-gray-300' : 'text-gray-600 hover:bg-gray-100'}`}
+									>
+										<ChevronRight className="h-4 w-4" />
+									</button>
+								</div>
+							)}
 						</div>
 						<div className="col-span-2">
 							{renderCurrentIncentive()}
 						</div>
 					</div>
-
-					
 				</div>
 			</div>
 		</div>
 	);
-}
-
+};
 
 export default GMVReview;

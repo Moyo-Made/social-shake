@@ -1,20 +1,33 @@
-import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'next/router';
-import { useEffect } from 'react';
+"use client"
 
-export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+
+export default function DashboardProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
+    // Check authentication status after loading is complete
+    if (!loading) {
+      if (user) {
+        setIsAuthorized(true);
+      } else {
+        // Redirect to login if no authenticated user
+        router.replace('/login');
+      }
     }
   }, [user, loading, router]);
 
+  // Show loading state while checking authentication
   if (loading) {
-    return <div>Loading...</div>;
+    return <div className="flex items-center justify-center h-screen">
+      <p>Loading dashboard...</p>
+    </div>;
   }
 
-  return <>{user ? children : null}</>;
+  // Only render children if user is authenticated
+  return isAuthorized ? children : null;
 }

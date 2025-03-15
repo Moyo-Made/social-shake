@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Check, ChevronLeft, Mail, Search, X } from "lucide-react";
 
-const Applications = () => {
+const Applications= () => {
 	// Sample data for creators
 	const initialCreators = [
 		{

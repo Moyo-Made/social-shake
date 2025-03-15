@@ -77,7 +77,7 @@ const BrandProfileDropdown: React.FC<BrandProfileDropdownProps> = ({
 				onClick={() => setIsOpen(!isOpen)}
 			>
 				{dropdownPosition === "sidenav" && (
-					<div className="flex items-center gap-3">
+					<div className="flex items-center gap-2">
 						<div className="h-10 w-10 overflow-hidden rounded-full">
 							{loading ? (
 								<div className="w-10 h-10 bg-gray-700 rounded-full animate-pulse"></div>

@@ -1,5 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+
+/config/social-shake-firebase-adminsdk-a2y0c-7c0a54d036.json
 # dependencies
 /node_modules
 /.pnp

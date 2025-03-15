@@ -141,10 +141,11 @@ const Login = () => {
   return (
     <main className="relative overflow-hidden min-h-screen">
       <div className="absolute inset-0">
-        <img
+        <Image
           src="/images/social-shake-bg.png"
           alt="Background Image"
-          className="w-full h-full object-cover"
+          layout="fill"
+          objectFit="cover"
         />
       </div>
 

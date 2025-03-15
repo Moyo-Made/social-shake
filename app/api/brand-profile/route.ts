@@ -1,84 +1,132 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, storage } from "@/config/firebase";
-import { doc, setDoc, getDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { adminDb, adminStorage } from "@/config/firebase-admin";
 
 export async function POST(request: NextRequest) {
   try {
-    // To handle multipart/form-data (for file uploads)
     const formData = await request.formData();
-    
-    // Extract the file if present
-    const imageFile = formData.get("image") as File | null;
-    
-    // Extract other form data
+    const imageFile = formData.get("logo") as File | null;
     const email = formData.get("email") as string;
-    
-    // Create an object from the form data, excluding the image file
-    const formDataObj: Record<string, string | File> = {};
+
+    const formDataObj: Record<string, string> = {};
     formData.forEach((value, key) => {
-      // Skip the image file in the data object
-      if (key !== "image") {
+      if (key !== "logo" && typeof value === "string") {
         formDataObj[key] = value;
       }
     });
 
     if (!email) {
-      return NextResponse.json(
-        { error: "Email is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
-    // Create a document reference with the email as ID
-    const brandRef = doc(db, "brandProfiles", email);
-    
-    // Check if the document already exists
-    const docSnap = await getDoc(brandRef);
-    
-    // Initialize the profile data
-    const profileData: { updatedAt: string; createdAt: string; imageUrl?: string } = {
+    // Using Admin SDK for Firestore operations
+    const brandRef = adminDb.collection("brandProfiles").doc(email);
+    const docSnap = await brandRef.get();
+
+    const profileData: Record<string, string | number | boolean | null> = {
       ...formDataObj,
       updatedAt: new Date().toISOString(),
-      createdAt: docSnap.exists() ? docSnap.data().createdAt : new Date().toISOString(),
+      createdAt: docSnap.exists
+        ? docSnap.data()?.createdAt
+        : new Date().toISOString(),
     };
-    
-    // Handle image upload if a file was provided
-    if (imageFile) {
-      // Create a reference to the storage location
-      const storageRef = ref(storage, `brand-images/${email}/${Date.now()}_${imageFile.name}`);
-      
-      // Convert File to ArrayBuffer for uploadBytes
-      const buffer = await imageFile.arrayBuffer();
-      
-      // Upload the file
-      const snapshot = await uploadBytes(storageRef, buffer);
-      
-      // Get the download URL
-      const imageUrl = await getDownloadURL(snapshot.ref);
-      
-      // Add the image URL to the profile data
-      profileData.imageUrl = imageUrl;
-    }
-    
-    // Save to Firestore
-    await setDoc(brandRef, profileData);
 
-    return NextResponse.json({ 
-      success: true, 
+    // Handle image upload if file exists
+    if (imageFile && imageFile.size > 0) {
+      try {
+        console.log(`Processing image: ${imageFile.name}, size: ${imageFile.size} bytes`);
+        
+        // Check if the file is actually an image by examining its type
+        if (!imageFile.type.startsWith('image/')) {
+          throw new Error(`Invalid file type: ${imageFile.type}. Only images are accepted.`);
+        }
+        
+        // Get buffer from File object
+        const arrayBuffer = await imageFile.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        
+        if (buffer.length === 0) {
+          throw new Error('File buffer is empty');
+        }
+        
+        console.log(`Buffer created successfully, size: ${buffer.length} bytes`);
+        
+        // Use a simpler file path with fewer special characters
+        const timestamp = Date.now();
+        const fileExtension = imageFile.name.split('.').pop() || 'jpg';
+        const fileName = `${timestamp}.${fileExtension}`;
+        const filePath = `brand-images/${email}/${fileName}`;
+        
+        // Get bucket and create file reference
+        const bucket = adminStorage.bucket();
+        const fileRef = bucket.file(filePath);
+        
+        // Upload with simplified options
+        await new Promise((resolve, reject) => {
+          const blobStream = fileRef.createWriteStream({
+            metadata: {
+              contentType: imageFile.type,
+            },
+            resumable: false
+          });
+          
+          blobStream.on('error', (error) => {
+            console.error('Stream error:', error);
+            reject(error);
+          });
+          
+          blobStream.on('finish', () => {
+            console.log('Upload stream finished');
+            resolve(true);
+          });
+          
+          blobStream.end(buffer);
+        });
+        
+        // Make the file public
+        await fileRef.makePublic();
+        
+        // Get the public URL
+        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
+        console.log(`File uploaded successfully. URL: ${publicUrl}`);
+        
+        profileData.logoUrl = publicUrl;
+      } catch (uploadError: unknown) {
+        console.error('Image upload error details:', uploadError);
+        if (uploadError instanceof Error) {
+          console.error('Error message:', uploadError.message);
+          console.error('Error stack:', uploadError.stack);
+        } else {
+          console.error('Unknown upload error:', uploadError);
+        }
+        
+        // Add the error to profileData but continue with the rest of the request
+        profileData.logoUploadError = uploadError instanceof Error ? uploadError.message : 'Unknown error';
+      }
+    } else if (imageFile) {
+      console.warn('Image file provided but has zero size');
+      profileData.logoUploadError = 'Empty file provided';
+    }
+
+    // Save to Firestore regardless of image upload result
+    await brandRef.set(profileData, { merge: true });
+
+    return NextResponse.json({
+      success: true,
       message: "Brand profile saved successfully",
-      data: profileData
+      data: profileData,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error saving brand profile:", error);
+    const errorMessage = error instanceof Error ? error.message : "Failed to save brand profile";
     return NextResponse.json(
-      { error: "Failed to save brand profile" },
+      { error: errorMessage },
       { status: 500 }
     );
   }
 }
 
 export async function GET(request: NextRequest) {
+  // Your existing GET implementation remains unchanged
   try {
     const { searchParams } = new URL(request.url);
     const email = searchParams.get("email");
@@ -90,18 +138,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get the document from Firestore
-    const brandRef = doc(db, "brandProfiles", email);
-    const docSnap = await getDoc(brandRef);
+    // Using Admin SDK for Firestore
+    const brandRef = adminDb.collection("brandProfiles").doc(email);
+    const docSnap = await brandRef.get();
 
-    if (!docSnap.exists()) {
+    if (!docSnap.exists) {
       return NextResponse.json(
         { error: "Brand profile not found" },
         { status: 404 }
       );
     }
 
-    // Return the brand profile data
     return NextResponse.json(docSnap.data());
   } catch (error) {
     console.error("Error fetching brand profile:", error);

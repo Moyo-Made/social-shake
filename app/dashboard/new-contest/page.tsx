@@ -2,13 +2,13 @@
 
 import React from "react";
 import ContestForm from "@/components/dashboard/newContest/ContestForm";
-import NewContestSideNavLayout from "@/components/dashboard/NewContestSideNav";
+import SideNavLayout from "@/components/dashboard/SideNav";
 
 const page = () => {
 	return (
-		<NewContestSideNavLayout>
+		<SideNavLayout>
 			<ContestForm />
-		</NewContestSideNavLayout>
+		</SideNavLayout>
 	);
 };
 

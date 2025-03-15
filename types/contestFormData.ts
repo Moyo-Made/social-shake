@@ -27,9 +27,11 @@ export interface BasicFormData {
 	criteria: string;
   }
   
-  export type ContestType = "leaderboard" | "gmv";
+  export type ContestType = "Leaderboard" | "GMV";
 
   export interface ContestFormData {
+	brandEmail: string;
+  	status: string;
 	contestType: ContestType | undefined;
 	basic: BasicFormData;
 	requirements: RequirementsFormData;

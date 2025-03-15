@@ -117,7 +117,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
 const SideNav: React.FC = () => {
 	const { brandProfile, loading } = useBrandProfile();
 	return (
-		<div className="w-64 bg-[#1A1A1A] text-white min-h-screen flex flex-col justify-between font-satoshi">
+		<div className="min-w-64 max-w-screen-sm bg-[#1A1A1A] text-white min-h-screen flex flex-col justify-between font-satoshi">
 			<nav className="p-4 mt-9">
 				<div className="space-y-2">
 					<MenuItem
@@ -247,8 +247,8 @@ const getPageTitle = (pathname: string): string => {
 		"/dashboard": "Dashboard",
 		"/projects": "Projects",
 		"/dashboard/contests": "Contests",
-		"/dashboard/contests/new-contest": "New Contest",
-		"/dashboard/contests/edit": "Edit Contest",
+		"/dashboard/new-contest": "New Contest",
+		"/dashboard/edit-contest/": "Edit Contest",
 		"/dashboard/creators": "Creators",
 		"/dashboard/creators/all": "All Creators",
 		"/dashboard/creators/saved": "Saved Creators",
@@ -266,6 +266,10 @@ const getPageTitle = (pathname: string): string => {
 	// More specific matching for different route sections
 	if (pathname.startsWith("/dashboard/contests/")) {
 		return "Contests";
+	}
+
+	if (pathname.startsWith("/dashboard/new-contest/")) {
+		return "New Contest";
 	}
 
 	if (pathname.startsWith("/dashboard/creators/")) {

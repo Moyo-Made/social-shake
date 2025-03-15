@@ -12,27 +12,36 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import React, { useState, useEffect } from "react";
-import { useContestForm } from "./ContestFormContext";
+import { useContestForm } from "./ContestFormContext"; // Add this import
 
 const Basic: React.FC = () => {
+    // Use the contest form context instead of local state
     const { formData, updateBasicData } = useContestForm();
-    const { 
-        contestName, 
-        industry, 
-        description, 
-        rules, 
-        thumbnail,
-        contestType: savedContestType 
-    } = formData.basic;
-
-    const [selectedFile, setSelectedFile] = useState<File | null>(thumbnail);
+    
+    // Get values from context
+    const { basic } = formData;
+    
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [dragActive, setDragActive] = useState(false);
+
+    // Initialize preview URL from context if available
+    useEffect(() => {
+        // If there's a string URL in the context
+        if (typeof basic.thumbnail === 'string') {
+            setPreviewUrl(basic.thumbnail as string);
+        } else if (basic.thumbnail instanceof File) {
+            // If there's a File object
+            setSelectedFile(basic.thumbnail);
+            const objectUrl = URL.createObjectURL(basic.thumbnail);
+            setPreviewUrl(objectUrl);
+            return () => URL.revokeObjectURL(objectUrl);
+        }
+    }, [basic.thumbnail]);
 
     // Create a preview URL when a file is selected
     useEffect(() => {
         if (!selectedFile) {
-            setPreviewUrl(null);
             return;
         }
 
@@ -43,7 +52,7 @@ const Basic: React.FC = () => {
         return () => URL.revokeObjectURL(objectUrl);
     }, [selectedFile]);
 
-    // Update the context whenever form fields change
+    // Update form fields using the context
     const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         updateBasicData({ contestName: e.target.value });
     };
@@ -95,7 +104,7 @@ const Basic: React.FC = () => {
         }
     };
 
-    const handleContestTypeChange = (type: "leaderboard" | "gmv") => {
+    const handleContestTypeChange = (type: "Leaderboard" | "GMV") => {
         updateBasicData({ contestType: type });
     };
 
@@ -107,7 +116,7 @@ const Basic: React.FC = () => {
             <Input
                 className="mt-1"
                 placeholder="Best TikTok Ad for XYZ Shoes"
-                value={contestName}
+                value={basic.contestName}
                 onChange={handleNameChange}
             />
 
@@ -119,22 +128,22 @@ const Basic: React.FC = () => {
                     <div
                         className={cn(
                             "relative rounded-2xl p-5 cursor-pointer transition-all duration-200",
-                            savedContestType === "leaderboard"
+                            basic.contestType === "Leaderboard"
                                 ? "border-2 border-orange-500 bg-orange-50"
                                 : "border border-gray-200 bg-white hover:border-gray-300"
                         )}
-                        onClick={() => handleContestTypeChange("leaderboard")}
+                        onClick={() => handleContestTypeChange("Leaderboard")}
                     >
                         <div className="absolute top-4 left-4">
                             <div
                                 className={cn(
                                     "w-4 h-4 rounded-full flex items-center justify-center",
-                                    savedContestType === "leaderboard"
+                                    basic.contestType === "Leaderboard"
                                         ? "border-2 border-orange-500"
                                         : "border border-gray-300"
                                 )}
                             >
-                                {savedContestType === "leaderboard" && (
+                                {basic.contestType === "Leaderboard" && (
                                     <div className="w-2.5 h-2.5 bg-orange-500 rounded-full" />
                                 )}
                             </div>
@@ -166,22 +175,22 @@ const Basic: React.FC = () => {
                     <div 
                         className={cn(
                             "relative rounded-2xl p-5 cursor-pointer transition-all duration-200",
-                            savedContestType === "gmv"
+                            basic.contestType === "GMV"
                                 ? "border-2 border-orange-500 bg-orange-50"
                                 : "border border-gray-200 bg-white hover:border-gray-300"
                         )}
-                        onClick={() => handleContestTypeChange("gmv")}
+                        onClick={() => handleContestTypeChange("GMV")}
                     >
                         <div className="absolute top-4 left-4">
                             <div
                                 className={cn(
                                     "w-4 h-4 rounded-full flex items-center justify-center",
-                                    savedContestType === "gmv"
+                                    basic.contestType === "GMV"
                                         ? "border-2 border-orange-500"
                                         : "border border-gray-300"
                                 )}
                             >
-                                {savedContestType === "gmv" && (
+                                {basic.contestType === "GMV" && (
                                     <div className="w-2.5 h-2.5 bg-orange-500 rounded-full" />
                                 )}
                             </div>
@@ -210,7 +219,7 @@ const Basic: React.FC = () => {
             <label className="block text-base font-medium text-gray-700 mt-4 mb-1">
                 Contest Industry
             </label>
-            <Select value={industry} onValueChange={handleIndustryChange}>
+            <Select value={basic.industry} onValueChange={handleIndustryChange}>
                 <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select Industry" />
                 </SelectTrigger>
@@ -229,7 +238,7 @@ const Basic: React.FC = () => {
                 className="mt-1"
                 rows={3}
                 placeholder="We're looking for an energetic and engaging TikTok ad for XYZ Shoes. Highlight comfort and style, and encourage users to try them out!"
-                value={description}
+                value={basic.description}
                 onChange={handleDescriptionChange}
             />
 
@@ -240,7 +249,7 @@ const Basic: React.FC = () => {
                 className="mt-1"
                 rows={5}
                 placeholder={` • Content must meet all brand guidelines (duration, aspect ratio, tone).\n • Only original content will be accepted—no copyrighted material.\n • Winners will be determined based on leaderboard rankings (views/likes).\n • The brand reserves the right to request revisions or disqualify incomplete entries.`}
-                value={rules}
+                value={basic.rules}
                 onChange={handleRulesChange}
             />
 
@@ -270,7 +279,7 @@ const Basic: React.FC = () => {
                             />
                         </div>
                         <p className="text-green-600">
-                            {selectedFile?.name} - Click or drop to change
+                            {selectedFile?.name || "Uploaded image"} - Click or drop to change
                         </p>
                     </div>
                 ) : (

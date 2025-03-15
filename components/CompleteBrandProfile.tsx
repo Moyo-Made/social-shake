@@ -17,8 +17,8 @@ import { Button } from "./ui/button";
 import { FaArrowRight } from "react-icons/fa6";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useBrandProfile } from "@/hooks/useBrandProfile";
 
-// This interface defines the structure of our form data
 interface BrandProfileData {
 	brandName: string;
 	phoneNumber: string;
@@ -42,8 +42,14 @@ interface BrandProfileData {
 const BrandProfileForm = () => {
 	const router = useRouter();
 	const { user } = useAuth();
+	const {
+		brandProfile,
+		loading,
+		error: hookError,
+		updateBrandProfile,
+	} = useBrandProfile();
 
-	// Initialize form state with the user's email if available
+	// Initialize form state with empty values
 	const [formData, setFormData] = useState<BrandProfileData>({
 		brandName: "",
 		phoneNumber: "",
@@ -66,52 +72,47 @@ const BrandProfileForm = () => {
 	const [selectedFile, setSelectedFile] = useState<File | null>(null);
 	const [dragActive, setDragActive] = useState(false);
 	const [logoPreview, setLogoPreview] = useState<string | null>(null);
-	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
-	// Fetch existing brand profile when component mounts
+	// Update form data when brandProfile is loaded
 	useEffect(() => {
-    const fetchBrandProfile = async () => {
-      if (!user?.email) {
-        setIsLoading(false);
-        return;
-      }
-  
-      try {
-        const response = await fetch(`/api/brand-profile?email=${user.email}`);
-  
-        if (response.ok) {
-          const data = await response.json();
-          console.log("API Response:", data);
-  
-          // Extract social media data from flattened structure
-          const socialMediaData = {
-            facebook: data["socialMedia.facebook"] || "",
-            instagram: data["socialMedia.instagram"] || "",
-            tiktok: data["socialMedia.tiktok"] || "",
-          };
-  
-          // Update form data with extracted social media data
-          setFormData({
-            ...data,
-            logo: null, // Reset file input
-            socialMedia: socialMediaData,
-          });
-  
-          // Set logo preview if available
-          if (data.logoUrl) {
-            setLogoPreview(data.logoUrl);
-          }
-        }
-      } catch (err) {
-        console.error("Error fetching brand profile:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-  
-    fetchBrandProfile();
-  }, [user]);
+		if (brandProfile) {
+			// Extract social media data from flattened structure or use defaults
+			const socialMediaData = {
+				facebook: brandProfile["socialMedia.facebook"] || "",
+				instagram: brandProfile["socialMedia.instagram"] || "",
+				tiktok: brandProfile["socialMedia.tiktok"] || "",
+			};
+
+			setFormData({
+				brandName: brandProfile.brandName || "",
+				phoneNumber: brandProfile.phoneNumber || "",
+				email: brandProfile.email || user?.email || "",
+				address: brandProfile.address || "",
+				website: brandProfile.website || "",
+				industry: brandProfile.industry || "",
+				logo: null, // Reset file input
+				logoUrl: brandProfile.logoUrl,
+				marketingGoal: brandProfile.marketingGoal || "",
+				otherGoal: brandProfile.otherGoal || "",
+				socialMedia: socialMediaData,
+				targetAudience: brandProfile.targetAudience || "",
+				userId: user?.uid,
+			});
+
+			// Set logo preview if available
+			if (brandProfile.logoUrl) {
+				setLogoPreview(brandProfile.logoUrl);
+			}
+		}
+	}, [brandProfile, user]);
+
+	// Set error from hook
+	useEffect(() => {
+		if (hookError) {
+			setError(hookError);
+		}
+	}, [hookError]);
 
 	const handleDrag = (e: {
 		preventDefault: () => void;
@@ -233,20 +234,14 @@ const BrandProfileForm = () => {
 				formDataToSubmit.append("logo", selectedFile);
 			}
 
-			// Submit everything to the brand-profile endpoint
-			const response = await fetch("/api/brand-profile", {
-				method: "POST",
-				body: formDataToSubmit,
-			});
+			// Use the updateBrandProfile function from the hook
+			const result = await updateBrandProfile(formDataToSubmit);
 
-			if (!response.ok) {
-				const data = await response.json();
-				throw new Error(data.error || "Failed to save brand profile");
+			if (!result.success) {
+				throw new Error(result.error || "Failed to save brand profile");
 			}
 
 			// Success handling
-			setIsSubmitting(false);
-
 			// Store basic brand info in localStorage for immediate use
 			localStorage.setItem("brandName", formData.brandName);
 			if (logoPreview) localStorage.setItem("brandLogo", logoPreview);
@@ -255,11 +250,12 @@ const BrandProfileForm = () => {
 		} catch (error) {
 			console.error("Submission error:", error);
 			setError(error instanceof Error ? error.message : String(error));
+		} finally {
 			setIsSubmitting(false);
 		}
 	};
 
-	if (isLoading) {
+	if (loading) {
 		return (
 			<div className="w-full max-w-2xl mx-auto p-12 font-satoshi">
 				<div className="flex justify-center items-center h-64">
