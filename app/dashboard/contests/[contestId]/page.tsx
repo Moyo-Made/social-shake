@@ -3,11 +3,16 @@ import SideNavLayout from "@/components/dashboard/SideNav";
 import ContestDetailPage from "@/components/dashboard/ViewContests/ContestDetails";
 import React from "react";
 
- const page = () => {
+interface PageParams {
+	contestId: string;
+  }
+
+ const page = ({ params }: { params: PageParams }) => {
+	const { contestId } = params;
   return (
     <SideNavLayout>
       <ContestFormProvider>
-        <ContestDetailPage contestId={""} />
+        <ContestDetailPage contestId={contestId} />
       </ContestFormProvider>
     </SideNavLayout>
   );
