@@ -57,6 +57,7 @@ interface Contest {
 }
 
 interface ContestDashboardProps {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     userId: any;
 }
 
