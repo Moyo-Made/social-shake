@@ -3,7 +3,7 @@ import SideNavLayout from "@/components/dashboard/SideNav";
 import ContestDetailPage from "@/components/dashboard/ViewContests/ContestDetails";
 import React from "react";
 
-export default function Page() {
+ const page = () => {
   return (
     <SideNavLayout>
       <ContestFormProvider>
@@ -12,3 +12,5 @@ export default function Page() {
     </SideNavLayout>
   );
 }
+
+export default page;
