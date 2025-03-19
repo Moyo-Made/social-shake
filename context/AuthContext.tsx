@@ -31,18 +31,12 @@ type AuthContextType = {
   loginWithFacebook: () => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
-  sendOTPEmail: (email: string, otp: string) => Promise<boolean>; // Add this line
   clearError: () => void;
 };
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 export const useAuth = () => useContext(AuthContext);
-
-// Helper function to generate OTP
-const generateOTP = () => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-};
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -86,11 +80,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Create the user
       await createUserWithEmailAndPassword(auth, email, password);
       
-      // Generate and send OTP for verification
-      const otp = generateOTP();
-      await sendOTPEmail(email, otp);
-      
-      // Redirect to verification page instead of success page
+      // Redirect to success page
       router.push(`/account-successfully-created`);
     } catch (err) {
       console.error(err);
@@ -174,39 +164,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const sendOTPEmail = async (email: string, otp: string) => {
-    try {
-      const response = await fetch('/api/auth/send-otp', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          otp,
-          message: "Your verification code is valid for 10 minutes."
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to send verification email');
-      }
-      
-      console.log('Email sent successfully');
-      return true;
-    } catch (error) {
-      console.error('Failed to send email:', error);
-      if (error instanceof Error) {
-        setError(error.message || "Failed to send verification email");
-      } else {
-        setError("Failed to send verification email");
-      }
-      return false;
-    }
-  };
-
   return (
     <AuthContext.Provider
       value={{
@@ -219,7 +176,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         loginWithFacebook,
         logout,
         resetPassword,
-        sendOTPEmail, 
         clearError,
       }}
     >
