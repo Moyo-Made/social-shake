@@ -6,7 +6,7 @@ import Link from "next/link";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useBrandProfile } from "@/hooks/useBrandProfile";
-import BrandProfileDropdown from "@/components/BrandProfileDropdown";
+import BrandProfileDropdown from "@/components/brandProfile/BrandProfileDropdown";
 
 interface MenuItemProps {
 	icon: React.ReactNode;

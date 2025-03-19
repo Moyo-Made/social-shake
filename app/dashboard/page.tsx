@@ -1,4 +1,4 @@
-import EmptyContest from "@/components/dashboard/Contests";
+import EmptyContest from "@/components/brandProfile/dashboard/Contests";
 import DashboardProtectedRoute from "@/components/ProtectedRoute";
 import React from "react";
 

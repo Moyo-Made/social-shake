@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
-import { Button } from "./ui/button";
+import { Button } from "../ui/button";
 import { FaArrowRight } from "react-icons/fa6";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -327,7 +327,6 @@ const BrandProfileForm = () => {
 									placeholder="info@social-shake.com"
 									type="email"
 									required
-									disabled={!!user?.email} // Disable if user is logged in
 								/>
 							</div>
 						</div>

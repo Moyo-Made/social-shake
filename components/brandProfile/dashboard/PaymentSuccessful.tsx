@@ -2,17 +2,16 @@ import React from "react";
 import SideNavLayout from "./SideNav";
 import Image from "next/image";
 import Link from "next/link";
-import { Button } from "../ui/button";
-import { Card, CardContent, CardHeader } from "../ui/card";
+import { Button } from "../../ui/button";
+import { Card, CardContent, CardHeader } from "../../ui/card";
 import { FaArrowRight } from "react-icons/fa6";
 
 const PaymentSuccessful = () => {
 	return (
 		<SideNavLayout>
-
 			{/* Dark Overlay */}
 			<div className="absolute inset-0 bg-black/50" />
-			
+
 			{/* Payment Successful Card */}
 			<div className="relative flex items-center justify-center px-4 py-16 xl:py-24 font-satoshi">
 				<Card className="w-full max-w-md bg-white border border-[#FFBF9B] backdrop-blur-sm px-[2px] py-[6px] md:px-[30px] md:py-[10px]">

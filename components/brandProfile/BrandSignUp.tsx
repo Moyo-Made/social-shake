@@ -1,22 +1,22 @@
 "use client";
 
 import React from "react";
-import { Button } from "./ui/button";
-import { Card, CardContent, CardHeader } from "./ui/card";
+import { Button } from "../ui/button";
+import { Card, CardContent, CardHeader } from "../ui/card";
 import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 
 const BusinessSignup = () => {
-	const { loginWithGoogle, loginWithFacebook, loading } = useAuth();
+	const { loginWithGoogle, loading } = useAuth();
 
 	const handleGoogleSignup = async () => {
 		await loginWithGoogle();
 	};
 
-	const handleFacebookSignup = async () => {
-		await loginWithFacebook();
-	};
+	// const handleFacebookSignup = async () => {
+	// 	await loginWithFacebook();
+	// };
 
 	return (
 		<main className="relative overflow-hidden min-h-screen">
@@ -90,9 +90,9 @@ const BusinessSignup = () => {
 								width={20}
 								height={20}
 							/>
-							 Sign up with Google
+							Sign up with Google
 						</Button>
-						<Button
+						{/* <Button
 							variant="outline"
 							className="w-full text-base md:text-[17px] py-5 font-normal border border-gray-300"
 							onClick={handleFacebookSignup}
@@ -106,8 +106,8 @@ const BusinessSignup = () => {
 								height={20}
 							/>
 							Sign up with Facebook
-						</Button>
-						
+						</Button> */}
+
 						<p className="text-sm md:text-base text-center text-[#000] pt-2">
 							By signing up, you confirm that you have read and agree to our{" "}
 							<Link href="#" className="text-[#FD5C02] hover:underline">

@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Button } from "./ui/button";
 import Link from "next/link";
 import { FaArrowRight } from "react-icons/fa6";
-import EmptyContest from "./dashboard/Contests";
+import EmptyContest from "./brandProfile/dashboard/Contests";
 
 const SignUpComplete = () => {
 	return (

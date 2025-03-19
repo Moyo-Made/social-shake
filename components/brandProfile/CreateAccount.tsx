@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader } from "./ui/card";
+import { Card, CardContent, CardHeader } from "../ui/card";
 import Image from "next/image";
-import { Label } from "./ui/label";
-import { Input } from "./ui/input";
+import { Label } from "../ui/label";
+import { Input } from "../ui/input";
 import { FaArrowRight, FaArrowLeft } from "react-icons/fa6";
-import { Button } from "./ui/button";
+import { Button } from "../ui/button";
 import { useAuth } from "@/context/AuthContext";
 
 const CreateAccount = () => {

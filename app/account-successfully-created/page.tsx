@@ -1,4 +1,4 @@
-import AccountCreated from '@/components/AccountCreated'
+import AccountCreated from '@/components/brandProfile/AccountCreated'
 import React from 'react'
 
 const page = () => {

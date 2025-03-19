@@ -1,4 +1,4 @@
-import CreateAccount from '@/components/CreateAccount'
+import CreateAccount from '@/components/brandProfile/CreateAccount'
 import React from 'react'
 
 const page = () => {

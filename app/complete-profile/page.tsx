@@ -1,12 +1,12 @@
-import CompleteBrandProfile from '@/components/CompleteBrandProfile'
-import React from 'react'
+import CompleteBrandProfile from "@/components/brandProfile/CompleteBrandProfile";
+import React from "react";
 
 const page = () => {
-  return (
-	<div>
-	  <CompleteBrandProfile />
-	</div>
-  )
-}
+	return (
+		<div>
+			<CompleteBrandProfile />
+		</div>
+	);
+};
 
-export default page
+export default page;
