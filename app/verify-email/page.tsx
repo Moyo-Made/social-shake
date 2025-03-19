@@ -1,10 +1,10 @@
-import VerificationCodeInput from '@/components/VerifyEmail'
+// import VerificationCodeInput from '@/components/VerifyEmail'
 import React from 'react'
 
 const page = () => {
   return (
 	<div>
-	  <VerificationCodeInput />
+	  {/* <VerificationCodeInput /> */}
 	</div>
   )
 }
