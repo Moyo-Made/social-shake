@@ -126,12 +126,14 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  // Your existing GET implementation remains unchanged
   try {
     const { searchParams } = new URL(request.url);
     const email = searchParams.get("email");
 
+    console.log('Received email for profile lookup:', email);
+
     if (!email) {
+      console.warn('No email provided in request');
       return NextResponse.json(
         { error: "Email is required" },
         { status: 400 }
@@ -142,18 +144,27 @@ export async function GET(request: NextRequest) {
     const brandRef = adminDb.collection("brandProfiles").doc(email);
     const docSnap = await brandRef.get();
 
+    console.log('Document exists:', docSnap.exists);
+
     if (!docSnap.exists) {
+      console.warn(`No profile found for email: ${email}`);
       return NextResponse.json(
         { error: "Brand profile not found" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json(docSnap.data());
+    const profileData = docSnap.data();
+    console.log('Retrieved profile data:', profileData);
+
+    return NextResponse.json(profileData);
   } catch (error) {
-    console.error("Error fetching brand profile:", error);
+    console.error("Detailed error fetching brand profile:", error);
     return NextResponse.json(
-      { error: "Failed to fetch brand profile" },
+      { 
+        error: "Failed to fetch brand profile", 
+        details: error instanceof Error ? error.message : String(error)
+      },
       { status: 500 }
     );
   }
