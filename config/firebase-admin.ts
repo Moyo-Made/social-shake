@@ -15,6 +15,9 @@ function initializeFirebaseAdmin() {
     'FIREBASE_CLIENT_EMAIL',
     'FIREBASE_PRIVATE_KEY'
   ];
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY
+  ? Buffer.from(process.env.FIREBASE_PRIVATE_KEY, 'base64').toString('utf-8')
+  : undefined;
 
   requiredEnvVars.forEach(varName => {
     if (!process.env[varName]) {
@@ -28,12 +31,10 @@ function initializeFirebaseAdmin() {
       credential: cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY
-          ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-          : undefined
+        privateKey: privateKey
       }),
       // Optional: Add storage bucket if needed
-      storageBucket: process.env.FIREBASE_STORAGE_BUCKET
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
     });
 
     return app;
