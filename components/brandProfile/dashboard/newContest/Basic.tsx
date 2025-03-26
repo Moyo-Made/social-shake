@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import React, { useState, useEffect } from "react";
-import { useContestForm } from "./ContestFormContext"; // Add this import
+import { useContestForm } from "./ContestFormContext";
 
 const Basic: React.FC = () => {
     // Use the contest form context instead of local state
@@ -26,18 +26,24 @@ const Basic: React.FC = () => {
     const [dragActive, setDragActive] = useState(false);
 
     // Initialize preview URL from context if available
-    useEffect(() => {
-        // If there's a string URL in the context
-        if (typeof basic.thumbnail === 'string') {
-            setPreviewUrl(basic.thumbnail as string);
-        } else if (basic.thumbnail instanceof File) {
-            // If there's a File object
-            setSelectedFile(basic.thumbnail);
-            const objectUrl = URL.createObjectURL(basic.thumbnail);
-            setPreviewUrl(objectUrl);
-            return () => URL.revokeObjectURL(objectUrl);
-        }
-    }, [basic.thumbnail]);
+        useEffect(() => {
+            if (!basic.thumbnail) {
+                // Reset preview and selected file if no thumbnail
+                setPreviewUrl(null);
+                setSelectedFile(null);
+                return;
+            }
+        
+            if (typeof basic.thumbnail === 'string') {
+                setPreviewUrl(basic.thumbnail);
+                setSelectedFile(null);
+            } else if (basic.thumbnail instanceof File) {
+                setSelectedFile(basic.thumbnail);
+                const objectUrl = URL.createObjectURL(basic.thumbnail);
+                setPreviewUrl(objectUrl);
+                return () => URL.revokeObjectURL(objectUrl);
+            }
+        }, [basic.thumbnail]);
 
     // Create a preview URL when a file is selected
     useEffect(() => {

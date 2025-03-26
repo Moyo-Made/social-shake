@@ -33,6 +33,12 @@ const satoshi = localFont({
 export const metadata: Metadata = {
 	title: "Social Shake",
 	description: "",
+	icons: {
+		icon: [
+		  { url: '/images/logo.svg', type: 'image/svg+xml' },
+		],
+		apple: { url: '/images/logo.svg', sizes: '180x180' },
+	  }
 };
 
 export default function RootLayout({

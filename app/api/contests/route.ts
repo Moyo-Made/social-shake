@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb, adminStorage } from "@/config/firebase-admin"; // Use admin SDK
+import { adminDb, adminStorage } from "@/config/firebase-admin";
 
-// Updated processThumbnail function with proper type annotations
 async function processThumbnail(
   thumbnail: File | null,
   contestId: string,
-  userId: string
+  userId: string,
+  existingThumbnail?: string | null
 ): Promise<string | null> {
+  // If no new thumbnail is provided, return the existing thumbnail
   if (!thumbnail || thumbnail.size === 0) {
-    console.log("No valid thumbnail provided");
-    return null;
+    return existingThumbnail || null; 
   }
 
   try {
@@ -28,9 +28,6 @@ async function processThumbnail(
       throw new Error('File buffer is empty');
     }
     
-    console.log(`Buffer created successfully, size: ${buffer.length} bytes`);
-    
-    // Use userId instead of brandEmail in the file path
     const timestamp = Date.now();
     const fileExtension = thumbnail.name.split('.').pop() || 'jpg';
     const fileName = `${timestamp}.${fileExtension}`;
@@ -38,9 +35,10 @@ async function processThumbnail(
     
     // Get bucket and create file reference
     const bucket = adminStorage.bucket();
+    console.log('Storage bucket details:', adminStorage.bucket().name);
     const fileRef = bucket.file(filePath);
     
-    // Upload using the simplified approach from brand profile route
+    // Upload file
     await new Promise<void>((resolve, reject) => {
       const blobStream = fileRef.createWriteStream({
         metadata: {
@@ -77,7 +75,7 @@ async function processThumbnail(
       console.error('Error message:', error.message);
       console.error('Error stack:', error.stack);
     }
-    return null;
+    return existingThumbnail || null;
   }
 }
 
@@ -238,33 +236,37 @@ export async function POST(request: NextRequest) {
 
       // Process the thumbnail
       let thumbnailUrl: string | null = null;
-      
+
       if (thumbnailFile) {
-        // Use the new method for file upload with userId instead of brandEmail
+        // Existing File upload logic
         thumbnailUrl = await processThumbnail(thumbnailFile, contestId, userId);
-      } else if (basic.thumbnail && typeof basic.thumbnail === "string" && basic.thumbnail.startsWith("data:")) {
-        // Handle base64 string (for backward compatibility)
-        const imageBuffer = Buffer.from(
-          basic.thumbnail.replace(/^data:image\/\w+;base64,/, ""),
-          "base64"
-        );
-
-        const bucket = adminStorage.bucket();
-        const timestamp = Date.now();
-        // Update path to use userId instead of brandEmail
-        const filePath = `contest-images/${userId}/${contestId}/${timestamp}.jpg`;
-        const file = bucket.file(filePath);
-
-        await file.save(imageBuffer, {
-          metadata: {
-            contentType: "image/jpeg",
-          },
-        });
-
-        await file.makePublic();
-        thumbnailUrl = `https://storage.googleapis.com/${bucket.name}/${file.name}`;
+      } else if (basic.thumbnail && typeof basic.thumbnail === "string") {
+        // Handle base64 or existing URL
+        if (basic.thumbnail.startsWith("data:")) {
+          // Convert base64 to file upload
+          const imageBuffer = Buffer.from(
+            basic.thumbnail.replace(/^data:image\/\w+;base64,/, ""),
+            "base64"
+          );
+      
+          const bucket = adminStorage.bucket();
+          const timestamp = Date.now();
+          const filePath = `contest-images/${userId}/${contestId}/${timestamp}.jpg`;
+          const file = bucket.file(filePath);
+      
+          await file.save(imageBuffer, {
+            metadata: {
+              contentType: "image/jpeg",
+            },
+          });
+      
+          await file.makePublic();
+          thumbnailUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
+        } else {
+          // If it's already a valid URL, use it directly
+          thumbnailUrl = basic.thumbnail;
+        }
       }
-
       // Format dates
       const startDate = prizeTimeline.startDate
         ? new Date(prizeTimeline.startDate).toISOString()

@@ -3,33 +3,40 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import Basic from "./Basic";
-import Requirements from "./Requirements";
-import PrizeTimeline from "./PrizeTimeline";
-import Review from "./Review";
 import { MdOutlinePayment } from "react-icons/md";
 import { useRouter } from "next/navigation";
-import { ContestFormProvider, useContestForm } from "./ContestFormContext";
+import {
+	ProjectFormProvider,
+	useProjectForm,
+} from "../brandProjects/ProjectFormContext";
 import { CheckCircle2, AlertCircle } from "lucide-react";
-import GMVPrizeTimeline from "./GMVPrizeTimeline";
-import GMVReview from "./GMVReview";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/context/AuthContext";
+import ProjectDetails from "./ProjectDetails";
+import UGCOnlyContentRequirements from "./UGCOnlyContentRequirements";
+import CreatorPricingTab from "./CreatorPricing";
+import TikTokShopContentRequirements from "./TikTokShopContentRequirements";
+import TikTokShopCreatorPricingTab from "./TikTokShopCreatorPricing";
+import CreatorProjectReview from "./ProjectReview";
+import TikTokShopProjectReview from "./TikTokShopReview";
 
-const ContestFormContent = () => {
+const ProjectFormContent = () => {
 	const [step, setStep] = useState(1);
 	const router = useRouter();
 	const { user } = useAuth();
 
 	const { formData, isLoading, saveDraft, submitContest, saveCurrentState } =
-		useContestForm();
+		useProjectForm();
 
 	const [submissionError, setSubmissionError] = useState<string | null>(null);
 	const [draftSuccess, setDraftSuccess] = useState<boolean>(false);
 
 	const {
-		prizeTimeline,
-		basic: { contestType = "Leaderboard" },
+		projectDetails: { projectType = "UGC Content" },
+	} = formData;
+
+	const {
+		creatorPricing,
 	} = formData;
 
 	// Save current state when navigating between steps
@@ -75,36 +82,42 @@ const ContestFormContent = () => {
 			// Save current state before submission
 			saveCurrentState();
 
-			console.log("Thumbnail before submission:", formData.basic.thumbnail);
+			console.log(
+				"Thumbnail before submission:",
+				formData.projectDetails.projectThumbnail
+			);
 			// Create FormData for file upload
 			const submitFormData = new FormData();
 
 			// Add the thumbnail file separately
-      if (formData.basic.thumbnail instanceof File) {
-        submitFormData.append("thumbnail", formData.basic.thumbnail);
-    } 
-    submitFormData.append(
-      "basic",
-      JSON.stringify({
-          ...formData.basic,
-          thumbnail: formData.basic.thumbnail instanceof File 
-              ? null  // For new files 
-              : formData.basic.thumbnail  // Preserve existing URL
-      })
-  )
+			if (formData.projectDetails.projectThumbnail instanceof File) {
+				submitFormData.append(
+					"thumbnail",
+					formData.projectDetails.projectThumbnail
+				);
+			}
+
+			// Add the rest of the data as JSON strings
 			submitFormData.append(
-				"requirements",
-				JSON.stringify(formData.requirements)
+				"basic",
+				JSON.stringify({
+					...formData.projectDetails,
+					thumbnail: null, // Don't include the file in the JSON
+				})
 			);
-			submitFormData.append(
-				"prizeTimeline",
-				JSON.stringify(formData.prizeTimeline)
-			);
-			submitFormData.append(
-				"contestType",
-				JSON.stringify(formData.contestType)
-			);
-			submitFormData.append("incentives", JSON.stringify(formData.incentives));
+			// submitFormData.append(
+			// 	"requirements",
+			// 	JSON.stringify(formData.requirements)
+			// );
+			// submitFormData.append(
+			// 	"prizeTimeline",
+			// 	JSON.stringify(formData.prizeTimeline)
+			// );
+			// submitFormData.append(
+			// 	"contestType",
+			// 	JSON.stringify(formData.contestType)
+			// );
+			// submitFormData.append("incentives", JSON.stringify(formData.incentives));
 
 			// Add status fields to explicitly mark this as a published contest (not a draft)
 			submitFormData.append("status", "published");
@@ -178,73 +191,102 @@ const ContestFormContent = () => {
 		}
 	};
 
-	// Dynamic component rendering based on contest type and step
+	// Dynamic component rendering based on project type and step
 	const renderStepComponent = () => {
-		if (contestType === "Leaderboard") {
+		if (projectType == "UGC Content") {
 			switch (step) {
 				case 1:
-					return <Basic />;
+					return <ProjectDetails />;
 				case 2:
-					return <Requirements />;
+					return <UGCOnlyContentRequirements />;
 				case 3:
-					return <PrizeTimeline />;
+					return <CreatorPricingTab />;
 				case 4:
-					return <Review />;
+					return <CreatorProjectReview />;
 				default:
-					return <Basic />;
+					return <ProjectDetails />;
+			}
+		} else if (projectType == "Creator UGC") {
+			switch (step) {
+				case 1:
+					return <ProjectDetails />;
+				case 2:
+					return <UGCOnlyContentRequirements />;
+				case 3:
+					return <CreatorPricingTab />;
+				case 4:
+					return <CreatorProjectReview />;
+				default:
+					return <ProjectDetails />;
+			}
+		} else if (projectType == "Spark Ads") {
+			switch (step) {
+				case 1:
+					return <ProjectDetails />;
+				case 2:
+					return <UGCOnlyContentRequirements />;
+				case 3:
+					return <CreatorPricingTab />;
+				case 4:
+					return <CreatorProjectReview />;
+				default:
+					return <ProjectDetails />;
 			}
 		} else {
 			switch (step) {
 				case 1:
-					return <Basic />;
+					return <ProjectDetails />;
 				case 2:
-					return <Requirements />;
+					return <TikTokShopContentRequirements />;
 				case 3:
-					return <GMVPrizeTimeline />;
+					return <TikTokShopCreatorPricingTab />;
 				case 4:
-					return <GMVReview />;
+					return <TikTokShopProjectReview />;
 				default:
-					return <Basic />;
+					return <ProjectDetails />;
 			}
 		}
 	};
 
 	return (
-		<div className="max-w-[48rem] mx-auto">
+		<div className="max-w-[56rem] mx-auto">
 			{/* Navigation Tabs */}
-			<nav className="grid grid-cols-4 gap-5 pb-5 pt-5">
-				{["Basics", "Requirements", "Incentives & Timeline", "Review"].map(
-					(tab, index) => (
-						<div key={index} className="whitespace-nowrap relative">
-							<button
-								className={`pb-2 ${
-									index + 1 <= step  ? "text-orange-500" : "text-gray-500"
-								}`}
-								onClick={() => handleStepChange(index + 1)}
-								disabled={isLoading}
-							>
-								<div className="flex items-start gap-1">
-									<Image
-										src={
-											index + 1 <= step 
-												? "/icons/orange-check.svg"
-												: "/icons/gray-check.svg"
-										}
-										alt="Check"
-										width={25}
-										height={25}
-									/>
-									<span className="text-base">{tab}</span>
-								</div>
-							</button>
-							{index + 1 <= step ? (
-								<div className="absolute bottom-0 left-0 w-full h-[3px] bg-[#FD5C02] rounded-full" />
-							) : (
-								<div className="absolute bottom-0 left-0 w-full h-[3px] bg-gray-300 rounded-full" />
-							)}
-						</div>
-					)
-				)}
+			<nav className="flex pb-5 pt-5 gap-8">
+				{[
+					"Project Details",
+					"Content Requirements",
+					"Creator & Pricing",
+					"Review & Publish",
+				].map((tab, index) => (
+					<div key={index} className="flex-1 whitespace-nowrap relative">
+						<button
+							className={`pb-2 ${
+								index + 1 <= step ? "text-orange-500" : "text-gray-500"
+							}`}
+							onClick={() => handleStepChange(index + 1)}
+							disabled={isLoading}
+						>
+							<div className="flex items-center justify-center gap-1">
+								<Image
+									src={
+										index + 1 <= step
+											? "/icons/orange-check.svg"
+											: "/icons/gray-check.svg"
+									}
+									alt="Check"
+									width={25}
+									height={25}
+								/>
+								<span className="text-base">{tab}</span>
+							</div>
+						</button>
+						{index + 1 <= step ? (
+							<div className="absolute bottom-0 left-0 w-full h-[3px] bg-[#FD5C02] rounded-full" />
+						) : (
+							<div className="absolute bottom-0 left-0 w-full h-[3px] bg-gray-300 rounded-full" />
+						)}
+					</div>
+				))}
 			</nav>
 
 			{/* Draft Status Indicator */}
@@ -333,7 +375,7 @@ const ContestFormContent = () => {
 					) : (
 						<Button
 							onClick={handleSubmit}
-							className="mt-4 bg-[#000] hover:bg-[#141414] text-white text-base py-2 font-normal"
+							className="mt-4 bg-[#FD5C02] hover:bg-orange-600 text-white text-base py-2 font-normal"
 							disabled={isLoading}
 						>
 							{isLoading ? (
@@ -341,7 +383,7 @@ const ContestFormContent = () => {
 							) : (
 								<>
 									<MdOutlinePayment size={30} /> Pay $
-									{prizeTimeline.totalBudget.toLocaleString()}
+									{creatorPricing.totalAmount.toLocaleString()}
 								</>
 							)}
 						</Button>
@@ -352,12 +394,12 @@ const ContestFormContent = () => {
 	);
 };
 
-export default function ContestForm() {
+export default function ProjectForm() {
 	const { user } = useAuth();
 
 	return (
-		<ContestFormProvider userId={user?.uid}>
-			<ContestFormContent />
-		</ContestFormProvider>
+		<ProjectFormProvider userId={user?.uid}>
+			<ProjectFormContent />
+		</ProjectFormProvider>
 	);
 }

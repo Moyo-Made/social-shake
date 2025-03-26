@@ -284,7 +284,7 @@ const ContestDashboard = () => {
   const handleContestClick = (contest: Contest, e: React.MouseEvent) => {
     if (contest.status === "Draft") {
       e.preventDefault();
-      router.push(`/dashboard/edit-contest/${contest.id}`);
+      router.push(`/dashboard/contests/edit/${contest.id}`);
     }
   };
 
@@ -359,7 +359,7 @@ const ContestDashboard = () => {
           </div>
 
           <Button className="bg-orange-500 text-white px-4 py-1 rounded-md flex items-center">
-            <Link href="/dashboard/new-contest">Create New Contest</Link>
+            <Link href="/dashboard/contests/new">Create New Contest</Link>
             <span className="ml-1 text-lg">+</span>
           </Button>
         </div>

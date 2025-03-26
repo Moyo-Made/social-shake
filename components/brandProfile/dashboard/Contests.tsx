@@ -23,7 +23,7 @@ const EmptyContest = () => {
 							set your requirements, and let creators compete to promote your
 							brand.
 						</p>
-						<Link href="/dashboard/new-contest">
+						<Link href="/dashboard/contests/new">
 							<Button className="bg-[#FD5C02] text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors">
 								Create Your First Contest{" "}
 								<span className="text-lg mb-px">+</span>

@@ -60,56 +60,6 @@ const Review = () => {
     return date ? format(date, "MMMM d, yyyy") : "Not set";
   };
 
-  // Save progress to draft using context method
-  // const handleSaveDraft = async () => {
-  //   try {
-  //     const result = await saveDraft();
-      
-  //     if (!result.success) {
-  //       throw new Error(result.error || "Failed to save progress");
-  //     }
-      
-  //     toast.success("Progress saved successfully!");
-  //   } catch (error) {
-  //     console.error("Error saving progress:", error);
-  //     toast.error(error instanceof Error ? error.message : "Failed to save progress");
-  //   }
-  // };
-
-  // Submit the contest using context method
-  // const handleSubmitContest = async () => {
-  //   if (!user?.email) {
-  //     toast.error("You must be logged in to create a contest");
-  //     return;
-  //   }
-
-  //   // Basic validation
-  //   if (!basic.contestName) {
-  //     toast.error("Contest name is required");
-  //     return;
-  //   }
-
-  //   try {
-  //     const formDataObj = new FormData();
-  //     formDataObj.append("email", user.email);
-  //     formDataObj.append("uid", user.uid);
-  //     formDataObj.append("contestData", JSON.stringify(formData));
-  //     const result = await submitContest(formDataObj);
-      
-  //     if (!result.success) {
-  //       throw new Error(result.error || "Failed to create contest");
-  //     }
-      
-  //     toast.success("Contest created successfully!");
-      
-  //     // Redirect to the contests dashboard or contest details page
-  //     router.push("/dashboard/contests");
-  //   } catch (error) {
-  //     console.error("Error creating contest:", error);
-  //     toast.error(error instanceof Error ? error.message : "Failed to create contest");
-  //   }
-  // };
-
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto border border-[#FFBF9B] rounded-xl p-6">
       {/* Contest Basics Section */}

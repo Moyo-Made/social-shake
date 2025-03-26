@@ -33,9 +33,9 @@ const MenuItem: React.FC<MenuItemProps> = ({
 	// Modified isActive condition to handle special case for contests
 	const isActive =
 		pathname === href ||
-		(pathname.startsWith(href + "/") && href !== "/dashboard") ||
+		(href === "/dashboard" && pathname === "/dashboard") ||
 		(href === "/dashboard/contests" &&
-			pathname === "/dashboard/contests/new-contest");
+			pathname.startsWith("/dashboard/contests/"));
 
 	const hasActiveSubItem =
 		hasSubItems && subItems.some((item) => pathname === item.href);
@@ -134,7 +134,7 @@ const SideNav: React.FC = () => {
 					/>
 
 					<MenuItem
-						href="/projects"
+						href="/dashboard/projects/new"
 						icon={
 							<Image
 								src="/icons/projects.svg"
@@ -244,11 +244,12 @@ const SideNav: React.FC = () => {
 const getPageTitle = (pathname: string): string => {
 	// You can expand this object with all your routes that need specific titles
 	const routeTitles: Record<string, string> = {
-		"/dashboard": "Dashboard",
-		"/projects": "Projects",
-		"/dashboard/contests": "Contests",
-		"/dashboard/new-contest": "New Contest",
-		"/dashboard/edit-contest/": "Edit Contest",
+		"/dashboard/": "Dashboard",
+		"/dashboard/projects": "Projects",
+		"/dashboard/projects/new": "Add New Project",
+		"/dashboard/contests/": "Contests",
+		"/dashboard/contests/new": "New Contest",
+		"/dashboard/contests/edit": "Edit Contest",
 		"/dashboard/creators": "Creators",
 		"/dashboard/creators/all": "All Creators",
 		"/dashboard/creators/saved": "Saved Creators",
@@ -262,7 +263,9 @@ const getPageTitle = (pathname: string): string => {
 	if (routeTitles[pathname]) {
 		return routeTitles[pathname];
 	}
-
+	if (pathname.startsWith("/dashboard/")) {
+		return "Dashboard";
+	}
 	// More specific matching for different route sections
 	if (pathname.startsWith("/dashboard/contests/")) {
 		return "Contests";
@@ -270,6 +273,13 @@ const getPageTitle = (pathname: string): string => {
 
 	if (pathname.startsWith("/dashboard/new-contest/")) {
 		return "New Contest";
+	}
+
+	if (pathname.startsWith("/dashboard/projects")) {
+		return "Projects";
+	}
+	if (pathname.startsWith("/dashboard/projects/new")) {
+		return "Add New Project";
 	}
 
 	if (pathname.startsWith("/dashboard/creators/")) {
