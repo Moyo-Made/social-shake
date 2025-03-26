@@ -1,8 +1,9 @@
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 
 // Enhanced Firebase Admin initialization
-export function initializeFirebaseAdmin() {
+function initializeFirebaseAdmin() {
   // Prevent re-initialization
   if (getApps().length > 0) {
     return getApps()[0];
@@ -23,7 +24,7 @@ export function initializeFirebaseAdmin() {
   });
 
   try {
-    return initializeApp({
+    const app = initializeApp({
       credential: cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
@@ -34,18 +35,24 @@ export function initializeFirebaseAdmin() {
       // Optional: Add storage bucket if needed
       storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
     });
+
+    return app;
   } catch (error) {
     console.error('Firebase Admin initialization error:', error);
     throw error;
   }
 }
 
-// Safe Firestore access
-export function getAdminFirestore() {
-  try {
-    return getFirestore(initializeFirebaseAdmin());
-  } catch (error) {
-    console.error('Failed to get Firestore instance:', error);
-    throw error;
-  }
-}
+// Initialize Firebase Admin app
+const firebaseAdmin = initializeFirebaseAdmin();
+
+// Initialize services
+const adminDb = getFirestore(firebaseAdmin);
+const adminStorage = getStorage(firebaseAdmin);
+
+export { 
+  firebaseAdmin, 
+  adminDb, 
+  adminStorage,
+  initializeFirebaseAdmin  // Keep this for potential manual initialization
+};
