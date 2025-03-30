@@ -105,14 +105,50 @@ const CreatorProjectReview = () => {
 					<div className="grid grid-cols-3 gap-4">
 						<div className="font-medium text-gray-600">Content Type</div>
 						<div className="col-span-2">
-							{formData.projectRequirements.contentType || "Not specified"}
+							{(() => {
+								// Make sure we're accessing the correct property path
+								const contentType = formData.projectRequirements.contentType;
+
+								// Map technical values to display-friendly names
+								const contentTypeMap = {
+									"product-showcase": "Product Showcase",
+									testimonials: "Testimonials",
+									tutorials: "Tutorials",
+									"trend-participation": "Trend Participation",
+								};
+
+								// Return the mapped name if it exists, otherwise use the original value
+								return (
+									contentTypeMap[contentType as keyof typeof contentTypeMap] ||
+									contentType ||
+									"Not specified"
+								);
+							})()}
 						</div>
 					</div>
-					{formData.projectDetails.projectType === "UGC Content" && (
+					{formData.projectDetails.projectType === "UGC Content Only" && (
 						<div className="grid grid-cols-3 gap-4">
 							<div className="font-medium text-gray-600">Platform</div>
 							<div className="col-span-2">
-								{formData.projectRequirements.platform || "Not specified"}
+								{(() => {
+									const platform = formData.projectRequirements.platform;
+
+									const platformMap = {
+										"youtube-shorts": "YouTube Shorts",
+										"instagram-reels": "Instagram Reels",
+										facebook: "Facebook",
+										tiktok: "TikTok",
+									};
+
+									// Return the mapped name if it exists, otherwise use the original value
+									return (
+										platformMap[
+											platform as unknown as keyof typeof platformMap
+										] ||
+										platform ||
+										"Not specified"
+									);
+								})()}
 							</div>
 						</div>
 					)}
@@ -127,11 +163,25 @@ const CreatorProjectReview = () => {
 					<div className="grid grid-cols-3 gap-4">
 						<div className="font-medium text-gray-600">Video Type</div>
 						<div className="col-span-2">
-							{formData.projectRequirements.videoType || "Not specified"}
+							{(() => {
+								const videoType = formData.projectRequirements.videoType;
+
+								const videoTypeMap = {
+									"client-script": "Client's Script",
+									"creator-script": "Creator's Script",
+								};
+
+								// Return the mapped name if it exists, otherwise use the original value
+								return (
+									videoTypeMap[videoType as keyof typeof videoTypeMap] ||
+									videoType ||
+									"Not specified"
+								);
+							})()}
 						</div>
 					</div>
 
-					{formData.projectDetails.projectType === "UGC Content" && (
+					{formData.projectDetails.projectType === "UGC Content Only" && (
 						<div className="grid grid-cols-3 gap-4">
 							<div className="font-medium text-gray-600">Aspect Ratio</div>
 							<div className="col-span-2">
@@ -216,16 +266,15 @@ const CreatorProjectReview = () => {
 						</div>
 					</div>
 
+					{/* Display for Invite Specific Creators */}
 					{formData.creatorPricing.creator.selectionMethod ===
-						"Invite Specific Creators" &&
-						formData.creatorPricing.creator.selectedCreators && (
-							<div className="grid grid-cols-3 gap-4">
-								<div className="font-medium text-gray-600">
-									Selected Creators
-								</div>
-								<div className="col-span-2">
-									<div className="flex flex-wrap gap-2">
-										{formData.creatorPricing.creator.selectedCreators.map(
+						"Invite Specific Creators" && (
+						<div className="grid grid-cols-3 gap-4">
+							<div className="font-medium text-gray-600">Selected Creators</div>
+							<div className="col-span-2">
+								<div className="flex flex-wrap gap-2">
+									{formData.creatorPricing.creator.selectedCreators &&
+										formData.creatorPricing.creator.selectedCreators.map(
 											(creator, index) => (
 												<div
 													key={index}
@@ -244,11 +293,12 @@ const CreatorProjectReview = () => {
 												</div>
 											)
 										)}
-									</div>
 								</div>
 							</div>
-						)}
+						</div>
+					)}
 
+					{/* Display for Post Public Brief - Demographics */}
 					{formData.creatorPricing.creator.selectionMethod ===
 						"Post Public Brief" && (
 						<>
@@ -262,7 +312,14 @@ const CreatorProjectReview = () => {
 							<div className="grid grid-cols-3 gap-4">
 								<div className="font-medium text-gray-600">Gender</div>
 								<div className="col-span-2">
-									{formData.creatorPricing.creator.gender || "Not specified"}
+									{(() => {
+										const gender = formData.creatorPricing.creator.gender;
+										if (!gender) return "Not specified";
+										// Format gender properly (capitalize first letter)
+										return gender === "all"
+											? "All Genders"
+											: gender.charAt(0).toUpperCase() + gender.slice(1);
+									})()}
 								</div>
 							</div>
 
@@ -271,19 +328,74 @@ const CreatorProjectReview = () => {
 									Type of Industry
 								</div>
 								<div className="col-span-2">
-									{formData.creatorPricing.creator.industry || "Not specified"}
+									{(() => {
+										const industry = formData.creatorPricing.creator.industry;
+										if (!industry) return "Not specified";
+										// Map industry values to proper display names
+										const industryMap = {
+											technology: "Technology",
+											fashion: "Fashion",
+											food: "Food & Beverage",
+										};
+										return (
+											industryMap[industry as keyof typeof industryMap] ||
+											industry
+										);
+									})()}
 								</div>
 							</div>
 
 							<div className="grid grid-cols-3 gap-4">
 								<div className="font-medium text-gray-600">Language</div>
 								<div className="col-span-2">
-									{formData.creatorPricing.creator.language || "Not specified"}
+									{(() => {
+										const language = formData.creatorPricing.creator.language;
+										if (!language) return "Not specified";
+										// Map language values to proper display names
+										const languageMap = {
+											english: "English",
+											spanish: "Spanish",
+											french: "French",
+										};
+										return (
+											languageMap[language as keyof typeof languageMap] ||
+											language
+										);
+									})()}
 								</div>
 							</div>
+
+							{formData.creatorPricing.creator.countries &&
+								formData.creatorPricing.creator.countries.length > 0 && (
+									<div className="grid grid-cols-3 gap-4">
+										<div className="font-medium text-gray-600">Countries</div>
+										<div className="col-span-2">
+											{(() => {
+												const countries =
+													formData.creatorPricing.creator.countries;
+												if (!countries || countries.length === 0)
+													return "Not specified";
+
+												// Map country codes to display names
+												const countryMap = {
+													us: "United States",
+													ca: "Canada",
+													uk: "United Kingdom",
+												};
+
+												// Return the mapped country names joined with commas
+												return (
+													countryMap[countries as keyof typeof countryMap] ||
+													countries
+												);
+											})()}
+										</div>
+									</div>
+								)}
 						</>
 					)}
 
+					{/* Common Creator Info - for both selection methods */}
 					<div className="grid grid-cols-3 gap-4">
 						<div className="font-medium text-gray-600">No of Creators</div>
 						<div className="col-span-2">

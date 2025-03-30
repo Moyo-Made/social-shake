@@ -27,7 +27,7 @@ type ApiResponse = {
 const defaultFormData: ProjectFormData = {
 	projectDetails: {
 		projectName: "",
-		projectType: "UGC Content",
+		projectType: "UGC Content Only",
 		productType: "",
 		projectDescription: [""],
 		projectThumbnail: null,
@@ -82,6 +82,7 @@ const defaultFormData: ProjectFormData = {
 			creatorCount: 2,
 			videosPerCreator: 1,
 			totalVideos: 0,
+			countries: ""
 		},
 		cost: {
 			budgetPerVideo: 0,
@@ -99,19 +100,6 @@ const defaultFormData: ProjectFormData = {
 			commissionPerSale: 0,
 		},
 	},
-
-	//   prizeTimeline: {
-	// 	totalBudget: 1500,
-	// 	winnerCount: 5,
-	// 	positions: [1000, 300, 100, 50, 50],
-	// 	startDate: undefined,
-	// 	endDate: undefined,
-	// 	criteria: "views",
-	//   },
-	//   contestType: "UGC Content",
-	//   incentives: [],
-	//   status: "",
-	//   brandEmail: ""
 };
 
 interface ProjectFormContextType {
@@ -268,18 +256,10 @@ export const ProjectFormProvider: React.FC<{
 	const updateCreatorPricing = useCallback((data: Partial<CreatorPricing>) => {
 		setFormData((prev) => ({
 			...prev,
-			prizeTimeline: { ...prev.creatorPricing, ...data },
+			creatorPricing: { ...prev.creatorPricing, ...data },
 		}));
 		setDraftSaved(false);
 	}, []);
-
-	// const updateIncentivesData = useCallback((incentives: Incentive[]) => {
-	// 	setFormData((prev) => ({
-	// 		...prev,
-	// 		incentives,
-	// 	}));
-	// 	setDraftSaved(false);
-	// }, []);
 
 	// Update your submission function to clearly distinguish between your form state and the FormData object
 	const submitContest = async (): Promise<ApiResponse> => {

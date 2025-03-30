@@ -38,6 +38,7 @@ const UGCOnlyContentRequirements = () => {
 			setShowOtherContentType(true);
 		} else {
 			setShowOtherContentType(false);
+			
 			updateProjectRequirementsData({ contentType: value });
 		}
 	};
@@ -199,7 +200,7 @@ const UGCOnlyContentRequirements = () => {
 			</div>
 
 			{/* Platform and Aspect Ratio sections now conditionally rendered */}
-			{projectType === "UGC Content" && (
+			{projectType === "UGC Content Only" && (
 				<>
 					{/* Platform Section */}
 					<div>
@@ -440,33 +441,33 @@ const UGCOnlyContentRequirements = () => {
 							<div
 								className="flex items-center space-x-2 cursor-pointer text-[#667085] border-[#667085] border px-4 py-2 rounded-md data-[state=checked]:bg-[#FD5C02] data-[state=checked]:text-white data-[state=checked]:border-none"
 								data-state={
-									aspectRatio === "vertical" ? "checked" : "unchecked"
+									aspectRatio === "Vertical" ? "checked" : "unchecked"
 								}
 							>
-								<RadioGroupItem value="vertical" id="vertical" className="" />
-								<Label htmlFor="vertical">9:16 (Vertical)</Label>
+								<RadioGroupItem value="Vertical" id="Vertical" className="" />
+								<Label htmlFor="Vertical">9:16 (Vertical)</Label>
 							</div>
 
 							<div
 								className="flex items-center space-x-2 cursor-pointer text-[#667085] border-[#667085] border px-4 py-2 rounded-md data-[state=checked]:bg-[#FD5C02] data-[state=checked]:text-white data-[state=checked]:border-none"
 								data-state={
-									aspectRatio === "horizontal" ? "checked" : "unchecked"
+									aspectRatio === "Horizontal" ? "checked" : "unchecked"
 								}
 							>
 								<RadioGroupItem
-									value="horizontal"
-									id="horizontal"
+									value="Horizontal"
+									id="Horizontal"
 									className=""
 								/>
-								<Label htmlFor="horizontal">16:9 (Horizontal)</Label>
+								<Label htmlFor="Horizontal">16:9 (Horizontal)</Label>
 							</div>
 
 							<div
 								className="flex items-center space-x-2 cursor-pointer text-[#667085] border-[#667085] border px-4 py-2 rounded-md data-[state=checked]:bg-[#FD5C02] data-[state=checked]:text-white data-[state=checked]:border-none"
-								data-state={aspectRatio === "square" ? "checked" : "unchecked"}
+								data-state={aspectRatio === "Square" ? "checked" : "unchecked"}
 							>
-								<RadioGroupItem value="square" id="square" className="" />
-								<Label htmlFor="square">4:5 (Square)</Label>
+								<RadioGroupItem value="Square" id="Square" className="" />
+								<Label htmlFor="Square">4:5 (Square)</Label>
 							</div>
 						</RadioGroup>
 					</div>

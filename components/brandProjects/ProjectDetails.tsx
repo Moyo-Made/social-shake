@@ -127,22 +127,22 @@ const ProjectDetails: React.FC = () => {
 					<div
 						className={cn(
 							"relative rounded-2xl p-5 cursor-pointer transition-all duration-200",
-							projectDetails.projectType === "UGC Content"
+							projectDetails.projectType === "UGC Content Only"
 								? "border-2 border-orange-500 bg-orange-50"
 								: "border border-gray-200 bg-white hover:border-gray-300"
 						)}
-						onClick={() => handleProjectTypeChange("UGC Content")}
+						onClick={() => handleProjectTypeChange("UGC Content Only")}
 					>
 						<div className="absolute top-4 left-4">
 							<div
 								className={cn(
 									"w-4 h-4 rounded-full flex items-center justify-center",
-									projectDetails.projectType === "UGC Content"
+									projectDetails.projectType === "UGC Content Only"
 										? "border-2 border-orange-500"
 										: "border border-gray-300"
 								)}
 							>
-								{projectDetails.projectType === "UGC Content" && (
+								{projectDetails.projectType === "UGC Content Only" && (
 									<div className="w-2.5 h-2.5 bg-orange-500 rounded-full" />
 								)}
 							</div>
@@ -173,22 +173,22 @@ const ProjectDetails: React.FC = () => {
 					<div
 						className={cn(
 							"relative rounded-2xl p-5 cursor-pointer transition-all duration-200",
-							projectDetails.projectType === "Creator UGC"
+							projectDetails.projectType === "Creator-Posted UGC"
 								? "border-2 border-orange-500 bg-orange-50"
 								: "border border-gray-200 bg-white hover:border-gray-300"
 						)}
-						onClick={() => handleProjectTypeChange("Creator UGC")}
+						onClick={() => handleProjectTypeChange("Creator-Posted UGC")}
 					>
 						<div className="absolute top-4 left-4">
 							<div
 								className={cn(
 									"w-4 h-4 rounded-full flex items-center justify-center",
-									projectDetails.projectType === "Creator UGC"
+									projectDetails.projectType === "Creator-Posted UGC"
 										? "border-2 border-orange-500"
 										: "border border-gray-300"
 								)}
 							>
-								{projectDetails.projectType === "Creator UGC" && (
+								{projectDetails.projectType === "Creator-Posted UGC" && (
 									<div className="w-2.5 h-2.5 bg-orange-500 rounded-full" />
 								)}
 							</div>

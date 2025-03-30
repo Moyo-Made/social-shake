@@ -32,17 +32,26 @@ export default function CreatorPricingTab() {
 		rawFiles: creatorPricing.extras.rawFiles || true,
 	});
 	const [invitedCreatorsCount] = useState(2); // Fixed at 2 for invited creators
-const [publicCreatorsCount, setPublicCreatorsCount] = useState(
-  creatorPricing.selectionMethod === "Post Public Brief" 
-    ? creatorPricing.creatorCount || 1 
-    : 1
-);
+	const [publicCreatorsCount, setPublicCreatorsCount] = useState(
+		creatorPricing.selectionMethod === "Post Public Brief"
+			? creatorPricing.creatorCount || 1
+			: 1
+	);
 	const [videosPerCreator, setVideosPerCreator] = useState(
 		creatorPricing.videosPerCreator || 2
 	);
 	const [creatorSelectionMode, setCreatorSelectionMode] = useState("all");
 	const [ageGroup, setAgeGroup] = useState(creatorPricing.ageGroup || "25-34");
 	const [gender, setGender] = useState(creatorPricing.gender || "female");
+	const [industry, setIndustry] = useState(
+		creatorPricing.creator?.industry || ""
+	);
+	const [language, setLanguage] = useState(
+		creatorPricing.creator?.language || ""
+	);
+	const [countries, setCountries] = useState<string | undefined>(
+		creatorPricing.creator?.countries || ""
+	);
 
 	// Predefined mock creators
 	const [selectedCreators] = useState<Creator[]>([
@@ -51,9 +60,10 @@ const [publicCreatorsCount, setPublicCreatorsCount] = useState(
 	]);
 
 	// Calculate totals
-	const totalVideos = (selectionMethod === "Invite Specific Creators" 
-		? invitedCreatorsCount * videosPerCreator
-		: publicCreatorsCount) * videosPerCreator;
+	const totalVideos =
+		(selectionMethod === "Invite Specific Creators"
+			? invitedCreatorsCount * videosPerCreator
+			: publicCreatorsCount) * videosPerCreator;
 	const musicTotal = extras.music ? 50 * totalVideos : 0;
 	const rawFilesTotal = extras.rawFiles ? 100 * totalVideos : 0;
 	const totalBudget = budget * totalVideos;
@@ -62,9 +72,10 @@ const [publicCreatorsCount, setPublicCreatorsCount] = useState(
 
 	// Update context when values change
 	const updateContextValues = () => {
-		const currentCreatorCount = selectionMethod === "Invite Specific Creators" 
-    ? invitedCreatorsCount 
-    : publicCreatorsCount;
+		const currentCreatorCount =
+			selectionMethod === "Invite Specific Creators"
+				? invitedCreatorsCount
+				: publicCreatorsCount;
 		updateCreatorPricing({
 			selectionMethod,
 			selectedCreators,
@@ -96,6 +107,9 @@ const [publicCreatorsCount, setPublicCreatorsCount] = useState(
 				creatorCount: currentCreatorCount,
 				videosPerCreator,
 				totalVideos,
+				industry,
+				language,
+				countries,
 			},
 			cost: {
 				budgetPerVideo: budget,
@@ -127,6 +141,9 @@ const [publicCreatorsCount, setPublicCreatorsCount] = useState(
 		extras,
 		ageGroup,
 		gender,
+		industry,
+		language,
+		countries,
 	]);
 
 	return (
@@ -360,7 +377,10 @@ const [publicCreatorsCount, setPublicCreatorsCount] = useState(
 										<h2 className="text-base font-medium">
 											What type of Industry
 										</h2>
-										<Select>
+										<Select
+											value={industry}
+											onValueChange={(value) => setIndustry(value)}
+										>
 											<SelectTrigger className="w-full border rounded-md">
 												<SelectValue placeholder="Select Industry" />
 											</SelectTrigger>
@@ -374,7 +394,10 @@ const [publicCreatorsCount, setPublicCreatorsCount] = useState(
 
 									<div className="space-y-2">
 										<h2 className="text-base font-medium">Language</h2>
-										<Select>
+										<Select
+											value={language}
+											onValueChange={(value) => setLanguage(value)}
+										>
 											<SelectTrigger className="w-full border rounded-md">
 												<SelectValue placeholder="Select Language of Creator" />
 											</SelectTrigger>
@@ -390,7 +413,10 @@ const [publicCreatorsCount, setPublicCreatorsCount] = useState(
 										<h2 className="text-base font-medium">
 											Countries allowed for Project
 										</h2>
-										<Select>
+										<Select
+											value={countries}
+											onValueChange={(value) => setCountries(value)}
+										>
 											<SelectTrigger className="w-full border rounded-md">
 												<SelectValue placeholder="Select Countries (Multi Select)" />
 											</SelectTrigger>
@@ -523,7 +549,9 @@ const [publicCreatorsCount, setPublicCreatorsCount] = useState(
 													"Invite Specific Creators"
 														? 2
 														: 1;
-														setPublicCreatorsCount(Math.max(min, Number(e.target.value)));
+												setPublicCreatorsCount(
+													Math.max(min, Number(e.target.value))
+												);
 											}}
 											className="w-16 h-8 px-2 text-center border rounded-md"
 											min={1}
@@ -532,7 +560,9 @@ const [publicCreatorsCount, setPublicCreatorsCount] = useState(
 											<button
 												className="flex-1 px-1 border-l flex items-center justify-center"
 												onClick={() =>
-													setPublicCreatorsCount((prev) => Math.max(1, prev + 1))
+													setPublicCreatorsCount((prev) =>
+														Math.max(1, prev + 1)
+													)
 												}
 											>
 												<svg
@@ -548,7 +578,9 @@ const [publicCreatorsCount, setPublicCreatorsCount] = useState(
 											<button
 												className="flex-1 px-1 border-l border-t flex items-center justify-center"
 												onClick={() =>
-													setPublicCreatorsCount((prev) => Math.max(1, prev - 1))
+													setPublicCreatorsCount((prev) =>
+														Math.max(1, prev - 1)
+													)
 												}
 											>
 												<svg

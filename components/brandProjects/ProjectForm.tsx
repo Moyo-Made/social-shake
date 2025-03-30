@@ -193,7 +193,7 @@ const ProjectFormContent = () => {
 
 	// Dynamic component rendering based on project type and step
 	const renderStepComponent = () => {
-		if (projectType == "UGC Content") {
+		if (projectType == "UGC Content Only") {
 			switch (step) {
 				case 1:
 					return <ProjectDetails />;
@@ -206,7 +206,7 @@ const ProjectFormContent = () => {
 				default:
 					return <ProjectDetails />;
 			}
-		} else if (projectType == "Creator UGC") {
+		} else if (projectType == "Creator-Posted UGC") {
 			switch (step) {
 				case 1:
 					return <ProjectDetails />;

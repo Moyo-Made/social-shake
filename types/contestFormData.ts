@@ -41,8 +41,8 @@ export interface ContestFormData {
 
 //Project Details Type
 export type ProjectType =
-	| "UGC Content"
-	| "Creator UGC"
+	| "UGC Content Only"
+	| "Creator-Posted UGC"
 	| "Spark Ads"
 	| "TikTok Shop";
 
@@ -108,6 +108,7 @@ interface CreatorSelection {
 	gender?: string;
 	industry?: string;
 	language?: string;
+	countries?: string;
 	creatorCount: number;
 	videosPerCreator: number;
 	totalVideos: number;
