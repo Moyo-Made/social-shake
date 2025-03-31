@@ -32,7 +32,7 @@ const defaultFormData: ProjectFormData = {
 		projectDescription: [""],
 		projectThumbnail: null,
 	},
-	status: "",
+	status: 'Draft',
 	projectRequirements: {
 		contentType: "allow-applications",
 		platform: [""],
@@ -181,15 +181,6 @@ export const ProjectFormProvider: React.FC<{
 		if (data.projectDetails?.projectName) {
 			data.projectDetails.projectName = data.projectDetails.projectName;
 		}
-
-		// Handle dates - convert string dates back to Date objects
-		// if (data.prizeTimeline?.startDate) {
-		// 	data.prizeTimeline.startDate = new Date(data.prizeTimeline.startDate);
-		// }
-		// if (data.prizeTimeline?.endDate) {
-		// 	data.prizeTimeline.endDate = new Date(data.prizeTimeline.endDate);
-		// }
-
 		// We can't restore the File object from storage, so we keep it null
 		// But preserve the thumbnail URL if it exists
 		if (typeof data.projectDetails?.projectThumbnail === "string") {
@@ -292,30 +283,19 @@ export const ProjectFormProvider: React.FC<{
 				"projectType",
 				JSON.stringify(formData.projectDetails.projectType)
 			);
-			// formDataForSubmission.append(
-			// 	"incentives",
-			// 	JSON.stringify(formData.incentives)
-			// );
 
 			// Add the thumbnail file if it exists
 			if (formData.projectDetails.projectThumbnail instanceof File) {
 				formDataForSubmission.append(
-					"thumbnail",
+					"projectThumbnail",
 					formData.projectDetails.projectThumbnail
 				);
 			}
-
-			// Log what we're about to send (for debugging)
-			console.log("Submitting data:", {
-				projectDetails: formData.projectDetails,
-				projectRequirements: formData.projectRequirements,
-				creatorPricing: formData.creatorPricing,
-				// contestType: formData.contestType,
-				// incentives: formData.incentives,
-			});
+			formDataForSubmission.append("status", formData.status);
+			
 
 			// Send the FormData to your API
-			const response = await fetch("/api/contests", {
+			const response = await fetch("/api/projects", {
 				method: "POST",
 				body: formDataForSubmission,
 			});
@@ -387,15 +367,11 @@ export const ProjectFormProvider: React.FC<{
 				"projectType",
 				JSON.stringify(formData.projectDetails.projectType)
 			);
-			//   formDataForSubmission.append(
-			// 	"incentives",
-			// 	JSON.stringify(formData.incentives)
-			//   );
 
 			// Add the thumbnail file if it exists
 			if (formData.projectDetails.projectThumbnail instanceof File) {
 				formDataForSubmission.append(
-					"thumbnail",
+					"projectThumbnail",
 					formData.projectDetails.projectThumbnail
 				);
 			}
@@ -413,16 +389,6 @@ export const ProjectFormProvider: React.FC<{
 				"updatedAt",
 				JSON.stringify(new Date().toISOString())
 			);
-
-			// Log what we're about to send (for debugging)
-			console.log("Saving draft data:", {
-				projectDetails: formData.projectDetails,
-				// requirements: formData.requirements,
-				// prizeTimeline: formData.prizeTimeline,
-				// contestType: formData.contestType,
-				// incentives: formData.incentives,
-				status: "draft",
-			});
 
 			// Send the FormData to your API
 			const response = await fetch("/api/contests", {
@@ -499,7 +465,6 @@ export const ProjectFormProvider: React.FC<{
 				updateProjectDetails,
 				updateProjectRequirementsData,
 				updateCreatorPricing,
-				// updateIncentivesData,
 				saveDraft,
 				submitContest,
 				resetDraft,

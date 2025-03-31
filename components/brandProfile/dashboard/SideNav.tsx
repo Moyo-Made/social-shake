@@ -134,7 +134,7 @@ const SideNav: React.FC = () => {
 					/>
 
 					<MenuItem
-						href="/dashboard/projects/new"
+						href="/dashboard/projects"
 						icon={
 							<Image
 								src="/icons/projects.svg"

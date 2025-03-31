@@ -57,7 +57,7 @@ interface ContestData {
   incentives?: Incentive[] | { prizeBreakdown?: string };
   status?: string;
   createdAt?: string;
-  contestType?: "leaderboard" | "gmv";
+  contestType?: "Leaderboard" | "GMV";
 }
 
 interface ContestDetailPageProps {
@@ -71,7 +71,7 @@ export default function ContestDetailPage({ contestId }: ContestDetailPageProps)
   const [error, setError] = useState<string | null>(null);
 
   const { formData } = useContestForm();
-  const contestType = contestData?.contestType || formData?.basic?.contestType?.toLowerCase() || "leaderboard";
+  const contestType = contestData?.contestType || formData?.basic?.contestType?.toLowerCase() || "Leaderboard";
   
   // Format date for display
   const formatDate = (dateString?: string): string => {
@@ -259,7 +259,7 @@ export default function ContestDetailPage({ contestId }: ContestDetailPageProps)
                 value="leaderboard"
                 className="data-[state=active]:bg-[#FFF4EE] data-[state=active]:border-b-2 data-[state=active]:border-[#FC52E4] data-[state=active]:text-[#FD5C02] data-[state=inactive]:text-[#667085] rounded-none py-3"
               >
-                {contestType === "Leaderboard" ? "Leaderboard" : "GMV Data"}
+                {contestType === "Leaderboard" ? "Leaderboard" : "GMV"}
               </TabsTrigger>
             </TabsList>
 
@@ -310,7 +310,7 @@ export default function ContestDetailPage({ contestId }: ContestDetailPageProps)
               {/* Contest Type Specific Criteria */}
               <div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
                 <h3 className="text-base text-[#667085] mb-2">
-                  {contestType === "leaderboard" ? "Ranking Criteria" : "GMV Criteria"}
+                  {contestType === "Leaderboard" ? "Ranking Criteria" : "GMV Criteria"}
                 </h3>
                 <p className="capitalize">{criteria.replace(/-/g, ' ')}</p>
               </div>
@@ -390,7 +390,7 @@ export default function ContestDetailPage({ contestId }: ContestDetailPageProps)
 
             {/* Dynamic Metrics Tab */}
             <TabsContent value="available-metrics">
-              {contestType === "leaderboard" ? (
+              {contestType === "Leaderboard" ? (
                 <AnalyticsDashboard />
               ) : (
                 <GMVMetrics />
@@ -399,7 +399,7 @@ export default function ContestDetailPage({ contestId }: ContestDetailPageProps)
 
             {/* Dynamic Leaderboard Tab */}
             <TabsContent value="leaderboard">
-              {contestType === "leaderboard" ? (
+              {contestType === "Leaderboard" ? (
                 <Leaderboard />
               ) : (
                 <GMVData />

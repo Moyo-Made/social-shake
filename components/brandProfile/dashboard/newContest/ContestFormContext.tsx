@@ -366,16 +366,6 @@ export const ContestFormProvider: React.FC<{
       formDataForSubmission.append("createdAt", JSON.stringify(new Date().toISOString()));
       formDataForSubmission.append("updatedAt", JSON.stringify(new Date().toISOString()));
   
-      // Log what we're about to send (for debugging)
-      console.log("Saving draft data:", {
-        basic: formData.basic,
-        requirements: formData.requirements,
-        prizeTimeline: formData.prizeTimeline,
-        contestType: formData.contestType,
-        incentives: formData.incentives,
-        status: "draft",
-      });
-  
       // Send the FormData to your API
       const response = await fetch("/api/contests", {
         method: "POST",

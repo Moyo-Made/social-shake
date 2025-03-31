@@ -13,12 +13,12 @@ import { CheckCircle2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/context/AuthContext";
 import ProjectDetails from "./ProjectDetails";
-import UGCOnlyContentRequirements from "./UGCOnlyContentRequirements";
 import CreatorPricingTab from "./CreatorPricing";
 import TikTokShopContentRequirements from "./TikTokShopContentRequirements";
 import TikTokShopCreatorPricingTab from "./TikTokShopCreatorPricing";
 import CreatorProjectReview from "./ProjectReview";
 import TikTokShopProjectReview from "./TikTokShopReview";
+import ContentRequirements from "./ContentRequirements";
 
 const ProjectFormContent = () => {
 	const [step, setStep] = useState(1);
@@ -35,9 +35,7 @@ const ProjectFormContent = () => {
 		projectDetails: { projectType = "UGC Content" },
 	} = formData;
 
-	const {
-		creatorPricing,
-	} = formData;
+	const { creatorPricing } = formData;
 
 	// Save current state when navigating between steps
 	const handleStepChange = (newStep: number) => {
@@ -99,25 +97,23 @@ const ProjectFormContent = () => {
 
 			// Add the rest of the data as JSON strings
 			submitFormData.append(
-				"basic",
+				"projectDetails",
 				JSON.stringify({
 					...formData.projectDetails,
-					thumbnail: null, // Don't include the file in the JSON
+					thumbnail:
+						formData.projectDetails.projectThumbnail instanceof File
+							? null // For new files
+							: formData.projectDetails.projectThumbnail, // Preserve existing URL
 				})
 			);
-			// submitFormData.append(
-			// 	"requirements",
-			// 	JSON.stringify(formData.requirements)
-			// );
-			// submitFormData.append(
-			// 	"prizeTimeline",
-			// 	JSON.stringify(formData.prizeTimeline)
-			// );
-			// submitFormData.append(
-			// 	"contestType",
-			// 	JSON.stringify(formData.contestType)
-			// );
-			// submitFormData.append("incentives", JSON.stringify(formData.incentives));
+			submitFormData.append(
+				"projectRequirements",
+				JSON.stringify(formData.projectRequirements)
+			);
+			submitFormData.append(
+				"creatorPricing",
+				JSON.stringify(formData.creatorPricing)
+			);
 
 			// Add status fields to explicitly mark this as a published contest (not a draft)
 			submitFormData.append("status", "published");
@@ -148,7 +144,7 @@ const ProjectFormContent = () => {
 			sessionStorage.removeItem("contestFormStep");
 
 			// Redirect to success page
-			router.push("/payment-successful");
+			router.push("/dashboard/projects/payment-successful");
 		} catch (error) {
 			console.error("Submission error:", error);
 			setSubmissionError(
@@ -198,7 +194,7 @@ const ProjectFormContent = () => {
 				case 1:
 					return <ProjectDetails />;
 				case 2:
-					return <UGCOnlyContentRequirements />;
+					return <ContentRequirements />;
 				case 3:
 					return <CreatorPricingTab />;
 				case 4:
@@ -211,7 +207,7 @@ const ProjectFormContent = () => {
 				case 1:
 					return <ProjectDetails />;
 				case 2:
-					return <UGCOnlyContentRequirements />;
+					return <ContentRequirements />;
 				case 3:
 					return <CreatorPricingTab />;
 				case 4:
@@ -224,7 +220,7 @@ const ProjectFormContent = () => {
 				case 1:
 					return <ProjectDetails />;
 				case 2:
-					return <UGCOnlyContentRequirements />;
+					return <ContentRequirements />;
 				case 3:
 					return <CreatorPricingTab />;
 				case 4:
@@ -288,24 +284,6 @@ const ProjectFormContent = () => {
 					</div>
 				))}
 			</nav>
-
-			{/* Draft Status Indicator */}
-			{formData?.status === "draft" && (
-				<Alert
-					variant="default"
-					className="mb-4 bg-gray-100 border border-gray-300"
-				>
-					<div className="flex items-center gap-2">
-						<span className="bg-gray-200 text-gray-700 px-2 py-1 rounded text-sm font-medium">
-							DRAFT
-						</span>
-						<AlertDescription>
-							You&apos;re working on a draft contest. Submit when ready to
-							publish.
-						</AlertDescription>
-					</div>
-				</Alert>
-			)}
 
 			{/* Error Message */}
 			{submissionError && (

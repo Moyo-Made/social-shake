@@ -64,6 +64,8 @@ export interface ProjectRequirements {
 	contentLinks: string[];
 	brandAssets: string;
 }
+export type ProjectStatus = 'Draft' | 'Accepting Pitches' | 'Ongoing Project' | 'Completed';
+
 
 export interface CreatorPricing {
 	selectionMethod: "Invite Specific Creators" | "Post Public Brief";
@@ -136,5 +138,5 @@ export interface ProjectFormData {
 	projectDetails: ProjectDetails;
 	projectRequirements: ProjectRequirements;
 	creatorPricing: CreatorPricing;
-	status: string;
+	status: ProjectStatus;
 }

@@ -15,7 +15,7 @@ import { HelpCircle, Plus, Trash2 } from "lucide-react";
 import React, { useState } from "react";
 import { useProjectForm } from "./ProjectFormContext";
 
-const UGCOnlyContentRequirements = () => {
+const ContentRequirements = () => {
 	const { formData, updateProjectRequirementsData } = useProjectForm();
 	const {
 		contentType,
@@ -634,4 +634,4 @@ const UGCOnlyContentRequirements = () => {
 	);
 };
 
-export default UGCOnlyContentRequirements;
+export default ContentRequirements;
