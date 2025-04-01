@@ -169,7 +169,7 @@ export default function ProjectSubmissions() {
 		setOpenReviewDialog(false);
 		setOpenApproveDialog(false);
 		console.log("Modal closed");
-	  };
+	};
 
 	return (
 		<div className="container mx-auto p-6">
@@ -285,12 +285,20 @@ export default function ProjectSubmissions() {
 											{submission.status === "new" && (
 												<Badge
 													variant="outline"
-													className="bg-orange-100 text-orange-500 border-orange-200 mr-2"
+													className="bg-orange-500 text-white rounded-full mr-2 py-1"
 												>
-													<span className="mr-1">New</span>
+													<div className="flex items-center gap-1">
+														<span className="">New</span>
+														<Image
+															src="/icons/star.svg"
+															alt="Star"
+															width={15}
+															height={15}
+														/>
+													</div>
 												</Badge>
 											)}
-											<div className="flex gap-1 text-gray-500 text-xs">
+											<div className="flex gap-1 text-gray-500 text-xs items-center">
 												{submission.status === "approved"
 													? "Approved:"
 													: "Submitted:"}
