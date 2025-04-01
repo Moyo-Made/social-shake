@@ -124,7 +124,7 @@ const ContentRequirements = () => {
 					onValueChange={updateContentType}
 				>
 					<div
-						className="flex items-center space-x-2 cursor-pointer text-[#667085] border-[#667085] border px-4 py-2 rounded-md data-[state=checked]:bg-[#FD5C02] data-[state=checked]:text-white data-[state=checked]:border-none"
+						className="flex items-center space-x-2 cursor-pointer text-[#667085] border-[#667085] border px-4 py-2 rounded-md data-[state=checked]:bg-[#FD5C02] data-[state=checked]:text-white data-[state=checked]:border-none capitalize"
 						data-state={
 							contentType === "product-showcase" ? "checked" : "unchecked"
 						}
@@ -138,9 +138,9 @@ const ContentRequirements = () => {
 					</div>
 
 					<div
-						className="flex items-center space-x-2 cursor-pointer text-[#667085] border border-[#667085] px-4 py-2 rounded-md data-[state=checked]:bg-[#FD5C02] data-[state=checked]:text-white data-[state=checked]:border-none"
+						className="flex items-center space-x-2 cursor-pointer capitalize text-[#667085] border border-[#667085] px-4 py-2 rounded-md data-[state=checked]:bg-[#FD5C02] data-[state=checked]:text-white data-[state=checked]:border-none"
 						data-state={
-							contentType === "testimonials" ? "checked" : "unchecked"
+							contentType === "Testimonials" ? "checked" : "unchecked"
 						}
 					>
 						<RadioGroupItem
@@ -152,7 +152,7 @@ const ContentRequirements = () => {
 					</div>
 
 					<div
-						className="flex items-center space-x-2 cursor-pointer text-[#667085] border border-[#667085] px-4 py-2 rounded-md data-[state=checked]:bg-[#FD5C02] data-[state=checked]:text-white data-[state=checked]:border-none"
+						className="flex items-center space-x-2 cursor-pointer capitalize text-[#667085] border border-[#667085] px-4 py-2 rounded-md data-[state=checked]:bg-[#FD5C02] data-[state=checked]:text-white data-[state=checked]:border-none"
 						data-state={contentType === "tutorials" ? "checked" : "unchecked"}
 					>
 						<RadioGroupItem value="tutorials" id="tutorials" className="" />
@@ -160,7 +160,7 @@ const ContentRequirements = () => {
 					</div>
 
 					<div
-						className="flex items-center space-x-2 cursor-pointer text-[#667085] border border-[#667085] px-4 py-2 rounded-md data-[state=checked]:bg-[#FD5C02] data-[state=checked]:text-white data-[state=checked]:border-none"
+						className="flex items-center space-x-2 cursor-pointer capitalize text-[#667085] border border-[#667085] px-4 py-2 rounded-md data-[state=checked]:bg-[#FD5C02] data-[state=checked]:text-white data-[state=checked]:border-none"
 						data-state={
 							contentType === "trend-participation" ? "checked" : "unchecked"
 						}
@@ -174,7 +174,7 @@ const ContentRequirements = () => {
 					</div>
 
 					<div
-						className="flex items-center space-x-2 cursor-pointer text-[#667085] border-[#667085] border px-4 py-2 rounded-md data-[state=checked]:bg-[#FD5C02] data-[state=checked]:text-white data-[state=checked]:border-none"
+						className="flex items-center space-x-2 cursor-pointer capitalize text-[#667085] border-[#667085] border px-4 py-2 rounded-md data-[state=checked]:bg-[#FD5C02] data-[state=checked]:text-white data-[state=checked]:border-none"
 						data-state={
 							contentType === "other" || showOtherContentType
 								? "checked"

@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
 import { auth, db } from "@/config/firebase";
+import { getStatusDot, getStatusStyle } from "@/utils/statusUtils";
 
 interface Project {
 	id: string;
@@ -233,42 +234,7 @@ const ProjectDashboard = () => {
 		e.currentTarget.style.display = "none"; // Hide broken image
 	};
 
-	// Function to determine status style
-	const getStatusStyle = (status: string) => {
-		// Normalize the status by converting to lowercase for comparison
-		const normalizedStatus = status.toLowerCase();
-
-		switch (normalizedStatus) {
-			case "accepting pitches":
-				return "bg-[#FFF9E5] text-[#3B82F6] border border-[#FFD700]";
-			case "ongoing project":
-				return "bg-[#FFE5FB] text-[#FC52E4] border border-[#FC52E4]";
-			case "completed":
-				return "bg-[#ABEFC6] text-[#067647] border border-[#067647]";
-			case "draft":
-				return "bg-[#F6F6F6] text-[#667085] border border-[#D0D5DD]";
-			default:
-				return "bg-[#F6F6F6] text-[#667085] border border-[#D0D5DD]";
-		}
-	};
-
-	// Function to determine status dot color
-	const getStatusDot = (status: string) => {
-		const normalizedStatus = status.toLowerCase();
-
-		switch (normalizedStatus) {
-			case "accepting pitches":
-				return "bg-[#3B82F6]";
-			case "ongoing project":
-				return "bg-[#FC52E4]";
-			case "completed":
-				return "bg-[#067647]";
-			case "draft":
-				return "bg-[#667085]";
-			default:
-				return "bg-[#667085]";
-		}
-	};
+	
 
 	// Function to get the right icon for project type
 	const getProjectTypeIcon = (projectType: string) => {
@@ -433,71 +399,77 @@ const ProjectDashboard = () => {
 								key={project.id}
 								className="bg-white border border-[#D2D2D2] p-5 rounded-xl shadow-sm overflow-hidden"
 							>
-								{/* Project Type Badge */}
-								<div className="flex items-center gap-2 mb-3 bg-[#FFF4EE] rounded-full py-2 px-4 w-fit">
-									<div className="w-6 h-6 rounded-full flex items-center justify-center">
+								{/* Project Thumbnail */}
+								{project.thumbnailUrl && (
+									<div className="relative mb-6 rounded-xl overflow-hidden">
 										<Image
-											src={getProjectTypeIcon(project.projectType)}
-											alt={project.projectType}
-											width={20}
-											height={20}
+											src={project.thumbnailUrl}
+											alt={`${project.title} thumbnail`}
+											className="w-full h-48 object-cover"
+											width={500}
+											height={400}
+											onError={handleImageError}
+											priority={true}
 										/>
 									</div>
-									<span className="text-sm font-medium">
-										{project.projectType}
-									</span>
-								</div>
-
-								<div className="mb-4">
-									<h3 className="text-3xl font-bold mb-3">
+								)}
+								{/* Project Type Badge */}
+								<div>
+									<h3 className="text-xl font-bold mb-2">
 										{project.title || "Untitled Project"}
 									</h3>
-
-									{/* Status Badge - Redesigned to match images */}
-									<div className="flex justify-between items-center mb-4">
-										<div className="text-gray-500 text-lg">Status:</div>
-										<div
-											className={`px-6 py-2 rounded-full flex items-center gap-2 ${getStatusStyle(project.status)}`}
-										>
-											<span
-												className={`inline-block w-2 h-2 rounded-full ${getStatusDot(project.status)}`}
-											></span>
-											{project.status}
+									<div className="flex justify-between items-center">
+										<div className="flex items-center gap-2 mb-2 bg-[#FFF4EE] rounded-full py-2 px-4 w-fit">
+											<div className="w-6 h-6 rounded-full flex items-center justify-center">
+												<Image
+													src={getProjectTypeIcon(project.projectType)}
+													alt={project.projectType}
+													width={20}
+													height={20}
+												/>
+											</div>
+											<span className="text-sm font-normal">
+												{project.projectType}
+											</span>
+										</div>
+										{/* Status Badge  */}
+										<div className="flex gap-1 items-center mb-4">
+											<div className="text-[#667085] text-base">Status:</div>
+											<div
+												className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${getStatusStyle(project.status)}`}
+											>
+												<span
+													className={`inline-block w-1.5 h-1.5 rounded-full ${getStatusDot(project.status)}`}
+												></span>
+												{project.status}
+											</div>
 										</div>
 									</div>
+								</div>
 
+								<div className="mb-2">
 									{/* Project Description */}
 									<p className="text-base text-[#667085] mb-6 line-clamp-3">
 										{project.description}
 									</p>
-
-									{/* Project Thumbnail */}
-									{project.thumbnailUrl && (
-										<div className="relative mb-6 rounded-xl overflow-hidden">
-											<Image
-												src={project.thumbnailUrl}
-												alt={`${project.title} thumbnail`}
-												className="w-full h-48 object-cover"
-												width={500}
-												height={300}
-												onError={handleImageError}
-												priority={true}
-											/>
-										</div>
-									)}
 								</div>
 
 								{/* Project Details Section */}
 								<div className="border-t border-gray-200 pt-4">
-									<div className="grid grid-cols-2 gap-4 mb-6">
+									<div className="flex justify-between items-center gap-4 mb-6">
 										{/* Project Budget */}
-										<div className="flex items-start gap-2">
-											<div className="text-orange-500 text-2xl mt-1">$</div>
+										<div className="flex items-center gap-2">
+											<Image
+												src="/icons/dollar.svg"
+												alt="Dollar icon"
+												width={25}
+												height={25}
+											/>
 											<div>
-												<p className="text-orange-500 font-medium">
+												<p className="text-sm text-orange-500 font-medium">
 													Project Budget
 												</p>
-												<p className="text-lg font-semibold">
+												<p className="text-sm font-normal">
 													${project.budget}/Creator
 												</p>
 											</div>
@@ -505,10 +477,10 @@ const ProjectDashboard = () => {
 
 										{/* Creators Required */}
 										<div>
-											<p className="text-orange-500 font-medium">
+											<p className="text-sm text-orange-500 font-medium">
 												Creators Required
 											</p>
-											<p className="text-lg font-semibold">
+											<p className="text-sm font-normal">
 												{project.creatorsRequired} Creators
 											</p>
 										</div>
@@ -516,21 +488,29 @@ const ProjectDashboard = () => {
 										{/* Conditional third section based on status */}
 										{project.status === "Accepting Pitches" ||
 										project.status === "Completed" ? (
-											<div className="col-span-2">
-												<p className="text-orange-500 font-medium">
-													Creators Applied
-												</p>
-												<p className="text-lg font-semibold">
-													{project.creatorsApplied} Applied
-												</p>
+											<div className="flex items-center gap-2">
+												<Image
+													src="/icons/applied.svg"
+													alt="Creator applied icon"
+													width={25}
+													height={25}
+												/>
+												<div className="col-span-2">
+													<p className="text-sm text-orange-500 font-medium">
+														Creators Applied
+													</p>
+													<p className="text-sm font-normal">
+														{project.creatorsApplied} Applied
+													</p>
+												</div>
 											</div>
 										) : (
 											project.status === "Ongoing Project" && (
 												<div className="col-span-2">
-													<p className="text-orange-500 font-medium">
+													<p className="text-sm text-orange-500 font-medium">
 														Submissions
 													</p>
-													<p className="text-lg font-semibold">
+													<p className="text-sm font-normal">
 														{project.submissions.videos} Videos •{" "}
 														{project.submissions.pending} Pending
 													</p>
@@ -543,7 +523,7 @@ const ProjectDashboard = () => {
 									{project.status === "Draft" ? (
 										<Link
 											href={`/dashboard/projects/edit/${project.id}`}
-											className="w-full py-3 px-4 bg-orange-500 text-white font-medium rounded-md flex items-center justify-center gap-2"
+											className="w-full py-2 px-4 bg-orange-500 text-white font-medium rounded-md flex items-center justify-center gap-2"
 										>
 											Edit Project
 											<svg
@@ -565,7 +545,7 @@ const ProjectDashboard = () => {
 									) : (
 										<Link
 											href={`/dashboard/projects/${project.id}`}
-											className="w-full py-3 px-4 bg-orange-500 text-white font-medium rounded-md flex items-center justify-center gap-2"
+											className="w-full py-2 px-4 bg-[#FD5C02] text-white font-medium rounded-lg flex items-center justify-center gap-2 hover:bg-[#ff6913]"
 										>
 											View Project
 											<svg
@@ -600,16 +580,17 @@ const ProjectDashboard = () => {
 						{filteredProjects.map((project) => (
 							<div
 								key={project.id}
-								className="bg-white rounded-xl shadow-sm overflow-hidden flex flex-col md:flex-row"
+								className="bg-white border border-[#D2D2D2] rounded-xl shadow-sm overflow-hidden flex flex-col md:flex-row p-3"
 							>
-								<div className="relative w-full md:w-72 h-48 md:h-64">
+								<div className="relative w-full md:w-72 h-48 md:h-auto flex-shrink-0">
 									{project.thumbnailUrl ? (
 										<Image
 											src={project.thumbnailUrl}
 											alt={`${project.title} thumbnail`}
-											className="w-full h-64 object-cover"
+											className="w-full h-full rounded-lg object-cover"
 											width={500}
-											height={300}
+											height={400}
+											style={{ aspectRatio: "4/3", objectFit: "cover" }}
 											onError={handleImageError}
 											priority={true}
 										/>
@@ -620,14 +601,14 @@ const ProjectDashboard = () => {
 									)}
 								</div>
 
-								<div className="p-6 flex-1">
-									<div className="flex flex-col md:flex-row justify-between items-start mb-4">
+								<div className="py-3 px-6 flex-1">
+									<div className="flex flex-col md:flex-row justify-between items-start mb-3">
 										<div>
-											<h3 className="text-xl font-semibold mb-2">
+											<h3 className="text-lg font-semibold mb-2">
 												{project.title || "Untitled Project"}
 											</h3>
 											{/* Project Type Badge */}
-											<div className="flex items-center gap-2 mb-3 bg-[#FFF4EE] rounded-full py-2 px-4 w-fit">
+											<div className="flex items-center gap-2 mb-2 bg-[#FFF4EE] rounded-full py-2 px-4 w-fit">
 												<div className="w-6 h-6 rounded-full flex items-center justify-center">
 													<Image
 														src={getProjectTypeIcon(project.projectType)}
@@ -636,47 +617,56 @@ const ProjectDashboard = () => {
 														height={20}
 													/>
 												</div>
-												<span className="text-sm font-medium">
+												<span className="text-sm font-normal">
 													{project.projectType}
 												</span>
 											</div>
 										</div>
 
 										{/* Status Badge */}
-										<div
-											className={`px-4 py-2 rounded-full flex items-center gap-2 ${getStatusStyle(project.status)}`}
-										>
-											<span
-												className={`inline-block w-2 h-2 rounded-full ${getStatusDot(project.status)}`}
-											></span>
-											{project.status}
+										<div className="flex gap-1 items-center mb-4">
+											<div className="text-[#667085] text-base">Status:</div>
+											<div
+												className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${getStatusStyle(project.status)}`}
+											>
+												<span
+													className={`inline-block w-1.5 h-1.5 rounded-full ${getStatusDot(project.status)}`}
+												></span>
+												{project.status}
+											</div>
 										</div>
 									</div>
 
-									<p className="text-sm text-gray-600 mb-6 line-clamp-2">
+									<p className="ext-base text-[#667085] mb-4 line-clamp-3">
 										{project.description}
 									</p>
 
-									<div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+									<div className="border-t border-gray-200 pt-4 grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
 										{/* Project Budget */}
-										<div className="flex items-start gap-2">
-											<div className="text-orange-500 text-2xl mt-1">$</div>
+										<div className="flex items-center gap-2">
+											<Image
+												src="/icons/dollar.svg"
+												alt="Dollar icon"
+												width={25}
+												height={25}
+											/>
 											<div>
-												<p className="text-orange-500 font-medium">
+												<p className="text-sm text-orange-500 font-medium">
 													Project Budget
 												</p>
-												<p className="text-lg font-semibold">
+												<p className="text-sm font-normal">
 													${project.budget}/Creator
 												</p>
 											</div>
 										</div>
 
 										{/* Creators Required */}
+
 										<div>
-											<p className="text-orange-500 font-medium">
+											<p className="text-sm text-orange-500 font-medium">
 												Creators Required
 											</p>
-											<p className="text-lg font-semibold">
+											<p className="text-sm font-normal">
 												{project.creatorsRequired} Creators
 											</p>
 										</div>
@@ -684,13 +674,21 @@ const ProjectDashboard = () => {
 										{/* Conditional third section based on status */}
 										{project.status === "Accepting Pitches" ||
 										project.status === "Completed" ? (
-											<div>
-												<p className="text-orange-500 font-medium">
-													Creators Applied
-												</p>
-												<p className="text-lg font-semibold">
-													{project.creatorsApplied} Applied
-												</p>
+											<div className="flex items-center gap-2">
+												<Image
+													src="/icons/applied.svg"
+													alt="Creator applied icon"
+													width={25}
+													height={25}
+												/>
+												<div>
+													<p className="text-sm text-orange-500 font-medium">
+														Creators Applied
+													</p>
+													<p className="text-sm font-normal">
+														{project.creatorsApplied} Applied
+													</p>
+												</div>
 											</div>
 										) : (
 											project.status === "Ongoing Project" && (
@@ -711,7 +709,7 @@ const ProjectDashboard = () => {
 									{project.status === "Draft" ? (
 										<Link
 											href={`/dashboard/projects/edit/${project.id}`}
-											className="inline-block py-3 px-6 bg-orange-500 text-white font-medium rounded-md items-center justify-center gap-2"
+											className="w-full flex py-2 px-4 bg-orange-500 text-white font-medium rounded-md items-center justify-center gap-2"
 										>
 											Edit Project
 											<svg
@@ -734,7 +732,7 @@ const ProjectDashboard = () => {
 									) : (
 										<Link
 											href={`/dashboard/projects/${project.id}`}
-											className="inline-block py-3 px-6 bg-orange-500 text-white font-medium rounded-md items-center justify-center gap-2"
+											className="w-full flex py-2 px-4 bg-orange-500 text-white font-medium rounded-md items-center justify-center gap-2"
 										>
 											View Project
 											<svg

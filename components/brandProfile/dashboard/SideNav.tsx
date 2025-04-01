@@ -35,7 +35,13 @@ const MenuItem: React.FC<MenuItemProps> = ({
 		pathname === href ||
 		(href === "/dashboard" && pathname === "/dashboard") ||
 		(href === "/dashboard/contests" &&
-			pathname.startsWith("/dashboard/contests/"));
+			pathname.startsWith("/dashboard/contests/")) ||
+		(href === "/dashboard/projects" && pathname.startsWith("/dashboard/projects/")) ||
+		(href === "/dashboard/creators" && pathname.startsWith("/dashboard/creators/")) ||
+		(href === "/dashboard/messages" && pathname.startsWith("/dashboard/messages/")) ||
+		(href === "/dashboard/transactions" && pathname.startsWith("/dashboard/transactions/")) ||
+		(href === "/dashboard/settings" && pathname.startsWith("/dashboard/settings/")) ||
+		(href === "/dashboard/help" && pathname.startsWith("/dashboard/help/"));
 
 	const hasActiveSubItem =
 		hasSubItems && subItems.some((item) => pathname === item.href);

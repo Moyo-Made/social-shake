@@ -110,7 +110,7 @@ interface CreatorSelection {
 	gender?: string;
 	industry?: string;
 	language?: string;
-	countries?: string;
+	countries?: string[];
 	creatorCount: number;
 	videosPerCreator: number;
 	totalVideos: number;

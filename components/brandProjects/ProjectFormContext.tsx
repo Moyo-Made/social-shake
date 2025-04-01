@@ -82,7 +82,7 @@ const defaultFormData: ProjectFormData = {
 			creatorCount: 2,
 			videosPerCreator: 1,
 			totalVideos: 0,
-			countries: ""
+			countries: []
 		},
 		cost: {
 			budgetPerVideo: 0,

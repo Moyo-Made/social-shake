@@ -49,9 +49,14 @@ export default function CreatorPricingTab() {
 	const [language, setLanguage] = useState(
 		creatorPricing.creator?.language || ""
 	);
-	const [countries, setCountries] = useState<string | undefined>(
-		creatorPricing.creator?.countries || ""
+	const [countries, setCountries] = useState<string[]>(
+		creatorPricing.creator?.countries
+			? Array.isArray(creatorPricing.creator.countries)
+				? creatorPricing.creator.countries
+				: [creatorPricing.creator.countries]
+			: []
 	);
+	const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
 
 	// Predefined mock creators
 	const [selectedCreators] = useState<Creator[]>([
@@ -109,7 +114,7 @@ export default function CreatorPricingTab() {
 				totalVideos,
 				industry,
 				language,
-				countries,
+				countries: countries,
 			},
 			cost: {
 				budgetPerVideo: budget,
@@ -343,7 +348,7 @@ export default function CreatorPricingTab() {
 
 									<div className="space-y-2">
 										<h2 className="text-base font-medium">Gender</h2>
-										<div className="flex flex-wrap gap-2">
+										<div className="flex flex-wrap gap-2 capitalize">
 											{["male", "female", "all"].map((option) => (
 												<button
 													key={option}
@@ -413,19 +418,122 @@ export default function CreatorPricingTab() {
 										<h2 className="text-base font-medium">
 											Countries allowed for Project
 										</h2>
-										<Select
-											value={countries}
-											onValueChange={(value) => setCountries(value)}
-										>
-											<SelectTrigger className="w-full border rounded-md">
-												<SelectValue placeholder="Select Countries (Multi Select)" />
-											</SelectTrigger>
-											<SelectContent className="bg-white">
-												<SelectItem value="us">United States</SelectItem>
-												<SelectItem value="ca">Canada</SelectItem>
-												<SelectItem value="uk">United Kingdom</SelectItem>
-											</SelectContent>
-										</Select>
+										<div className="relative">
+											{/* Display selected countries */}
+											<div
+												className="w-full border rounded-md py-2 px-3 flex flex-wrap gap-1 min-h-10 cursor-pointer"
+												onClick={() => setIsCountryDropdownOpen(!isCountryDropdownOpen)}
+											>
+												{countries.length > 0 ? (
+													countries.map((country) => (
+														<div
+															key={country}
+															className="bg-orange-100 text-orange-700 rounded-md px-2 py-1 text-sm flex items-center gap-1"
+														>
+															{country === "us"
+																? "United States"
+																: country === "ca"
+																	? "Canada"
+																	: country === "uk"
+																		? "United Kingdom"
+																		: country}
+															<button
+																onClick={(e) => {
+																	e.stopPropagation();
+																	setCountries(countries.filter((c) => c !== country));
+																}}
+																className="text-orange-700 hover:text-orange-900"
+															>
+																<X size={14} />
+															</button>
+														</div>
+													))
+												) : (
+													<span className="text-gray-500">
+														Select Countries (Multi Select)
+													</span>
+												)}
+											</div>
+
+											{/* Custom dropdown */}
+											{isCountryDropdownOpen && (
+												<div className="absolute z-10 mt-1 w-full bg-white border rounded-md shadow-lg">
+													<div className="py-1">
+														<div 
+															className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+															onClick={() => {
+																if (!countries.includes("us")) {
+																	setCountries([...countries, "us"]);
+																}
+																// Uncomment below to close after selection
+																// setIsCountryDropdownOpen(false);
+															}}
+														>
+															<div className="flex items-center gap-2">
+																<div
+																	className={`w-4 h-4 border rounded flex items-center justify-center ${
+																		countries.includes("us")
+																			? "bg-orange-500 border-orange-500"
+																			: "border-gray-400"
+																	}`}
+																>
+																	{countries.includes("us") && (
+																		<div className="w-2 h-2 rounded bg-white"></div>
+																	)}
+																</div>
+																United States
+															</div>
+														</div>
+														<div 
+															className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+															onClick={() => {
+																if (!countries.includes("ca")) {
+																	setCountries([...countries, "ca"]);
+																}
+															}}
+														>
+															<div className="flex items-center gap-2">
+																<div
+																	className={`w-4 h-4 border rounded flex items-center justify-center ${
+																		countries.includes("ca")
+																			? "bg-orange-500 border-orange-500"
+																			: "border-gray-400"
+																	}`}
+																>
+																	{countries.includes("ca") && (
+																		<div className="w-2 h-2 rounded bg-white"></div>
+																	)}
+																</div>
+																Canada
+															</div>
+														</div>
+														<div 
+															className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+															onClick={() => {
+																if (!countries.includes("uk")) {
+																	setCountries([...countries, "uk"]);
+																}
+															}}
+														>
+															<div className="flex items-center gap-2">
+																<div
+																	className={`w-4 h-4 border rounded flex items-center justify-center ${
+																		countries.includes("uk")
+																			? "bg-orange-500 border-orange-500"
+																			: "border-gray-400"
+																	}`}
+																>
+																	{countries.includes("uk") && (
+																		<div className="w-2 h-2 rounded bg-white"></div>
+																	)}
+																</div>
+																United Kingdom
+															</div>
+														</div>
+													</div>
+												</div>
+											)}
+										</div>
 									</div>
 								</div>
 							)}
