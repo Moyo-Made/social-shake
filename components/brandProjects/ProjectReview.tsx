@@ -385,7 +385,7 @@ const CreatorProjectReview = () => {
 
 												// Return the mapped country names joined with commas
 												return (
-													countryMap[countries as keyof typeof countryMap] ||
+													countryMap[countries as unknown as keyof typeof countryMap] ||
 													countries
 												);
 											})()}
