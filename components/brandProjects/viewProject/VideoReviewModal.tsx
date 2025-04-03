@@ -5,7 +5,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { CheckIcon, ChevronDown, ChevronLeft, X } from "lucide-react";
 import Image from "next/image";
-import { Submission } from "./viewProject/ProjectSubmissions";
+import { Submission } from "@/types/submission";
+
+
 
 interface ReviewVideoModalProps {
 	submission: Submission | null;

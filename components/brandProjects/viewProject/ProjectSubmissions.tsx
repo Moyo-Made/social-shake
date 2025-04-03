@@ -15,28 +15,7 @@ import Image from "next/image";
 import ReviewVideoModal from "./VideoReviewModal";
 import ProjectApprovalModal from "./ProjectApprovalModal";
 import VerifySparkCodeModal from "./VerifySparkCodeModal";
-
-// Types
-export interface Submission {
-	id: string;
-	creatorName: string;
-	creatorIcon: string;
-	videoNumber: string;
-	revisionNumber: string;
-	status:
-		| "submitted"
-		| "approved"
-		| "new"
-		| "spark_requested"
-		| "spark_received"
-		| "spark_verified"   // New state for spark code verification
-		| "payment_confirmed" // New state for confirmed payment
-		| "awaiting_payment"; // New state for awaiting payment
-	submittedAt: string;
-	thumbnail: string;
-	product: "skincare" | "supplement";
-	sparkCode?: string;
-}
+import { Submission } from "@/types/submission";
 
 // Mock data with enhanced status options
 export const submissions: Submission[] = [
