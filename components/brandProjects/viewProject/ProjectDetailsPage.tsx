@@ -60,7 +60,7 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 		);
 	}
 
-	const { projectDetails, projectRequirements, creatorPricing, status } =
+	const { projectDetails, projectRequirements, creatorPricing } =
 		project;
 
 	return (
