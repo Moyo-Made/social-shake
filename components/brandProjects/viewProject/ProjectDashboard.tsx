@@ -400,14 +400,12 @@ const ProjectDashboard = () => {
 								{/* Project Thumbnail */}
 								{project.thumbnailUrl && (
 									<div className="relative mb-6 rounded-xl overflow-hidden">
-										<Image
+										{/* eslint-disable-next-line @next/next/no-img-element */}
+										<img
 											src={project.thumbnailUrl}
 											alt={`${project.title} thumbnail`}
 											className="w-full h-48 object-cover"
-											width={500}
-											height={400}
 											onError={handleImageError}
-											priority={true}
 										/>
 									</div>
 								)}

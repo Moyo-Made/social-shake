@@ -111,7 +111,7 @@ interface ProjectFormContextType {
 	submitContest: (
 		formData: FormData,
 		userId?: string,
-		contestId?: string
+		projectId?: string
 	) => Promise<ApiResponse>;
 	resetDraft: () => void;
 	draftSaved: boolean;
