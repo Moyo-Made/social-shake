@@ -1,4 +1,3 @@
-// pages/index.tsx
 import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -26,6 +25,8 @@ export default function CreatorPricingTab() {
 		CreatorPricing["selectionMethod"]
 	>(creatorPricing.selectionMethod || "Invite Specific Creators");
 	const [budget, setBudget] = useState(creatorPricing.budgetPerVideo || 1500);
+	const [budgetValue, setBudgetValue] = useState(budget.toString());
+	const [budgetError, setBudgetError] = useState("");
 	const [extras, setExtras] = useState({
 		captions: creatorPricing.extras.captions || false,
 		music: creatorPricing.extras.music || true,
@@ -63,6 +64,31 @@ export default function CreatorPricingTab() {
 		{ name: "Colina Demirdjian", avatar: "/icons/colina.svg" },
 		{ name: "Tolulope Olu", avatar: "/icons/colina.svg" },
 	]);
+
+	// Handle budget value change
+	const handleBudgetChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		// Allow empty string for clearing the input field
+		if (e.target.value === "") {
+			setBudgetValue("");
+			setBudgetError("Minimum budget per video is $1,500");
+			return;
+		}
+
+		// Parse the input value as number
+		const inputValue = e.target.value;
+		setBudgetValue(inputValue);
+
+		const numValue = Number(inputValue);
+
+		// Validate the value
+		if (numValue < 1500) {
+			setBudgetError("Minimum budget per video is $1,500");
+			setBudget(numValue); // Still update the budget for calculations
+		} else {
+			setBudgetError("");
+			setBudget(numValue);
+		}
+	};
 
 	// Calculate totals
 	const totalVideos =
@@ -422,7 +448,9 @@ export default function CreatorPricingTab() {
 											{/* Display selected countries */}
 											<div
 												className="w-full border rounded-md py-2 px-3 flex flex-wrap gap-1 min-h-10 cursor-pointer"
-												onClick={() => setIsCountryDropdownOpen(!isCountryDropdownOpen)}
+												onClick={() =>
+													setIsCountryDropdownOpen(!isCountryDropdownOpen)
+												}
 											>
 												{countries.length > 0 ? (
 													countries.map((country) => (
@@ -440,7 +468,9 @@ export default function CreatorPricingTab() {
 															<button
 																onClick={(e) => {
 																	e.stopPropagation();
-																	setCountries(countries.filter((c) => c !== country));
+																	setCountries(
+																		countries.filter((c) => c !== country)
+																	);
 																}}
 																className="text-orange-700 hover:text-orange-900"
 															>
@@ -459,7 +489,7 @@ export default function CreatorPricingTab() {
 											{isCountryDropdownOpen && (
 												<div className="absolute z-10 mt-1 w-full bg-white border rounded-md shadow-lg">
 													<div className="py-1">
-														<div 
+														<div
 															className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
 															onClick={() => {
 																if (!countries.includes("us")) {
@@ -484,7 +514,7 @@ export default function CreatorPricingTab() {
 																United States
 															</div>
 														</div>
-														<div 
+														<div
 															className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
 															onClick={() => {
 																if (!countries.includes("ca")) {
@@ -507,7 +537,7 @@ export default function CreatorPricingTab() {
 																Canada
 															</div>
 														</div>
-														<div 
+														<div
 															className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
 															onClick={() => {
 																if (!countries.includes("uk")) {
@@ -555,19 +585,20 @@ export default function CreatorPricingTab() {
 									$
 								</span>
 								<Input
-									type="number"
-									value={budget}
-									onChange={(e) => {
-										const value = Number(e.target.value);
-										setBudget(value);
-									}}
-									className="pl-8 border rounded-md"
+									type="text"
+									value={budgetValue}
+									onChange={handleBudgetChange}
+									className={`pl-8 border rounded-md ${budgetError ? "border-red-500" : ""}`}
 									min={1500}
 								/>
 							</div>
-							<p className="text-sm text-gray-500 mt-1">
-								This is the total amount you intend to spend (Min. $1,500)
-							</p>
+							{budgetError ? (
+								<p className="text-sm text-red-500 mt-1">{budgetError}</p>
+							) : (
+								<p className="text-sm text-gray-500 mt-1">
+									This is the total amount you intend to spend (Min. $1,500)
+								</p>
+							)}
 						</div>
 
 						<div className="border-t pt-4">

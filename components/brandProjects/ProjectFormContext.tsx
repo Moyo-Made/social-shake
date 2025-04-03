@@ -32,7 +32,7 @@ const defaultFormData: ProjectFormData = {
 		projectDescription: [""],
 		projectThumbnail: null,
 	},
-	status: 'Draft',
+
 	projectRequirements: {
 		contentType: "allow-applications",
 		platform: [""],
@@ -191,7 +191,7 @@ export const ProjectFormProvider: React.FC<{
 
 		// Force default contest type if not set
 		data.projectDetails.projectType =
-			data.projectDetails.projectType || "UGC Content";
+			data.projectDetails.projectType || "UGC Content Only";
 		data.projectDetails.projectType = data.projectDetails.projectType;
 
 		setFormData(data);
@@ -252,85 +252,106 @@ export const ProjectFormProvider: React.FC<{
 		setDraftSaved(false);
 	}, []);
 
-	// Update your submission function to clearly distinguish between your form state and the FormData object
+
+	// Submission function
 	const submitContest = async (): Promise<ApiResponse> => {
 		setIsLoading(true);
 		setError(null);
-
+	  
 		try {
-			// Add userId check
-			if (!userId) {
-				throw new Error("User ID is required for submitting contests");
-			}
-
-			const formDataForSubmission = new FormData();
-			formDataForSubmission.append("userId", userId);
-
-			// Add the complex objects from your state, properly stringified
+		  // Add userId check
+		  if (!userId) {
+			throw new Error("User ID is required for submitting projects");
+		  }
+	  
+		  // Create FormData for submission without pre-determining the status
+		  const formDataForSubmission = new FormData();
+		  formDataForSubmission.append("userId", userId);
+	  
+		  // Add the complex objects from your state, properly stringified
+		  formDataForSubmission.append(
+			"projectDetails",
+			JSON.stringify(formData.projectDetails)
+		  );
+		  formDataForSubmission.append(
+			"projectRequirements",
+			JSON.stringify(formData.projectRequirements)
+		  );
+		  formDataForSubmission.append(
+			"creatorPricing",
+			JSON.stringify(formData.creatorPricing)
+		  );
+		  formDataForSubmission.append(
+			"projectType",
+			JSON.stringify(formData.projectDetails.projectType)
+		  );
+	  
+		  // Add the thumbnail file if it exists
+		  if (formData.projectDetails.projectThumbnail instanceof File) {
 			formDataForSubmission.append(
-				"projectDetails",
-				JSON.stringify(formData.projectDetails)
+			  "projectThumbnail",
+			  formData.projectDetails.projectThumbnail
 			);
-			formDataForSubmission.append(
-				"projectRequirements",
-				JSON.stringify(formData.projectRequirements)
-			);
-			formDataForSubmission.append(
-				"creatorPricing",
-				JSON.stringify(formData.creatorPricing)
-			);
-			formDataForSubmission.append(
-				"projectType",
-				JSON.stringify(formData.projectDetails.projectType)
-			);
-
-			// Add the thumbnail file if it exists
-			if (formData.projectDetails.projectThumbnail instanceof File) {
-				formDataForSubmission.append(
-					"projectThumbnail",
-					formData.projectDetails.projectThumbnail
-				);
-			}
-			formDataForSubmission.append("status", formData.status);
-			
-
-			// Send the FormData to your API
-			const response = await fetch("/api/projects", {
-				method: "POST",
-				body: formDataForSubmission,
-			});
-
-			// Parse the response
-			const result = await response.json();
-			console.log("Submission result:", result);
-
-			if (!response.ok || !result.success) {
-				throw new Error(result.error || "Failed to create contest");
-			}
-
-			// On success, clear saved data
-			localStorage.removeItem("contestFormDraft");
-
-			setIsLoading(false);
-			return result;
+		  }
+		  
+		  // Add timestamps for sorting in dashboard
+		  formDataForSubmission.append(
+			"createdAt",
+			JSON.stringify(new Date().toISOString())
+		  );
+		  formDataForSubmission.append(
+			"updatedAt",
+			JSON.stringify(new Date().toISOString())
+		  );
+	  
+		  // Send the FormData to your API
+		  const response = await fetch("/api/projects", {
+			method: "POST",
+			body: formDataForSubmission,
+		  });
+	  
+		  // Parse the response
+		  const result = await response.json();
+		  console.log("Submission result:", result);
+	  
+		  if (!response.ok || !result.success) {
+			throw new Error(result.error || "Failed to create project");
+		  }
+	  
+		  // Update local form status with status from API response
+		  if (result.data && result.data.status) {
+			setFormData(prevData => ({
+			  ...prevData,
+			  status: result.data.status
+			}));
+		  }
+	  
+		  // Only clear saved data if we're not in draft mode
+		  if (result.data?.status !== "draft") {
+			localStorage.removeItem("projectFormDraft");
+			sessionStorage.removeItem("contestFormSession");
+		  }
+	  
+		  setIsLoading(false);
+		  return result;
 		} catch (error) {
-			console.error("Submission error:", error);
-			setIsLoading(false);
-			setError(
-				error instanceof Error
-					? error.message
-					: "An error occurred during submission"
-			);
-
-			return {
-				success: false,
-				error:
-					error instanceof Error
-						? error.message
-						: "An error occurred during submission",
-			};
+		  console.error("Submission error:", error);
+		  setIsLoading(false);
+		  setError(
+			error instanceof Error
+			  ? error.message
+			  : "An error occurred during submission"
+		  );
+	  
+		  return {
+			success: false,
+			error:
+			  error instanceof Error
+				? error.message
+				: "An error occurred during submission",
+		  };
 		}
-	};
+	  };
 
 	const saveDraft = async (): Promise<ApiResponse> => {
 		setIsLoading(true);
@@ -338,13 +359,13 @@ export const ProjectFormProvider: React.FC<{
 
 		try {
 			if (!userId) {
-				throw new Error("User ID is required for submitting contests");
+				throw new Error("User ID is required for submitting projects");
 			}
 
 			// Save to localStorage and sessionStorage first (for redundancy)
 			const dataToSave = JSON.stringify(formData);
-			localStorage.setItem("contestFormDraft", dataToSave);
-			sessionStorage.setItem("contestFormSession", dataToSave);
+			localStorage.setItem("projectFormDraft", dataToSave);
+			sessionStorage.setItem("projectFormSession", dataToSave);
 
 			// Create a new FormData object for the HTTP request
 			const formDataForSubmission = new FormData();
@@ -391,7 +412,7 @@ export const ProjectFormProvider: React.FC<{
 			);
 
 			// Send the FormData to your API
-			const response = await fetch("/api/contests", {
+			const response = await fetch("/api/projects", {
 				method: "POST",
 				body: formDataForSubmission,
 			});
@@ -440,8 +461,8 @@ export const ProjectFormProvider: React.FC<{
 
 			// Save to both localStorage and sessionStorage
 			const dataString = JSON.stringify(processedData);
-			localStorage.setItem("contestFormDraft", dataString);
-			sessionStorage.setItem("contestFormSession", dataString);
+			localStorage.setItem("projectFormDraft", dataString);
+			sessionStorage.setItem("projectFormSession", dataString);
 
 			console.log("Loaded draft data:", processedData);
 		} catch (error) {
@@ -451,8 +472,8 @@ export const ProjectFormProvider: React.FC<{
 
 	// Reset draft and storages
 	const resetDraft = useCallback(() => {
-		localStorage.removeItem("contestFormDraft");
-		sessionStorage.removeItem("contestFormSession");
+		localStorage.removeItem("projectFormDraft");
+		sessionStorage.removeItem("projectFormSession");
 		setFormData(defaultFormData);
 		setDraftSaved(false);
 		setError(null);

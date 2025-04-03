@@ -90,7 +90,7 @@ const ProjectFormContent = () => {
 			// Add the thumbnail file separately
 			if (formData.projectDetails.projectThumbnail instanceof File) {
 				submitFormData.append(
-					"thumbnail",
+					"projectThumbnail",
 					formData.projectDetails.projectThumbnail
 				);
 			}
@@ -100,7 +100,7 @@ const ProjectFormContent = () => {
 				"projectDetails",
 				JSON.stringify({
 					...formData.projectDetails,
-					thumbnail:
+					projectThumbnail:
 						formData.projectDetails.projectThumbnail instanceof File
 							? null // For new files
 							: formData.projectDetails.projectThumbnail, // Preserve existing URL
@@ -302,11 +302,7 @@ const ProjectFormContent = () => {
 					<div className="flex items-center gap-2">
 						<CheckCircle2 className="h-4 w-4 text-green-500" />
 						<AlertDescription className="text-green-700">
-							Draft saved successfully! View in{" "}
-							<a href="/dashboard" className="underline font-medium">
-								dashboard
-							</a>
-							.
+							Draft saved successfully!
 						</AlertDescription>
 					</div>
 				</Alert>

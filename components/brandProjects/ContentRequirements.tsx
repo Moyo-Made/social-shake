@@ -140,7 +140,7 @@ const ContentRequirements = () => {
 					<div
 						className="flex items-center space-x-2 cursor-pointer capitalize text-[#667085] border border-[#667085] px-4 py-2 rounded-md data-[state=checked]:bg-[#FD5C02] data-[state=checked]:text-white data-[state=checked]:border-none"
 						data-state={
-							contentType === "Testimonials" ? "checked" : "unchecked"
+							contentType === "testimonials" ? "checked" : "unchecked"
 						}
 					>
 						<RadioGroupItem

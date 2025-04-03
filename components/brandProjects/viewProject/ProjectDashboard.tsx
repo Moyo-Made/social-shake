@@ -113,7 +113,7 @@ const ProjectDashboard = () => {
 					const data = doc.data();
 
 					// Determine status based on the status field or default to Draft
-					const rawStatus = data.status || "Draft";
+					const rawStatus = data.status || "Accepting Pitches";
 					// Make first letter of each word uppercase for display
 					const status = rawStatus
 						.split(" ")
@@ -233,8 +233,6 @@ const ProjectDashboard = () => {
 	) => {
 		e.currentTarget.style.display = "none"; // Hide broken image
 	};
-
-	
 
 	// Function to get the right icon for project type
 	const getProjectTypeIcon = (projectType: string) => {
@@ -584,19 +582,17 @@ const ProjectDashboard = () => {
 							>
 								<div className="relative w-full md:w-72 h-48 md:h-auto flex-shrink-0">
 									{project.thumbnailUrl ? (
-										<Image
+										// eslint-disable-next-line @next/next/no-img-element
+										<img
 											src={project.thumbnailUrl}
 											alt={`${project.title} thumbnail`}
-											className="w-full h-full rounded-lg object-cover"
-											width={500}
-											height={400}
-											style={{ aspectRatio: "4/3", objectFit: "cover" }}
+											className="w-full h-48 object-cover"
 											onError={handleImageError}
-											priority={true}
+											loading="lazy"
 										/>
 									) : (
-										<div className="w-full h-64 flex items-center justify-center bg-gray-200">
-											<p className="text-gray-500">No image available</p>
+										<div className="w-full h-48 bg-gray-100 flex items-center justify-center rounded-xl">
+											<p className="text-gray-400">No thumbnail available</p>
 										</div>
 									)}
 								</div>
