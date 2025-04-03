@@ -100,6 +100,7 @@ const defaultFormData: ProjectFormData = {
 			commissionPerSale: 0,
 		},
 	},
+	status: ""
 };
 
 interface ProjectFormContextType {

@@ -496,7 +496,7 @@ export default function CreatorPricingTab() {
 																	setCountries([...countries, "us"]);
 																}
 																// Uncomment below to close after selection
-																// setIsCountryDropdownOpen(false);
+																setIsCountryDropdownOpen(false);
 															}}
 														>
 															<div className="flex items-center gap-2">

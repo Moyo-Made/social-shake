@@ -99,7 +99,7 @@ export default function ProjectSubmissions() {
 	);
 	const [revisionUsed, setRevisionUsed] = useState<number>(1);
 	const [maxRevisions] = useState<number>(3);
-	const [submissionsList, setSubmissionsList] = 
+	const [submissionsList, setSubmissionsList] =
 		useState<Submission[]>(submissions);
 	const [expandedCreators, setExpandedCreators] = useState<
 		Record<string, boolean>
@@ -186,26 +186,25 @@ export default function ProjectSubmissions() {
 		setOpenVerifySparkDialog(true);
 	};
 
-	// NEW: Add function to handle spark code verification
-	// const handleSparkCodeVerified = (submission: Submission) => {
-	// 	const updatedSubmissions = submissionsList.map((sub) =>
-	// 		sub.id === submission.id 
-	// 			? { ...sub, status: "spark_verified", sparkCode: sparkCode } 
-	// 			: sub
-	// 	);
-	// 	setSubmissionsList(updatedSubmissions as Submission[]);
-	// 	console.log(`Spark code verified for submission ${submission.id}`);
-	// };
-
-	// NEW: Add function to handle payment confirmation
+	// Function to handle payment confirmation with status update after delay
 	const handleConfirmPayment = (submission: Submission) => {
+		// First update status to awaiting_payment
 		const updatedSubmissions = submissionsList.map((sub) =>
-			sub.id === submission.id 
-				? { ...sub, status: "awaiting_payment" } 
-				: sub
+			sub.id === submission.id ? { ...sub, status: "awaiting_payment" } : sub
 		);
 		setSubmissionsList(updatedSubmissions as Submission[]);
-		console.log(`Payment confirmed for submission ${submission.id}`);
+		console.log(`Payment initiated for submission ${submission.id}`);
+
+		// After 5 seconds, update status to payment_confirmed
+		setTimeout(() => {
+			const confirmedSubmissions = submissionsList.map((sub) =>
+				sub.id === submission.id ? { ...sub, status: "payment_confirmed" } : sub
+			);
+			setSubmissionsList(confirmedSubmissions as Submission[]);
+			console.log(
+				`Payment confirmed for submission ${submission.id} after 5 seconds`
+			);
+		}, 5000); // 5 second delay to simulate payment confirmation
 	};
 
 	const confirmSparkCodeVerification = () => {
@@ -312,22 +311,41 @@ export default function ProjectSubmissions() {
 			case "spark_verified":
 				// NEW: Show first image with Review/Approve buttons
 				return (
-					<>
+					<div className="flex flex-col w-full gap-2">
 						<Button
 							variant="secondary"
-							className="flex-1 mr-2 bg-[#FD5C02] text-white"
+							className="bg-[#FD5C02] text-white flex items-center justify-center w-full"
+						>
+							Download Video
+							<Download className="h-4 w-4 ml-2" />
+						</Button>
+						<Button
+							variant="secondary"
+							className="bg-[#000] text-white w-full"
 							onClick={() => handleConfirmPayment(submission)}
 						>
 							Confirm Payment
 							<Check className="h-5 w-5 ml-1" />
 						</Button>
-					</>
+					</div>
 				);
 			case "awaiting_payment":
 				// NEW: Show "Awaiting Admin Payment" status
 				return (
-					<div className="w-full text-center text-green-600 font-medium py-2">
-						Awaiting Admin Payment
+					<div className="flex flex-col w-full gap-2">
+						<Button
+							variant="secondary"
+							className="bg-[#FD5C02] text-white flex items-center justify-center w-full"
+						>
+							Download Video
+							<Download className="h-4 w-4 ml-2" />
+						</Button>
+						<Button
+							variant="secondary"
+							className="w-full bg-[#F0F7F4] text-center text-[#067647] py-2"
+						>
+							Awaiting Admin Payment
+						</Button>
 					</div>
 				);
 			case "payment_confirmed":
@@ -432,7 +450,6 @@ export default function ProjectSubmissions() {
 									height={192}
 									className="w-full object-fit rounded-md pt-2"
 								/>
-								
 							</div>
 
 							<div className="mt-4 flex">
@@ -440,8 +457,8 @@ export default function ProjectSubmissions() {
 							</div>
 
 							{(submission.status === "spark_received" ||
-							 submission.status === "spark_verified" ||
-							 submission.status === "awaiting_payment") &&
+								submission.status === "spark_verified" ||
+								submission.status === "awaiting_payment") &&
 								submission.sparkCode && (
 									<div className="mt-1 flex items-center gap-1 justify-center">
 										<span className="text-sm">
@@ -543,7 +560,7 @@ export default function ProjectSubmissions() {
 										return (
 											<div
 												key={submission.id}
-												className={`border rounded-lg overflow-hidden ${isNew ? "border-purple-300" : "border-transparent"}`}
+												className={`border rounded-lg overflow-hidden ${isNew ? "border-orange-500" : "border-[#FFBF9BBA]"}`}
 											>
 												<div className="p-4">
 													<div className="flex justify-between mb-1">
@@ -604,12 +621,15 @@ export default function ProjectSubmissions() {
 													</div>
 
 													{(submission.status === "spark_received" ||
-													 submission.status === "spark_verified" ||
-													 submission.status === "awaiting_payment") &&
+														submission.status === "spark_verified" ||
+														submission.status === "awaiting_payment") &&
 														submission.sparkCode && (
-															<div className="mt-2 flex items-center justify-between bg-gray-100 p-2 rounded">
+															<div className="mt-2 flex items-center gap-1 justify-center">
 																<span className="text-sm">
-																	Spark Code: {submission.sparkCode}
+																	Spark Code:{" "}
+																	<span className="text-black">
+																		{submission.sparkCode}
+																	</span>
 																</span>
 																<Button
 																	variant="ghost"
@@ -697,7 +717,9 @@ export default function ProjectSubmissions() {
 							<SelectItem value="spark_received">Spark Received</SelectItem>
 							<SelectItem value="spark_verified">Spark Verified</SelectItem>
 							<SelectItem value="awaiting_payment">Awaiting Payment</SelectItem>
-							<SelectItem value="payment_confirmed">Payment Confirmed</SelectItem>
+							<SelectItem value="payment_confirmed">
+								Payment Confirmed
+							</SelectItem>
 						</SelectContent>
 					</Select>
 

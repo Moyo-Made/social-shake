@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 // import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft} from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,6 +11,7 @@ import { ProjectFormData } from "@/types/contestFormData";
 import { getStatusDot, getStatusStyle } from "@/utils/statusUtils";
 import ProjectApplications from "./ProjectApplications";
 import ProjectSubmissions from "./ProjectSubmissions";
+import Image from "next/image";
 
 interface ProjectDetailPageProps {
 	projectId: string;
@@ -60,47 +61,57 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 		);
 	}
 
-	const { projectDetails, projectRequirements, creatorPricing } =
-		project;
+	const { projectDetails, projectRequirements, creatorPricing } = project;
 
 	return (
 		<div className="flex flex-col bg-white border border-[#FFD9C3] rounded-lg py-5 px-10 mt-3">
 			{/* Header Banner */}
-			<div
-				className="relative w-full h-64 p-6 flex flex-col justify-end rounded-lg"
-				style={{
-					backgroundImage: `url(${projectDetails.projectThumbnail})`,
-					backgroundSize: "cover",
-					backgroundPosition: "center",
-				}}
-			>
+			<div className="relative w-full h-64 p-6 flex flex-col justify-end rounded-lg">
+				<Image
+					src={
+						typeof projectDetails.projectThumbnail === "string"
+							? projectDetails.projectThumbnail
+							: projectDetails.projectThumbnail
+								? URL.createObjectURL(projectDetails.projectThumbnail)
+								: ""
+					}
+					alt="Project thumbnail"
+					fill
+					sizes="100vw"
+					className="object-cover z-0"
+					priority={true}
+				/>
+
+				{/* Dark overlay to improve text visibility */}
+				<div className="absolute inset-0 bg-black bg-opacity-40 z-1"></div>
+
 				{/* Back Button */}
 				<Link
 					href="/dashboard/projects"
-					className="absolute bottom-28 left-6 flex items-center text-white hover:underline"
+					className="absolute bottom-28 left-6 flex items-center text-white hover:underline z-10"
 				>
 					<ChevronLeft size={20} />
 					<span>All Projects</span>
 				</Link>
 
-				{/* Project Title */}
-				<div className="mt-8">
+				{/* Project Title & Stats */}
+				<div className="relative z-10 mt-8">
 					<div className="flex items-center gap-3 mb-2">
-						<h1 className="text-2xl font-bold text-white">
+						<h1 className="text-2xl font-bold text-white drop-shadow-md">
 							{projectDetails.projectName}
 						</h1>
 						<div
-							className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${getStatusStyle(status)}`}
+							className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${getStatusStyle(project.status)}`}
 						>
 							<span
-								className={`inline-block w-1.5 h-1.5 rounded-full ${getStatusDot(status)}`}
+								className={`inline-block w-1.5 h-1.5 rounded-full ${getStatusDot(project.status)}`}
 							></span>
-							<p className="capitalize">{status}</p>
+							<p className="capitalize">{project.status}</p>
 						</div>
 					</div>
 
 					{/* Project Stats */}
-					<div className="flex flex-wrap gap-4 w-fit text-base bg-[#f7f7f7] px-5 py-2 rounded-lg">
+					<div className="flex flex-wrap gap-4 w-fit text-base bg-white bg-opacity-90 border border-[#FFD9C3] px-5 py-2 rounded-lg shadow-md">
 						<div>
 							<span className="text-[#FD5C02]">Project Budget:</span> $
 							{creatorPricing.totalBudget || 0}

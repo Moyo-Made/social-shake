@@ -1,4 +1,3 @@
-// pages/index.tsx
 import React, { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -14,46 +13,65 @@ import { Label } from "@/components/ui/label";
 import { X } from "lucide-react";
 import Image from "next/image";
 import { useProjectForm } from "./ProjectFormContext";
+import { Creator, CreatorPricing } from "@/types/contestFormData";
 
 export default function TikTokShopCreatorPricingTab() {
-  const { updateCreatorPricing } = useProjectForm();
-  const [selectionMethod, setSelectionMethod] = useState("invite");
-  const [creatorPayment, setCreatorPayment] = useState(1500);
-  const [affiliateCommission, setAffiliateCommission] = useState("");
-  const [extras, setExtras] = useState({
-    captions: false,
-    music: true,
-    rawFiles: false,
+  const { formData, updateCreatorPricing } = useProjectForm();
+  const { creatorPricing } = formData;
+  
+  // Initialize state from context or use default values
+  const [selectionMethod, setSelectionMethod] = useState<
+    CreatorPricing["selectionMethod"]
+  >(creatorPricing.selectionMethod || "Invite Specific Creators");
+  const [creatorPayment, setCreatorPayment] = useState(creatorPricing.budgetPerVideo || 1500);
+  const [affiliateCommission, setAffiliateCommission] = useState("10");
+  const [extras, setExtras] = useState<{
+    captions: boolean;
+    music: boolean;
+    rawFiles: boolean;
+  }>({
+    captions: creatorPricing.extras?.captions || false,
+    music: creatorPricing.extras?.music || true,
+    rawFiles: creatorPricing.extras?.rawFiles || true,
   });
-  const [creators, setCreators] = useState(2);
-  const [videosPerCreator, setVideosPerCreator] = useState(2);
-  const [creatorSelectionMode, setCreatorSelectionMode] = useState("all"); // 'all' or 'search'
-  const [ageGroup, setAgeGroup] = useState("25-34");
-  const [gender, setGender] = useState("female");
-  const [industry, setIndustry] = useState("");
-  const [language, setLanguage] = useState("");
-  const [countries] = useState<string[]>([]);
+  const [invitedCreatorsCount] = useState(2); // Fixed at 2 for invited creators
+  const [publicCreatorsCount, setPublicCreatorsCount] = useState(
+    creatorPricing.selectionMethod === "Post Public Brief"
+      ? creatorPricing.creatorCount || 1
+      : 1
+  );
+  const [videosPerCreator, setVideosPerCreator] = useState(
+    creatorPricing.videosPerCreator || 2
+  );
+  const [creatorSelectionMode, setCreatorSelectionMode] = useState("all");
+  const [ageGroup, setAgeGroup] = useState(creatorPricing.ageGroup || "25-34");
+  const [gender, setGender] = useState(creatorPricing.gender || "female");
+  const [industry, setIndustry] = useState(
+    creatorPricing.creator?.industry || ""
+  );
+  const [language, setLanguage] = useState(
+    creatorPricing.creator?.language || ""
+  );
+  const [countries, setCountries] = useState<string[]>(
+    creatorPricing.creator?.countries
+      ? Array.isArray(creatorPricing.creator.countries)
+        ? creatorPricing.creator.countries
+        : [creatorPricing.creator.countries]
+      : []
+  );
+  const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
 
-  const [selectedCreators] = useState([
-    { id: 1, name: "Colina Demirdjian", avatar: "/icons/colina.svg" },
-    { id: 1, name: "Colina Demirdjian", avatar: "/icons/colina.svg" },
-    { id: 2, name: "Tolulope Olu", avatar: "/icons/colina.svg" },
-    { id: 2, name: "Tolulope Olu", avatar: "/icons/colina.svg" },
-    { id: 1, name: "Colina Demirdjian", avatar: "/icons/colina.svg" },
-    { id: 1, name: "Colina Demirdjian", avatar: "/icons/colina.svg" },
-    { id: 2, name: "Tolulope Olu", avatar: "/icons/colina.svg" },
-    { id: 2, name: "Tolulope Olu", avatar: "/icons/colina.svg" },
+  const [selectedCreators] = useState<Creator[]>([
+    { name: "Colina Demirdjian", avatar: "/icons/colina.svg" },
+    { name: "Colina Demirdjian", avatar: "/icons/colina.svg" },
+    { name: "Tolulope Olu", avatar: "/icons/colina.svg" },
   ]);
 
-  // Calculate number of unique creators when in invite mode
-//   const uniqueCreatorIds = new Set(selectedCreators.map(creator => creator.id));
-//   const selectedCreatorCount = uniqueCreatorIds.size;
+  // Calculate the number of creators based on the selection method
+  const creators = selectionMethod === "Invite Specific Creators" ? invitedCreatorsCount : publicCreatorsCount;
 
   // Calculate totals
-  const totalVideos =
-    selectionMethod === "invite"
-      ? creators * videosPerCreator
-      : creators * videosPerCreator;
+  const totalVideos = creators * videosPerCreator;
 
   const captionsTotal = extras.captions ? 120 * totalVideos : 0;
   const musicTotal = extras.music ? 50 * totalVideos : 0;
@@ -65,12 +83,12 @@ export default function TikTokShopCreatorPricingTab() {
 
   // Update context when values change
   const updateContextValues = () => {
-    const creatorsForContext = selectionMethod === "invite" 
+    const creatorsForContext = selectionMethod === "Invite Specific Creators" 
       ? selectedCreators.map(c => ({ name: c.name, avatar: c.avatar }))
       : [];
       
     updateCreatorPricing({
-      selectionMethod: selectionMethod === "invite" ? "Invite Specific Creators" : "Post Public Brief",
+      selectionMethod: selectionMethod === "Invite Specific Creators" ? "Invite Specific Creators" : "Post Public Brief",
       selectedCreators: creatorsForContext,
       ageGroup,
       gender,
@@ -95,7 +113,7 @@ export default function TikTokShopCreatorPricingTab() {
       extrasTotal,
       totalAmount,
       creator: {
-        selectionMethod: selectionMethod === "invite" ? "Invite Specific Creators" : "Post Public Brief",
+        selectionMethod: selectionMethod === "Invite Specific Creators" ? "Invite Specific Creators" : "Post Public Brief",
         selectedCreators: creatorsForContext,
         ageGroup,
         gender,
@@ -155,7 +173,7 @@ export default function TikTokShopCreatorPricingTab() {
 
               <Select
                 value={selectionMethod}
-                onValueChange={setSelectionMethod}
+                onValueChange={(value) => setSelectionMethod(value as "Invite Specific Creators" | "Post Public Brief")}
               >
                 <SelectTrigger className="w-full border rounded-md">
                   <SelectValue placeholder="Select method" />
@@ -168,7 +186,7 @@ export default function TikTokShopCreatorPricingTab() {
                 </SelectContent>
               </Select>
 
-              {selectionMethod === "invite" ? (
+              {selectionMethod === "Invite Specific Creators" ? (
                 <div className="space-y-4">
                   <h3 className="text-base font-medium">
                     Invite Specific Creators
@@ -400,16 +418,126 @@ export default function TikTokShopCreatorPricingTab() {
                     <h2 className="text-base font-medium">
                       Countries allowed for Project
                     </h2>
-                    <Select>
-                      <SelectTrigger className="w-full border rounded-md">
-                        <SelectValue placeholder="Select Countries (Multi Select)" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white">
-                        <SelectItem value="us">United States</SelectItem>
-                        <SelectItem value="ca">Canada</SelectItem>
-                        <SelectItem value="uk">United Kingdom</SelectItem>
-                      </SelectContent>
-                    </Select>
+                   <div className="relative">
+                      {/* Display selected countries */}
+                      <div
+                        className="w-full border rounded-md py-2 px-3 flex flex-wrap gap-1 min-h-10 cursor-pointer"
+                        onClick={() =>
+                          setIsCountryDropdownOpen(!isCountryDropdownOpen)
+                        }
+                      >
+                        {countries.length > 0 ? (
+                          countries.map((country) => (
+                            <div
+                              key={country}
+                              className="bg-orange-100 text-orange-700 rounded-md px-2 py-1 text-sm flex items-center gap-1"
+                            >
+                              {country === "us"
+                                ? "United States"
+                                : country === "ca"
+                                  ? "Canada"
+                                  : country === "uk"
+                                    ? "United Kingdom"
+                                    : country}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCountries(
+                                    countries.filter((c) => c !== country)
+                                  );
+                                }}
+                                className="text-orange-700 hover:text-orange-900"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ))
+                        ) : (
+                          <span className="text-gray-500">
+                            Select Countries (Multi Select)
+                          </span>
+                        )}
+                      </div>
+                   
+                      {/* Custom dropdown */}
+                      {isCountryDropdownOpen && (
+                        <div className="absolute z-10 mt-1 w-full bg-white border rounded-md shadow-lg">
+                          <div className="py-1">
+                            <div
+                              className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                              onClick={() => {
+                                if (!countries.includes("us")) {
+                                  setCountries([...countries, "us"]);
+                                }
+                                // Uncomment below to close after selection
+                                setIsCountryDropdownOpen(false);
+                              }}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className={`w-4 h-4 border rounded flex items-center justify-center ${
+                                    countries.includes("us")
+                                      ? "bg-orange-500 border-orange-500"
+                                      : "border-gray-400"
+                                  }`}
+                                >
+                                  {countries.includes("us") && (
+                                    <div className="w-2 h-2 rounded bg-white"></div>
+                                  )}
+                                </div>
+                                United States
+                              </div>
+                            </div>
+                            <div
+                              className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                              onClick={() => {
+                                if (!countries.includes("ca")) {
+                                  setCountries([...countries, "ca"]);
+                                }
+                              }}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className={`w-4 h-4 border rounded flex items-center justify-center ${
+                                    countries.includes("ca")
+                                      ? "bg-orange-500 border-orange-500"
+                                      : "border-gray-400"
+                                  }`}
+                                >
+                                  {countries.includes("ca") && (
+                                    <div className="w-2 h-2 rounded bg-white"></div>
+                                  )}
+                                </div>
+                                Canada
+                              </div>
+                            </div>
+                            <div
+                              className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                              onClick={() => {
+                                if (!countries.includes("uk")) {
+                                  setCountries([...countries, "uk"]);
+                                }
+                              }}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className={`w-4 h-4 border rounded flex items-center justify-center ${
+                                    countries.includes("uk")
+                                      ? "bg-orange-500 border-orange-500"
+                                      : "border-gray-400"
+                                  }`}
+                                >
+                                  {countries.includes("uk") && (
+                                    <div className="w-2 h-2 rounded bg-white"></div>
+                                  )}
+                                </div>
+                                United Kingdom
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -449,7 +577,7 @@ export default function TikTokShopCreatorPricingTab() {
               </h2>
               <div className="relative">
                 <Input
-                  type="number"
+                  type="text"
                   value={affiliateCommission}
                   onChange={(e) => setAffiliateCommission(e.target.value)}
                   className="pl-3 border rounded-md"
@@ -531,7 +659,7 @@ export default function TikTokShopCreatorPricingTab() {
             </div>
 
             <div className="border-t pt-4">
-              {selectionMethod === "invite" ? (
+              {selectionMethod === "Invite Specific Creators" ? (
                 <div className="flex justify-between mb-2">
                   <span>No of Creators:</span>
                   <span>{creators} Creators</span>
@@ -542,8 +670,8 @@ export default function TikTokShopCreatorPricingTab() {
                   <div className="relative flex items-center">
                     <Input
                       type="number"
-                      value={creators}
-                      onChange={(e) => setCreators(Number(e.target.value))}
+                      value={publicCreatorsCount}
+                      onChange={(e) => setPublicCreatorsCount(Number(e.target.value))}
                       className="w-16 h-8 px-2 text-center border rounded-md"
                       min={1}
                     />
@@ -551,7 +679,7 @@ export default function TikTokShopCreatorPricingTab() {
                       <button
                         className="flex-1 px-1 border-l flex items-center justify-center"
                         onClick={() =>
-                          setCreators((prev) => Math.max(1, prev + 1))
+                          setPublicCreatorsCount((prev) => Math.max(1, prev + 1))
                         }
                       >
                         <svg
@@ -567,7 +695,7 @@ export default function TikTokShopCreatorPricingTab() {
                       <button
                         className="flex-1 px-1 border-l border-t flex items-center justify-center"
                         onClick={() =>
-                          setCreators((prev) => Math.max(1, prev - 1))
+                          setPublicCreatorsCount((prev) => Math.max(1, prev - 1))
                         }
                       >
                         <svg

@@ -133,6 +133,7 @@ interface CreatorSelection {
   }
 
 export interface ProjectFormData {
+	status: string;
 	projectDetails: ProjectDetails;
 	projectRequirements: ProjectRequirements;
 	creatorPricing: CreatorPricing;
