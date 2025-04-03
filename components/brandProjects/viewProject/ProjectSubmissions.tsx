@@ -16,6 +16,8 @@ import ReviewVideoModal from "./VideoReviewModal";
 import ProjectApprovalModal from "./ProjectApprovalModal";
 import VerifySparkCodeModal from "./VerifySparkCodeModal";
 import { Submission } from "@/types/submission";
+import { ProjectFormData } from "@/types/contestFormData";
+import VerifyTikTokLinkModal from "./VerifyTikTokLinkModal";
 
 // Mock data with enhanced status options
 export const submissions: Submission[] = [
@@ -87,13 +89,24 @@ export const submissions: Submission[] = [
 	},
 ];
 
-export default function ProjectSubmissions() {
+interface ProjectSubmissionsProps {
+	projectFormData: ProjectFormData;
+}
+
+export default function ProjectSubmissions({
+	projectFormData,
+}: ProjectSubmissionsProps) {
+	const projectType =
+		projectFormData?.projectDetails?.projectType;
+
 	const [activeView, setActiveView] = useState<"project" | "creator">(
 		"project"
 	);
 	const [openReviewDialog, setOpenReviewDialog] = useState(false);
 	const [openApproveDialog, setOpenApproveDialog] = useState(false);
 	const [openVerifySparkDialog, setOpenVerifySparkDialog] = useState(false);
+	const [openVerifyTiktokLinkDialog, setOpenVerifyTiktokLinkDialog] =
+		useState(false);
 	const [currentSubmission, setCurrentSubmission] = useState<Submission | null>(
 		null
 	);
@@ -107,7 +120,8 @@ export default function ProjectSubmissions() {
 		"Melinda Roshovelle": true,
 		"Colina Smith": false,
 	});
-	const [sparkCode, setSparkCode] = useState<string>("SPRK-9X2L4M7QF5");
+	const [sparkCode] = useState<string>("SPRK-9X2L4M7QF5");
+	// const [tiktokLink, setTikTokLink] = useState<string>("https://tiktok.com/@creator");
 
 	// Group submissions by creator
 	const groupedSubmissions = submissionsList.reduce(
@@ -176,14 +190,44 @@ export default function ProjectSubmissions() {
 					: sub
 			);
 			setSubmissionsList(sparkUpdatedSubmissions as Submission[]);
-		}, 5000); // 5 second delay to simulate server response
+		}, 3000); // 3 second delay to simulate server response
 
 		console.log(`Spark code requested for submission ${submission.id}`);
+	};
+
+	// Create a new function for requesting TikTok link
+	const handleRequestTiktokLink = (submission: Submission) => {
+
+		const updatedSubmissions = submissionsList.map((sub) =>
+			sub.id === submission.id ? { ...sub, status: "spark_requested" } : sub
+		);
+		setSubmissionsList(updatedSubmissions as Submission[]);
+
+		// Simulate receiving a TikTok link after a delay (in a real app, this would be an API call)
+		setTimeout(() => {
+			const tiktokUpdatedSubmissions = updatedSubmissions.map((sub) =>
+				sub.id === submission.id
+					? {
+							...sub,
+							status: "spark_received",
+							sparkCode: `https://tiktok.com/@creator_${Math.random().toString(36).substring(2, 8)}`,
+						}
+					: sub
+			);
+			setSubmissionsList(tiktokUpdatedSubmissions as Submission[]);
+		}, 3000); // 3 second delay to simulate server response
+
+		console.log(`TikTok link requested for submission ${submission.id}`);
 	};
 
 	const handleVerifySparkCode = (submission: Submission) => {
 		setCurrentSubmission(submission);
 		setOpenVerifySparkDialog(true);
+	};
+
+	const handleVerifyTiktokLink = (submission: Submission) => {
+		setCurrentSubmission(submission);
+		setOpenVerifyTiktokLinkDialog(true);
 	};
 
 	// Function to handle payment confirmation with status update after delay
@@ -204,7 +248,7 @@ export default function ProjectSubmissions() {
 			console.log(
 				`Payment confirmed for submission ${submission.id} after 5 seconds`
 			);
-		}, 5000); // 5 second delay to simulate payment confirmation
+		}, 3000); // 3 second delay to simulate payment confirmation
 	};
 
 	const confirmSparkCodeVerification = () => {
@@ -220,13 +264,73 @@ export default function ProjectSubmissions() {
 		}
 	};
 
-	const handleRequestNewCode = () => {
-		// Logic to request a new code
-		setSparkCode(
-			"SPRK-" + Math.random().toString(36).substring(2, 10).toUpperCase()
-		);
-		console.log("New Spark code requested");
+	const confirmTiktokLinkVerification = () => {
+		if (currentSubmission) {
+			const updatedSubmissions = submissionsList.map((sub) =>
+				sub.id === currentSubmission.id
+					? { ...sub, status: "spark_verified", sparkCode: sparkCode }
+					: sub
+			);
+			setSubmissionsList(updatedSubmissions as Submission[]);
+			setOpenVerifyTiktokLinkDialog(false);
+			console.log(`Spark code verified for submission ${currentSubmission.id}`);
+		}
 	};
+
+	const handleRequestNewCode = (submission: Submission, setIsModalOpen: React.Dispatch<React.SetStateAction<boolean>>) => {
+		// First close the modal
+		setIsModalOpen(false);
+		
+		// Update the submission status to indicate a new code is being requested
+		const updatedSubmissions = submissionsList.map((sub) =>
+		  sub.id === submission.id ? { ...sub, status: "spark_requested" } : sub
+		);
+		setSubmissionsList(updatedSubmissions as Submission[]);
+		
+		// Simulate receiving a new TikTok link after a delay (in a real app, this would be an API call)
+		setTimeout(() => {
+		  const newTiktokUpdatedSubmissions = updatedSubmissions.map((sub) =>
+			sub.id === submission.id
+			  ? {
+				  ...sub,
+				  status: "spark_received",
+				  sparkCode: "SPRK-" +
+								Math.random().toString(36).substring(2, 10).toUpperCase(),
+				}
+			  : sub
+		  );
+		  setSubmissionsList(newTiktokUpdatedSubmissions as Submission[]);
+		}, 3000); // 3 second delay to simulate server response
+		
+		console.log(`New TikTok link requested for submission ${submission.id}`);
+	  };
+
+	  const handleRequestNewLink = (submission: Submission, setIsModalOpen: React.Dispatch<React.SetStateAction<boolean>>) => {
+		// First close the modal
+		setIsModalOpen(false);
+		
+		// Update the submission status to indicate a new code is being requested
+		const updatedSubmissions = submissionsList.map((sub) =>
+		  sub.id === submission.id ? { ...sub, status: "spark_requested" } : sub
+		);
+		setSubmissionsList(updatedSubmissions as Submission[]);
+		
+		// Simulate receiving a new TikTok link after a delay (in a real app, this would be an API call)
+		setTimeout(() => {
+		  const newTiktokUpdatedSubmissions = updatedSubmissions.map((sub) =>
+			sub.id === submission.id
+			  ? {
+				  ...sub,
+				  status: "spark_received",
+				  sparkCode: `https://tiktok.com/@creator_${Math.random().toString(36).substring(2, 8)}`,
+				}
+			  : sub
+		  );
+		  setSubmissionsList(newTiktokUpdatedSubmissions as Submission[]);
+		}, 3000); // 3 second delay to simulate server response
+		
+		console.log(`New TikTok link requested for submission ${submission.id}`);
+	  };
 
 	const handleSubmit = (
 		approved: boolean,
@@ -279,15 +383,44 @@ export default function ProjectSubmissions() {
 					</>
 				);
 			case "approved":
-				return (
-					<Button
-						variant="secondary"
-						className="flex-grow bg-[#FD5C02] text-white flex items-center justify-center"
-						onClick={() => handleRequestSparkCode(submission)}
-					>
-						Request Spark Code
-					</Button>
-				);
+				// For UGC, show download directly after approval
+				if (projectType === "UGC Content Only" || projectType === "TikTok Shop") {
+					return ( 
+						<Button
+							variant="secondary"
+							className="flex-grow bg-[#FD5C02] text-white flex items-center justify-center"
+						>
+							Download Video
+							<Download className="h-4 w-4 ml-2" />
+						</Button>
+					);
+				}
+				// For Spark Ads, start with request spark code
+				else if (projectType === "Spark Ads") {
+					return (
+						<Button
+							variant="secondary"
+							className="flex-grow bg-[#FD5C02] text-white flex items-center justify-center"
+							onClick={() => handleRequestSparkCode(submission)}
+						>
+							Request Spark Code
+						</Button>
+					);
+				}
+				// For TikTok, start with request TikTok link
+				else if (projectType === "Creator-Posted UGC") {
+					return (
+						<Button
+							variant="secondary"
+							className="flex-grow bg-[#FD5C02] text-white flex items-center justify-center"
+							onClick={() => handleRequestTiktokLink(submission)}
+						>
+							Request Tiktok Link
+						</Button>
+					);
+				}
+				break;
+
 			case "spark_requested":
 				return (
 					<Button
@@ -295,11 +428,21 @@ export default function ProjectSubmissions() {
 						className="flex-grow bg-[#FD5C02] text-white opacity-70 flex items-center justify-center"
 						disabled
 					>
-						Request Sent
+						{projectType === "Creator-Posted UGC"
+							? "Tiktok Link Requested"
+							: "Request Sent"}
 					</Button>
 				);
 			case "spark_received":
-				return (
+				return projectType === "Creator-Posted UGC" ? (
+					<Button
+						variant="secondary"
+						className="flex-grow bg-[#FD5C02] text-white flex items-center justify-center"
+						onClick={() => handleVerifyTiktokLink(submission)}
+					>
+						Verify Tiktok Link
+					</Button>
+				) : (
 					<Button
 						variant="secondary"
 						className="flex-grow bg-[#FD5C02] text-white flex items-center justify-center"
@@ -462,8 +605,22 @@ export default function ProjectSubmissions() {
 								submission.sparkCode && (
 									<div className="mt-1 flex items-center gap-1 justify-center">
 										<span className="text-sm">
-											Spark Code:{" "}
-											<span className="text-black">{submission.sparkCode}</span>
+											{projectType === "Creator-Posted UGC"
+												? ""
+												: "Spark Code: "}
+											<span className="text-black">
+												{projectType === "Creator-Posted UGC" ? (
+													<a
+														href={submission.sparkCode}
+														target="_blank"
+														className="text-black text-center underline"
+													>
+														Tiktok Link
+													</a>
+												) : (
+													submission.sparkCode
+												)}
+											</span>
 										</span>
 										<Button variant="ghost" size="sm" className="h-8 w-8 p-0">
 											<Copy className="h-4 w-4" />
@@ -760,7 +917,15 @@ export default function ProjectSubmissions() {
 				isOpen={openVerifySparkDialog}
 				onClose={handleCloseModals}
 				onVerify={confirmSparkCodeVerification}
-				onRequestNewCode={handleRequestNewCode}
+				onRequestNewCode={() => handleRequestNewCode(currentSubmission!, setOpenVerifySparkDialog)}
+			/>
+
+			{/* Spark Code Modal */}
+			<VerifyTikTokLinkModal
+				isOpen={openVerifyTiktokLinkDialog}
+				onClose={handleCloseModals}
+				onVerify={confirmTiktokLinkVerification}
+				onRequestNewLink={() => handleRequestNewLink(currentSubmission!, setOpenVerifyTiktokLinkDialog)}
 			/>
 		</div>
 	);

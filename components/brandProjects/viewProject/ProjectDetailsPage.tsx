@@ -88,7 +88,7 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 				{/* Back Button */}
 				<Link
 					href="/dashboard/projects"
-					className="absolute bottom-28 left-6 flex items-center text-white hover:underline z-10"
+					className="absolute top-4 left-6 flex items-center text-white hover:underline z-10"
 				>
 					<ChevronLeft size={20} />
 					<span>All Projects</span>
@@ -422,7 +422,7 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 				{/* Submissions Tab */}
 				<TabsContent value="submissions">
 					<div className="p-8 text-center text-gray-500">
-						<ProjectSubmissions />
+						<ProjectSubmissions projectFormData={project}/>
 
 						{/* Empty State for Submissions */}
 						{/* {submissions && submissions.length === 0 && (
