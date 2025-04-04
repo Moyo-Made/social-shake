@@ -1,197 +1,286 @@
 import React, { useState } from "react";
-import { ChevronDown, Mail } from "lucide-react";
+import { Mail, Check } from "lucide-react";
 import Image from "next/image";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 
-// interface ProductDeliveryProps {
-//   projectFormData: ProjectFormData;
-// }
+// Define types for our data
+interface DeliveryUser {
+	id: number;
+	name: string;
+	creatorIcon: string;
+	email: string;
+	status: DeliveryStatus;
+	updatedOn: string;
+	hasIssue: boolean;
+	trackingNumber: string;
+}
 
-const ProductDelivery = () => {
+// Create a union type for status values
+type DeliveryStatus =
+	| "Pending Shipment"
+	| "Shipped"
+	| "Delivered"
+	| "Issue Reported";
+
+// Define type for issue descriptions state
+interface IssueDescriptionsState {
+	[userId: number]: string;
+}
+
+const ProductDelivery: React.FC = () => {
 	// Mock data based on the image
-	const deliveryData = [
+	const initialDeliveryData: DeliveryUser[] = [
 		{
 			id: 1,
 			name: "Colina Michelle",
+			creatorIcon: "/icons/creator-icon.svg",
 			email: "colina@test.com",
 			status: "Pending Shipment",
 			updatedOn: "March 5, 2025",
 			hasIssue: false,
+			trackingNumber: "",
 		},
 		{
 			id: 2,
 			name: "Melinda Roshovelle",
+			creatorIcon: "/icons/creator-icon.svg",
 			email: "melinda@test.com",
 			status: "Shipped",
 			updatedOn: "March 5, 2025",
 			hasIssue: false,
+			trackingNumber: "TRK12345678",
 		},
 		{
 			id: 3,
 			name: "Olumise Web",
+			creatorIcon: "/icons/creator-icon.svg",
 			email: "olumise@test.com",
 			status: "Delivered",
 			updatedOn: "March 5, 2025",
 			hasIssue: false,
+			trackingNumber: "TRK87654321",
 		},
 		{
 			id: 4,
 			name: "Bumia Nocolee",
+			creatorIcon: "/icons/creator-icon.svg",
 			email: "bumia@test.com",
 			status: "Shipped",
 			updatedOn: "March 5, 2025",
 			hasIssue: true,
+			trackingNumber: "TRK11223344",
 		},
 	];
 
-	// State to maintain description for the last user with issue
-	const [issueDescription, setIssueDescription] = useState("");
+	const [deliveryData, setDeliveryData] =
+		useState<DeliveryUser[]>(initialDeliveryData);
+	const [issueDescriptions, setIssueDescriptions] =
+		useState<IssueDescriptionsState>({});
 
-	const getStatusColor = (status: string) => {
-		switch (status) {
-			case "Pending Shipment":
-				return "bg-yellow-100 text-yellow-800";
-			case "Shipped":
-				return "bg-pink-100 text-pink-800";
-			case "Delivered":
-				return "bg-green-100 text-green-800";
-			default:
-				return "bg-gray-100 text-gray-800";
-		}
+	const handleStatusChange = (userId: number, newStatus: DeliveryStatus) => {
+		setDeliveryData((prevData) =>
+			prevData.map((user) => {
+				if (user.id === userId) {
+					// Update the updated date when status changes
+					return {
+						...user,
+						status: newStatus,
+						updatedOn: new Date().toLocaleDateString("en-US", {
+							month: "long",
+							day: "numeric",
+							year: "numeric",
+						}),
+					};
+				}
+				return user;
+			})
+		);
 	};
 
-	const getStatusIcon = (status: string) => {
+	const handleTrackingNumberChange = (
+		userId: number,
+		trackingNumber: string
+	) => {
+		setDeliveryData((prevData) =>
+			prevData.map((user) => {
+				if (user.id === userId) {
+					return { ...user, trackingNumber };
+				}
+				return user;
+			})
+		);
+	};
+
+	const handleIssueDescriptionChange = (
+		userId: number,
+		description: string
+	) => {
+		setIssueDescriptions((prev) => ({
+			...prev,
+			[userId]: description,
+		}));
+	};
+
+	// Status badge styling function
+	const getStatusBadge = (status: DeliveryStatus) => {
+		let badgeClass =
+			"inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ";
+
 		switch (status) {
 			case "Pending Shipment":
-				return "•";
+				badgeClass += "bg-[#FFF0C3] border border-[#FDD849] text-[#1A1A1A]";
+				return (
+					<div className={badgeClass}>
+						<span className="mr-1 mb-0.5">•</span>
+						{status}
+					</div>
+				);
 			case "Shipped":
-				return "•";
+				badgeClass += "bg-[#FFE5FB] border border-[#FC52E4] text-[#FC52E4]";
+				return (
+					<div className={badgeClass}>
+						<span className="mr-1 mb-0.5">•</span>
+						{status}
+					</div>
+				);
 			case "Delivered":
-				return "✓";
+				badgeClass += "bg-[#ECFDF3] border border-[#ABEFC6] text-[#067647";
+				return (
+					<div className={badgeClass}>
+						<Check className="w-3 h-3 mr-1" />
+						{status}
+					</div>
+				);
+			case "Issue Reported":
+				badgeClass += "bg-red-100 text-red-800";
+				return <div className={badgeClass}>{status}</div>;
 			default:
-				return "";
+				badgeClass += "bg-gray-100 text-gray-800";
+				return <div className={badgeClass}>{status}</div>;
 		}
 	};
 
 	return (
-		<div className="w-full max-w-4xl mx-auto bg-white rounded-lg shadow-sm p-6 space-y-4 border border-gray-200">
+		<div className="w-full max-w-4xl mx-auto rounded-lg shadow-sm space-y-4">
 			{deliveryData.map((user) => (
-				<div
-					key={user.id}
-					className="border border-gray-200 rounded-lg p-4 mb-4"
-				>
-					<div className="flex items-start mb-4">
-						<div className="flex-shrink-0 mr-4">
-							<div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200">
-								<Image
-									src="/icons/"
-									alt={user.name}
-									width={20}
-									height={20}
-									className="w-full h-full object-cover"
-								/>
+				<Card key={user.id} className="mb-4">
+					<CardContent className="p-4">
+						<div className="flex items-start mb-4">
+							<div className="flex-shrink-0 mr-4">
+								<div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200">
+									<Image
+										src={user.creatorIcon}
+										alt={user.name}
+										width={64}
+										height={64}
+										className="w-full h-full object-cover"
+									/>
+								</div>
 							</div>
-						</div>
-						<div className="flex-grow">
-							<div className="flex justify-between">
-								<div>
-									<h3 className="text-lg font-medium text-gray-900">
-										{user.name}
-									</h3>
-									<p className="text-sm text-gray-600">Email: {user.email}</p>
-									<div className="inline-flex items-center mt-1 px-2 py-1 bg-gray-800 text-white text-xs rounded-full">
-										<span className="mr-1">Message Creator</span>
-										<span className="transform rotate-45">⌘</span>
+							<div className="flex-grow">
+								<div className="flex justify-between">
+									<div>
+										<h3 className="text-lg font-medium text-gray-900">
+											{user.name}
+										</h3>
+										<p className="text-sm text-gray-600">Email: {user.email}</p>
+										<div className="inline-flex items-center mt-1 px-2 py-1 bg-black text-white text-xs rounded-full">
+											<span className="mr-1">Message Creator</span>
+											<Image
+												src="/icons/messageIcon.svg"
+												alt="Message Icon"
+												width={10}
+												height={10}
+											/>
+										</div>
+									</div>
+									<div className="text-right">
+										{getStatusBadge(user.status)}
+										<p className="text-sm text-gray-600 mt-1">
+											Updated On: {user.updatedOn}
+										</p>
 									</div>
 								</div>
-								<div className="text-right">
-									{user.status && (
-										<span
-											className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(user.status)}`}
-										>
-											<span className="mr-1">{getStatusIcon(user.status)}</span>
-											{user.status}
-										</span>
-									)}
-									<p className="text-sm text-gray-600 mt-1">
-										Updated On: {user.updatedOn}
-									</p>
-								</div>
 							</div>
 						</div>
-					</div>
 
-					<div className="space-y-4">
-						<div>
-							<label className="text-sm font-medium text-gray-700">
-								Delivery Status
-							</label>
-							<div className="mt-1 relative">
-								<select
-									className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md appearance-none bg-white"
-									defaultValue={
-										user.status === "Pending Shipment" ? "" : user.status
+						<div className="space-y-4 mt-4">
+							<div>
+								<label className="text-sm font-medium text-gray-700 block mb-1">
+									Delivery Status
+								</label>
+								<Select
+									defaultValue={user.status}
+									onValueChange={(value: string) =>
+										handleStatusChange(user.id, value as DeliveryStatus)
 									}
 								>
-									{user.hasIssue ? (
-										<option>Report an Issue</option>
-									) : (
-										<>
-											{user.status === "Pending Shipment" && (
-												<option value="">Select Status</option>
-											)}
-											{user.status === "Shipped" && (
-												<option value="Shipped">Shipped</option>
-											)}
-											{user.status === "Delivered" && (
-												<option value="Delivered">Delivered</option>
-											)}
-										</>
-									)}
-								</select>
-								<div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-									<ChevronDown className="h-4 w-4 text-gray-400" />
-								</div>
+									<SelectTrigger className="w-full">
+										<SelectValue placeholder="Select status" />
+									</SelectTrigger>
+									<SelectContent className="bg-[#f7f7f7]">
+										<SelectItem value="Pending Shipment">
+											Pending Shipment
+										</SelectItem>
+										<SelectItem value="Shipped">Shipped</SelectItem>
+										<SelectItem value="Delivered">Delivered</SelectItem>
+										<SelectItem value="Issue Reported">
+											Report an Issue
+										</SelectItem>
+									</SelectContent>
+								</Select>
 							</div>
-						</div>
 
-						{user.id === 2 && (
-							<div>
-								<label className="text-sm font-medium text-gray-700">
-									Tracking Number
-								</label>
-								<div className="mt-1">
-									<input
+							{user.status === "Shipped" && (
+								<div>
+									<label className="text-sm font-medium text-gray-700 block mb-1">
+										Tracking Number
+									</label>
+									<Input
 										type="text"
 										placeholder="Enter Tracking Number"
-										className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+										value={user.trackingNumber}
+										onChange={(e) =>
+											handleTrackingNumberChange(user.id, e.target.value)
+										}
 									/>
 								</div>
-							</div>
-						)}
+							)}
 
-						{user.hasIssue && (
-							<div>
-								<label className="text-sm font-medium text-gray-700">
-									Issue Faced
-								</label>
-								<div className="mt-1">
-									<textarea
+							{user.status === "Issue Reported" && (
+								<div>
+									<label className="text-sm font-medium text-gray-700 block mb-1">
+										Issue Description
+									</label>
+									<Textarea
 										rows={4}
 										placeholder="Describe the Issue in detail"
-										className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-										value={issueDescription}
-										onChange={(e) => setIssueDescription(e.target.value)}
+										value={issueDescriptions[user.id] || ""}
+										onChange={(e) =>
+											handleIssueDescriptionChange(user.id, e.target.value)
+										}
 									/>
 								</div>
-							</div>
-						)}
-
-						<button className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-orange-500 hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500">
+							)}
+						</div>
+					</CardContent>
+					<CardFooter className="px-4 pb-4 pt-0">
+						<Button className="w-full bg-orange-500 hover:bg-orange-600 text-white">
 							<span>Notify Creator</span>
 							<Mail className="ml-2 h-4 w-4" />
-						</button>
-					</div>
-				</div>
+						</Button>
+					</CardFooter>
+				</Card>
 			))}
 		</div>
 	);

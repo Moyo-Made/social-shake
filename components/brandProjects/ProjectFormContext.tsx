@@ -123,6 +123,11 @@ interface ProjectFormContextType {
 	loadDraftData: (data: ContestFormData) => void;
 	// New function to save current state while navigating
 	saveCurrentState: () => void;
+	// New flag to control whether to load saved data
+	loadSavedData: boolean;
+	setLoadSavedData: (load: boolean) => void;
+	// New function to start a fresh project
+	startNewProject: () => void;
 }
 
 const ProjectFormContext = createContext<ProjectFormContextType | undefined>(
@@ -132,24 +137,49 @@ const ProjectFormContext = createContext<ProjectFormContextType | undefined>(
 export const useProjectForm = () => {
 	const context = useContext(ProjectFormContext);
 	if (!context) {
-		throw new Error("useProjectForm must be used within a ContestFormProvider");
+		throw new Error("useProjectForm must be used within a ProjectFormProvider");
 	}
 	return context;
 };
 
+
+
 export const ProjectFormProvider: React.FC<{
 	children: React.ReactNode;
 	userId?: string;
-}> = ({ children, userId }) => {
+	isNewProject?: boolean;
+}> = ({ children, userId, isNewProject = false }) => {
+		
 	const [formData, setFormData] = useState<ProjectFormData>(defaultFormData);
 	const [draftSaved, setDraftSaved] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	// New state to control whether to load saved data
+	const [loadSavedData, setLoadSavedData] = useState(!isNewProject);
 
-	// Load saved data on first render
+	// Get user-specific storage keys
+	const getStorageKeys = useCallback(() => {
+		const userPrefix = userId ? `user_${userId}_` : '';
+		return {
+			sessionKey: `${userPrefix}projectFormSession`,
+			localKey: `${userPrefix}projectFormDraft`
+		};
+	}, [userId]);
+
+	
+
+	// Load saved data on first render, but only if loadSavedData is true
 	useEffect(() => {
+		if (!loadSavedData) {
+			// If we're creating a new project, use default form data
+			setFormData(defaultFormData);
+			return;
+		}
+
+		const { sessionKey, localKey } = getStorageKeys();
+
 		// First try to get from sessionStorage (for current session)
-		const sessionData = sessionStorage.getItem("contestFormSession");
+		const sessionData = sessionStorage.getItem(sessionKey);
 
 		if (sessionData) {
 			try {
@@ -163,7 +193,7 @@ export const ProjectFormProvider: React.FC<{
 		}
 
 		// Fall back to localStorage (for drafts between sessions)
-		const savedData = localStorage.getItem("contestFormDraft");
+		const savedData = localStorage.getItem(localKey);
 		if (savedData) {
 			try {
 				const parsedData = JSON.parse(savedData);
@@ -175,7 +205,7 @@ export const ProjectFormProvider: React.FC<{
 				setFormData(defaultFormData);
 			}
 		}
-	}, []);
+	}, [loadSavedData, userId, getStorageKeys]);
 
 	// Helper function to process loaded form data
 	const processFormData = (data: ProjectFormData) => {
@@ -201,17 +231,28 @@ export const ProjectFormProvider: React.FC<{
 
 	// Save the current state to sessionStorage to prevent loss during navigation
 	const saveCurrentState = useCallback(() => {
+		if (!userId) return; // Don't save if no user ID
+
 		try {
-			sessionStorage.setItem("contestFormSession", JSON.stringify(formData));
+			const { sessionKey } = getStorageKeys();
+			sessionStorage.setItem(sessionKey, JSON.stringify(formData));
 		} catch (error) {
 			console.error("Error saving form state to session storage:", error);
 		}
-	}, [formData]);
+	}, [formData, userId, getStorageKeys]);
 
 	// Auto-save form data to sessionStorage whenever it changes
 	useEffect(() => {
 		saveCurrentState();
 	}, [formData, saveCurrentState]);
+
+	// New function to start a fresh project
+	const startNewProject = useCallback(() => {
+		setLoadSavedData(false);
+		setFormData(defaultFormData);
+		setDraftSaved(false);
+		setError(null);
+	}, []);
 
 	const updateProjectDetails = useCallback((data: Partial<ProjectDetails>) => {
 		setFormData((prevData) => {
@@ -330,8 +371,9 @@ export const ProjectFormProvider: React.FC<{
 	  
 		  // Only clear saved data if we're not in draft mode
 		  if (result.data?.status !== "draft") {
-			localStorage.removeItem("projectFormDraft");
-			sessionStorage.removeItem("contestFormSession");
+			const { localKey, sessionKey } = getStorageKeys();
+			localStorage.removeItem(localKey);
+			sessionStorage.removeItem(sessionKey);
 		  }
 	  
 		  setIsLoading(false);
@@ -365,9 +407,10 @@ export const ProjectFormProvider: React.FC<{
 			}
 
 			// Save to localStorage and sessionStorage first (for redundancy)
+			const { localKey, sessionKey } = getStorageKeys();
 			const dataToSave = JSON.stringify(formData);
-			localStorage.setItem("projectFormDraft", dataToSave);
-			sessionStorage.setItem("projectFormSession", dataToSave);
+			localStorage.setItem(localKey, dataToSave);
+			sessionStorage.setItem(sessionKey, dataToSave);
 
 			// Create a new FormData object for the HTTP request
 			const formDataForSubmission = new FormData();
@@ -462,24 +505,26 @@ export const ProjectFormProvider: React.FC<{
 			processFormData(processedData);
 
 			// Save to both localStorage and sessionStorage
+			const { localKey, sessionKey } = getStorageKeys();
 			const dataString = JSON.stringify(processedData);
-			localStorage.setItem("projectFormDraft", dataString);
-			sessionStorage.setItem("projectFormSession", dataString);
+			localStorage.setItem(localKey, dataString);
+			sessionStorage.setItem(sessionKey, dataString);
 
 			console.log("Loaded draft data:", processedData);
 		} catch (error) {
 			console.error("Error loading draft data:", error);
 		}
-	}, []);
+	}, [getStorageKeys]);
 
 	// Reset draft and storages
 	const resetDraft = useCallback(() => {
-		localStorage.removeItem("projectFormDraft");
-		sessionStorage.removeItem("projectFormSession");
+		const { localKey, sessionKey } = getStorageKeys();
+		localStorage.removeItem(localKey);
+		sessionStorage.removeItem(sessionKey);
 		setFormData(defaultFormData);
 		setDraftSaved(false);
 		setError(null);
-	}, []);
+	}, [getStorageKeys]);
 
 	return (
 		<ProjectFormContext.Provider
@@ -497,6 +542,9 @@ export const ProjectFormProvider: React.FC<{
 				setDraftSaved,
 				loadDraftData,
 				saveCurrentState,
+				loadSavedData,
+				setLoadSavedData,
+				startNewProject,
 			}}
 		>
 			{children}

@@ -47,7 +47,7 @@ const ProjectFormContent = () => {
 
 	// On component mount, try to restore previously saved step from sessionStorage
 	useEffect(() => {
-		const savedStep = sessionStorage.getItem("contestFormStep");
+		const savedStep = sessionStorage.getItem("projectFormStep");
 		if (savedStep) {
 			setStep(parseInt(savedStep, 10));
 		}
@@ -55,7 +55,7 @@ const ProjectFormContent = () => {
 
 	// Save current step to sessionStorage whenever it changes
 	useEffect(() => {
-		sessionStorage.setItem("contestFormStep", step.toString());
+		sessionStorage.setItem("projectFormStep", step.toString());
 	}, [step]);
 
 	// Automatically hide the success message after 5 seconds
@@ -141,7 +141,7 @@ const ProjectFormContent = () => {
 			}
 
 			// On success, clear saved step
-			sessionStorage.removeItem("contestFormStep");
+			sessionStorage.removeItem("projectFormStep");
 
 			// Redirect to success page
 			router.push("/dashboard/projects/payment-successful");
@@ -372,7 +372,7 @@ export default function ProjectForm() {
 	const { user } = useAuth();
 
 	return (
-		<ProjectFormProvider userId={user?.uid}>
+		<ProjectFormProvider userId={user?.uid} isNewProject={true}>
 			<ProjectFormContent />
 		</ProjectFormProvider>
 	);

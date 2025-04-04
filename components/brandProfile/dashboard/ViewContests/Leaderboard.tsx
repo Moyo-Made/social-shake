@@ -147,7 +147,7 @@ const Leaderboard = () => {
 			</div>
 
 			{/* Leaderboard Table */}
-			<div className="flex bg-gray-50 py-3 text-gray-600 text-sm font-medium border-b border-gray-200">
+			<div className="flex bg-gray-50 py-3 text-gray-600 text-sm font-normal border-b border-gray-200">
 				<div className="flex-1 text-center">Position</div>
 				<div className="flex-1 mr-5 text-center">Creator Username</div>
 				<div className="flex-1 text-center">Creator Fullname</div>
@@ -165,10 +165,12 @@ const Leaderboard = () => {
 				>
 					<div className="flex-1 text-center font-medium">{item.position}</div>
 					<div className="flex-1 mr-5 flex justify-center items-center gap-2">
-						<img
+						<Image
 							src={item.profileImage}
 							alt={item.username}
 							className="w-8 h-8 rounded-full"
+							width={8}
+							height={8}
 						/>
 						<span className="underline font-medium">{item.username}</span>
 					</div>

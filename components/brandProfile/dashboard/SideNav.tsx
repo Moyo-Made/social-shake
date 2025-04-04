@@ -91,7 +91,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
 									key={index}
 									href={item.href}
 									className={`flex items-center space-x-3 px-4 py-2 ml-4 rounded-lg cursor-pointer font-satoshi 
-									${isSubItemActive ? "bg-orange-500" : "hover:bg-gray-700"}`}
+									${isSubItemActive ? "text-orange-500" : "hover:bg-gray-700"}`}
 								>
 									<span>{item.text}</span>
 								</Link>

@@ -16,6 +16,8 @@ import Link from "next/link";
 import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
 import { auth, db } from "@/config/firebase";
 import { getStatusDot, getStatusStyle } from "@/utils/statusUtils";
+import { useProjectForm } from "../ProjectFormContext";
+import { useRouter } from "next/navigation";
 
 interface Project {
 	id: string;
@@ -51,6 +53,7 @@ interface Project {
 }
 
 const ProjectDashboard = () => {
+	const { startNewProject } = useProjectForm();
 	const [searchTerm, setSearchTerm] = useState("");
 	const [statusFilter, setStatusFilter] = useState<string | null>(null);
 	const [budgetFilter, setBudgetFilter] = useState<string | null>(null);
@@ -63,6 +66,14 @@ const ProjectDashboard = () => {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+	const router = useRouter();
+
+	const handleCreateNew = () => {
+		startNewProject();
+		// Then navigate to create form
+		router.push("/dashboard/projects/new");
+	};
 
 	// Set up auth state listener to get current user ID
 	useEffect(() => {
@@ -330,8 +341,11 @@ const ProjectDashboard = () => {
 					</div>
 
 					{/* Create New Project Button */}
-					<Button className="bg-orange-500 text-white px-4 py-1 rounded-md flex items-center w-full md:w-auto justify-center">
-						<Link href="/dashboard/projects/new">Create New Project</Link>
+					<Button
+						className="bg-orange-500 text-white px-4 py-1 rounded-md flex items-center w-full md:w-auto justify-center"
+						onClick={handleCreateNew}
+					>
+						Create New Project
 						<span className="ml-1 text-lg">+</span>
 					</Button>
 				</div>

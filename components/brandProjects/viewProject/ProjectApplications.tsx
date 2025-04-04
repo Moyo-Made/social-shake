@@ -226,11 +226,11 @@ My videos maintain a balance between being entertaining and informative, which h
 	const getStatusStyles = (status: string) => {
 		switch (status) {
 			case "Pending":
-				return "bg-yellow-100 text-yellow-800 border border-yellow-200";
+				return "bg-[#FFF0C3] text-[#1A1A1A] border border-[#FDD849]";
 			case "Approved":
-				return "bg-green-100 text-green-800 border border-green-200";
+				return "bg-[#ECFDF3] text-[#067647] border border-[#ABEFC6]";
 			case "Rejected":
-				return "bg-red-100 text-red-800 border border-red-200";
+				return "bg-[#FFE5FB] text-[#FC52E4] border border-[#FC52E4]";
 			default:
 				return "bg-gray-100 text-gray-800 border border-gray-200";
 		}
@@ -249,11 +249,11 @@ My videos maintain a balance between being entertaining and informative, which h
 	// Render status indicator
 	const renderStatusIndicator = (status: string) => {
 		if (status === "Approved") {
-			return <Check size={12} className="mr-1 text-green-600" />;
+			return <Check size={12} className="mr-1 text-[#067647]" />;
 		} else if (status === "Pending") {
-			return <div className="w-2 h-2 bg-yellow-400 rounded-full mr-1" />;
+			return <div className="w-1 h-1 bg-[#1A1A1A] rounded-full mr-1" />;
 		} else if (status === "Rejected") {
-			return <div className="w-2 h-2 bg-red-400 rounded-full mr-1" />;
+			return <div className="w-1 h-1 bg-[#FC52E4] rounded-full mr-1" />;
 		}
 		return null;
 	};

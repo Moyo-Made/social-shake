@@ -13,6 +13,8 @@ import ProjectApplications from "./ProjectApplications";
 import ProjectSubmissions from "./ProjectSubmissions";
 import ProductDelivery from "./ProductDelivery";
 import Image from "next/image";
+import ProjectAnalytics from "./ProjectAnalytics";
+import AffiliatePayout from "./AffiliatePayout";
 
 interface ProjectDetailPageProps {
 	projectId: string;
@@ -63,12 +65,14 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 	}
 
 	const { projectDetails, projectRequirements, creatorPricing } = project;
-  
+
 	// Check if the product type is physical to determine whether to show the delivery tab
 	const isPhysicalProduct = projectDetails.productType === "physical";
 
+	const tabTriggerStyles = "w-40 data-[state=active]:bg-[#FFF4EE] data-[state=active]:border-b-2 data-[state=active]:border-[#FC52E4] data-[state=active]:text-[#FD5C02] data-[state=inactive]:text-[#667085] rounded-none py-3";
+
 	return (
-		<div className="flex flex-col bg-white border border-[#FFD9C3] rounded-lg py-5 px-10 mt-3">
+		<div className="flex flex-col bg-white border border-[#FFD9C3] rounded-lg py-5 px-6 mt-3">
 			{/* Header Banner */}
 			<div className="relative w-full h-64 p-6 flex flex-col justify-end rounded-lg">
 				<Image
@@ -115,7 +119,7 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 					</div>
 
 					{/* Project Stats */}
-					<div className="flex flex-wrap gap-4 w-fit text-base bg-white bg-opacity-90 border border-[#FFD9C3] px-5 py-2 rounded-lg shadow-md">
+					<div className="flex flex-wrap gap-4 w-fit text-sm bg-white bg-opacity-90 border border-[#FFD9C3] px-5 py-2 rounded-lg shadow-md">
 						<div>
 							<span className="text-[#FD5C02]">Project Budget:</span> $
 							{creatorPricing.totalBudget || 0}
@@ -130,7 +134,9 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 						</div>
 						<div>
 							<span className="text-[#FD5C02]">Product Type:</span>{" "}
-							{projectDetails.productType === "physical" ? "Physical Product" : "Virtual Product"}
+							{projectDetails.productType === "physical"
+								? "Physical Product"
+								: "Virtual Product"}
 						</div>
 						<div>
 							<span className="text-[#FD5C02]">Submissions:</span> 2 Videos • 1
@@ -142,37 +148,51 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 
 			{/* Tabs Navigation */}
 			<Tabs defaultValue="overview" className="w-full">
-				<TabsList className="flex gap-10 mb-8 bg-transparent p-0 mt-6">
+				<TabsList className="flex gap-6 mb-3 p-3 mt-6">
 					<TabsTrigger
 						value="overview"
-						className="w-40 data-[state=active]:bg-[#FFF4EE] data-[state=active]:border-b-2 data-[state=active]:border-[#FC52E4] data-[state=active]:text-[#FD5C02] data-[state=inactive]:text-[#667085] rounded-none py-3"
+						className={tabTriggerStyles}
 					>
 						Project Overview
 					</TabsTrigger>
 					<TabsTrigger
 						value="applications"
-						className="w-40 data-[state=active]:bg-[#FFF4EE] data-[state=active]:border-b-2 data-[state=active]:border-[#FC52E4] data-[state=active]:text-[#FD5C02] data-[state=inactive]:text-[#667085] rounded-none py-3"
+						className={tabTriggerStyles}
 					>
 						Applications
 					</TabsTrigger>
 					<TabsTrigger
 						value="submissions"
-						className="w-40 data-[state=active]:bg-[#FFF4EE] data-[state=active]:border-b-2 data-[state=active]:border-[#FC52E4] data-[state=active]:text-[#FD5C02] data-[state=inactive]:text-[#667085] rounded-none py-3"
+						className={tabTriggerStyles}
 					>
 						Submissions
 					</TabsTrigger>
 					{isPhysicalProduct && (
 						<TabsTrigger
 							value="product-delivery"
-							className="w-40 data-[state=active]:bg-[#FFF4EE] data-[state=active]:border-b-2 data-[state=active]:border-[#FC52E4] data-[state=active]:text-[#FD5C02] data-[state=inactive]:text-[#667085] rounded-none py-3"
+							className={tabTriggerStyles}
 						>
 							Product Delivery
 						</TabsTrigger>
 					)}
+
+					{projectDetails.projectType === "TikTok Shop" && (
+						<>
+							<TabsTrigger
+								value="analytics"
+								className={tabTriggerStyles}
+							>
+								Analytics
+							</TabsTrigger>
+							<TabsTrigger value="affiliate-payout" className={tabTriggerStyles}>
+							Affiliates Payout
+							</TabsTrigger>
+						</>
+					)}
 				</TabsList>
 
 				{/* Project Overview Tab */}
-				<TabsContent value="overview" className="w-full space-y-6 pl-4">
+				<TabsContent value="overview" className="w-full space-y-6 pl-4 pt-3">
 					{/* Project Title */}
 					<div className="flex gap-28">
 						<p className="text-[#667085] font-normal w-40">Project Title:</p>
@@ -184,13 +204,15 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 						<h3 className="text-[#667085] font-normal w-40">Project Type:</h3>
 						<p>{projectDetails.projectType}</p>
 					</div>
-					
+
 					{/* Product Type */}
 					<div className="flex gap-28">
 						<h3 className="text-[#667085] font-normal w-40">Product Type:</h3>
-						<p>{projectDetails.productType === "physical" 
-							? "Physical Product - A tangible item that will be shipped to creators" 
-							: "Virtual Product – A digital or online service that does not require shipping"}</p>
+						<p>
+							{projectDetails.productType === "physical"
+								? "Physical Product - A tangible item that will be shipped to creators"
+								: "Virtual Product – A digital or online service that does not require shipping"}
+						</p>
 					</div>
 
 					{/* Project Description */}
@@ -431,7 +453,7 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 				{/* Submissions Tab */}
 				<TabsContent value="submissions">
 					<div className="p-8 text-center text-gray-500">
-						<ProjectSubmissions projectFormData={project}/>
+						<ProjectSubmissions projectFormData={project} />
 					</div>
 				</TabsContent>
 
@@ -442,6 +464,22 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 							<ProductDelivery />
 						</div>
 					</TabsContent>
+				)}
+
+				{/* Analytics and Affiliate tab for Tiktok shop  */}
+				{projectDetails.projectType === "TikTok Shop" &&(
+					<>
+					<TabsContent value="analytics">
+						<div className="p-8 text-gray-500">
+							<ProjectAnalytics />
+						</div>
+					</TabsContent>
+					<TabsContent value="affiliate-payout">
+						<div className="p-8 text-gray-500">
+							<AffiliatePayout />
+						</div>
+					</TabsContent>
+					</>
 				)}
 			</Tabs>
 		</div>
