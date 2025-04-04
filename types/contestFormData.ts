@@ -49,6 +49,7 @@ export type ProjectType =
 export interface ProjectDetails {
 	projectName: string;
 	projectType: ProjectType;
+	productLink: string;
 	productType: string;
 	projectDescription: string[];
 	projectThumbnail: File | null;

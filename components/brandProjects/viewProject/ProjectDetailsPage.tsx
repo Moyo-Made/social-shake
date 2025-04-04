@@ -11,6 +11,7 @@ import { ProjectFormData } from "@/types/contestFormData";
 import { getStatusDot, getStatusStyle } from "@/utils/statusUtils";
 import ProjectApplications from "./ProjectApplications";
 import ProjectSubmissions from "./ProjectSubmissions";
+import ProductDelivery from "./ProductDelivery";
 import Image from "next/image";
 
 interface ProjectDetailPageProps {
@@ -62,6 +63,9 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 	}
 
 	const { projectDetails, projectRequirements, creatorPricing } = project;
+  
+	// Check if the product type is physical to determine whether to show the delivery tab
+	const isPhysicalProduct = projectDetails.productType === "physical";
 
 	return (
 		<div className="flex flex-col bg-white border border-[#FFD9C3] rounded-lg py-5 px-10 mt-3">
@@ -125,6 +129,10 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 							{projectDetails.projectType}
 						</div>
 						<div>
+							<span className="text-[#FD5C02]">Product Type:</span>{" "}
+							{projectDetails.productType === "physical" ? "Physical Product" : "Virtual Product"}
+						</div>
+						<div>
 							<span className="text-[#FD5C02]">Submissions:</span> 2 Videos • 1
 							Pending
 						</div>
@@ -153,6 +161,14 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 					>
 						Submissions
 					</TabsTrigger>
+					{isPhysicalProduct && (
+						<TabsTrigger
+							value="product-delivery"
+							className="w-40 data-[state=active]:bg-[#FFF4EE] data-[state=active]:border-b-2 data-[state=active]:border-[#FC52E4] data-[state=active]:text-[#FD5C02] data-[state=inactive]:text-[#667085] rounded-none py-3"
+						>
+							Product Delivery
+						</TabsTrigger>
+					)}
 				</TabsList>
 
 				{/* Project Overview Tab */}
@@ -167,6 +183,14 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 					<div className="flex gap-28">
 						<h3 className="text-[#667085] font-normal w-40">Project Type:</h3>
 						<p>{projectDetails.projectType}</p>
+					</div>
+					
+					{/* Product Type */}
+					<div className="flex gap-28">
+						<h3 className="text-[#667085] font-normal w-40">Product Type:</h3>
+						<p>{projectDetails.productType === "physical" 
+							? "Physical Product - A tangible item that will be shipped to creators" 
+							: "Virtual Product – A digital or online service that does not require shipping"}</p>
 					</div>
 
 					{/* Project Description */}
@@ -401,21 +425,6 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 				<TabsContent value="applications">
 					<div className="p-8 text-center text-gray-500">
 						<ProjectApplications />
-						{/* Empty State for Applications */}
-						{/* {applications && applications.length === 0 && (
-							<div className="mt-6 flex flex-col items-center justify-center">
-								<div className="rounded-full bg-gray-100 p-6 mb-4">
-									<MailQuestion className="h-10 w-10 text-gray-400" />
-								</div>
-								<h3 className="text-lg font-medium text-gray-900">
-									No applications received yet
-								</h3>
-								<p className="mt-2 text-sm text-gray-500 max-w-md">
-									When users apply to your project, their applications will
-									appear here.
-								</p>
-							</div>
-						)} */}
 					</div>
 				</TabsContent>
 
@@ -423,24 +432,17 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 				<TabsContent value="submissions">
 					<div className="p-8 text-center text-gray-500">
 						<ProjectSubmissions projectFormData={project}/>
-
-						{/* Empty State for Submissions */}
-						{/* {submissions && submissions.length === 0 && (
-							<div className="mt-6 flex flex-col items-center justify-center">
-								<div className="rounded-full bg-gray-100 p-6 mb-4">
-									<FileX className="h-10 w-10 text-gray-400" />
-								</div>
-								<h3 className="text-lg font-medium text-gray-900">
-									No submissions yet
-								</h3>
-								<p className="mt-2 text-sm text-gray-500 max-w-md">
-									When users submit their work for your project, it will appear
-									here.
-								</p>
-							</div>
-						)} */}
 					</div>
 				</TabsContent>
+
+				{/* Product Delivery Tab (only shown for physical products) */}
+				{isPhysicalProduct && (
+					<TabsContent value="product-delivery">
+						<div className="p-8 text-gray-500">
+							<ProductDelivery />
+						</div>
+					</TabsContent>
+				)}
 			</Tabs>
 		</div>
 	);

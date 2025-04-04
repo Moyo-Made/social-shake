@@ -62,6 +62,12 @@ const ProjectDetails: React.FC = () => {
 		updateProjectDetails({ productType: value });
 	};
 
+	const handleProductLinkChange = (
+		e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+	) => {
+		updateProjectDetails({ productLink: e.target.value });
+	};
+
 	const handleProjectDescriptionChange = (
 		e: React.ChangeEvent<HTMLTextAreaElement>
 	) => {
@@ -295,6 +301,20 @@ const ProjectDetails: React.FC = () => {
 						</div>
 					</div>
 				</div>
+				{/* Product Link field - only show for TikTok Shop */}
+				{projectDetails.projectType === "TikTok Shop" && (
+					<>
+						<label className="block text-base font-medium text-gray-700 mt-4">
+							Product Link
+						</label>
+						<Input
+							className="mt-1"
+							placeholder="www.summercream.com"
+							value={projectDetails.productLink}
+							onChange={handleProductLinkChange}
+						/>
+					</>
+				)}
 			</div>
 
 			<label className="block text-base font-medium text-gray-700 mt-4 mb-1">
@@ -305,10 +325,15 @@ const ProjectDetails: React.FC = () => {
 				onValueChange={handleProductTypeChange}
 			>
 				<SelectTrigger className="w-full mt-1">
-					<SelectValue placeholder="Virtual Product – A digital or online service that does not require shipping" />
+					<SelectValue
+						placeholder="Virtual Product – A digital or online service that does not require shipping"
+						className="placeholder:text-gray-600"
+					/>
 				</SelectTrigger>
 				<SelectContent className="bg-[#f7f7f7]">
-					<SelectItem value="physical">Physical Product - A tangible item that will be shipped to creators</SelectItem>
+					<SelectItem value="physical">
+						Physical Product - A tangible item that will be shipped to creators
+					</SelectItem>
 					<SelectItem value="virtual">
 						Virtual Product – A digital or online service that does not require
 						shipping

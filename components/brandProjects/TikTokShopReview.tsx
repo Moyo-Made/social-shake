@@ -57,6 +57,13 @@ const TikTokShopProjectReview = () => {
 					</div>
 
 					<div className="grid grid-cols-3 gap-4">
+						<div className="font-medium text-gray-600">Product Link</div>
+						<div className="col-span-2">
+							{formData.projectDetails.productLink || "Not specified"}
+						</div>
+					</div>
+
+					<div className="grid grid-cols-3 gap-4">
 						<div className="font-medium text-gray-600">Project Description</div>
 						<div className="col-span-2">
 							{formData.projectDetails.projectDescription || "Not specified"}
@@ -105,7 +112,7 @@ const TikTokShopProjectReview = () => {
 					<div className="grid grid-cols-3 gap-4">
 						<div className="font-medium text-gray-600">Content Type</div>
 						<div className="col-span-2">
-							{formData.projectDetails.projectType || "Not specified"}
+							{formData.projectRequirements.contentType || "Not specified"}
 						</div>
 					</div>
 

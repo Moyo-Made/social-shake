@@ -28,6 +28,7 @@ const defaultFormData: ProjectFormData = {
 	projectDetails: {
 		projectName: "",
 		projectType: "UGC Content Only",
+		productLink: "",
 		productType: "",
 		projectDescription: [""],
 		projectThumbnail: null,
