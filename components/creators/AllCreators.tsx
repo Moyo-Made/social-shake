@@ -76,6 +76,36 @@ const sampleCreators: Creator[] = [
 		},
 		avatar: "/icons/creator-icon.svg",
 	},
+	{
+		id: 4,
+		name: "Mabel Yurika",
+		username: "@mabelyurika",
+		bio: "Hey there! I'm Mabel, a passionate content creator specializing in viral TikTok campaigns and engaging short-form videos.",
+		totalGMV: 2000,
+		avgGMVPerVideo: 500,
+		avgImpressions: "10.6k",
+		pricing: {
+			singleVideo: 1000,
+			fiveVideos: 2000,
+			tenVideos: 10000,
+		},
+		avatar: "/icons/creator-icon.svg",
+	},
+	{
+		id: 5,
+		name: "Mabel Yurika",
+		username: "@mabelyurika",
+		bio: "Hey there! I'm Mabel, a passionate content creator specializing in viral TikTok campaigns and engaging short-form videos.",
+		totalGMV: 2000,
+		avgGMVPerVideo: 500,
+		avgImpressions: "10.6k",
+		pricing: {
+			singleVideo: 1000,
+			fiveVideos: 2000,
+			tenVideos: 10000,
+		},
+		avatar: "/icons/creator-icon.svg",
+	},
 ];
 
 const CreatorMarketplace = () => {
@@ -376,7 +406,7 @@ const CreatorMarketplace = () => {
 				{!isClient || savedCreators.length === 0 ? (
 					<EmptyState />
 				) : (
-					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:-mt-36 ">
+					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 ">
 						{savedCreators.map((creator) => (
 							<Card key={creator.id} className="overflow-hidden">
 								<CardHeader className="pb-0">
