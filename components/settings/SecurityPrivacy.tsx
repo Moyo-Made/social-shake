@@ -1,5 +1,4 @@
 import { useState, FormEvent, useEffect } from "react";
-import { useToast } from "@/hooks/use-toast";
 import {
 	getAuth,
 	EmailAuthProvider,
@@ -9,6 +8,7 @@ import {
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Button } from "../ui/button";
+import { toast } from "sonner";
 
 interface SecuritySettingsProps {
 	userEmail: string;
@@ -29,8 +29,6 @@ export default function SecurityPrivacySettings({
 		new: "",
 		confirm: "",
 	});
-
-	const { toast } = useToast();
 
 	// Password validation
 	const validatePassword = () => {
@@ -91,11 +89,7 @@ export default function SecurityPrivacySettings({
 			// Update password
 			await updatePassword(user, newPassword);
 
-			toast({
-				title: "Password Updated",
-				description: "Your password has been successfully changed.",
-				variant: "default",
-			});
+			toast("Password Updated: Your password has been successfully changed.");
 
 			// Reset form fields
 			setCurrentPassword("");
@@ -117,12 +111,9 @@ export default function SecurityPrivacySettings({
 				});
 			}
 
-			toast({
-				title: "Error",
-				description:
-					error instanceof Error ? error.message : "Failed to update password",
-				variant: "destructive",
-			});
+			toast(
+				error instanceof Error ? error.message : "Failed to update password"
+			);
 		} finally {
 			setIsSubmittingPassword(false);
 		}
@@ -150,23 +141,17 @@ export default function SecurityPrivacySettings({
 				throw new Error(data.error || "Failed to update two-factor settings");
 			}
 
-			toast({
-				title: "Two-Factor Authentication Updated",
-				description:
-					twoFactorMethod === "none"
-						? "Two-factor authentication has been disabled."
-						: `Two-factor authentication method set to ${twoFactorMethod}.`,
-				variant: "default",
-			});
+			toast(
+				twoFactorMethod === "none"
+					? "Two-factor authentication has been disabled."
+					: `Two-factor authentication method set to ${twoFactorMethod}.`
+			);
 		} catch (error) {
-			toast({
-				title: "Error",
-				description:
-					error instanceof Error
-						? error.message
-						: "Failed to update two-factor settings",
-				variant: "destructive",
-			});
+			toast(
+				error instanceof Error
+					? error.message
+					: "Failed to update two-factor settings"
+			);
 		} finally {
 			setIsSubmitting(false);
 		}
