@@ -1,11 +1,11 @@
 import PaymentCancelled from '@/components/brandProjects/PaymentCancelled'
-import React from 'react'
+import React, { Suspense } from 'react'
 
 const page = () => {
   return (
-	<div>
+	<Suspense>
 	  <PaymentCancelled />
-	</div>
+	</Suspense>
   )
 }
 
