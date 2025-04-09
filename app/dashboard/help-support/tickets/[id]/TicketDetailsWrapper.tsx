@@ -1,4 +1,3 @@
-// app/dashboard/help-support/tickets/[id]/TicketDetailWrapper.tsx
 "use client";
 
 import TicketDetail from "@/components/help-and-support/TicketDetails";

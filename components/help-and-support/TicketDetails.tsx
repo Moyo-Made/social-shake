@@ -17,11 +17,11 @@ import Link from "next/link";
 
 interface TicketDetailProps {
 	params: {
-		id: string;
+	  id: string;
 	};
-}
+  }
 
-export default function TicketDetail({ params }: TicketDetailProps) {
+  export default function TicketDetail({ params }: TicketDetailProps) {
 	const ticketId = params.id;
 	const router = useRouter();
 	const { user } = useAuth();
