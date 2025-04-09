@@ -1,38 +1,42 @@
-import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
 import { DecodedIdToken } from "firebase-admin/auth";
 import { Firestore } from "firebase-admin/firestore";
+import { getFirebaseAdminApp } from "@/config/firebase-admin";
 
-const db = getFirestore();
-const auth = getAuth();
+// Initialize Firebase Admin
+const app = getFirebaseAdminApp();
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 
 interface PaymentMethod {
-	type: string;
-	isDefault: boolean;
-	lastUpdated: Date;
-	userId: string;
-	bankName?: string;
-	accountHolderName?: string;
-	routingNumber?: string;
-	accountEnding?: string;
-	paypalEmail?: string;
-	cardType?: string;
-	cardEnding?: string;
-	expiryDate?: string;
+  type: string;
+  isDefault: boolean;
+  lastUpdated: Date;
+  userId: string;
+  bankName?: string;
+  accountHolderName?: string;
+  routingNumber?: string;
+  accountEnding?: string;
+  paypalEmail?: string;
+  cardType?: string;
+  cardEnding?: string;
+  expiryDate?: string;
 }
 
 interface PaymentMethodRequestBody {
-	type: string;
-	isDefault?: boolean;
-	bankName?: string;
-	accountNumber?: string;
-	accountHolderName?: string;
-	routingNumber?: string;
-	paypalEmail?: string;
-	cardNumber?: string;
-	expiryDate?: string;
-	cardholderName?: string;
+  type: string;
+  isDefault?: boolean;
+  bankName?: string;
+  accountNumber?: string;
+  accountHolderName?: string;
+  routingNumber?: string;
+  paypalEmail?: string;
+  cardNumber?: string;
+  expiryDate?: string;
+  cardholderName?: string;
 }
 
 // Helper function to handle authorization

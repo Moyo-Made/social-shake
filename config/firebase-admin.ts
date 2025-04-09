@@ -50,11 +50,13 @@ const firebaseAdmin = initializeFirebaseAdmin();
 const adminDb = getFirestore(firebaseAdmin);
 const adminAuth = getAuth(firebaseAdmin);
 const adminStorage = getStorage(firebaseAdmin);
+const getFirebaseAdminApp = () => firebaseAdmin;
 
 export { 
   firebaseAdmin, 
   adminDb,
   adminAuth,
   adminStorage,
+  getFirebaseAdminApp,
   initializeFirebaseAdmin  // Keep this for potential manual initialization
 };
