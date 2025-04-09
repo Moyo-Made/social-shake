@@ -64,7 +64,7 @@ export default async function handler(req: Request, res: Response) {
 			const { type, isDefault } = req.body as { type: string; isDefault?: boolean };
 			
 			// Create update data based on type
-			let updateData: UpdateData = {
+			const updateData: UpdateData = {
 				lastUpdated: new Date(),
 			};
 			
