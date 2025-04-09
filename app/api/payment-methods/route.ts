@@ -1,12 +1,11 @@
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
-
-const db = getFirestore();
-
-const auth = getAuth();
-import { NextApiRequest, NextApiResponse } from "next";
+import { NextRequest, NextResponse } from "next/server";
 import { DecodedIdToken } from "firebase-admin/auth";
 import { Firestore } from "firebase-admin/firestore";
+
+const db = getFirestore();
+const auth = getAuth();
 
 interface PaymentMethod {
 	type: string;
@@ -36,122 +35,20 @@ interface PaymentMethodRequestBody {
 	cardholderName?: string;
 }
 
-export default async function handler(
-	req: NextApiRequest,
-	res: NextApiResponse
-): Promise<void> {
-	// Check auth header
-	const authHeader = req.headers.authorization;
-	if (!authHeader || !authHeader.startsWith("Bearer ")) {
-		return res.status(401).json({ error: "Unauthorized" });
-	}
+// Helper function to handle authorization
+async function authorizeRequest(request: NextRequest) {
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return null;
+  }
 
-	try {
-		// Verify the user's token
-		const token = authHeader.split("Bearer ")[1];
-		const decodedToken: DecodedIdToken = await auth.verifyIdToken(token);
-		const userId = decodedToken.uid;
-
-		// GET - Fetch all payment methods for the user
-		if (req.method === "GET") {
-			const snapshot = await db
-				.collection("paymentMethods")
-				.where("userId", "==", userId)
-				.get();
-
-			const methods: PaymentMethod[] = [];
-			snapshot.forEach((doc) => {
-				methods.push({ id: doc.id, ...doc.data() } as unknown as PaymentMethod);
-			});
-
-			return res.status(200).json(methods);
-		}
-
-		// POST - Create a new payment method
-		if (req.method === "POST") {
-			const { type, isDefault, ...rest } = req.body as PaymentMethodRequestBody;
-
-			if (!type || !["bank", "paypal", "card"].includes(type)) {
-				return res.status(400).json({ error: "Invalid payment type" });
-			}
-
-			// Create payment method data based on type
-			let paymentMethodData: PaymentMethod = {
-				type,
-				isDefault: isDefault || false,
-				lastUpdated: new Date(),
-				userId,
-			};
-
-			// Process data based on type
-			switch (type) {
-				case "bank":
-					const { bankName, accountNumber, accountHolderName, routingNumber } =
-						rest;
-					paymentMethodData = {
-						...paymentMethodData,
-						bankName,
-						accountHolderName,
-						// Only store the last 4 digits
-						routingNumber: routingNumber
-							? `****${routingNumber.slice(-4)}`
-							: "",
-						accountEnding: accountNumber
-							? `****${accountNumber.slice(-4)}`
-							: "",
-					};
-					break;
-
-				case "paypal":
-					const { paypalEmail } = rest;
-					paymentMethodData = {
-						...paymentMethodData,
-						paypalEmail,
-					};
-					break;
-
-				case "card":
-					const { cardNumber, expiryDate, cardholderName } = rest;
-					paymentMethodData = {
-						...paymentMethodData,
-						cardType: detectCardType(cardNumber) || "Card", // Add a helper function to detect card type
-						cardEnding: cardNumber ? `${cardNumber.slice(-4)}` : "",
-						expiryDate,
-						accountHolderName: cardholderName,
-					};
-					break;
-			}
-
-			// If setting as default, update other methods
-			if (isDefault) {
-				const defaultMethods = await db
-					.collection("paymentMethods")
-					.where("userId", "==", userId)
-					.where("isDefault", "==", true)
-					.get();
-
-				const batch = (db as Firestore).batch();
-				defaultMethods.forEach((doc) => {
-					batch.update(doc.ref, { isDefault: false });
-				});
-
-				await batch.commit();
-			}
-
-			// Add new payment method
-			const docRef = await db.collection("paymentMethods").add(paymentMethodData);
-
-			return res.status(201).json({
-				id: docRef.id,
-				message: "Payment method added successfully",
-			});
-		}
-
-		return res.status(405).json({ error: "Method not allowed" });
-	} catch (error) {
-		console.error("Error:", error);
-		return res.status(500).json({ error: "Internal server error" });
-	}
+  try {
+    const token = authHeader.split("Bearer ")[1];
+    const decodedToken: DecodedIdToken = await auth.verifyIdToken(token);
+    return decodedToken.uid;
+  } catch {
+    return null;
+  }
 }
 
 // Helper function to detect card type from number
@@ -165,4 +62,119 @@ function detectCardType(cardNumber: string | undefined) {
   if (/^6(?:011|5)/.test(cardNumber)) return "Discover";
   
   return "Card";
+}
+
+// GET handler
+export async function GET(request: NextRequest) {
+  const userId = await authorizeRequest(request);
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const snapshot = await db
+      .collection("paymentMethods")
+      .where("userId", "==", userId)
+      .get();
+
+    const methods: PaymentMethod[] = [];
+    snapshot.forEach((doc) => {
+      methods.push({ id: doc.id, ...doc.data() } as unknown as PaymentMethod);
+    });
+
+    return NextResponse.json(methods);
+  } catch (error) {
+    console.error("Error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+// POST handler
+export async function POST(request: NextRequest) {
+  const userId = await authorizeRequest(request);
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json() as PaymentMethodRequestBody;
+    const { type, isDefault, ...rest } = body;
+
+    if (!type || !["bank", "paypal", "card"].includes(type)) {
+      return NextResponse.json({ error: "Invalid payment type" }, { status: 400 });
+    }
+
+    // Create payment method data based on type
+    let paymentMethodData: PaymentMethod = {
+      type,
+      isDefault: isDefault || false,
+      lastUpdated: new Date(),
+      userId,
+    };
+
+    // Process data based on type
+    switch (type) {
+      case "bank":
+        const { bankName, accountNumber, accountHolderName, routingNumber } = rest;
+        paymentMethodData = {
+          ...paymentMethodData,
+          bankName,
+          accountHolderName,
+          // Only store the last 4 digits
+          routingNumber: routingNumber
+            ? `****${routingNumber.slice(-4)}`
+            : "",
+          accountEnding: accountNumber
+            ? `****${accountNumber.slice(-4)}`
+            : "",
+        };
+        break;
+
+      case "paypal":
+        const { paypalEmail } = rest;
+        paymentMethodData = {
+          ...paymentMethodData,
+          paypalEmail,
+        };
+        break;
+
+      case "card":
+        const { cardNumber, expiryDate, cardholderName } = rest;
+        paymentMethodData = {
+          ...paymentMethodData,
+          cardType: detectCardType(cardNumber) || "Card",
+          cardEnding: cardNumber ? `${cardNumber.slice(-4)}` : "",
+          expiryDate,
+          accountHolderName: cardholderName,
+        };
+        break;
+    }
+
+    // If setting as default, update other methods
+    if (isDefault) {
+      const defaultMethods = await db
+        .collection("paymentMethods")
+        .where("userId", "==", userId)
+        .where("isDefault", "==", true)
+        .get();
+
+      const batch = (db as Firestore).batch();
+      defaultMethods.forEach((doc) => {
+        batch.update(doc.ref, { isDefault: false });
+      });
+
+      await batch.commit();
+    }
+
+    // Add new payment method
+    const docRef = await db.collection("paymentMethods").add(paymentMethodData);
+
+    return NextResponse.json({
+      id: docRef.id,
+      message: "Payment method added successfully"
+    }, { status: 201 });
+  } catch (error) {
+    console.error("Error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
