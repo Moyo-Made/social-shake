@@ -31,7 +31,12 @@ export const useContestSubmission = () => {
     // Handle thumbnail if it exists
     if (formData.basic.thumbnail) {
       try {
-        const base64Thumbnail = await fileToBase64(formData.basic.thumbnail);
+        let base64Thumbnail = null;
+        if (formData.basic.thumbnail instanceof File) {
+          base64Thumbnail = await fileToBase64(formData.basic.thumbnail);
+        } else {
+          base64Thumbnail = formData.basic.thumbnail; // Assume it's already a base64 string
+        }
         processedData.basic.thumbnail = base64Thumbnail;
       } catch (error) {
         console.error("Error converting thumbnail to base64:", error);
