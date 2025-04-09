@@ -1,11 +1,11 @@
 import PaymentSuccessful from "@/components/brandProfile/dashboard/PaymentSuccessful";
-import React from "react";
+import React, { Suspense } from "react";
 
 const page = () => {
 	return (
-		<div>
+		<Suspense>
 			<PaymentSuccessful />
-		</div>
+		</Suspense>
 	);
 };
 
