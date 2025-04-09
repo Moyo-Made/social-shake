@@ -29,11 +29,15 @@ const GMVReview = () => {
 			return;
 		}
 
-		const objectUrl = URL.createObjectURL(basic.thumbnail);
-		setPreviewUrl(objectUrl);
+		if (basic.thumbnail instanceof File) {
+			const objectUrl = URL.createObjectURL(basic.thumbnail);
+			setPreviewUrl(objectUrl);
 
-		// Free memory when this component is unmounted
-		return () => URL.revokeObjectURL(objectUrl);
+			// Free memory when this component is unmounted
+			return () => URL.revokeObjectURL(objectUrl);
+		} else {
+			setPreviewUrl(basic.thumbnail);
+		}
 	}, [basic.thumbnail]);
 
 	// Format dates
@@ -167,7 +171,9 @@ const GMVReview = () => {
 										/>
 										<p className="text-gray-500 mt-2">
 											{basic.thumbnail
-												? basic.thumbnail.name
+												? basic.thumbnail instanceof File
+													? basic.thumbnail.name
+													: "Invalid thumbnail"
 												: "No thumbnail selected"}
 										</p>
 									</div>
