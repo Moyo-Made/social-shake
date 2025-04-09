@@ -1,15 +1,22 @@
-"use client";
-
 import SideNavLayout from "@/components/brandProfile/dashboard/SideNav";
-import TicketDetail from "@/components/help-and-support/TicketDetails";
 import React from "react";
+import TicketDetailWrapper from "./TicketDetailsWrapper";
 
-export default function Page({ params }: { params: { id: string } }) {
-	return (
-		<SideNavLayout>
-			<div className="w-full p-6">
-				<TicketDetail params={{ id: params.id.toString() }} />
-			</div>
-		</SideNavLayout>
-	);
+
+// This is the correct type for App Router pages with dynamic parameters
+interface PageProps {
+  params: {
+    id: string;
+  };
+  searchParams: Record<string, string | string[] | undefined>;
+}
+
+export default function Page({ params }: PageProps) {
+  return (
+    <SideNavLayout>
+      <div className="w-full p-6">
+        <TicketDetailWrapper id={params.id} />
+      </div>
+    </SideNavLayout>
+  );
 }
