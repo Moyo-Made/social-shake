@@ -169,3 +169,53 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export async function PUT(request: NextRequest) {
+  try {
+    const data = await request.json();
+    const { email } = data;
+
+    if (!email) {
+      return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    }
+
+    // Using Admin SDK for Firestore operations
+    const brandRef = adminDb.collection("brandProfiles").doc(email);
+    const docSnap = await brandRef.get();
+
+    if (!docSnap.exists) {
+      return NextResponse.json({ error: "Brand profile not found" }, { status: 404 });
+    }
+
+    // Clean the received data to prevent field duplication
+    const { socialMedia, ...otherData } = data;
+    
+    // Remove any dot-notation socialMedia fields if they exist
+    const cleanedData = Object.keys(otherData).reduce((acc, key) => {
+      if (!key.startsWith('socialMedia.')) {
+        acc[key] = otherData[key];
+      }
+      return acc;
+    }, {} as Record<string, unknown>);
+    
+    // Create a clean update object
+    const updateData = {
+      ...cleanedData,
+      socialMedia: socialMedia || {},  // Ensure it's an object
+      updatedAt: new Date().toISOString()
+    };
+
+    // Update the document
+    await brandRef.update(updateData);
+
+    return NextResponse.json({
+      success: true,
+      message: "Brand profile updated successfully",
+      data: updateData
+    });
+  } catch (error) {
+    console.error("Error updating brand profile:", error);
+    const errorMessage = error instanceof Error ? error.message : "Failed to update brand profile";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
+  }
+}

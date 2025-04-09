@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronDown, LogOut, User, Settings } from "lucide-react";
+import { ChevronDown, LogOut, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
@@ -169,18 +169,6 @@ const BrandProfileDropdown: React.FC<BrandProfileDropdownProps> = ({
 					</div>
 
 					<div className="py-1">
-						<Link
-							href="/dashboard/brand-profile"
-							className={`flex items-center px-4 py-2 text-sm ${
-								dropdownPosition === "header"
-									? "text-gray-700 hover:bg-gray-100"
-									: "text-gray-200 hover:bg-gray-700"
-							}`}
-							onClick={() => setIsOpen(false)}
-						>
-							<User className="mr-2 h-4 w-4" />
-							Profile
-						</Link>
 
 						<Link
 							href="/dashboard/settings"

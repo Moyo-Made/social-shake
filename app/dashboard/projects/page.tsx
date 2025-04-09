@@ -6,9 +6,9 @@ import React from "react";
 const Page = () => {
 	return (
 		<ProjectFormProvider>
-		<SideNavLayout>
-			<ProjectDashboard />
-		</SideNavLayout>
+			<SideNavLayout>
+				<ProjectDashboard />
+			</SideNavLayout>
 		</ProjectFormProvider>
 	);
 };

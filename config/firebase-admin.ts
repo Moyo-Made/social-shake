@@ -1,6 +1,7 @@
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
+import { getAuth } from 'firebase-admin/auth';
 
 // Enhanced Firebase Admin initialization
 function initializeFirebaseAdmin() {
@@ -46,13 +47,14 @@ function initializeFirebaseAdmin() {
 // Initialize Firebase Admin app
 const firebaseAdmin = initializeFirebaseAdmin();
 
-// Initialize services
 const adminDb = getFirestore(firebaseAdmin);
+const adminAuth = getAuth(firebaseAdmin);
 const adminStorage = getStorage(firebaseAdmin);
 
 export { 
   firebaseAdmin, 
-  adminDb, 
+  adminDb,
+  adminAuth,
   adminStorage,
   initializeFirebaseAdmin  // Keep this for potential manual initialization
 };

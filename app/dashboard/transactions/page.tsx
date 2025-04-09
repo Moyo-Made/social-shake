@@ -1,5 +1,5 @@
 import SideNavLayout from "@/components/brandProfile/dashboard/SideNav";
-import Transactions from "@/components/brandProjects/transactions/Transactions";
+import Transactions from "@/components/transactions/Transactions";
 import React from "react";
 
 const page = () => {

@@ -53,7 +53,12 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 	}, [projectId]);
 
 	if (loading) {
-		return <div className="p-8 text-center">Loading project details...</div>;
+		return (
+			<div className="flex flex-col items-center justify-center h-screen">
+				<div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
+				<div className="p-8 text-center">Loading project details...</div>
+			</div>
+		);
 	}
 
 	if (error || !project) {
@@ -69,7 +74,8 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 	// Check if the product type is physical to determine whether to show the delivery tab
 	const isPhysicalProduct = projectDetails.productType === "physical";
 
-	const tabTriggerStyles = "w-40 data-[state=active]:bg-[#FFF4EE] data-[state=active]:border-b-2 data-[state=active]:border-[#FC52E4] data-[state=active]:text-[#FD5C02] data-[state=inactive]:text-[#667085] rounded-none py-3";
+	const tabTriggerStyles =
+		"w-40 data-[state=active]:bg-[#FFF4EE] data-[state=active]:border-b-2 data-[state=active]:border-[#FC52E4] data-[state=active]:text-[#FD5C02] data-[state=inactive]:text-[#667085] rounded-none py-3";
 
 	return (
 		<div className="flex flex-col bg-white border border-[#FFD9C3] rounded-lg py-5 px-6 mt-3">
@@ -149,43 +155,31 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 			{/* Tabs Navigation */}
 			<Tabs defaultValue="overview" className="w-full">
 				<TabsList className="flex gap-6 mb-3 p-3 mt-6">
-					<TabsTrigger
-						value="overview"
-						className={tabTriggerStyles}
-					>
+					<TabsTrigger value="overview" className={tabTriggerStyles}>
 						Project Overview
 					</TabsTrigger>
-					<TabsTrigger
-						value="applications"
-						className={tabTriggerStyles}
-					>
+					<TabsTrigger value="applications" className={tabTriggerStyles}>
 						Applications
 					</TabsTrigger>
-					<TabsTrigger
-						value="submissions"
-						className={tabTriggerStyles}
-					>
+					<TabsTrigger value="submissions" className={tabTriggerStyles}>
 						Submissions
 					</TabsTrigger>
 					{isPhysicalProduct && (
-						<TabsTrigger
-							value="product-delivery"
-							className={tabTriggerStyles}
-						>
+						<TabsTrigger value="product-delivery" className={tabTriggerStyles}>
 							Product Delivery
 						</TabsTrigger>
 					)}
 
 					{projectDetails.projectType === "TikTok Shop" && (
 						<>
-							<TabsTrigger
-								value="analytics"
-								className={tabTriggerStyles}
-							>
+							<TabsTrigger value="analytics" className={tabTriggerStyles}>
 								Analytics
 							</TabsTrigger>
-							<TabsTrigger value="affiliate-payout" className={tabTriggerStyles}>
-							Affiliates Payout
+							<TabsTrigger
+								value="affiliate-payout"
+								className={tabTriggerStyles}
+							>
+								Affiliates Payout
 							</TabsTrigger>
 						</>
 					)}
@@ -467,18 +461,18 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 				)}
 
 				{/* Analytics and Affiliate tab for Tiktok shop  */}
-				{projectDetails.projectType === "TikTok Shop" &&(
+				{projectDetails.projectType === "TikTok Shop" && (
 					<>
-					<TabsContent value="analytics">
-						<div className="p-8 text-gray-500">
-							<ProjectAnalytics />
-						</div>
-					</TabsContent>
-					<TabsContent value="affiliate-payout">
-						<div className="p-8 text-gray-500">
-							<AffiliatePayout />
-						</div>
-					</TabsContent>
+						<TabsContent value="analytics">
+							<div className="p-8 text-gray-500">
+								<ProjectAnalytics />
+							</div>
+						</TabsContent>
+						<TabsContent value="affiliate-payout">
+							<div className="p-8 text-gray-500">
+								<AffiliatePayout />
+							</div>
+						</TabsContent>
 					</>
 				)}
 			</Tabs>

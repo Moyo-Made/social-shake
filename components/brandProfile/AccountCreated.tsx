@@ -9,10 +9,12 @@ const AccountCreated = () => {
 	return (
 		<main className="relative min-h-[90vh] overflow-y-auto ">
 			<div className="absolute inset-0">
-				<img
+				<Image
 					src="/images/social-shake-bg.png"
 					alt="Background Image"
 					className="w-full h-full object-cover"
+					fill
+					
 				/>
 			</div>
 

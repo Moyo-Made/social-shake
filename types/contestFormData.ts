@@ -6,7 +6,8 @@ export interface BasicFormData {
 	industry: string;
 	description: string;
 	rules: string;
-	thumbnail: File | null;
+	thumbnail: File | string | null;
+	thumbnailName?: string;
 }
 
 export interface RequirementsFormData {
@@ -37,6 +38,7 @@ export interface ContestFormData {
 	requirements: RequirementsFormData;
 	prizeTimeline: PrizeTimelineFormData;
 	incentives: Incentive[];
+	contestId: string;
 }
 
 //Project Details Type

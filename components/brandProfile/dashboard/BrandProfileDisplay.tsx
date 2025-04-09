@@ -84,8 +84,6 @@ const BrandProfileDisplay: React.FC = () => {
 						method: "GET",
 						headers: {
 							"Content-Type": "application/json",
-							// Add any authentication headers if required
-							// 'Authorization': `Bearer ${user.token}`
 						},
 					}
 				);

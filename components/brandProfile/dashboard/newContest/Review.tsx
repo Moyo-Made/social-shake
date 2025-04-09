@@ -98,10 +98,10 @@ const Review = () => {
             <div className="col-span-2">
               <div className="relative w-full h-48 rounded-lg overflow-hidden">
                 {previewUrl ? (
-                  <Image
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
                     src={previewUrl}
                     alt="Contest thumbnail preview"
-                    fill
                     className="object-cover"
                   />
                 ) : (

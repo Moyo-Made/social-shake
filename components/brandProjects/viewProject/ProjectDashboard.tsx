@@ -16,7 +16,7 @@ import Link from "next/link";
 import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
 import { auth, db } from "@/config/firebase";
 import { getStatusDot, getStatusStyle } from "@/utils/statusUtils";
-import { useProjectForm } from "../ProjectFormContext";
+import { useProjectForm } from "../../brandProjects/ProjectFormContext";
 import { useRouter } from "next/navigation";
 
 interface Project {
@@ -371,7 +371,8 @@ const ProjectDashboard = () => {
 
 			{/* Loading state */}
 			{loading && (
-				<div className="text-center py-12">
+				<div className="flex flex-col items-center justify-center text-center py-12">
+					<div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
 					<p className="text-gray-500">Loading projects...</p>
 				</div>
 			)}

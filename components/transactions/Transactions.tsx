@@ -154,7 +154,7 @@ const Transactions: React.FC = () => {
 	const [typeFilter, setTypeFilter] = useState<string>("");
 	const [statusFilter, setStatusFilter] = useState<string>("");
 	// For demonstration purposes - set to true to test empty state
-	const [hasTransactions] = useState<boolean>(false);
+	const [hasTransactions] = useState<boolean>(true);
 
 	const handleViewTransaction = (transaction: Transaction): void => {
 		setSelectedTransaction(transaction);

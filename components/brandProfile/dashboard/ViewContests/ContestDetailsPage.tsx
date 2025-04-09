@@ -7,7 +7,7 @@ interface PageParams {
 	contestId: string;
 }
 
-const ContestDetailsPage = ({ params }: { params: PageParams }) => {
+const ContestDetailsPage = async ({ params }: { params: PageParams }) => {
 	const { contestId } = params;
 	return (
 		<SideNavLayout>

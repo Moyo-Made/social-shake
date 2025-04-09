@@ -4,13 +4,13 @@ import Image from "next/image";
 import { Button } from "./ui/button";
 import Link from "next/link";
 import { FaArrowRight } from "react-icons/fa6";
-import EmptyContest from "./brandProfile/dashboard/Contests";
+import DashboardPage from "@/app/dashboard/page";
 
 const SignUpComplete = () => {
 	return (
 		<main className="relative min-h-screen overflow-y-auto ">
 			<div className="absolute inset-0">
-				<EmptyContest />
+				<DashboardPage />
 			</div>
 
 			{/* Dark Overlay */}

@@ -368,7 +368,8 @@ const ContestDashboard = () => {
 
 			{/* Loading state */}
 			{loading && (
-				<div className="col-span-2 text-center py-8 rounded-lg">
+				<div className="flex flex-col justify-center items-center text-center py-8 rounded-lg">
+					<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
 					<p className="text-gray-500">Loading contests...</p>
 				</div>
 			)}
@@ -453,14 +454,12 @@ const ContestCard = ({
 			{/* Contest card */}
 			<div className="relative">
 				{contest.thumbnailUrl ? (
-					<Image
+					// eslint-disable-next-line @next/next/no-img-element
+					<img
 						src={contest.thumbnailUrl}
 						alt={`${contest.title} thumbnail`}
 						className="w-full h-48 object-cover rounded-md mb-2"
-						width={500}
-						height={300}
 						onError={handleImageError}
-						priority={true}
 					/>
 				) : (
 					<div className="w-full h-64 flex items-center justify-center bg-gray-200 rounded-lg">

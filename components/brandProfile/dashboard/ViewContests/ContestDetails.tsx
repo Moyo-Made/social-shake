@@ -144,7 +144,8 @@ export default function ContestDetailPage({ contestId }: ContestDetailPageProps)
 
   if (loading) {
     return (
-      <div className="container px-5 py-6 max-w-6xl bg-white border border-[#FFD9C3] rounded-lg mx-6 my-5 flex justify-center items-center h-64">
+      <div className="flex-col container px-5 py-6 max-w-6xl bg-white border border-[#FFD9C3] rounded-lg mx-6 my-5 flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
         <p>Loading contest details...</p>
       </div>
     );

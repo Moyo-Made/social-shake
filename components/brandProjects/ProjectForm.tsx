@@ -25,11 +25,19 @@ const ProjectFormContent = () => {
 	const router = useRouter();
 	const { user } = useAuth();
 
-	const { formData, isLoading, saveDraft, submitContest, saveCurrentState } =
-		useProjectForm();
+	const { 
+		formData, 
+		isLoading, 
+		saveDraft, 
+		submitContest, 
+		saveCurrentState,
+		validateStep,
+		validateAllSteps
+	} = useProjectForm();
 
 	const [submissionError, setSubmissionError] = useState<string | null>(null);
 	const [draftSuccess, setDraftSuccess] = useState<boolean>(false);
+	const [validationError, setValidationError] = useState<string | null>(null);
 
 	const {
 		projectDetails: { projectType = "UGC Content" },
@@ -37,12 +45,183 @@ const ProjectFormContent = () => {
 
 	const { creatorPricing } = formData;
 
+	// Define validation rules for each step
+	useEffect(() => {
+		// Step 1: Project Details validation
+		validateStep("projectDetails", () => {
+			const { projectName, productType, projectDescription } = formData.projectDetails;
+			
+			if (!projectName || projectName.trim() === "") {
+				setValidationError("Project name is required");
+				return false;
+			}
+			
+			if (!productType || productType.trim() === "") {
+				setValidationError("Project type is required");
+				return false;
+			}
+			
+			if (!projectDescription || projectDescription.length === 0 || !projectDescription[0] || projectDescription[0].trim() === "") {
+				setValidationError("Project description is required");
+				return false;
+			}
+			
+			return true;
+		});
+
+		// Step 2: Content Requirements validation
+		validateStep("contentRequirements", () => {
+			const { contentType, platform, aspectRatio, duration, script } = formData.projectRequirements;
+			
+			if (!contentType||  contentType.trim() === ""){
+				setValidationError("Content type is required");
+				return false;
+			}
+
+			if (!platform || platform.length === 0 || !platform[0] || platform[0].trim() === "") {
+				setValidationError("At least one platform is required");
+				return false;
+			}
+			
+			if (!aspectRatio || aspectRatio.trim() === "") {
+				setValidationError("Aspect ratio is required");
+				return false;
+			}
+			
+			if (!duration || duration.trim() === "") {
+				setValidationError("Video duration is required");
+				return false;
+			}
+
+			if (!script || script.trim() === "") {
+				setValidationError("Project script is required");
+				return false;
+			}
+			
+			return true;
+		});
+
+		// Step 3: Creator Pricing validation
+		validateStep("creatorPricing", () => {
+			const { selectionMethod, selectedCreators, creatorCount } = formData.creatorPricing;
+			
+			if (selectionMethod === "Invite Specific Creators" && 
+				(!selectedCreators || selectedCreators.length === 0)) {
+				setValidationError("Please select at least one creator");
+				return false;
+			}
+			
+			if (selectionMethod !== "Invite Specific Creators" && 
+				(!creatorCount || creatorCount < 1)) {
+				setValidationError("Creator count must be at least 1");
+				return false;
+			}
+			
+			return true;
+		});
+
+		// Step 4: Review (no specific validation needed as it's just a review)
+		validateStep("review", () => true);
+		
+	}, [formData, validateStep]);
+
 	// Save current state when navigating between steps
 	const handleStepChange = (newStep: number) => {
-		// First save the current state
+		// Reset validation error
+		setValidationError(null);
+		
+		// If moving forward, validate the current step
+		if (newStep > step) {
+			let validationResult = false;
+			
+			// Validate based on current step
+			switch (step) {
+				case 1:
+					validationResult = validateStepOne();
+					break;
+				case 2:
+					validationResult = validateStepTwo();
+					break;
+				case 3:
+					validationResult = validateStepThree();
+					break;
+				default:
+					validationResult = true;
+					break;
+			}
+			
+			// Don't proceed if validation fails
+			if (!validationResult) return;
+		}
+		
+		// Save the current state
 		saveCurrentState();
+		
 		// Then change the step
 		setStep(newStep);
+	};
+
+	// Validate Step 1: Project Details
+	const validateStepOne = () => {
+		const { projectName, productType, projectDescription } = formData.projectDetails;
+		
+		if (!projectName || projectName.trim() === "") {
+			setValidationError("Project name is required");
+			return false;
+		}
+		
+		if (!productType || productType.trim() === "") {
+			setValidationError("Product type is required");
+			return false;
+		}
+		
+		if (!projectDescription || projectDescription.length === 0 || !projectDescription[0] || projectDescription[0].trim() === "") {
+			setValidationError("Project description is required");
+			return false;
+		}
+		
+		return true;
+	};
+
+	// Validate Step 2: Content Requirements
+	const validateStepTwo = () => {
+		const { platform, aspectRatio, duration } = formData.projectRequirements;
+		
+		if (!platform || platform.length === 0 || !platform[0] || platform[0].trim() === "") {
+			setValidationError("At least one platform is required");
+			return false;
+		}
+		
+		if (!aspectRatio || aspectRatio.trim() === "") {
+			setValidationError("Aspect ratio is required");
+			return false;
+		}
+		
+		if (!duration || duration.trim() === "") {
+			setValidationError("Video duration is required");
+			return false;
+		}
+		
+		return true;
+	};
+
+	// Validate Step 3: Creator Pricing
+	const validateStepThree = () => {
+		const { selectionMethod, selectedCreators, creatorCount } = formData.creatorPricing;
+		
+		if (selectionMethod === "Invite Specific Creators" && 
+			(!selectedCreators || selectedCreators.length === 0)) {
+			setValidationError("Please select at least one creator");
+			return false;
+		}
+		
+		if (selectionMethod !== "Invite Specific Creators" && 
+			(!creatorCount || creatorCount < 1)) {
+			setValidationError("Creator count must be at least 1");
+			return false;
+		}
+		
+		return true;
 	};
 
 	// On component mount, try to restore previously saved step from sessionStorage
@@ -71,9 +250,16 @@ const ProjectFormContent = () => {
 	const handleSubmit = async () => {
 		try {
 			setSubmissionError(null);
+			setValidationError(null);
 
 			if (!user?.email) {
 				setSubmissionError("You must be logged in to submit a contest");
+				return;
+			}
+
+			// Validate all steps before submission
+			if (!validateAllSteps()) {
+				setValidationError("Please complete all required fields before submitting");
 				return;
 			}
 
@@ -134,7 +320,7 @@ const ProjectFormContent = () => {
 			);
 
 			// Submit using the context method with submitFormData
-			const result = await submitContest(submitFormData, user.email, user.uid);
+			const result = await submitContest();
 
 			if (!result.success) {
 				throw new Error(result.error || "Failed to create contest");
@@ -290,6 +476,14 @@ const ProjectFormContent = () => {
 				<Alert variant="destructive" className="mb-4">
 					<AlertCircle className="h-4 w-4" />
 					<AlertDescription>{submissionError}</AlertDescription>
+				</Alert>
+			)}
+
+			{/* Validation Error Message */}
+			{validationError && (
+				<Alert variant="destructive" className="mb-4">
+					<AlertCircle className="h-4 w-4" />
+					<AlertDescription>{validationError}</AlertDescription>
 				</Alert>
 			)}
 

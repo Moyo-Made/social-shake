@@ -36,12 +36,18 @@ const MenuItem: React.FC<MenuItemProps> = ({
 		(href === "/dashboard" && pathname === "/dashboard") ||
 		(href === "/dashboard/contests" &&
 			pathname.startsWith("/dashboard/contests/")) ||
-		(href === "/dashboard/projects" && pathname.startsWith("/dashboard/projects/")) ||
-		(href === "/dashboard/creators" && pathname.startsWith("/dashboard/creators/")) ||
-		(href === "/dashboard/messages" && pathname.startsWith("/dashboard/messages/")) ||
-		(href === "/dashboard/transactions" && pathname.startsWith("/dashboard/transactions/")) ||
-		(href === "/dashboard/settings" && pathname.startsWith("/dashboard/settings/")) ||
-		(href === "/dashboard/help" && pathname.startsWith("/dashboard/help/"));
+		(href === "/dashboard/projects" &&
+			pathname.startsWith("/dashboard/projects/")) ||
+		(href === "/dashboard/creators" &&
+			pathname.startsWith("/dashboard/creators/")) ||
+		(href === "/dashboard/messages" &&
+			pathname.startsWith("/dashboard/messages/")) ||
+		(href === "/dashboard/transactions" &&
+			pathname.startsWith("/dashboard/transactions/")) ||
+		(href === "/dashboard/settings" &&
+			pathname.startsWith("/dashboard/settings/")) ||
+		(href === "/dashboard/help-support" &&
+			pathname.startsWith("/dashboard/help-support/"));
 
 	const hasActiveSubItem =
 		hasSubItems && subItems.some((item) => pathname === item.href);
@@ -221,7 +227,7 @@ const SideNav: React.FC = () => {
 					text="Settings"
 				/>
 				<MenuItem
-					href="/dashboard/help"
+					href="/dashboard/help-support"
 					icon={
 						<Image
 							src="/icons/help-icon.svg"
@@ -250,10 +256,10 @@ const SideNav: React.FC = () => {
 const getPageTitle = (pathname: string): string => {
 	// You can expand this object with all your routes that need specific titles
 	const routeTitles: Record<string, string> = {
-		"/dashboard/": "Dashboard",
+		"/dashboard": "Dashboard",
 		"/dashboard/projects": "Projects",
 		"/dashboard/projects/new": "Add New Project",
-		"/dashboard/contests/": "Contests",
+		"/dashboard/contests": "Contests",
 		"/dashboard/contests/new": "New Contest",
 		"/dashboard/contests/edit": "Edit Contest",
 		"/dashboard/creators": "Creators",
@@ -262,15 +268,12 @@ const getPageTitle = (pathname: string): string => {
 		"/dashboard/messages": "Messages",
 		"/dashboard/transactions": "Transactions",
 		"/dashboard/settings": "Settings",
-		"/dashboard/help": "Help & Support",
+		"/dashboard/help-support": "Help & Support",
 	};
 
 	// Check for exact match first
 	if (routeTitles[pathname]) {
 		return routeTitles[pathname];
-	}
-	if (pathname.startsWith("/dashboard/")) {
-		return "Dashboard";
 	}
 	// More specific matching for different route sections
 	if (pathname.startsWith("/dashboard/contests/")) {
@@ -292,6 +295,20 @@ const getPageTitle = (pathname: string): string => {
 		return "Creators";
 	}
 
+	if (pathname.startsWith("/dashboard/settings/")) {
+		return "Settings";
+	}
+	if (pathname.startsWith("/dashboard/messages/")) {
+		return "Messages";
+	}
+	if (pathname.startsWith("/dashboard/transactions/")) {
+		return "Transactions";
+	}
+
+	if (pathname.startsWith("/dashboard/help-support/")) {
+		return "Help & Support";
+	}
+
 	// Default fallback
 	return "Dashboard";
 };
@@ -310,13 +327,15 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 				<header className="bg-white p-4 w-full flex justify-between items-center border-b border-[#FD5C02]">
 					<h1 className="text-xl font-semibold">{pageTitle}</h1>
 					<div className="flex items-center">
-						<Image
-							src="/icons/notification.svg"
-							alt="Notifications"
-							width={20}
-							height={20}
-							className="mr-4"
-						/>
+						<Link href="/dashboard/notifications">
+							<Image
+								src="/icons/notification.svg"
+								alt="Notifications"
+								width={20}
+								height={20}
+								className="mr-4"
+							/>
+						</Link>
 						{brandProfile && (
 							<BrandProfileDropdown
 								brandProfile={brandProfile}

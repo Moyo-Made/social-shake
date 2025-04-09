@@ -24,6 +24,10 @@ type ApiResponse = {
 	exists?: boolean;
 };
 
+// Define types for validation
+type ValidationFunction = () => boolean;
+type ValidationSteps = Record<string, ValidationFunction>;
+
 const defaultFormData: ProjectFormData = {
 	projectDetails: {
 		projectName: "",
@@ -36,7 +40,7 @@ const defaultFormData: ProjectFormData = {
 
 	projectRequirements: {
 		contentType: "allow-applications",
-		platform: [""],
+		platform: [],
 		aspectRatio: "",
 		duration: "30-seconds",
 		videoType: "client-script",
@@ -83,7 +87,7 @@ const defaultFormData: ProjectFormData = {
 			creatorCount: 2,
 			videosPerCreator: 1,
 			totalVideos: 0,
-			countries: []
+			countries: [],
 		},
 		cost: {
 			budgetPerVideo: 0,
@@ -101,7 +105,7 @@ const defaultFormData: ProjectFormData = {
 			commissionPerSale: 0,
 		},
 	},
-	status: ""
+	status: "",
 };
 
 interface ProjectFormContextType {
@@ -110,11 +114,7 @@ interface ProjectFormContextType {
 	updateProjectRequirementsData: (data: Partial<ProjectRequirements>) => void;
 	updateCreatorPricing: (data: Partial<CreatorPricing>) => void;
 	saveDraft: () => Promise<ApiResponse>;
-	submitContest: (
-		formData: FormData,
-		userId?: string,
-		projectId?: string
-	) => Promise<ApiResponse>;
+	submitContest: () => Promise<ApiResponse>;
 	resetDraft: () => void;
 	draftSaved: boolean;
 	isLoading: boolean;
@@ -128,6 +128,9 @@ interface ProjectFormContextType {
 	setLoadSavedData: (load: boolean) => void;
 	// New function to start a fresh project
 	startNewProject: () => void;
+	// Added validation functionality
+	validateStep: (step: string, validationFn: ValidationFunction) => void;
+	validateAllSteps: () => boolean;
 }
 
 const ProjectFormContext = createContext<ProjectFormContextType | undefined>(
@@ -142,31 +145,28 @@ export const useProjectForm = () => {
 	return context;
 };
 
-
-
 export const ProjectFormProvider: React.FC<{
 	children: React.ReactNode;
 	userId?: string;
 	isNewProject?: boolean;
 }> = ({ children, userId, isNewProject = false }) => {
-		
 	const [formData, setFormData] = useState<ProjectFormData>(defaultFormData);
 	const [draftSaved, setDraftSaved] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	// New state to control whether to load saved data
 	const [loadSavedData, setLoadSavedData] = useState(!isNewProject);
+	// Add validation state
+	const [validationFunctions, setValidationFunctions] = useState<ValidationSteps>({});
 
 	// Get user-specific storage keys
 	const getStorageKeys = useCallback(() => {
-		const userPrefix = userId ? `user_${userId}_` : '';
+		const userPrefix = userId ? `user_${userId}_` : "";
 		return {
 			sessionKey: `${userPrefix}projectFormSession`,
-			localKey: `${userPrefix}projectFormDraft`
+			localKey: `${userPrefix}projectFormDraft`,
 		};
 	}, [userId]);
-
-	
 
 	// Load saved data on first render, but only if loadSavedData is true
 	useEffect(() => {
@@ -246,13 +246,55 @@ export const ProjectFormProvider: React.FC<{
 		saveCurrentState();
 	}, [formData, saveCurrentState]);
 
-	// New function to start a fresh project
+	// Function to fetch user preferences
+	const fetchUserPreferences = useCallback(async () => {
+		if (!userId) return;
+
+		try {
+			setIsLoading(true);
+			const response = await fetch(`/api/user-preferences?userId=${userId}`);
+			const result = await response.json();
+
+			if (response.ok && result.success && result.data) {
+				// Apply preferences to the default form data
+				const newFormData = { ...defaultFormData };
+
+				// Apply project requirements if available
+				if (result.data.projectRequirements) {
+					newFormData.projectRequirements = {
+						...newFormData.projectRequirements,
+						...result.data.projectRequirements,
+					};
+				}
+
+				// Apply creator pricing preferences if available
+				if (result.data.creatorPricing) {
+					newFormData.creatorPricing = {
+						...newFormData.creatorPricing,
+						...result.data.creatorPricing,
+					};
+				}
+
+				setFormData(newFormData);
+				console.log("Loaded user preferences:", result.data);
+			}
+		} catch (error) {
+			console.error("Error fetching user preferences:", error);
+		} finally {
+			setIsLoading(false);
+		}
+	}, [userId]);
+
+	// Update startNewProject to fetch preferences
 	const startNewProject = useCallback(() => {
 		setLoadSavedData(false);
 		setFormData(defaultFormData);
 		setDraftSaved(false);
 		setError(null);
-	}, []);
+
+		// Fetch and apply user preferences for the new project
+		fetchUserPreferences();
+	}, [fetchUserPreferences]);
 
 	const updateProjectDetails = useCallback((data: Partial<ProjectDetails>) => {
 		setFormData((prevData) => {
@@ -276,6 +318,12 @@ export const ProjectFormProvider: React.FC<{
 		setDraftSaved(false);
 	}, []);
 
+	useEffect(() => {
+		if (isNewProject && userId) {
+			fetchUserPreferences();
+		}
+	}, [isNewProject, userId, fetchUserPreferences]);
+
 	const updateProjectRequirementsData = useCallback(
 		(data: Partial<ProjectRequirements>) => {
 			setFormData((prev) => ({
@@ -295,107 +343,130 @@ export const ProjectFormProvider: React.FC<{
 		setDraftSaved(false);
 	}, []);
 
+	// Add validation functions
+	const validateStep = useCallback((step: string, validationFn: ValidationFunction) => {
+		setValidationFunctions(prev => ({
+			...prev,
+			[step]: validationFn
+		}));
+	}, []);
+
+	// Validate all steps
+	const validateAllSteps = useCallback(() => {
+		const results = Object.values(validationFunctions).map(fn => fn());
+		return results.every(result => result === true);
+	}, [validationFunctions]);
 
 	// Submission function
 	const submitContest = async (): Promise<ApiResponse> => {
 		setIsLoading(true);
 		setError(null);
-	  
-		try {
-		  // Add userId check
-		  if (!userId) {
-			throw new Error("User ID is required for submitting projects");
-		  }
-	  
-		  // Create FormData for submission without pre-determining the status
-		  const formDataForSubmission = new FormData();
-		  formDataForSubmission.append("userId", userId);
-	  
-		  // Add the complex objects from your state, properly stringified
-		  formDataForSubmission.append(
-			"projectDetails",
-			JSON.stringify(formData.projectDetails)
-		  );
-		  formDataForSubmission.append(
-			"projectRequirements",
-			JSON.stringify(formData.projectRequirements)
-		  );
-		  formDataForSubmission.append(
-			"creatorPricing",
-			JSON.stringify(formData.creatorPricing)
-		  );
-		  formDataForSubmission.append(
-			"projectType",
-			JSON.stringify(formData.projectDetails.projectType)
-		  );
-	  
-		  // Add the thumbnail file if it exists
-		  if (formData.projectDetails.projectThumbnail instanceof File) {
-			formDataForSubmission.append(
-			  "projectThumbnail",
-			  formData.projectDetails.projectThumbnail
-			);
-		  }
-		  
-		  // Add timestamps for sorting in dashboard
-		  formDataForSubmission.append(
-			"createdAt",
-			JSON.stringify(new Date().toISOString())
-		  );
-		  formDataForSubmission.append(
-			"updatedAt",
-			JSON.stringify(new Date().toISOString())
-		  );
-	  
-		  // Send the FormData to your API
-		  const response = await fetch("/api/projects", {
-			method: "POST",
-			body: formDataForSubmission,
-		  });
-	  
-		  // Parse the response
-		  const result = await response.json();
-		  console.log("Submission result:", result);
-	  
-		  if (!response.ok || !result.success) {
-			throw new Error(result.error || "Failed to create project");
-		  }
-	  
-		  // Update local form status with status from API response
-		  if (result.data && result.data.status) {
-			setFormData(prevData => ({
-			  ...prevData,
-			  status: result.data.status
-			}));
-		  }
-	  
-		  // Only clear saved data if we're not in draft mode
-		  if (result.data?.status !== "draft") {
-			const { localKey, sessionKey } = getStorageKeys();
-			localStorage.removeItem(localKey);
-			sessionStorage.removeItem(sessionKey);
-		  }
-	  
-		  setIsLoading(false);
-		  return result;
-		} catch (error) {
-		  console.error("Submission error:", error);
-		  setIsLoading(false);
-		  setError(
-			error instanceof Error
-			  ? error.message
-			  : "An error occurred during submission"
-		  );
-	  
-		  return {
-			success: false,
-			error:
-			  error instanceof Error
-				? error.message
-				: "An error occurred during submission",
-		  };
+
+		// First validate all steps
+		const isValid = validateAllSteps();
+		if (!isValid) {
+			setIsLoading(false);
+			return {
+				success: false,
+				error: "Please complete all required fields before submitting"
+			};
 		}
-	  };
+
+		try {
+			// Add userId check
+			if (!userId) {
+				throw new Error("User ID is required for submitting projects");
+			}
+
+			// Create FormData for submission without pre-determining the status
+			const formDataForSubmission = new FormData();
+			formDataForSubmission.append("userId", userId);
+
+			// Add the complex objects from your state, properly stringified
+			formDataForSubmission.append(
+				"projectDetails",
+				JSON.stringify(formData.projectDetails)
+			);
+			formDataForSubmission.append(
+				"projectRequirements",
+				JSON.stringify(formData.projectRequirements)
+			);
+			formDataForSubmission.append(
+				"creatorPricing",
+				JSON.stringify(formData.creatorPricing)
+			);
+			formDataForSubmission.append(
+				"projectType",
+				JSON.stringify(formData.projectDetails.projectType)
+			);
+
+			// Add the thumbnail file if it exists
+			if (formData.projectDetails.projectThumbnail instanceof File) {
+				formDataForSubmission.append(
+					"projectThumbnail",
+					formData.projectDetails.projectThumbnail
+				);
+			}
+
+			// Add timestamps for sorting in dashboard
+			formDataForSubmission.append(
+				"createdAt",
+				JSON.stringify(new Date().toISOString())
+			);
+			formDataForSubmission.append(
+				"updatedAt",
+				JSON.stringify(new Date().toISOString())
+			);
+
+			// Send the FormData to your API
+			const response = await fetch("/api/projects", {
+				method: "POST",
+				body: formDataForSubmission,
+			});
+
+			// Parse the response
+			const result = await response.json();
+			console.log("Submission result:", result);
+
+			if (!response.ok || !result.success) {
+				throw new Error(result.error || "Failed to create project");
+			}
+
+			// Update local form status with status from API response
+			if (result.data && result.data.status) {
+				setFormData((prevData) => ({
+					...prevData,
+					status: result.data.status,
+				}));
+			}
+
+			// Only clear saved data if we're not in draft mode
+			if (result.data?.status !== "draft") {
+				const { localKey, sessionKey } = getStorageKeys();
+				localStorage.removeItem(localKey);
+				sessionStorage.removeItem(sessionKey);
+			}
+
+			setIsLoading(false);
+			return result;
+		} catch (error) {
+			console.error("Submission error:", error);
+			setIsLoading(false);
+			setError(
+				error instanceof Error
+					? error.message
+					: "An error occurred during submission"
+			);
+
+			return {
+				success: false,
+				error:
+					error instanceof Error
+						? error.message
+						: "An error occurred during submission",
+			};
+		}
+	};
 
 	const saveDraft = async (): Promise<ApiResponse> => {
 		setIsLoading(true);
@@ -498,23 +569,26 @@ export const ProjectFormProvider: React.FC<{
 		}
 	};
 
-	const loadDraftData = useCallback((data: ContestFormData) => {
-		try {
-			// Create a deep copy to avoid reference issues
-			const processedData = JSON.parse(JSON.stringify(data));
-			processFormData(processedData);
+	const loadDraftData = useCallback(
+		(data: ContestFormData) => {
+			try {
+				// Create a deep copy to avoid reference issues
+				const processedData = JSON.parse(JSON.stringify(data));
+				processFormData(processedData);
 
-			// Save to both localStorage and sessionStorage
-			const { localKey, sessionKey } = getStorageKeys();
-			const dataString = JSON.stringify(processedData);
-			localStorage.setItem(localKey, dataString);
-			sessionStorage.setItem(sessionKey, dataString);
+				// Save to both localStorage and sessionStorage
+				const { localKey, sessionKey } = getStorageKeys();
+				const dataString = JSON.stringify(processedData);
+				localStorage.setItem(localKey, dataString);
+				sessionStorage.setItem(sessionKey, dataString);
 
-			console.log("Loaded draft data:", processedData);
-		} catch (error) {
-			console.error("Error loading draft data:", error);
-		}
-	}, [getStorageKeys]);
+				console.log("Loaded draft data:", processedData);
+			} catch (error) {
+				console.error("Error loading draft data:", error);
+			}
+		},
+		[getStorageKeys]
+	);
 
 	// Reset draft and storages
 	const resetDraft = useCallback(() => {
@@ -545,6 +619,8 @@ export const ProjectFormProvider: React.FC<{
 				loadSavedData,
 				setLoadSavedData,
 				startNewProject,
+				validateStep,
+				validateAllSteps,
 			}}
 		>
 			{children}
