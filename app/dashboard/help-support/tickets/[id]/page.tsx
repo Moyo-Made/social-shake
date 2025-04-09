@@ -1,17 +1,13 @@
 import SideNavLayout from "@/components/brandProfile/dashboard/SideNav";
 import React from "react";
-import TicketDetailWrapper from "./TicketDetailsWrapper";
+import TicketDetailContainer from "./TicketDetailContainer";
 
-export default function Page({
-  params,
-}: {
-  params: { id: string };
-  searchParams?: Record<string, string | string[] | undefined>;
-}) {
+
+export default function TicketPage() {
   return (
     <SideNavLayout>
       <div className="w-full p-6">
-        <TicketDetailWrapper id={params.id} />
+        <TicketDetailContainer />
       </div>
     </SideNavLayout>
   );

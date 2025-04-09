@@ -16,13 +16,11 @@ import { ArrowLeft, Send, Paperclip } from "lucide-react";
 import Link from "next/link";
 
 interface TicketDetailProps {
-	params: {
-	  id: string;
-	};
+	ticketId: string;
   }
 
-  export default function TicketDetail({ params }: TicketDetailProps) {
-	const ticketId = params.id;
+  export default function TicketDetail({ ticketId }: TicketDetailProps) {
+
 	const router = useRouter();
 	const { user } = useAuth();
 
