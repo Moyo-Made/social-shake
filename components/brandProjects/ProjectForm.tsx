@@ -65,6 +65,15 @@ const ProjectFormContent = () => {
 				setValidationError("Project description is required");
 				return false;
 			}
+
+			if(
+				!formData.projectDetails.projectThumbnail ||
+				(formData.projectDetails.projectThumbnail instanceof File &&
+					formData.projectDetails.projectThumbnail.size === 0)
+			) {
+				setValidationError("Project thumbnail is required");
+				return false;
+			}
 			
 			return true;
 		});
@@ -179,6 +188,15 @@ const ProjectFormContent = () => {
 			setValidationError("Project description is required");
 			return false;
 		}
+
+		if(
+				!formData.projectDetails.projectThumbnail ||
+				(formData.projectDetails.projectThumbnail instanceof File &&
+					formData.projectDetails.projectThumbnail.size === 0)
+			) {
+				setValidationError("Project thumbnail is required");
+				return false;
+			}
 		
 		return true;
 	};
