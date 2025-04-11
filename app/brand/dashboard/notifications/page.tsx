@@ -2,7 +2,7 @@
 
 import { NextPage } from "next";
 import { useAuth } from "@/context/AuthContext";
-import NotificationPreferences from "@/components/settings/notification/NotificationsPreferences";
+import NotificationPreferences from "@/components/brand/settings/notification/NotificationsPreferences";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import SideNavLayout from "@/components/brand/brandProfile/dashboard/SideNav";
