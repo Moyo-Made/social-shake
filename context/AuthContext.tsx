@@ -79,9 +79,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       // Create the user
       await createUserWithEmailAndPassword(auth, email, password);
-      
-      // Redirect to success page
-      router.push(`/account-successfully-created`);
     } catch (err) {
       console.error(err);
       if (err instanceof Error) {
@@ -99,7 +96,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-      router.push("/account-successfully-created");
     } catch (err) {
       console.error(err);
       if (err instanceof Error) {

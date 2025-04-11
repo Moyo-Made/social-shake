@@ -1,4 +1,4 @@
-import { Incentive } from "@/components/brandProfile/dashboard/newContest/ContestFormContext";
+import { Incentive } from "@/components/brand/brandProfile/dashboard/newContest/ContestFormContext";
 
 export interface BasicFormData {
 	contestName: string;
@@ -115,25 +115,25 @@ interface CreatorSelection {
 	creatorCount: number;
 	videosPerCreator: number;
 	totalVideos: number;
-  }
+}
 
-  interface Extras {
+interface Extras {
 	music: boolean;
 	musicPrice: number;
 	musicTotal: number;
 	rawFiles: boolean;
 	rawFilesPrice: number;
 	rawFilesTotal: number;
-  }
+}
 
-  interface CostBreakdown {
+interface CostBreakdown {
 	budgetPerVideo: number;
 	totalBudget: number;
 	extras: Extras;
 	extrasTotal: number;
 	totalAmount: number;
 	commissionPerSale: number;
-  }
+}
 
 export interface ProjectFormData {
 	status: string;

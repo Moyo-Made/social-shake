@@ -16,7 +16,7 @@ export default function DashboardProtectedRoute({ children }: { children: React.
         setIsAuthorized(true);
       } else {
         // Redirect to login if no authenticated user
-        router.replace('/login');
+        router.replace('/');
       }
     }
   }, [user, loading, router]);

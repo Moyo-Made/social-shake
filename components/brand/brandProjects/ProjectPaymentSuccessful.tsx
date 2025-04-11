@@ -1,9 +1,9 @@
 import React from "react";
-import SideNavLayout from "../brand/brandProfile/dashboard/SideNav";
+import SideNavLayout from "../brandProfile/dashboard/SideNav";
 import Image from "next/image";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "../../ui/button";
+import { Card, CardContent, CardHeader } from "../../ui/card";
 import { FaArrowRight } from "react-icons/fa6";
 
 const ProjectPaymentSuccessful = () => {

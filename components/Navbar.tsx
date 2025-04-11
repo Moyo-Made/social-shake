@@ -5,13 +5,13 @@ import Link  from "next/link";
 
 const Navbar = () => {
 	return (
-		<nav className="w-full px-4 md:px-12 lg:px-16 py-4 flex justify-between items-center">
+		<nav className="w-full px-4 md:px-12 lg:px-16 py-4 flex justify-between items-center border-b border-[#667085]">
 			<Link href="/" className="flex items-center">
 				<Image
 					src="/images/logo.svg"
 					alt="Social Shake logo"
-					width={100}
-					height={100}
+					width={80}
+					height={80}
 				/>
 			</Link>
 			<Button

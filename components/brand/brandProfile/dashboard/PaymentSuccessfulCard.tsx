@@ -1,14 +1,13 @@
 import React from "react";
-import SideNavLayout from "../brand/brandProfile/dashboard/SideNav";
 import Image from "next/image";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "../../../ui/button";
+import { Card, CardContent, CardHeader } from "../../../ui/card";
 import { FaArrowRight } from "react-icons/fa6";
 
-const ProjectPaymentSuccessful = () => {
+const PaymentSuccessfulCard = () => {
 	return (
-		<SideNavLayout>
+		<>
 			{/* Dark Overlay */}
 			<div className="absolute inset-0 bg-black/50" />
 
@@ -22,26 +21,26 @@ const ProjectPaymentSuccessful = () => {
 							width={80}
 							height={80}
 						/>
-						<h1 className="text-lg md:text-xl lg:text-2xl text-gray-900 font-semibold lg:leading-10">
-							Project Payment Confirmed
+						<h1 className="text-xl md:text-2xl lg:text-3xl text-gray-900 font-semibold lg:leading-10">
+							Contest Payment Confirmed
 						</h1>
 						<p className="w-full mb-5 text-sm md:text-base text-gray-600 font-normal">
-							Your Project is live and will start receiving applications
+							Your Contest is live and will start receiving applications
 						</p>
 					</CardHeader>
 					<CardContent>
 						{/* Submit Button */}
 						<Button className="flex justify-center items-center bg-[#FD5C02] hover:bg-orange-600 text-white text-[17px] py-5 font-normal mx-auto">
-							<Link href="/brand/dashboard/projects" className="flex">
-								<p>View Projects</p>{" "}
+							<Link href="/brand/dashboard/contests" className="flex">
+								<p>View Contest</p>{" "}
 								<FaArrowRight className="w-5 h-5 ml-2 mt-1.5" />
 							</Link>
 						</Button>
 					</CardContent>
 				</Card>
 			</div>
-		</SideNavLayout>
+		</>
 	);
 };
 
-export default ProjectPaymentSuccessful;
+export default PaymentSuccessfulCard;
