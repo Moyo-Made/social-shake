@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      router.push("/dashboard");
+      router.push("/brand/dashboard");
     } catch (err) {
       console.error(err);
       if (err instanceof Error) {
@@ -130,7 +130,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
       await signOut(auth);
-      router.push("/login");
+      router.push("/brand/login");
     } catch (err) {
       console.error(err);
       if (err instanceof Error) {

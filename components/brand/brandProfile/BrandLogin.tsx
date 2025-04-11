@@ -255,7 +255,7 @@ const Login = () => {
 						</form>
 
 						<Link
-							href="/forgot-password"
+							href="/brand/forgot-password"
 							className="flex justify-center items-center text-sm md:text-base text-[#000] hover:underline"
 						>
 							<p className="pt-1">Forgot Password?</p>
@@ -266,7 +266,7 @@ const Login = () => {
 								Don&apos;t have an account?
 							</p>
 							<Link
-								href="/signup"
+								href="/brand/signup"
 								className="text-[#FD5C02] hover:underline text-sm md:text-base"
 							>
 								Sign up
