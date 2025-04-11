@@ -10,15 +10,31 @@ import { useRouter } from "next/navigation";
 
 const BusinessSignup = () => {
 	const { loginWithGoogle, loading } = useAuth();
-	const router = useRouter()
+	const router = useRouter();
 
 	const handleGoogleSignup = async () => {
-		await loginWithGoogle();
-		router.push("/brand/account-created")
-	};
+		try {
+		  const { isExistingAccount } = await loginWithGoogle();
+		  
+		  // Navigate based on whether it's a new user or existing user
+		  if (!isExistingAccount) {
+			router.push("/brand/account-created");
+		  } else {
+			router.push("/brand/dashboard");
+		  }
+		} catch (error) {
+		  console.error("Google signup error:", error);
+		  // Handle any errors here
+		}
+	  };
 
 	// const handleFacebookSignup = async () => {
-	// 	await loginWithFacebook();
+	// 	try {
+	//     await loginWithFacebook();
+	//     router.push("/brand/account-created");
+	//   } catch (error) {
+	//     console.error("Facebook signup error:", error);
+	//   }
 	// };
 
 	return (

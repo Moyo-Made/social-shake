@@ -18,8 +18,8 @@ import {
   GoogleAuthProvider,
   FacebookAuthProvider,
   User,
+  getAdditionalUserInfo
 } from "firebase/auth";
-import { useRouter } from "next/navigation";
 
 type AuthContextType = {
   user: User | null;
@@ -27,7 +27,7 @@ type AuthContextType = {
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
+  loginWithGoogle: () => Promise<{ isExistingAccount: boolean }>;
   loginWithFacebook: () => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -42,7 +42,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -61,7 +60,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      router.push("/brand/dashboard");
     } catch (err) {
       console.error(err);
       if (err instanceof Error) {
@@ -91,11 +89,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+
   const loginWithGoogle = async () => {
     setLoading(true);
     const provider = new GoogleAuthProvider();
+    let isNewUser = false;
+    
     try {
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      // Get additional info including isNewUser flag
+      const additionalInfo = getAdditionalUserInfo(result);
+      isNewUser = additionalInfo?.isNewUser ?? false;
     } catch (err) {
       console.error(err);
       if (err instanceof Error) {
@@ -106,14 +110,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
+    
+    return { isExistingAccount: !isNewUser };
   };
 
   const loginWithFacebook = async () => {
     setLoading(true);
-    const provider = new FacebookAuthProvider();
     try {
+      const provider = new FacebookAuthProvider();
       await signInWithPopup(auth, provider);
-      router.push("/account-successfully-created");
     } catch (err) {
       console.error(err);
       if (err instanceof Error) {
@@ -130,7 +135,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
       await signOut(auth);
-      router.push("/brand/login");
     } catch (err) {
       console.error(err);
       if (err instanceof Error) {

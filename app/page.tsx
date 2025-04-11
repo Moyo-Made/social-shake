@@ -31,7 +31,7 @@ export default function SignupOptions() {
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
         {/* Creator Button */}
-        <Link href="/brand/creator" className="flex items-center">
+        <Link href="/creator/signup" className="flex items-center">
         <button 
           className={`group relative flex items-center justify-between p-6 rounded-lg transition-all duration-300 ${
             hoveredButton === 'creator' 

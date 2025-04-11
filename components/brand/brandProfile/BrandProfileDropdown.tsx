@@ -60,7 +60,7 @@ const BrandProfileDropdown: React.FC<BrandProfileDropdownProps> = ({
 	const handleLogout = async () => {
 		try {
 			await logout();
-			router.push("/login");
+			router.push("/brand/login");
 		} catch (error) {
 			console.error("Logout failed:", error);
 		}
