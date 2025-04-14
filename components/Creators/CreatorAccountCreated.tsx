@@ -36,7 +36,7 @@ const CreatorAccountCreated = () => {
 					<CardContent>
 						{/* Submit Button */}
 						<Button className="w-full bg-[#FD5C02] hover:bg-orange-600 text-white text-[17px] py-5 font-normal">
-							<Link href="" className="flex">
+							<Link href="/creator/verify-identity" className="flex">
 								<p>Complete Verification</p>{" "}
 								<FaArrowRight className="w-5 h-5 ml-2 mt-1.5" />
 							</Link>

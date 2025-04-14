@@ -52,19 +52,24 @@ interface ValidationErrors {
 
 const BrandProfileForm = () => {
   const router = useRouter();
-  const { user } = useAuth();
+  const { currentUser } = useAuth();
+  
+  // Initialize with mode 'create' to prevent loading existing profile data by default
+  // We'll switch to 'edit' mode if we detect an existing profile later
   const {
     brandProfile,
     loading,
     error: hookError,
     updateBrandProfile,
-  } = useBrandProfile();
+    setProfileMode,
+    mode
+  } = useBrandProfile('create');
 
   // Initialize form state with empty values
   const [formData, setFormData] = useState<BrandProfileData>({
     brandName: "",
     phoneNumber: "",
-    email: user?.email || "",
+    email:  currentUser?.email || "",
     address: "",
     website: "",
     industry: "",
@@ -76,7 +81,7 @@ const BrandProfileForm = () => {
       facebook: "",
     },
     targetAudience: "",
-    userId: user?.uid,
+    userId: currentUser?.uid,
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -86,6 +91,31 @@ const BrandProfileForm = () => {
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  
+// Effect to check for existing profile on initial load
+useEffect(() => {
+  const checkExistingProfile = async () => {
+    // Only proceed if we have a current user
+    if (currentUser?.uid) {
+      try {
+        // Try to fetch the profile using the API endpoint
+        const apiUrl = `/api/brand-profile?userId=${encodeURIComponent(currentUser.uid)}`;
+        const response = await fetch(apiUrl);
+        
+        // Only switch to edit mode if we successfully found a profile
+        if (response.ok) {
+          setProfileMode('edit');
+        }
+        // Otherwise remain in 'create' mode
+      } catch (error) {
+        console.error("Error checking for existing profile:", error);
+        // If there's an error, stay in 'create' mode
+      }
+    }
+  };
+  
+  checkExistingProfile();
+}, [currentUser?.uid]);
 
   // Update form data when brandProfile is loaded
   useEffect(() => {
@@ -100,7 +130,7 @@ const BrandProfileForm = () => {
       setFormData({
         brandName: brandProfile.brandName || "",
         phoneNumber: brandProfile.phoneNumber || "",
-        email: brandProfile.email || user?.email || "",
+        email: brandProfile.email || currentUser?.email || "",
         address: brandProfile.address || "",
         website: brandProfile.website || "",
         industry: brandProfile.industry || "",
@@ -110,7 +140,7 @@ const BrandProfileForm = () => {
         otherGoal: brandProfile.otherGoal || "",
         socialMedia: socialMediaData,
         targetAudience: brandProfile.targetAudience || "",
-        userId: user?.uid,
+        userId: currentUser?.uid,
       });
 
       // Set logo preview if available
@@ -118,7 +148,7 @@ const BrandProfileForm = () => {
         setLogoPreview(brandProfile.logoUrl);
       }
     }
-  }, [brandProfile, user]);
+  }, [brandProfile, currentUser]);
 
   // Set error from hook
   useEffect(() => {
@@ -264,6 +294,31 @@ const BrandProfileForm = () => {
     setTouched((prev) => ({ ...prev, [name]: true }));
   };
 
+  // Reset form and switch to create mode
+  const handleCreateNewProfile = () => {
+    setProfileMode('create');
+    setFormData({
+      brandName: "",
+      phoneNumber: "",
+      email: currentUser?.email || "",
+      address: "",
+      website: "",
+      industry: "",
+      logo: null,
+      marketingGoal: "",
+      socialMedia: {
+        tiktok: "",
+        instagram: "",
+        facebook: "",
+      },
+      targetAudience: "",
+      userId: currentUser?.uid,
+    });
+    setSelectedFile(null);
+    setLogoPreview(null);
+    setTouched({});
+  };
+
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -328,8 +383,8 @@ const BrandProfileForm = () => {
       );
 
       // Add userId if available
-      if (user?.uid) {
-        formDataToSubmit.append("userId", user.uid);
+      if (currentUser?.uid) {
+        formDataToSubmit.append("userId", currentUser.uid);
       }
 
       // Add logo if selected
@@ -381,10 +436,23 @@ const BrandProfileForm = () => {
     <>
       <div className="w-full border-t border-[#1A1A1A]" />
       <div className="w-full max-w-2xl mx-auto p-12 font-satoshi mb-12">
+        {/* Add option to create new profile if editing existing one */}
+        {mode === 'edit' && brandProfile && (
+          <div className="mb-6 flex justify-end">
+            <Button
+              type="button"
+              className="bg-gray-200 hover:bg-gray-300 text-black text-sm py-2"
+              onClick={handleCreateNewProfile}
+            >
+              Create New Profile
+            </Button>
+          </div>
+        )}
+        
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <h1 className="text-xl md:text-2xl font-bold">
-              {formData.brandName
+              {mode === 'edit' && brandProfile 
                 ? "Update Your Brand Profile"
                 : "Complete Your Brand Profile"}
             </h1>
@@ -774,7 +842,7 @@ const BrandProfileForm = () => {
               ) : (
                 <>
                   <p>
-                    {formData.brandName
+                    {mode === 'edit' && brandProfile
                       ? "Update Profile"
                       : "Submit Registration"}
                   </p>

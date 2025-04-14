@@ -22,7 +22,7 @@ interface TicketDetailProps {
   export default function TicketDetail({ ticketId }: TicketDetailProps) {
 
 	const router = useRouter();
-	const { user } = useAuth();
+	const { currentUser } = useAuth();
 
 	interface Ticket {
 		id: string;
@@ -55,8 +55,8 @@ interface TicketDetailProps {
 					const data = ticketSnap.data();
 					// Verify user owns the ticket or is admin
 					if (
-						data.userId === user?.uid ||
-						(user as { uid: string; role?: string }).role === "admin"
+						data.userId === currentUser?.uid ||
+						(currentUser as { uid: string; role?: string }).role === "admin"
 					) {
 						setTicket({
 							id: ticketSnap.id,
@@ -88,7 +88,7 @@ interface TicketDetailProps {
 		};
 
 		fetchTicket();
-	}, [ticketId, user, router]);
+	}, [ticketId, currentUser, router]);
 
 	const sendMessage = async (e: { preventDefault: () => void }) => {
 		e.preventDefault();
@@ -100,8 +100,8 @@ interface TicketDetailProps {
 			await updateDoc(ticketRef, {
 				messages: arrayUnion({
 					content: message,
-					sender: user?.displayName ?? user?.email ?? "Unknown Sender",
-					senderId: user?.uid,
+					sender: currentUser?.displayName ?? currentUser?.email ?? "Unknown Sender",
+					senderId: currentUser?.uid,
 					timestamp: Timestamp.now(),
 				}),
 				lastUpdated: Timestamp.now(),
@@ -111,7 +111,7 @@ interface TicketDetailProps {
 			// Update local state
 			setTicket((prev) => {
 				if (!prev) return prev;
-				if (!user) return prev;
+				if (!currentUser) return prev;
 
 				return {
 					...prev,
@@ -119,8 +119,8 @@ interface TicketDetailProps {
 						...(prev.messages || []),
 						{
 							content: message,
-							sender: user.displayName ?? user.email ?? "Unknown Sender",
-							senderId: user.uid,
+							sender: currentUser.displayName ?? currentUser.email ?? "Unknown Sender",
+							senderId: currentUser.uid,
 							timestamp: Timestamp.now(),
 						},
 					],
@@ -286,7 +286,7 @@ interface TicketDetailProps {
 					{/* Message history */}
 					{ticket.messages &&
 						ticket.messages.map((msg, index) => {
-							const isUser = msg.senderId === user?.uid;
+							const isUser = msg.senderId === currentUser?.uid;
 
 							return (
 								<div

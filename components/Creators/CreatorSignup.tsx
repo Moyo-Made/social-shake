@@ -11,12 +11,22 @@ import { useRouter } from "next/navigation";
 const CreatorSignup = () => {
 	const { loginWithGoogle, loading } = useAuth();
 	const router = useRouter();
-	const handleGoogleSignup = async () => {
-		await loginWithGoogle();
-		router.push("/creator/account-created");
-	
-	};
 
+	const handleGoogleSignup = async () => {
+		try {
+		  const { isExistingAccount } = await loginWithGoogle();
+		  
+		  // Navigate based on whether it's a new user or existing user
+		  if (!isExistingAccount) {
+			router.push("/creator/account-created");
+		  } else {
+			router.push("/creator/dashboard");
+		  }
+		} catch (error) {
+		  console.error("Google signup error:", error);
+		  // Handle any errors here
+		}
+	  };
 	return (
 		<main className="relative overflow-hidden min-h-screen">
 			<div className="absolute inset-0">
@@ -54,7 +64,7 @@ const CreatorSignup = () => {
 							your audience with exciting brand collaborations.
 						</p>
 						<div className="flex space-x-1">
-							<p className="text-gray-600 font-medium text-sm md:text-base">
+							<p className="text-gray-600 text-sm md:text-base">
 								Already have an account?
 							</p>
 							<Link
@@ -68,7 +78,7 @@ const CreatorSignup = () => {
 					<CardContent className="space-y-3">
 						<Button className="w-full bg-[#FD5C02] hover:bg-orange-600 text-white text-base md:text-[17px] py-5 font-normal">
 							<Link
-								href="/creators/create-account"
+								href="/creator/create-account"
 								className="flex items-center justify-center gap-2 w-full"
 							>
 								Sign up with Email

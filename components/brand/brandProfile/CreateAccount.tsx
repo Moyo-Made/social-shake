@@ -8,11 +8,9 @@ import { Label } from "../../ui/label";
 import { Input } from "../../ui/input";
 import { FaArrowRight, FaArrowLeft } from "react-icons/fa6";
 import { Button } from "../../ui/button";
-import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 
 const CreateAccount = () => {
-	const { signup, error: authError, loading, clearError } = useAuth();
 	const [formData, setFormData] = useState({
 		firstName: "",
 		lastName: "",
@@ -20,50 +18,13 @@ const CreateAccount = () => {
 		password: "",
 	});
 	const [formError, setFormError] = useState<string | null>(null);
-	const [fieldErrors, setFieldErrors] = useState<{
-		firstName?: string;
-		lastName?: string;
-		email?: string;
-		password?: string;
-	}>({});
+	const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [emailChecking, setEmailChecking] = useState(false);
 	const router = useRouter();
 
-	// Map auth errors to form errors when they occur
-	useEffect(() => {
-		if (authError) {
-			// Map Firebase error messages to user-friendly messages and fields
-			let errorMessage = authError;
-
-			if (authError.includes("email-already-in-use")) {
-				errorMessage =
-					"This email address is already in use. Please use a different email or login.";
-				setFieldErrors((prev) => ({
-					...prev,
-					email: "This email address is already in use.",
-				}));
-			} else if (authError.includes("invalid-email")) {
-				errorMessage = "Please enter a valid email address.";
-				setFieldErrors((prev) => ({
-					...prev,
-					email: "Please enter a valid email address.",
-				}));
-			} else if (authError.includes("weak-password")) {
-				errorMessage =
-					"Your password is too weak. Please choose a stronger password.";
-				setFieldErrors((prev) => ({
-					...prev,
-					password: "Please choose a stronger password.",
-				}));
-			}
-
-			setFormError(errorMessage);
-			setIsSubmitting(false);
-		}
-	}, [authError]);
-
 	// Clear form errors when inputs change
-	const handleChange = (e: { target: { id: string; value: string } }) => {
+	const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const { id, value } = e.target;
 		setFormData({
 			...formData,
@@ -71,31 +32,69 @@ const CreateAccount = () => {
 		});
 
 		// Clear field-specific error when that field changes
-		if (fieldErrors[id as keyof typeof fieldErrors]) {
-			setFieldErrors((prev) => ({
-				...prev,
-				[id]: undefined,
-			}));
+		if (fieldErrors[id]) {
+			setFieldErrors((prev) => {
+				const newErrors = { ...prev };
+				delete newErrors[id];
+				return newErrors;
+			});
 		}
 
 		// Clear general error message when any field changes
 		if (formError) {
 			setFormError(null);
 		}
-
-		// Clear auth errors when form changes
-		if (authError) {
-			clearError();
-		}
 	};
 
+	// Check if email is already registered with debouncing
+	useEffect(() => {
+		const checkEmail = async () => {
+			if (!formData.email || !/\S+@\S+\.\S+/.test(formData.email)) return;
+
+			setEmailChecking(true);
+			try {
+				const response = await fetch(
+					`/api/check-email?email=${encodeURIComponent(formData.email)}`
+				);
+				const data = await response.json();
+
+				if (!response.ok) {
+					console.error("Email check error:", data.error);
+					return;
+				}
+
+				if (data.exists) {
+					setFieldErrors((prev) => ({
+						...prev,
+						email:
+							"This email address is already in use. Please log in instead.",
+					}));
+				} else {
+					// Clear email error if it exists
+					setFieldErrors((prev) => {
+						const newErrors = { ...prev };
+						delete newErrors.email;
+						return newErrors;
+					});
+				}
+			} catch (error) {
+				console.error("Error checking email:", error);
+			} finally {
+				setEmailChecking(false);
+			}
+		};
+
+		const timeoutId = setTimeout(() => {
+			if (formData.email) {
+				checkEmail();
+			}
+		}, 500); // 500ms debounce
+
+		return () => clearTimeout(timeoutId);
+	}, [formData.email]);
+
 	const validateForm = (): boolean => {
-		const errors: {
-			firstName?: string;
-			lastName?: string;
-			email?: string;
-			password?: string;
-		} = {};
+		const errors: Record<string, string> = {};
 		let isValid = true;
 
 		// Validate first name
@@ -132,12 +131,11 @@ const CreateAccount = () => {
 		return isValid;
 	};
 
-	const handleSubmit = async (e: { preventDefault: () => void }) => {
+	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 
 		// Clear previous errors
 		setFormError(null);
-		clearError();
 
 		// Validate the form
 		if (!validateForm()) {
@@ -148,11 +146,36 @@ const CreateAccount = () => {
 		setIsSubmitting(true);
 
 		try {
-			// Attempt to sign up
-			await signup(formData.email, formData.password);
-			router.push("/brand/account-created");
-		} catch (err: unknown) {
-			// This catches any errors not handled by the auth context
+			// Check for email availability first
+			const emailResponse = await fetch(
+				`/api/check-email?email=${encodeURIComponent(formData.email)}`
+			);
+			const emailData = await emailResponse.json();
+			
+			if (emailData.exists) {
+				setFieldErrors((prev) => ({
+					...prev,
+					email: "This email address is already in use. Please log in instead.",
+				}));
+				setFormError("This email address is already in use. Please log in instead.");
+				setIsSubmitting(false);
+				return;
+			}
+
+			// CHANGE: Instead of creating user immediately, store the signup data in localStorage
+			// This will be used later when the user completes their brand profile
+			localStorage.setItem("pendingSignup", JSON.stringify({
+				email: formData.email,
+				password: formData.password,
+				firstName: formData.firstName,
+				lastName: formData.lastName,
+				userType: "brand",
+				timestamp: new Date().toISOString()
+			}));
+
+			// Direct the user to complete their profile
+			router.push("/brand/complete-profile");
+		} catch (err) {
 			console.error("Signup error:", err);
 			if (err instanceof Error) {
 				setFormError(err.message || "An error occurred during signup");
@@ -164,7 +187,7 @@ const CreateAccount = () => {
 	};
 
 	// Use combined loading state from auth and local form state
-	const isLoading = loading || isSubmitting;
+	const isLoading = isSubmitting;
 
 	return (
 		<main className="relative min-h-screen overflow-y-auto">
@@ -219,7 +242,19 @@ const CreateAccount = () => {
 						</div>
 					</CardHeader>
 
-					<CardContent className="space-y-2">
+					<CardContent className="space-y-3 md:space-y-4">
+						{/* General Form Error */}
+						{formError && (
+							<div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-md mb-4">
+								<p className="text-sm">
+									{formError}
+									{formError.includes("already in use") && (
+										<> <Link href="/brand/login" className="text-[#FD5C02] font-medium hover:underline">Log in here</Link></>
+									)}
+								</p>
+							</div>
+						)}
+						
 						<form onSubmit={handleSubmit} noValidate>
 							{/* Name Fields Row */}
 							<div className="grid grid-cols-2 gap-4">
@@ -233,7 +268,7 @@ const CreateAccount = () => {
 										value={formData.firstName}
 										onChange={handleChange}
 										placeholder="Enter your first name"
-										className={`w-full placeholder:text-sm md:py-3 ${
+										className={`w-full placeholder:text-sm py-3 ${
 											fieldErrors.firstName
 												? "border-red-500 focus:ring-red-500"
 												: ""
@@ -272,7 +307,7 @@ const CreateAccount = () => {
 							</div>
 
 							{/* Email Field */}
-							<div className="space-y-1 mt-3">
+							<div className="space-y-1 mt-3 md:mt-4">
 								<Label htmlFor="email" className="text-sm font-medium">
 									Email <span className="text-red-500">*</span>
 								</Label>
@@ -292,10 +327,15 @@ const CreateAccount = () => {
 										{fieldErrors.email}
 									</p>
 								)}
+								{emailChecking && (
+									<p className="text-blue-500 text-sm mt-1">
+										Checking email availability...
+									</p>
+								)}
 							</div>
 
 							{/* Password Field */}
-							<div className="space-y-1 pb-4 mt-2">
+							<div className="space-y-1 mt-3 md:mt-4">
 								<Label htmlFor="password" className="text-sm font-medium">
 									Password <span className="text-red-500">*</span>
 								</Label>
@@ -327,16 +367,16 @@ const CreateAccount = () => {
 							{/* Submit Button */}
 							<Button
 								type="submit"
-								disabled={isLoading}
-								className={`w-full bg-[#FD5C02] hover:bg-orange-600 text-white text-[17px] py-5 font-normal ${
-									isLoading ? "opacity-50 cursor-not-allowed" : ""
+								disabled={isLoading || Object.keys(fieldErrors).length > 0}
+								className={`w-full bg-[#FD5C02] hover:bg-orange-600 text-white text-[17px] py-5 font-normal mt-4 ${
+									isLoading || Object.keys(fieldErrors).length > 0 ? "opacity-50 cursor-not-allowed" : ""
 								}`}
 							>
 								{isLoading ? (
-									"Creating account..."
+									"Processing..."
 								) : (
 									<>
-										Create Account{" "}
+										Continue to Profile Setup{" "}
 										<FaArrowRight className="w-5 h-5 ml-2 mt-0.5" />
 									</>
 								)}
@@ -351,6 +391,7 @@ const CreateAccount = () => {
 								<Link href="#" className="text-[#FD5C02] underline">
 									Terms of Use
 								</Link>
+								.
 							</p>
 						</form>
 					</CardContent>

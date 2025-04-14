@@ -88,7 +88,7 @@ export default function UserDashboard({ userId }: UserDashboardProps) {
 	if (loading) {
 		return (
 			<div className="flex flex-col justify-center items-center h-64">
-				<div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
+				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
 				<p>Loading dashboard..</p>
 			</div>
 		);
@@ -97,7 +97,7 @@ export default function UserDashboard({ userId }: UserDashboardProps) {
 	if (!userData) {
 		return (
 			<div className="text-center p-8">
-				<EmptyContest />
+				<EmptyContest userId={userId} />
 			</div>
 		);
 	}

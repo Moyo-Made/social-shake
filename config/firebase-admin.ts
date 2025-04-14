@@ -34,7 +34,7 @@ function initializeFirebaseAdmin() {
           : undefined
       }),
       // Optional: Add storage bucket if needed
-      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     });
 
     return app;

@@ -12,7 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 
 const Login = () => {
-	const { login, error: authError, loading, clearError } = useAuth();
+	const { login, error: authError, isLoading, clearError } = useAuth();
 	const [formData, setFormData] = useState({
 		email: "",
 		password: "",
@@ -22,7 +22,7 @@ const Login = () => {
 		email?: string;
 		password?: string;
 	}>({});
-	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [, setIsSubmitting] = useState(false);
 	const router = useRouter();
 
 	// Map auth errors to user-friendly form errors when they occur
@@ -136,7 +136,7 @@ const Login = () => {
 		try {
 			// Attempt to log in
 			await login(formData.email, formData.password);
-			router.push("/brand/login");
+			router.push("/brand/dashboard");
 		} catch (err: unknown) {
 			// This catches any errors not handled by the auth context
 			console.error("Login error:", err);
@@ -144,9 +144,6 @@ const Login = () => {
 			setIsSubmitting(false);
 		}
 	};
-
-	// Use combined loading state from auth and local form state
-	const isLoading = loading || isSubmitting;
 
 	return (
 		<main className="relative overflow-hidden min-h-screen">

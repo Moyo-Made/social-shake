@@ -332,6 +332,34 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    
+    // Only check brand approval for final submissions, not drafts
+    if (!isDraft) {
+      // Get the user's brand profile to check approval status
+      const brandsSnapshot = await adminDb.collection("brandProfiles")
+        .where("userId", "==", userId)
+        .limit(1)
+        .get();
+        
+      if (!brandsSnapshot.empty) {
+        const brandDoc = brandsSnapshot.docs[0];
+        const brandData = brandDoc.data();
+        
+        // Check if brand is approved
+        if (brandData.status !== "approved") {
+          return NextResponse.json({ 
+            error: "brand_not_approved", 
+            message: "Your brand profile must be approved before creating contests." 
+          }, { status: 403 });
+        }
+      } else {
+        // No brand profile found
+        return NextResponse.json({ 
+          error: "brand_profile_missing", 
+          message: "You need to create a brand profile and get it approved before creating contests." 
+        }, { status: 403 });
+      }
+    }
 
     // Check if this is a draft save or a final submission
     if (isDraft) {

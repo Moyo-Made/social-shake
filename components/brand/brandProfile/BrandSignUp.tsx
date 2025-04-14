@@ -1,32 +1,46 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "../../ui/button";
 import { Card, CardContent, CardHeader } from "../../ui/card";
 import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
+import { Alert, AlertDescription } from "@/components/ui/alert"; // Make sure these components exist
 
 const BusinessSignup = () => {
-	const { loginWithGoogle, loading } = useAuth();
+	const { loginWithGoogle } = useAuth();
 	const router = useRouter();
+	const [error, setError] = useState("");
+	const [isLoading, setIsLoading] = useState(false);
 
 	const handleGoogleSignup = async () => {
 		try {
+		  setError(""); 
+		  setIsLoading(true);
+		  
+		  // Wait for the Google login to complete
 		  const { isExistingAccount } = await loginWithGoogle();
 		  
-		  // Navigate based on whether it's a new user or existing user
-		  if (!isExistingAccount) {
-			router.push("/brand/account-created");
-		  } else {
-			router.push("/brand/dashboard");
-		  }
+		  // Add a small delay to ensure auth state is fully processed
+		  setTimeout(() => {
+			// Navigate based on whether it's a new user or existing user
+			if (!isExistingAccount) {
+			  router.push("/brand/account-created");
+			} else {
+			  router.push("/brand/dashboard");
+			}
+			setIsLoading(false);
+		  }, 500);
+		  
 		} catch (error) {
 		  console.error("Google signup error:", error);
-		  // Handle any errors here
+		  setIsLoading(false);
+		  // Your existing error handling...
 		}
 	  };
+
 
 	// const handleFacebookSignup = async () => {
 	// 	try {
@@ -79,13 +93,27 @@ const BusinessSignup = () => {
 							</p>
 							<Link
 								href="/brand/login"
-								className="text-[#FD5C02] hover:underline text-sm md:text-base"
+								className="text-[#FD5C02] font-medium hover:underline text-sm md:text-base"
 							>
 								Log in
 							</Link>
 						</div>
 					</CardHeader>
 					<CardContent className="space-y-3">
+						{/* Error Alert */}
+						{error && (
+							<Alert variant="destructive" className="mb-3">
+								<AlertDescription className="flex items-center">
+									{error}
+									{error.includes("already in use") && (
+										<Link href="/brand/login" className="ml-2 text-[#FD5C02] font-medium hover:underline">
+											Log in now
+										</Link>
+									)}
+								</AlertDescription>
+							</Alert>
+						)}
+						
 						<Button className="w-full bg-[#FD5C02] hover:bg-orange-600 text-white text-base md:text-[17px] py-5 font-normal">
 							<Link
 								href="/brand/create-account"
@@ -104,7 +132,7 @@ const BusinessSignup = () => {
 							variant="outline"
 							className="w-full text-base md:text-[17px] py-5 font-normal border border-gray-300"
 							onClick={handleGoogleSignup}
-							disabled={loading}
+							disabled={isLoading}
 						>
 							<Image
 								src="/icons/google.png"

@@ -24,7 +24,7 @@ const stripePromise = loadStripe(
 
 const ContestFormContent = () => {
   const [step, setStep] = useState(1);
-  const { user } = useAuth();
+  const { currentUser } = useAuth();
 
   const { 
     formData, 
@@ -301,7 +301,7 @@ const ContestFormContent = () => {
       setSubmissionError(null);
       setValidationError(null);
 
-      if (!user?.email) {
+      if (!currentUser?.email) {
         setSubmissionError("You must be logged in to submit a contest");
         setIsLoading(false);
         return;
@@ -329,8 +329,8 @@ const ContestFormContent = () => {
       });
       
       // Add user data
-      paymentFormData.append("userId", user.uid);
-      paymentFormData.append("brandEmail", user.email);
+      paymentFormData.append("userId", currentUser.uid);
+      paymentFormData.append("brandEmail", currentUser.email);
       paymentFormData.append("amount", prizeTimeline.totalBudget.toString());
       
       // Create a payment intent record in Firebase
@@ -355,8 +355,8 @@ const ContestFormContent = () => {
         amount: prizeTimeline.totalBudget,
         paymentId: paymentId,
         contestTitle: formData.basic.contestName || "Contest",
-        userEmail: user.email,
-        userId: user.uid
+        userEmail: currentUser.email,
+        userId: currentUser.uid
       });
 
       const { sessionId } = response.data;
@@ -389,7 +389,7 @@ const ContestFormContent = () => {
       setSubmissionError(null);
       setDraftSuccess(false);
 
-      if (!user?.email) {
+      if (!currentUser?.email) {
         setSubmissionError("You must be logged in to save a draft");
         return;
       }
@@ -599,10 +599,10 @@ const ContestFormContent = () => {
 };
 
 export default function ContestForm() {
-  const { user } = useAuth();
+  const { currentUser } = useAuth();
 
   return (
-    <ContestFormProvider userId={user?.uid}>
+    <ContestFormProvider userId={currentUser?.uid}>
       <ContestFormContent />
     </ContestFormProvider>
   );

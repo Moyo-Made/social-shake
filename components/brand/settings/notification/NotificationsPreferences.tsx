@@ -11,7 +11,7 @@ interface NotificationSetting {
 }
 
 export default function NotificationPreferences() {
-	const { user } = useAuth();
+	const { currentUser } = useAuth();
 	const [settings, setSettings] = useState<NotificationSetting[]>([
 		{
 			id: "creator_applications",
@@ -50,10 +50,10 @@ export default function NotificationPreferences() {
 	// Fetch current notification settings
 	useEffect(() => {
 		async function fetchSettings() {
-			if (!user) return;
+			if (!currentUser) return;
 
 			try {
-				const userDocRef = doc(db, "users", user.uid);
+				const userDocRef = doc(db, "users", currentUser.uid);
 				const userDoc = await getDoc(userDocRef);
 
 				if (userDoc.exists() && userDoc.data().notificationSettings) {
@@ -78,7 +78,7 @@ export default function NotificationPreferences() {
 		}
 
 		fetchSettings();
-	}, [user]);
+	}, [currentUser]);
 
 	const toggleSetting = (id: string) => {
 		setSettings((prev) =>
@@ -89,12 +89,12 @@ export default function NotificationPreferences() {
 	};
 
 	const savePreferences = async () => {
-		if (!user) return;
+		if (!currentUser) return;
 
 		setIsSaving(true);
 
 		try {
-			const userDocRef = doc(db, "users", user.uid);
+			const userDocRef = doc(db, "users", currentUser.uid);
 
 			// Convert settings array to object for storage
 			const settingsObj = settings.reduce(

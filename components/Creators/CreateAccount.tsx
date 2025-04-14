@@ -12,7 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 
 const CreateCreatorAccount = () => {
-	const { signup, error: authError, loading, clearError } = useAuth();
+	const { error: authError, clearError } = useAuth();
 	const [formData, setFormData] = useState({
 		firstName: "",
 		lastName: "",
@@ -24,6 +24,7 @@ const CreateCreatorAccount = () => {
 	const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [usernameChecking, setUsernameChecking] = useState(false);
+	const [emailChecking, setEmailChecking] = useState(false);
 	const router = useRouter();
 
 	// Map auth errors to form errors when they occur
@@ -34,7 +35,7 @@ const CreateCreatorAccount = () => {
 
 			if (authError.includes("email-already-in-use")) {
 				errorMessage =
-					"This email address is already in use. Please use a different email or login.";
+					"This email address is already in use. Please log in instead.";
 				setFieldErrors((prev) => ({
 					...prev,
 					email: "This email address is already in use.",
@@ -61,24 +62,26 @@ const CreateCreatorAccount = () => {
 
 	// Check if username is available with debouncing
 	useEffect(() => {
-
 		const checkUsername = async () => {
 			if (!formData.username || formData.username.length < 3) return;
-			
+
 			setUsernameChecking(true);
 			try {
-				const response = await fetch(`/api/check-username?username=${encodeURIComponent(formData.username)}`);
+				const response = await fetch(
+					`/api/check-username?username=${encodeURIComponent(formData.username)}`
+				);
 				const data = await response.json();
-				
+
 				if (!response.ok) {
 					console.error("Username check error:", data.error);
 					return;
 				}
-				
+
 				if (data.exists) {
 					setFieldErrors((prev) => ({
 						...prev,
-						username: "This username is already taken. Please choose another one.",
+						username:
+							"This username is already taken. Please choose another one.",
 					}));
 				} else {
 					// Clear username error if it exists
@@ -103,6 +106,53 @@ const CreateCreatorAccount = () => {
 
 		return () => clearTimeout(timeoutId);
 	}, [formData.username]);
+
+	// Check if email is already registered with debouncing
+	useEffect(() => {
+		const checkEmail = async () => {
+			if (!formData.email || !/\S+@\S+\.\S+/.test(formData.email)) return;
+
+			setEmailChecking(true);
+			try {
+				const response = await fetch(
+					`/api/check-email?email=${encodeURIComponent(formData.email)}`
+				);
+				const data = await response.json();
+
+				if (!response.ok) {
+					console.error("Email check error:", data.error);
+					return;
+				}
+
+				if (data.exists) {
+					setFieldErrors((prev) => ({
+						...prev,
+						email:
+							"This email address is already in use. Please log in instead.",
+					}));
+				} else {
+					// Clear email error if it exists
+					setFieldErrors((prev) => {
+						const newErrors = { ...prev };
+						delete newErrors.email;
+						return newErrors;
+					});
+				}
+			} catch (error) {
+				console.error("Error checking email:", error);
+			} finally {
+				setEmailChecking(false);
+			}
+		};
+
+		const timeoutId = setTimeout(() => {
+			if (formData.email) {
+				checkEmail();
+			}
+		}, 500); // 500ms debounce
+
+		return () => clearTimeout(timeoutId);
+	}, [formData.email]);
 
 	// Clear form errors when inputs change
 	const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -188,26 +238,44 @@ const CreateCreatorAccount = () => {
 			return;
 		}
 
-		
-		// Check for username availability one last time before submission
 		setIsSubmitting(true);
+		
 		try {
-			const usernameResponse = await fetch(`/api/check-username?username=${encodeURIComponent(formData.username)}`);
+			// Check for username availability
+			const usernameResponse = await fetch(
+				`/api/check-username?username=${encodeURIComponent(formData.username)}`
+			);
 			const usernameData = await usernameResponse.json();
-			
+
 			if (usernameData.exists) {
 				setFieldErrors((prev) => ({
 					...prev,
-					username: "This username is already taken. Please choose another one.",
+					username:
+						"This username is already taken. Please choose another one.",
 				}));
 				setIsSubmitting(false);
 				return;
 			}
-
-			// First, sign up the user with Firebase authentication
-			await signup(formData.email, formData.password);
 			
+			// Check for email availability
+			const emailResponse = await fetch(
+				`/api/check-email?email=${encodeURIComponent(formData.email)}`
+			);
+			const emailData = await emailResponse.json();
+			
+			if (emailData.exists) {
+				setFieldErrors((prev) => ({
+					...prev,
+					email: "This email address is already in use. Please log in instead.",
+				}));
+				setFormError("This email address is already in use. Please log in instead.");
+				setIsSubmitting(false);
+				return;
+			}
 
+			// If we get here, both username and email are available
+			// Now proceed with creating the account
+			
 			// After successful signup, create creator profile
 			const response = await fetch("/api/creator-profile", {
 				method: "POST",
@@ -226,10 +294,12 @@ const CreateCreatorAccount = () => {
 
 			if (!response.ok) {
 				const errorData = await response.json();
-				throw new Error(errorData.error || "Failed to create creator profile");
+				throw new Error(
+					errorData.error || "Failed to create creator profile"
+				);
 			}
 
-			router.push('/creator-account-created');
+			router.push("/creator/account-created");
 		} catch (err) {
 			// This catches any errors not handled by the auth context
 			console.error("Signup error:", err);
@@ -243,7 +313,7 @@ const CreateCreatorAccount = () => {
 	};
 
 	// Use combined loading state from auth and local form state
-	const isLoading = loading || isSubmitting;
+	const isLoading =  isSubmitting;
 
 	return (
 		<main className="relative min-h-screen overflow-y-auto">
@@ -266,7 +336,7 @@ const CreateCreatorAccount = () => {
 			{/* Signup Card */}
 			<div className="relative flex items-center justify-center px-4 py-6 xl:py-8 font-satoshi">
 				<Card className="w-full max-w-xl bg-white border-2 border-[#FFBF9B] backdrop-blur-sm px-[2px] py-[6px] md:px-[30px] md:py-[5px] lg:px-[50px] lg:py-[5px]">
-					<Link href="/">
+					<Link href="/creator/signup">
 						<FaArrowLeft className="w-5 h-5 absolute left-8 md:left-6 top-12 md:top-10" />
 					</Link>
 					<CardHeader className="space-y-2 items-center text-center">
@@ -282,8 +352,8 @@ const CreateCreatorAccount = () => {
 							Join Social Shake as a Creator
 						</h1>
 						<p className="mb-6 text-sm md:text-base text-[#000] font-normal">
-							Sign up to connect with top brands, showcase your creativity, and get 
-							paid for your content.
+							Sign up to connect with top brands, showcase your creativity, and
+							get paid for your content.
 						</p>
 						<div className="flex space-x-1">
 							<p className="text-gray-600 text-sm md:text-base">
@@ -303,10 +373,7 @@ const CreateCreatorAccount = () => {
 							{/* Name Fields Row */}
 							<div className="grid grid-cols-2 gap-4">
 								<div className="space-y-1">
-									<Label
-										htmlFor="firstName"
-										className="text-sm font-medium"
-									>
+									<Label htmlFor="firstName" className="text-sm font-medium">
 										First Name <span className="text-red-500">*</span>
 									</Label>
 									<Input
@@ -329,10 +396,7 @@ const CreateCreatorAccount = () => {
 									)}
 								</div>
 								<div className="space-y-1">
-									<Label
-										htmlFor="lastName"
-										className="text-sm font-medium"
-									>
+									<Label htmlFor="lastName" className="text-sm font-medium">
 										Last Name <span className="text-red-500">*</span>
 									</Label>
 									<Input
@@ -358,10 +422,7 @@ const CreateCreatorAccount = () => {
 
 							{/* Username Field */}
 							<div className="space-y-1 mt-3 md:mt-4">
-								<Label
-									htmlFor="username"
-									className="text-sm font-medium"
-								>
+								<Label htmlFor="username" className="text-sm font-medium">
 									Username <span className="text-red-500">*</span>
 								</Label>
 								<Input
@@ -371,7 +432,9 @@ const CreateCreatorAccount = () => {
 									onChange={handleChange}
 									placeholder="Your Preferred Username"
 									className={`w-full placeholder:text-sm py-3 ${
-										fieldErrors.username ? "border-red-500 focus:ring-red-500" : ""
+										fieldErrors.username
+											? "border-red-500 focus:ring-red-500"
+											: ""
 									}`}
 									required
 								/>
@@ -394,10 +457,7 @@ const CreateCreatorAccount = () => {
 
 							{/* Email Field */}
 							<div className="space-y-1 mt-3 md:mt-4">
-								<Label
-									htmlFor="email"
-									className="text-sm font-medium"
-								>
+								<Label htmlFor="email" className="text-sm font-medium">
 									Email <span className="text-red-500">*</span>
 								</Label>
 								<Input
@@ -416,14 +476,16 @@ const CreateCreatorAccount = () => {
 										{fieldErrors.email}
 									</p>
 								)}
+								{emailChecking && (
+									<p className="text-blue-500 text-sm mt-1">
+										Checking email availability...
+									</p>
+								)}
 							</div>
 
 							{/* Password Field */}
 							<div className="space-y-1 mt-3 md:mt-4">
-								<Label
-									htmlFor="password"
-									className="text-sm font-medium"
-								>
+								<Label htmlFor="password" className="text-sm font-medium">
 									Password <span className="text-red-500">*</span>
 								</Label>
 								<Input
@@ -451,19 +513,12 @@ const CreateCreatorAccount = () => {
 								)}
 							</div>
 
-							{/* Error message */}
-							{formError && (
-								<div className="mt-2 text-red-500 text-sm text-center">
-									{formError}
-								</div>
-							)}
-
 							{/* Submit Button */}
 							<Button
 								type="submit"
-								disabled={isLoading}
+								disabled={isLoading || Object.keys(fieldErrors).length > 0}
 								className={`w-full bg-[#FD5C02] hover:bg-orange-600 text-white text-[17px] py-5 font-normal mt-4 ${
-									isLoading ? "opacity-50 cursor-not-allowed" : ""
+									isLoading || Object.keys(fieldErrors).length > 0 ? "opacity-50 cursor-not-allowed" : ""
 								}`}
 							>
 								{isLoading ? (

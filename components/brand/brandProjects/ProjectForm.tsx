@@ -20,7 +20,7 @@ import ContentRequirements from "./ContentRequirements";
 const ProjectFormContent = () => {
 	const [step, setStep] = useState(1);
 	const router = useRouter();
-	const { user } = useAuth();
+	const { currentUser } = useAuth();
 
 	const {
 		formData,
@@ -300,7 +300,7 @@ const ProjectFormContent = () => {
 			setSubmissionError(null);
 			setValidationError(null);
 
-			if (!user?.email) {
+			if (!currentUser?.email) {
 				setSubmissionError("You must be logged in to submit a contest");
 				return;
 			}
@@ -356,8 +356,8 @@ const ProjectFormContent = () => {
 			submitFormData.append("isDraft", "false");
 
 			// Add brandEmail and userId for proper association
-			submitFormData.append("brandEmail", user.email);
-			submitFormData.append("userId", user.uid);
+			submitFormData.append("brandEmail", currentUser.email);
+			submitFormData.append("userId", currentUser.uid);
 
 			// Add timestamp for sorting in dashboard
 			submitFormData.append(
@@ -396,7 +396,7 @@ const ProjectFormContent = () => {
 		  setSubmissionError(null);
 		  setDraftSuccess(false);
 	  
-		  if (!user?.email) {
+		  if (!currentUser?.email) {
 			setSubmissionError("You must be logged in to save a draft");
 			return;
 		  }
@@ -613,10 +613,10 @@ const ProjectFormContent = () => {
 };
 
 export default function ProjectForm() {
-	const { user } = useAuth();
+	const { currentUser } = useAuth();
 
 	return (
-		<ProjectFormProvider userId={user?.uid} isNewProject={!user?.uid}>
+		<ProjectFormProvider userId={currentUser?.uid} isNewProject={!currentUser?.uid}>
 			<ProjectFormContent />
 		</ProjectFormProvider>
 	);

@@ -28,8 +28,8 @@ export default function ContactSupportForm() {
   const [dragActive, setDragActive] = useState(false);
   const [submittedTicketId, setSubmittedTicketId] = useState<string | null>(null);
 
-  const { user } = useAuth();
-  const userId = user?.uid;
+  const { currentUser } = useAuth();
+  const userId = currentUser?.uid;
 
   useEffect(() => {
     if (!userId) {

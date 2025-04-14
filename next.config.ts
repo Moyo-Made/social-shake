@@ -14,7 +14,12 @@ const nextConfig: NextConfig = {
   },
   env: {
     FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY
-  }
+  },
+  api: {
+    bodyParser: {
+      sizeLimit: '50mb',
+    },
+  },
 };
 
 export default nextConfig;

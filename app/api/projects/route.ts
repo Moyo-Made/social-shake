@@ -200,13 +200,41 @@ export async function POST(request: NextRequest) {
       status: requestedStatus,
     } = requestData;
 
-    // Check if userId is provided
-    if (!userId) {
-      return NextResponse.json(
-        { error: "User ID is required" },
-        { status: 400 }
-      );
-    }
+      // Check if userId is provided
+      if (!userId) {
+        return NextResponse.json(
+          { error: "User ID is required" },
+          { status: 400 }
+        );
+      }
+      
+      // Only check brand approval status for final submissions, not drafts
+      if (requestedStatus !== "draft") {
+        // Get the user's brand profile to check approval status
+        const brandsSnapshot = await adminDb.collection("brandProfiles")
+          .where("userId", "==", userId)
+          .limit(1)
+          .get();
+          
+        if (!brandsSnapshot.empty) {
+          const brandDoc = brandsSnapshot.docs[0];
+          const brandData = brandDoc.data();
+          
+          // Check if brand is approved
+          if (brandData.status !== "approved") {
+            return NextResponse.json({ 
+              error: "brand_not_approved", 
+              message: "Your brand profile must be approved before creating projects." 
+            }, { status: 403 });
+          }
+        } else {
+          // No brand profile found
+          return NextResponse.json({ 
+            error: "brand_profile_missing", 
+            message: "You need to create a brand profile and get it approved before creating projects." 
+          }, { status: 403 });
+        }
+      }
     
     // Get user preferences if available
     const userPreferences = await getUserPreferences(userId);

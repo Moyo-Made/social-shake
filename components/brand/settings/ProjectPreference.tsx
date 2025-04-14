@@ -37,13 +37,13 @@ const ProjectPreference = () => {
 	const [error, setError] = useState<string | null>(null);
 	const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-	const { user } = useAuth();
+	const { currentUser } = useAuth();
 
 	// Fetch user preferences when component mounts
 	useEffect(() => {
 		const fetchUserPreferences = async () => {
 			try {
-				const userId = user?.uid || "";
+				const userId = currentUser?.uid || "";
 				if (!userId) {
 					setIsLoading(false);
 					return;
@@ -86,7 +86,7 @@ const ProjectPreference = () => {
 		};
 
 		fetchUserPreferences();
-	}, [updateProjectRequirementsData, updateCreatorPricing, user?.uid]);
+	}, [updateProjectRequirementsData, updateCreatorPricing, currentUser?.uid]);
 
 	// Clear error message after 3 seconds
 	useEffect(() => {
@@ -131,7 +131,7 @@ const ProjectPreference = () => {
 		try {
 			setIsSaving(true);
 
-			const userId = user?.uid || "";
+			const userId = currentUser?.uid || "";
 			if (!userId) {
 				setError("User ID not found. Please log in again.");
 				return;

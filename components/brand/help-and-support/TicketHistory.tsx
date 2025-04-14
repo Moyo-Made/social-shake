@@ -37,8 +37,8 @@ export default function SupportTicketHistory() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
   
-  const { user } = useAuth();
-  const userId = user?.uid;
+  const { currentUser } = useAuth();
+  const userId = currentUser?.uid;
 
   // Fetch tickets from Firestore
   useEffect(() => {

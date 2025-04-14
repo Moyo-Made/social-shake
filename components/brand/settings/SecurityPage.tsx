@@ -5,15 +5,15 @@ import SecurityPrivacySettings from "./SecurityPrivacy";
 import { useAuth } from "@/context/AuthContext";
 
 export default function SecurityPage() {
-	const { user } = useAuth(); // Get the current user from your auth context
+	const { currentUser } = useAuth(); // Get the current user from your auth context
 	const [isLoading, setIsLoading] = useState(true);
 
 	useEffect(() => {
 		// Wait for auth to initialize
-		if (user !== undefined) {
+		if (currentUser !== undefined) {
 			setIsLoading(false);
 		}
-	}, [user]);
+	}, [currentUser]);
 
 	if (isLoading) {
 		return (
@@ -24,14 +24,14 @@ export default function SecurityPage() {
 		);
 	}
 
-	if (!user) {
+	if (!currentUser) {
 		// Redirect to login or show unauthorized message
 		return (
 			<div className="flex flex-col items-center justify-center h-full">
 				<h2 className="text-xl font-bold mb-2">Unauthorized</h2>
 				<p>Please login to access this page</p>
 				<a
-					href="/login"
+					href="/brand/login"
 					className="mt-4 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md transition"
 				>
 					Go to Login
@@ -42,7 +42,7 @@ export default function SecurityPage() {
 
 	return (
 		<div className="container mx-auto px-4 py-8 max-w-3xl">
-			<SecurityPrivacySettings userEmail={user.email || ""} />
+			<SecurityPrivacySettings userEmail={currentUser.email || ""} />
 		</div>
 	);
 }

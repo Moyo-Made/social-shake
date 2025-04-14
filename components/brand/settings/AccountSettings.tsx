@@ -51,7 +51,7 @@ interface TabItem {
 }
 
 const AccountSettings: React.FC = () => {
-	const { user } = useAuth();
+	const { currentUser } = useAuth();
 	const [activeTab, setActiveTab] = useState<string>("account");
 	const [isLoading, setIsLoading] = useState<boolean>(true);
 	const [error, setError] = useState<string | null>(null);
@@ -73,17 +73,17 @@ const AccountSettings: React.FC = () => {
 
 	useEffect(() => {
 		const fetchBrandProfile = async (): Promise<void> => {
-			if (!user?.email) {
+			if (!currentUser?.email) {
 				console.warn("No user email found");
 				setIsLoading(false);
 				return;
 			}
 
 			try {
-				console.log("Fetching brand profile for email:", user.email);
+				console.log("Fetching brand profile for email:", currentUser.email);
 
 				const response = await fetch(
-					`/api/brand-profile?email=${encodeURIComponent(user.email)}`,
+					`/api/brand-profile?email=${encodeURIComponent(currentUser.email)}`,
 					{
 						method: "GET",
 						headers: {
@@ -135,7 +135,7 @@ const AccountSettings: React.FC = () => {
 		};
 
 		fetchBrandProfile();
-	}, [user]);
+	}, [currentUser]);
 
 	const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const { name, value } = e.target;
@@ -165,7 +165,7 @@ const AccountSettings: React.FC = () => {
 	};
 
 	const handleSaveChanges = async () => {
-		if (!formData || !user?.email) return;
+		if (!formData || !currentUser?.email) return;
 
 		setError(null);
 		setSuccessMessage(null);
@@ -173,7 +173,7 @@ const AccountSettings: React.FC = () => {
 		// Make sure socialMedia is properly structured as an object
 		const dataToSend = {
 			...formData,
-			email: user.email,
+			email: currentUser.email,
 			// Ensure socialMedia is an object, not individual dot-notation fields
 			socialMedia: {
 				facebook: formData.socialMedia?.facebook || "",
@@ -229,13 +229,13 @@ const AccountSettings: React.FC = () => {
 		uploadData.append("logo", file);
 
 		// Add email which is required by the API
-		if (!user?.email) {
+		if (!currentUser?.email) {
 			setError("User email is required for uploading a logo");
 			setIsLoading(false);
 			return;
 		}
 
-		uploadData.append("email", user.email);
+		uploadData.append("email", currentUser.email);
 
 		try {
 			const response = await fetch("/api/brand-profile", {
@@ -289,7 +289,7 @@ const AccountSettings: React.FC = () => {
 	if (isLoading) {
 		return (
 			<div className="flex flex-col justify-center items-center h-screen">
-				<div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
+				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
 				Loading account settings...
 			</div>
 		);

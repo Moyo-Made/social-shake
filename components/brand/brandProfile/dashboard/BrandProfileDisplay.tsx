@@ -62,24 +62,24 @@ interface BrandProfileResponse {
 
 const BrandProfileDisplay: React.FC = () => {
 	const router = useRouter();
-	const { user } = useAuth();
+	const { currentUser } = useAuth();
 	const [profileData, setProfileData] = useState<BrandProfileData | null>(null);
 	const [isLoading, setIsLoading] = useState<boolean>(true);
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
 		const fetchBrandProfile = async (): Promise<void> => {
-			if (!user?.email) {
+			if (!currentUser?.email) {
 				console.warn("No user email found");
 				setIsLoading(false);
 				return;
 			}
 
 			try {
-				console.log("Fetching brand profile for email:", user.email);
+				console.log("Fetching brand profile for email:", currentUser.email);
 
 				const response = await fetch(
-					`/api/brand-profile?email=${encodeURIComponent(user.email)}`,
+					`/api/brand-profile?email=${encodeURIComponent(currentUser.email)}`,
 					{
 						method: "GET",
 						headers: {
@@ -121,7 +121,7 @@ const BrandProfileDisplay: React.FC = () => {
 		};
 
 		fetchBrandProfile();
-	}, [user]);
+	}, [currentUser]);
 
 	const handleEditProfile = (): void => {
 		router.push("/complete-profile");
