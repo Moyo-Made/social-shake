@@ -13,7 +13,7 @@ import { useAuth } from "@/context/AuthContext";
 // Wrap the actual page content in this component to access the context
 function VerifyIdentityContent() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<string>("upload-verification");
   const { 
     isVerificationComplete, 
@@ -25,11 +25,11 @@ function VerifyIdentityContent() {
 
   // If user isn't authenticated, redirect to login
   useEffect(() => {
-    if (!user) {
+    if (!currentUser) {
       toast.error("Please log in to continue with verification");
       router.push("/creator/login");
     }
-  }, [user, router]);
+  }, [currentUser, router]);
 
   // Load active tab from session storage on initial render - use a stable reference
   const loadTabFromStorage = useCallback(() => {
@@ -63,7 +63,7 @@ function VerifyIdentityContent() {
 
   const handleNextClick = async () => {
     // First check if user is authenticated
-    if (!user) {
+    if (!currentUser) {
       toast.error("You must be logged in to complete verification");
       router.push("/creator/login");
       return;
@@ -104,7 +104,7 @@ function VerifyIdentityContent() {
   };
 
   // Show loading state or return to login if not authenticated
-  if (!user) {
+  if (!currentUser) {
     return null; // We'll redirect in the useEffect
   }
 
@@ -191,10 +191,10 @@ function VerifyIdentityContent() {
 
 // The main component that sets up the context
 export default function VerifyIdentityPage() {
-  const { user } = useAuth(); // Get user from auth context
+  const { currentUser } = useAuth(); // Get user from auth context
   
   return (
-    <CreatorVerificationProvider userId={user?.uid}>
+    <CreatorVerificationProvider userId={currentUser?.uid}>
       <VerifyIdentityContent />
     </CreatorVerificationProvider>
   );
