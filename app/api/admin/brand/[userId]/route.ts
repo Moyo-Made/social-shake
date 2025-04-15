@@ -1,13 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/config/firebase-admin";
 
 // Use the correct type structure for App Router
 export async function GET(
-  request: Request,
-  context: { params: { userId: string } }
+  request: NextRequest,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  { params }: any
 ) {
   try {
-    const userId = context.params.userId;
+    const userId = params.userId;
     
     if (!userId) {
       return NextResponse.json({ error: "User ID is required" }, { status: 400 });
