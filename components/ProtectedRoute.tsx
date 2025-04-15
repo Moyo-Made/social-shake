@@ -5,24 +5,24 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 export default function DashboardProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { currentUser, isLoading } = useAuth();
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
     // Check authentication status after loading is complete
-    if (!loading) {
-      if (user) {
+    if (!isLoading) {
+      if (currentUser) {
         setIsAuthorized(true);
       } else {
         // Redirect to login if no authenticated user
         router.replace('/');
       }
     }
-  }, [user, loading, router]);
+  }, [currentUser, isLoading, router]);
 
   // Show loading state while checking authentication
-  if (loading) {
+  if (isLoading) {
     return <div className="flex items-center justify-center h-screen">
       <p>Loading dashboard...</p>
     </div>;
