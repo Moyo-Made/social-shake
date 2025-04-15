@@ -6,7 +6,7 @@ import { useAuth } from "@/context/AuthContext"
 
 // This hook handles the submission of contest form data to Firestore
 export const useContestSubmission = () => {
-  const { user } = useAuth(); // Get the current authenticated user
+  const { currentUser } = useAuth(); // Get the current authenticated user
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,11 +45,11 @@ export const useContestSubmission = () => {
     }
     
     // Add brand email from authenticated user
-    processedData.brandEmail = user?.email;
+    processedData.brandEmail = currentUser?.email;
     
     // Add user ID for drafts
-    if (isDraft && user?.uid) {
-      processedData.userId = user.uid;
+    if (isDraft && currentUser?.uid) {
+      processedData.userId = currentUser.uid;
       processedData.isDraft = true;
     }
     
@@ -63,7 +63,7 @@ export const useContestSubmission = () => {
       setError(null);
       
       try {
-        if (!user?.email) {
+        if (!currentUser?.email) {
           throw new Error("User not authenticated");
         }
 
@@ -98,7 +98,7 @@ export const useContestSubmission = () => {
         };
       }
     },
-    [user]
+    [currentUser]
   );
 
   // Save draft to server
@@ -108,7 +108,7 @@ export const useContestSubmission = () => {
       setError(null);
       
       try {
-        if (!user?.email || !user?.uid) {
+        if (!currentUser?.email || !currentUser?.uid) {
           throw new Error("User not authenticated");
         }
 
@@ -140,17 +140,17 @@ export const useContestSubmission = () => {
         };
       }
     },
-    [user]
+    [currentUser]
   );
 
   // Get saved draft from server
   const getSavedDraft = useCallback(async () => {
     try {
-      if (!user?.uid) {
+      if (!currentUser?.uid) {
         throw new Error("User not authenticated");
       }
 
-      const response = await fetch(`/api/contests?userId=${user.uid}&draft=true`);
+      const response = await fetch(`/api/contests?userId=${currentUser.uid}&draft=true`);
       const draft = await response.json();
 
       if (!response.ok) {
@@ -166,16 +166,16 @@ export const useContestSubmission = () => {
         error: error instanceof Error ? error.message : "An unknown error occurred" 
       };
     }
-  }, [user]);
+  }, [currentUser]);
 
   // Get contests for the current brand
   const getBrandContests = useCallback(async () => {
     try {
-      if (!user?.email) {
+      if (!currentUser?.email) {
         throw new Error("User not authenticated");
       }
 
-      const response = await fetch(`/api/contests?brandEmail=${user.email}`);
+      const response = await fetch(`/api/contests?brandEmail=${currentUser.email}`);
       const contests = await response.json();
 
       if (!response.ok) {
@@ -190,7 +190,7 @@ export const useContestSubmission = () => {
         error: error instanceof Error ? error.message : "An unknown error occurred" 
       };
     }
-  }, [user]);
+  }, [currentUser]);
 
   // Get a specific contest by ID
   const getContestById = useCallback(async (contestId: string) => {
