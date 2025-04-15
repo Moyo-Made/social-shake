@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/config/firebase-admin";
 
+// Use the correct type structure for App Router
 export async function GET(
   request: NextRequest,
-  { params }: { params: { userId: string } } 
+  context: { params: { userId: string } }
 ) {
   try {
-    const userId = params.userId;
+    const userId = context.params.userId;
     
     if (!userId) {
       return NextResponse.json({ error: "User ID is required" }, { status: 400 });
@@ -22,8 +23,7 @@ export async function GET(
     
     const brandData = brandDoc.data();
     
-    // Make sure status field exists and is properly formatted as BrandStatus
-    // If it doesn't exist in the database, default to 'pending'
+    // Make sure status field exists
     if (brandData && (!brandData.status || 
         !['pending', 'approved', 'rejected', 'suspended', 'info_requested'].includes(brandData.status))) {
       brandData.status = 'pending';
