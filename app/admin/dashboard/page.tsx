@@ -1,8 +1,9 @@
 
+import SideNavLayout from '@/components/admin/AdminSideNav'
 import React from 'react'
 
 export default function page () {
   return (
-	<p>Admin Dashboard</p>
+	<SideNavLayout>Admin Dashboard</SideNavLayout>
   )
 }
