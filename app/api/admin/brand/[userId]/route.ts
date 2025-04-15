@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { adminDb } from "@/config/firebase-admin";
 
 // Use the correct type structure for App Router
 export async function GET(
-  request: NextRequest,
+  request: Request,
   context: { params: { userId: string } }
 ) {
   try {
