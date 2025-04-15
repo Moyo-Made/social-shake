@@ -3,17 +3,17 @@ import { adminDb } from "@/config/firebase-admin";
 
 export async function GET(
 	request: NextRequest,
-	{ params }: { params: { userId: string } }
+	{ params }: { params: { brandId: string } }
   ) {
 	try {
-	  const userId = params.userId;
+	  const brandId = params.brandId;
 	  
-	  if (!userId) {
-		return NextResponse.json({ error: "User ID is required" }, { status: 400 });
+	  if (!brandId) {
+		return NextResponse.json({ error: "Brand ID is required" }, { status: 400 });
 	  }
 	  
-	  // Get brand profile from userId
-	  const brandRef = adminDb.collection("brandProfiles").doc(userId);
+	  // Get brand profile from brandId
+	  const brandRef = adminDb.collection("brandProfiles").doc(brandId);
 	  const brandDoc = await brandRef.get();
 	  
 	  if (!brandDoc.exists) {
@@ -29,11 +29,11 @@ export async function GET(
 		brandData.status = 'pending';
 	  }
 	  
-	  // Return the brand data with correct id and userId
+	  // Return the brand data with correct id
 	  return NextResponse.json({ 
 		brand: {
-		  id: userId,
-		  userId: userId,
+		  id: brandId,
+		  userId: brandId, // Keeping this if needed for your app logic
 		  ...brandData
 		} 
 	  });
