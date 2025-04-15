@@ -6,13 +6,13 @@ import { Notification} from '@/lib/notification/type';
 import { markNotificationAsRead, deleteNotification } from '@/lib/notification/notificationService';
 
 export function useNotifications() {
-  const { user } = useAuth();
+  const { currentUser } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) {
+    if (!currentUser) {
       setNotifications([]);
       setUnreadCount(0);
       setLoading(false);
@@ -21,7 +21,7 @@ export function useNotifications() {
 
     const q = query(
       collection(db, 'notifications'),
-      where('userId', '==', user.uid),
+      where('userId', '==', currentUser.uid),
       orderBy('createdAt', 'desc')
     );
 
@@ -38,15 +38,15 @@ export function useNotifications() {
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [currentUser]);
 
   const markAsRead = async (notificationId: string) => {
-    if (!user) return;
+    if (!currentUser) return;
     await markNotificationAsRead(notificationId);
   };
 
   const markAllAsRead = async () => {
-    if (!user) return;
+    if (!currentUser) return;
     const promises = notifications
       .filter(n => !n.read)
       .map(n => markNotificationAsRead(n.id));
@@ -54,7 +54,7 @@ export function useNotifications() {
   };
 
   const removeNotification = async (notificationId: string) => {
-    if (!user) return;
+    if (!currentUser) return;
     await deleteNotification(notificationId);
   };
 
