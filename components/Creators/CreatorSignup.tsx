@@ -9,7 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 
 const CreatorSignup = () => {
-	const { loginWithGoogle, loading } = useAuth();
+	const { loginWithGoogle, isLoading } = useAuth();
 	const router = useRouter();
 
 	const handleGoogleSignup = async () => {
@@ -94,7 +94,7 @@ const CreatorSignup = () => {
 							variant="outline"
 							className="w-full text-base md:text-[17px] py-5 font-normal border border-gray-300"
 							onClick={handleGoogleSignup}
-							disabled={loading}
+							disabled={isLoading}
 						>
 							<Image
 								src="/icons/google.png"
