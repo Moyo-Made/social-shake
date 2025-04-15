@@ -12,7 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 
 const Login = () => {
-	const { login, error: authError, loading, clearError } = useAuth();
+	const { login, error: authError, isLoading, clearError } = useAuth();
 	const [formData, setFormData] = useState({
 		email: "",
 		password: "",
@@ -145,9 +145,6 @@ const Login = () => {
 		}
 	};
 
-	// Use combined loading state from auth and local form state
-	const isLoading = loading || isSubmitting;
-
 	return (
 		<main className="relative overflow-hidden min-h-screen">
 			<div className="absolute inset-0">
@@ -240,7 +237,7 @@ const Login = () => {
 								type="submit"
 								disabled={isLoading}
 								className={`w-full bg-[#FD5C02] hover:bg-orange-600 text-white text-[17px] py-5 font-normal ${
-									isLoading ? "opacity-50 cursor-not-allowed" : ""
+									isSubmitting ? "opacity-50 cursor-not-allowed" : ""
 								}`}
 							>
 								{isLoading ? (
