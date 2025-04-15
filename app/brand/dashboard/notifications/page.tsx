@@ -8,17 +8,17 @@ import { useEffect } from "react";
 import SideNavLayout from "@/components/brand/brandProfile/dashboard/SideNav";
 
 const NotificationsPage: NextPage = () => {
-	const { user, loading } = useAuth();
+	const { currentUser, isLoading } = useAuth();
 	const router = useRouter();
 
 	// Redirect if not authenticated
 	useEffect(() => {
-		if (!loading && !user) {
+		if (!isLoading && !currentUser) {
 			router.push("/login?redirect=/account/notifications");
 		}
-	}, [user, loading, router]);
+	}, [currentUser, isLoading, router]);
 
-	if (loading) {
+	if (isLoading) {
 		return (
 			<SideNavLayout>
 				<div className="flex justify-center items-center h-64">
@@ -28,7 +28,7 @@ const NotificationsPage: NextPage = () => {
 		);
 	}
 
-	if (!user) {
+	if (!currentUser) {
 		return null; // Will redirect due to useEffect
 	}
 
