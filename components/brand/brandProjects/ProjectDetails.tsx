@@ -419,10 +419,10 @@ const ProjectDetails: React.FC = () => {
 						/>
 					</SelectTrigger>
 					<SelectContent className="bg-[#f7f7f7]">
-						<SelectItem value="physical">
+						<SelectItem value="Physical">
 							Physical Product - A tangible item that will be shipped to creators
 						</SelectItem>
-						<SelectItem value="virtual">
+						<SelectItem value="Virtual">
 							Virtual Product – A digital or online service that does not require
 							shipping
 						</SelectItem>

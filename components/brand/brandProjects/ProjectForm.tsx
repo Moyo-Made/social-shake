@@ -69,7 +69,7 @@ const ProjectFormContent = () => {
 				return false;
 			}
 
-			if(
+			if (
 				!formData.projectDetails.projectThumbnail ||
 				(formData.projectDetails.projectThumbnail instanceof File &&
 					formData.projectDetails.projectThumbnail.size === 0)
@@ -77,7 +77,6 @@ const ProjectFormContent = () => {
 				setValidationError("Project thumbnail is required");
 				return false;
 			}
-			
 
 			return true;
 		});
@@ -209,35 +208,33 @@ const ProjectFormContent = () => {
 			return false;
 		}
 
-		if(
-				!formData.projectDetails.projectThumbnail ||
-				(formData.projectDetails.projectThumbnail instanceof File &&
-					formData.projectDetails.projectThumbnail.size === 0)
-			) {
-				setValidationError("Project thumbnail is required");
-				return false;
-			}
-		
+		if (
+			!formData.projectDetails.projectThumbnail ||
+			(formData.projectDetails.projectThumbnail instanceof File &&
+				formData.projectDetails.projectThumbnail.size === 0)
+		) {
+			setValidationError("Project thumbnail is required");
+			return false;
+		}
+
 		return true;
 	};
 
 	// Validate Step 2: Content Requirements
 	const validateStepTwo = () => {
 		const { platform, aspectRatio, duration } = formData.projectRequirements;
+		const { projectType } = formData.projectDetails;
 
-		if (
-			!platform ||
-			platform.length === 0 ||
-			!platform[0] ||
-			platform[0].trim() === ""
-		) {
-			setValidationError("At least one platform is required");
-			return false;
-		}
-
-		if (!aspectRatio || aspectRatio.trim() === "") {
-			setValidationError("Aspect ratio is required");
-			return false;
+		// Only validate platforms for project types that have this field
+		if (projectType === "UGC Content Only") {
+			if (!platform || platform.length === 0) {
+				setValidationError("At least one platform is required");
+				return false;
+			}
+			if (!aspectRatio || aspectRatio.trim() === "") {
+				setValidationError("Aspect ratio is required");
+				return false;
+			}
 		}
 
 		if (!duration || duration.trim() === "") {
@@ -393,35 +390,35 @@ const ProjectFormContent = () => {
 
 	const handleSaveDraft = async () => {
 		try {
-		  setSubmissionError(null);
-		  setDraftSuccess(false);
-	  
-		  if (!currentUser?.email) {
-			setSubmissionError("You must be logged in to save a draft");
-			return;
-		  }
-	  
-		  // Make sure to save the current state first
-		  saveCurrentState();
-		  
-		  // Then save to backend
-		  const result = await saveDraft();
-	  
-		  if (!result.success) {
-			throw new Error(result.error || "Failed to save draft");
-		  }
-	  
-		  // Show success message and keep it shown for 5 seconds
-		  setDraftSuccess(true);
+			setSubmissionError(null);
+			setDraftSuccess(false);
+
+			if (!currentUser?.email) {
+				setSubmissionError("You must be logged in to save a draft");
+				return;
+			}
+
+			// Make sure to save the current state first
+			saveCurrentState();
+
+			// Then save to backend
+			const result = await saveDraft();
+
+			if (!result.success) {
+				throw new Error(result.error || "Failed to save draft");
+			}
+
+			// Show success message and keep it shown for 5 seconds
+			setDraftSuccess(true);
 		} catch (error) {
-		  console.error("Draft save error:", error);
-		  setSubmissionError(
-			error instanceof Error
-			  ? error.message
-			  : "An error occurred while saving draft"
-		  );
+			console.error("Draft save error:", error);
+			setSubmissionError(
+				error instanceof Error
+					? error.message
+					: "An error occurred while saving draft"
+			);
 		}
-	  };
+	};
 
 	// Dynamic component rendering based on project type and step
 	const renderStepComponent = () => {
@@ -616,7 +613,10 @@ export default function ProjectForm() {
 	const { currentUser } = useAuth();
 
 	return (
-		<ProjectFormProvider userId={currentUser?.uid} isNewProject={!currentUser?.uid}>
+		<ProjectFormProvider
+			userId={currentUser?.uid}
+			isNewProject={!currentUser?.uid}
+		>
 			<ProjectFormContent />
 		</ProjectFormProvider>
 	);

@@ -15,13 +15,14 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
 import { auth, db } from "@/config/firebase";
-import { getStatusDot, getStatusStyle } from "@/utils/statusUtils";
 import { useProjectForm } from "../ProjectFormContext";
 import { useRouter } from "next/navigation";
+import { ProjectStatus } from "@/types/projects";
+import { getStatusStyle } from "@/utils/statusUtils";
 
 interface Project {
 	id: string;
-	status: string;
+	status: ProjectStatus;
 	title: string;
 	projectType: string;
 	budget: number;
@@ -44,7 +45,6 @@ interface Project {
 			budgetPerVideo?: number;
 			creatorCount?: number;
 		};
-		status?: string;
 		creatorApplications?: unknown[];
 		submissions?: unknown[];
 		pendingSubmissions?: unknown[];
@@ -263,6 +263,25 @@ const ProjectDashboard = () => {
 		}
 	};
 
+	// Helper function to determine if project should be editable
+	const shouldShowEditButton = (status: string) => {
+		const nonEditableStatuses = [
+			"completed",
+			"pending",
+			"active",
+			"rejected",
+			"request_edit",
+		];
+
+		return !nonEditableStatuses.includes(status.toLowerCase());
+	};
+
+	const shouldShowSubmissions = (status: string) => {
+		// Only show submissions for active or completed projects
+		return ["active", "ongoing project", "completed"].includes(
+			status.toLowerCase()
+		);
+	};
 	return (
 		<div className="bg-gray-50 p-6 min-h-screen w-full">
 			{/* Header with search and filters */}
@@ -415,7 +434,6 @@ const ProjectDashboard = () => {
 								{/* Project Thumbnail */}
 								{project.thumbnailUrl && (
 									<div className="relative mb-6 rounded-xl overflow-hidden">
-										{/* eslint-disable-next-line @next/next/no-img-element */}
 										<Image
 											src={project.thumbnailUrl}
 											alt={`${project.title} thumbnail`}
@@ -450,12 +468,9 @@ const ProjectDashboard = () => {
 										<div className="flex gap-1 items-center mb-4">
 											<div className="text-[#667085] text-base">Status:</div>
 											<div
-												className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${getStatusStyle(project.status)}`}
+												className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${getStatusStyle(project.status).color}`}
 											>
-												<span
-													className={`inline-block w-1.5 h-1.5 rounded-full ${getStatusDot(project.status)}`}
-												></span>
-												{project.status}
+												{getStatusStyle(project.status).text}
 											</div>
 										</div>
 									</div>
@@ -499,9 +514,8 @@ const ProjectDashboard = () => {
 											</p>
 										</div>
 
-										{/* Conditional third section based on status */}
-										{project.status === "Accepting Pitches" ||
-										project.status === "Completed" ? (
+										{/* Show Creators Applied conditionally */}
+										{shouldShowSubmissions(project.status) && (
 											<div className="flex items-center gap-2">
 												<Image
 													src="/icons/applied.svg"
@@ -509,7 +523,7 @@ const ProjectDashboard = () => {
 													width={25}
 													height={25}
 												/>
-												<div className="col-span-2">
+												<div>
 													<p className="text-sm text-orange-500 font-medium">
 														Creators Applied
 													</p>
@@ -518,23 +532,24 @@ const ProjectDashboard = () => {
 													</p>
 												</div>
 											</div>
-										) : (
-											project.status === "Ongoing Project" && (
-												<div className="col-span-2">
-													<p className="text-sm text-orange-500 font-medium">
-														Submissions
-													</p>
-													<p className="text-sm font-normal">
-														{project.submissions.videos} Videos •{" "}
-														{project.submissions.pending} Pending
-													</p>
-												</div>
-											)
 										)}
 									</div>
 
+									{/* Show Submissions conditionally */}
+									{shouldShowSubmissions(project.status) && (
+										<div className="pl-8 mb-6">
+											<p className="text-sm text-orange-500 font-medium">
+												Submissions
+											</p>
+											<p className="text-sm font-normal">
+												{project.submissions.videos} Videos •{" "}
+												{project.submissions.pending} Pending
+											</p>
+										</div>
+									)}
+
 									{/* Action Button */}
-									{project.status === "Draft" ? (
+									{shouldShowEditButton(project.status) ? (
 										<Link
 											href={`/brand/dashboard/projects/edit/${project.id}`}
 											className="w-full py-2 px-4 bg-orange-500 text-white font-medium rounded-md flex items-center justify-center gap-2"
@@ -639,12 +654,9 @@ const ProjectDashboard = () => {
 										<div className="flex gap-1 items-center mb-4">
 											<div className="text-[#667085] text-base">Status:</div>
 											<div
-												className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${getStatusStyle(project.status)}`}
+												className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${getStatusStyle(project.status).color}`}
 											>
-												<span
-													className={`inline-block w-1.5 h-1.5 rounded-full ${getStatusDot(project.status)}`}
-												></span>
-												{project.status}
+												{getStatusStyle(project.status).text}
 											</div>
 										</div>
 									</div>
@@ -684,41 +696,40 @@ const ProjectDashboard = () => {
 										</div>
 
 										{/* Conditional third section based on status */}
-										{project.status === "Accepting Pitches" ||
-										project.status === "Completed" ? (
-											<div className="flex items-center gap-2">
-												<Image
-													src="/icons/applied.svg"
-													alt="Creator applied icon"
-													width={25}
-													height={25}
-												/>
-												<div>
-													<p className="text-sm text-orange-500 font-medium">
-														Creators Applied
-													</p>
-													<p className="text-sm font-normal">
-														{project.creatorsApplied} Applied
-													</p>
-												</div>
-											</div>
-										) : (
-											project.status === "Ongoing Project" && (
-												<div>
-													<p className="text-orange-500 font-medium">
-														Submissions
-													</p>
-													<p className="text-lg font-semibold">
-														{project.submissions.videos} Videos •{" "}
-														{project.submissions.pending} Pending
-													</p>
-												</div>
-											)
-										)}
+										{project.status === "active" ||
+											(project.status === "completed" && (
+												<>
+													<div className="flex items-center gap-2">
+														<Image
+															src="/icons/applied.svg"
+															alt="Creator applied icon"
+															width={25}
+															height={25}
+														/>
+														<div>
+															<p className="text-sm text-orange-500 font-medium">
+																Creators Applied
+															</p>
+															<p className="text-sm font-normal">
+																{project.creatorsApplied} Applied
+															</p>
+														</div>
+													</div>
+													<div>
+														<p className="text-orange-500 font-medium">
+															Submissions
+														</p>
+														<p className="text-lg font-semibold">
+															{project.submissions.videos} Videos •{" "}
+															{project.submissions.pending} Pending
+														</p>
+													</div>
+												</>
+											))}
 									</div>
 
 									{/* Action Button */}
-									{project.status === "Draft" ? (
+									{shouldShowEditButton(project.status) ? (
 										<Link
 											href={`/brand/dashboard/projects/edit/${project.id}`}
 											className="w-full flex py-2 px-4 bg-orange-500 text-white font-medium rounded-md items-center justify-center gap-2"

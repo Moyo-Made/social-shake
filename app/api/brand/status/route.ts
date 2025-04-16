@@ -58,7 +58,6 @@ export async function GET(request: NextRequest) {
         status: brandData?.status,
         rejectionReason: brandData?.rejectionReason,
         requestedInfo: brandData?.requestedInfo,
-        // Include any other relevant fields
       }
     });
   } catch (error) {

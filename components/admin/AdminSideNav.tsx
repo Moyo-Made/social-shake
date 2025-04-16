@@ -16,7 +16,9 @@ interface MenuItemProps {
 	subItems?: Array<{
 		href: string;
 		text: string;
+		activePaths?: string[];
 	}>;
+	activePaths?: string[];
 }
 
 const MenuItem: React.FC<MenuItemProps> = ({
@@ -25,6 +27,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
 	badge,
 	href,
 	subItems,
+	activePaths,
 }) => {
 	const pathname = usePathname();
 	const [isOpen, setIsOpen] = useState(false);
@@ -33,13 +36,33 @@ const MenuItem: React.FC<MenuItemProps> = ({
 	// Modified isActive condition to handle special case for contests
 	const isActive =
 		pathname === href ||
+		activePaths?.some(
+			(path) => pathname === path || pathname.startsWith(`${path}/`)
+		) ||
 		(href === "/admin/dashboard" && pathname === "/admin/dashboard/") ||
 		(href === "/admin/manage-users/brands" &&
-			pathname.startsWith("/admin/manage-users/brands/"))
+			pathname.startsWith("/admin/manage-users/brands/")) ||
+		(href === "/admin/manage-users/creators" &&
+			pathname.startsWith("/admin/manage-users/creators/")) ||
+		(href === "/admin/campaigns/projects" &&
+			pathname.startsWith("/admin/campaigns/projects/")) ||
+		(href === "/admin/campaigns/contests" &&
+			pathname.startsWith("/admin/campaigns/contests/")) ||
+		(href === "/admin/manage-projects" &&
+			pathname.startsWith("/admin/manage-projects/")) ||
+		(href === "/admin/manage-contests" &&
+			pathname.startsWith("/admin/manage-contests/"));
+
 	const hasActiveSubItem =
 		hasSubItems &&
 		subItems.some(
-			(item) => pathname === item.href || pathname.startsWith(`${item.href}/`)
+			(item) =>
+				pathname === item.href ||
+				pathname.startsWith(`${item.href}/`) ||
+				(item.activePaths &&
+					item.activePaths.some(
+						(path) => pathname === path || pathname.startsWith(`${path}/`)
+					))
 		);
 
 	useEffect(() => {
@@ -79,13 +102,21 @@ const MenuItem: React.FC<MenuItemProps> = ({
 				{isOpen && (
 					<div className="mt-1">
 						{subItems.map((item, index) => {
-							const isSubItemActive = pathname === item.href;
+							const isSubItemActive =
+								pathname === item.href ||
+								pathname.startsWith(`${item.href}/`) ||
+								(item.activePaths &&
+									item.activePaths.some(
+										(path) =>
+											pathname === path || pathname.startsWith(`${path}/`)
+									));
+
 							return (
 								<Link
 									key={index}
 									href={item.href}
 									className={`flex items-center space-x-3 px-4 py-2 ml-4 rounded-lg cursor-pointer font-satoshi 
-									${isSubItemActive ? "text-orange-500" : "hover:bg-gray-700"}`}
+      ${isSubItemActive ? "text-orange-500" : "hover:bg-gray-700"}`}
 								>
 									<span>{item.text}</span>
 								</Link>
@@ -166,14 +197,23 @@ const SideNav: React.FC = () => {
 							/>
 						}
 						text="Campaigns"
+						activePaths={["/admin/campaigns", "/admin/manage-projects"]}
 						subItems={[
 							{
 								href: "/admin/campaigns/projects",
 								text: "Projects",
+								activePaths: [
+									"/admin/campaigns/projects",
+									"/admin/manage-projects",
+								],
 							},
 							{
 								href: "/admin/campaigns/contests",
 								text: "Contests",
+								activePaths: [
+									"/admin/campaigns/contests",
+									"/admin/manage-contests",
+								],
 							},
 						]}
 					/>
@@ -202,44 +242,57 @@ const getPageTitle = (pathname: string): string => {
 		"/admin/dashboard": "Admin Dashboard",
 		"/admin/manage-users": "Manage Users",
 		"/admin/manage-users/brands": "Manage Brands",
+		"/admin/manage-users/brands/": "Manage Brands",
 		"/admin/manage-users/creators": "Manage Creators",
 		"/admin/campaigns": "Campaigns",
-		"/admin/campaigns/projects": "Projects",
-		"/admin/campaigns/contests": "Contests",
+		"/admin/campaigns/projects": "Campaign - Projects",
+		"/admin/manage-projects": "Campaign - Projects",
+		"/admin/manage-contests": "Campaign - Contests",
+		"/admin/campaigns/contests": "Campaign - Contests",
 		"/admin/payouts": "Payouts",
 	};
 
-	// Check for exact match first
-	if (routeTitles[pathname]) {
-		return routeTitles[pathname];
-	}
-	// More specific matching for different route sections
-	if (pathname.startsWith("/admin/dashboard/")) {
-		return "Admin Dashboard";
-	}
-	if (pathname.startsWith("/admin/manage-users")) {
-		return "Manage Users";
-	}
-	if (pathname.startsWith("/admin/manage-users/creators")) {
-		return "Manage Creators";
-	}
-
-	if (pathname.startsWith("/admin/manage-users/brands/")) {
+	 // Check for paths with IDs first (more specific routes)
+	 if (pathname.startsWith("/admin/manage-users/brands/")) {
 		return "Manage Brands";
-	}
-
-	if (pathname.startsWith("/admin/campaigns/projects")) {
-		return "Projects";
-	}
-	if (pathname.startsWith("/admin/campaigns/contests")) {
-		return "Contests";
-	}
-	if (pathname.startsWith("/admin/payouts")) {
+	  }
+	  if (pathname.startsWith("/admin/manage-users/creators/")) {
+		return "Manage Creators";
+	  }
+	  if (pathname.startsWith("/admin/manage-projects/")) {
+		return "Campaign - Projects";
+	  }
+	  if (pathname.startsWith("/admin/manage-contests/")) {
+		return "Campaign - Contests";
+	  }
+	
+	  // Check for exact match
+	  if (routeTitles[pathname]) {
+		return routeTitles[pathname];
+	  }
+	  
+	  // More general route matching
+	  if (pathname.startsWith("/admin/dashboard/")) {
+		return "Admin Dashboard";
+	  }
+	  if (pathname.startsWith("/admin/manage-users/brands")) {
+		return "Manage Brands";
+	  }
+	  if (pathname.startsWith("/admin/manage-users/creators")) {
+		return "Manage Creators";
+	  }
+	  if (pathname.startsWith("/admin/manage-users")) {
+		return "Manage Users";
+	  }
+	  if (pathname.startsWith("/admin/manage-projects")) {
+		return "Campaign - Projects";
+	  }
+	  if (pathname.startsWith("/admin/payouts")) {
 		return "Payouts";
-	}
-
-	// Default fallback
-	return "Admin Dashboard";
+	  }
+	
+	  // Default fallback
+	  return "Admin Dashboard";
 };
 
 const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({

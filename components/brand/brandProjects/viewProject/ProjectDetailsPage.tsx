@@ -8,7 +8,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectFormData } from "@/types/contestFormData";
-import { getStatusDot, getStatusStyle } from "@/utils/statusUtils";
+import { getStatusStyle } from "@/utils/statusUtils";
 import ProjectApplications from "./ProjectApplications";
 import ProjectSubmissions from "./ProjectSubmissions";
 import ProductDelivery from "./ProductDelivery";
@@ -55,8 +55,8 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 	if (loading) {
 		return (
 			<div className="flex flex-col items-center justify-center h-screen">
-				<div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
-				<div className="p-8 text-center">Loading project details...</div>
+				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+				<div className="text-center">Loading project details...</div>
 			</div>
 		);
 	}
@@ -115,13 +115,10 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 							{projectDetails.projectName}
 						</h1>
 						<div
-							className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${getStatusStyle(project.status)}`}
-						>
-							<span
-								className={`inline-block w-1.5 h-1.5 rounded-full ${getStatusDot(project.status)}`}
-							></span>
-							<p className="capitalize">{project.status}</p>
-						</div>
+												className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${getStatusStyle(project.status).color}`}
+											>
+												{getStatusStyle(project.status).text}
+											</div>
 					</div>
 
 					{/* Project Stats */}

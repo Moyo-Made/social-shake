@@ -7,6 +7,7 @@ import {
 	ProjectFormData,
 	ProjectRequirements,
 } from "@/types/contestFormData";
+import { ProjectStatus } from "@/types/projects";
 import React, {
 	createContext,
 	useContext,
@@ -39,7 +40,7 @@ const defaultFormData: ProjectFormData = {
 	},
 
 	projectRequirements: {
-		contentType: "allow-applications",
+		contentType: "",
 		platform: [],
 		aspectRatio: "",
 		duration: "30-seconds",
@@ -105,7 +106,9 @@ const defaultFormData: ProjectFormData = {
 			commissionPerSale: 0,
 		},
 	},
-	status: "",
+	userId: "",
+	status: ProjectStatus.PENDING,
+	createdAt: ""
 };
 
 interface ProjectFormContextType {

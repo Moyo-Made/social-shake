@@ -1,4 +1,5 @@
 import { Incentive } from "@/components/brand/brandProfile/dashboard/newContest/ContestFormContext";
+import { ProjectStatus } from "./projects";
 
 export interface BasicFormData {
 	contestName: string;
@@ -136,8 +137,10 @@ interface CostBreakdown {
 }
 
 export interface ProjectFormData {
-	status: string;
+	userId: string;
+	status: ProjectStatus;
 	projectDetails: ProjectDetails;
 	projectRequirements: ProjectRequirements;
 	creatorPricing: CreatorPricing;
+	createdAt: string;
 }

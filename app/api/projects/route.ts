@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminStorage } from "@/config/firebase-admin";
+import { ProjectStatus } from "@/types/projects"; // Import ProjectStatus enum from types
 
 async function processThumbnail(
   projectThumbnail: File | null,
@@ -182,7 +183,8 @@ export async function POST(request: NextRequest) {
             } else {
               requestData[key] = value;
             }
-          } catch {
+          }
+          catch {
             requestData[key] = value;
           }
         }
@@ -200,42 +202,42 @@ export async function POST(request: NextRequest) {
       status: requestedStatus,
     } = requestData;
 
-      // Check if userId is provided
-      if (!userId) {
-        return NextResponse.json(
-          { error: "User ID is required" },
-          { status: 400 }
-        );
-      }
-      
-      // Only check brand approval status for final submissions, not drafts
-      if (requestedStatus !== "draft") {
-        // Get the user's brand profile to check approval status
-        const brandsSnapshot = await adminDb.collection("brandProfiles")
-          .where("userId", "==", userId)
-          .limit(1)
-          .get();
-          
-        if (!brandsSnapshot.empty) {
-          const brandDoc = brandsSnapshot.docs[0];
-          const brandData = brandDoc.data();
-          
-          // Check if brand is approved
-          if (brandData.status !== "approved") {
-            return NextResponse.json({ 
-              error: "brand_not_approved", 
-              message: "Your brand profile must be approved before creating projects." 
-            }, { status: 403 });
-          }
-        } else {
-          // No brand profile found
+    // Check if userId is provided
+    if (!userId) {
+      return NextResponse.json(
+        { error: "User ID is required" },
+        { status: 400 }
+      );
+    }
+    
+    // Only check brand approval status for final submissions, not drafts
+    if (requestedStatus !== "draft") {
+      // Get the user's brand profile to check approval status
+      const brandsSnapshot = await adminDb.collection("brandProfiles")
+        .where("userId", "==", userId)
+        .limit(1)
+        .get();
+        
+      if (!brandsSnapshot.empty) {
+        const brandDoc = brandsSnapshot.docs[0];
+        const brandData = brandDoc.data();
+        
+        // Check if brand is approved
+        if (brandData.status !== "approved") {
           return NextResponse.json({ 
-            error: "brand_profile_missing", 
-            message: "You need to create a brand profile and get it approved before creating projects." 
+            error: "brand_not_approved", 
+            message: "Your brand profile must be approved before creating projects." 
           }, { status: 403 });
         }
+      } else {
+        // No brand profile found
+        return NextResponse.json({ 
+          error: "brand_profile_missing", 
+          message: "You need to create a brand profile and get it approved before creating projects." 
+        }, { status: 403 });
       }
-    
+    }
+  
     // Get user preferences if available
     const userPreferences = await getUserPreferences(userId);
     
@@ -295,7 +297,8 @@ export async function POST(request: NextRequest) {
       if (isThumbnailMissing || isBudgetNotSet || isProjectNameEmpty) {
         determinedStatus = "draft";
       } else {
-        determinedStatus = "Accepting Pitches";
+        // Change from "Accepting Pitches" to "pending" to require admin approval
+        determinedStatus = ProjectStatus.PENDING;
       }
     }
 
@@ -406,6 +409,22 @@ export async function POST(request: NextRequest) {
       // Save to Firestore using admin SDK
       await adminDb.collection("projects").doc(projectId).set(projectData);
 
+      // Create notification for admin about new project that needs approval
+      const brandEmail = await getBrandEmail(userId);
+      if (brandEmail) {
+        await adminDb.collection("notifications").add({
+          recipientEmail: "admin@yourplatform.com", // Change to your admin email
+          message: `New project "${projectDetails.projectName}" requires approval`,
+          status: "unread",
+          type: "project_approval_requested",
+          createdAt: new Date().toISOString(),
+          relatedTo: "project",
+          projectId: projectId,
+          projectName: projectDetails.projectName || "Untitled Project",
+          brandEmail: brandEmail,
+        });
+      }
+
       // Update the draft after successful submission
       await adminDb
         .collection("projectDrafts")
@@ -414,7 +433,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: "Project created successfully",
+        message: "Project created successfully and pending approval",
         data: projectData,
       });
     }
@@ -427,6 +446,25 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     );
+  }
+}
+
+// Helper function to get brand email for notifications
+async function getBrandEmail(userId: string): Promise<string | null> {
+  try {
+    const brandsSnapshot = await adminDb.collection("brandProfiles")
+      .where("userId", "==", userId)
+      .limit(1)
+      .get();
+      
+    if (!brandsSnapshot.empty) {
+      const brandData = brandsSnapshot.docs[0].data();
+      return brandData.email || null;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error getting brand email:", error);
+    return null;
   }
 }
 
@@ -592,7 +630,9 @@ export async function PUT(request: NextRequest) {
         },
         projectRequirements,
         creatorPricing,
-        status,
+        // If current status is PENDING/REJECTED and substantial edits have been made, 
+        // set back to PENDING for re-approval
+        status: projectData?.status === ProjectStatus.REJECTED ? ProjectStatus.PENDING : status,
         updatedAt: new Date().toISOString(),
       };
 
@@ -601,6 +641,24 @@ export async function PUT(request: NextRequest) {
         .collection("projects")
         .doc(projectId)
         .update(updatedData);
+
+      // Notify admin if project was in REQUEST_EDIT status and is now fixed
+      if (projectData?.status === ProjectStatus.REQUEST_EDIT) {
+        const brandEmail = await getBrandEmail(userId);
+        if (brandEmail) {
+          await adminDb.collection("notifications").add({
+            recipientEmail: "admin@yourplatform.com", // Change to your admin email
+            message: `Project "${projectDetails.projectName}" has been edited and requires review`,
+            status: "unread",
+            type: "project_edit_submitted",
+            createdAt: new Date().toISOString(),
+            relatedTo: "project",
+            projectId: projectId,
+            projectName: projectDetails.projectName || projectData?.projectDetails?.projectName || "Untitled Project",
+            brandEmail: brandEmail,
+          });
+        }
+      }
 
       return NextResponse.json({
         success: true,

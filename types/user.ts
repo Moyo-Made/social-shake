@@ -23,6 +23,7 @@ export interface User {
 	REJECTED = 'rejected',
 	INFO_REQUESTED = 'info_requested'
   }
+
   
   export interface Brand extends User {
 	companyName: string;
