@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminStorage } from "@/config/firebase-admin";
 import { ProjectStatus } from "@/types/projects";
-import { compress, decompress } from "lz-string"; // Add this package to your dependencies
+import { compress, decompress } from "lz-string"; 
 
 // Constants for payload management
 const MAX_JSON_SIZE = 50 * 1024 * 1024; // 50MB max JSON size
