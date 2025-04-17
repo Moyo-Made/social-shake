@@ -115,10 +115,10 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 							{projectDetails.projectName}
 						</h1>
 						<div
-												className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${getStatusStyle(project.status).color}`}
-											>
-												{getStatusStyle(project.status).text}
-											</div>
+							className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${getStatusStyle(project.status).color}`}
+						>
+							{getStatusStyle(project.status).text}
+						</div>
 					</div>
 
 					{/* Project Stats */}
@@ -207,7 +207,7 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 					</div>
 
 					{/* Project Description */}
-					<div className="flex gap-32 w-full">
+					<div className="flex gap-[8.5rem] w-full">
 						<h3 className="text-[#667085] font-normal">Project Description:</h3>
 						<p className="whitespace-pre-line max-w-2xl">
 							{Array.isArray(projectDetails.projectDescription)
@@ -220,9 +220,25 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 					<div className="flex gap-28">
 						<h3 className="text-[#667085] font-normal w-40">Content Type:</h3>
 						<p>
-							{projectRequirements.contentType === "allow-applications"
-								? "Product Showcase"
-								: projectRequirements.contentType}
+							{(() => {
+								// Make sure we're accessing the correct property path
+								const contentType = projectRequirements.contentType;
+
+								// Map technical values to display-friendly names
+								const contentTypeMap = {
+									"product-showcase": "Product Showcase",
+									testimonials: "Testimonials",
+									tutorials: "Tutorials",
+									"trend-participation": "Trend Participation",
+								};
+
+								// Return the mapped name if it exists, otherwise use the original value
+								return (
+									contentTypeMap[contentType as keyof typeof contentTypeMap] ||
+									contentType ||
+									"Not specified"
+								);
+							})()}
 						</p>
 					</div>
 
@@ -240,9 +256,21 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 					<div className="flex gap-28">
 						<h3 className="text-[#667085] font-normal w-40">Video Type:</h3>
 						<p>
-							{projectRequirements.videoType === "client-script"
-								? "Client's Script"
-								: projectRequirements.videoType}
+							{(() => {
+								const videoType = projectRequirements.videoType;
+
+								const videoTypeMap = {
+									"client-script": "Client's Script",
+									"creator-script": "Creator's Script",
+								};
+
+								// Return the mapped name if it exists, otherwise use the original value
+								return (
+									videoTypeMap[videoType as keyof typeof videoTypeMap] ||
+									videoType ||
+									"Not specified"
+								);
+							})()}
 						</p>
 					</div>
 
@@ -255,7 +283,7 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 					{/* Client's Script */}
 					{projectRequirements.videoType === "client-script" &&
 						projectRequirements.script && (
-							<div className="flex gap-40 w-full">
+							<div className="flex gap-[10.7rem] w-full">
 								<h3 className="text-[#667085] font-normal">
 									Client&apos;s Script:
 								</h3>
@@ -322,7 +350,22 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 
 						<div className="flex gap-28">
 							<h3 className="text-[#667085] font-normal w-40">Gender:</h3>
-							<p>{creatorPricing.gender || "Female"}</p>
+							
+							{(() => {
+								const genderType = creatorPricing.gender;
+
+								const genderTypeMap = {
+									male: "Male",
+									female: "Female",
+								};
+
+								// Return the mapped name if it exists, otherwise use the original value
+								return (
+									genderTypeMap[genderType as keyof typeof genderTypeMap] ||
+									genderType ||
+									"Not specified"
+								);
+							})()}
 						</div>
 
 						<div className="flex gap-28">

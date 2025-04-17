@@ -13,16 +13,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { EyeIcon } from "lucide-react";
-
-// Add a new interface for brand profiles
-interface BrandProfile {
-	id: string;
-	userId: string;
-	email: string;
-	brandName?: string;
-	logoUrl?: string;
-	status?: string;
-}
+import { BrandProfile } from "@/types/user";
 
 interface Project {
 	id: string;

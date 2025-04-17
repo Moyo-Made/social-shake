@@ -25,12 +25,11 @@ export interface User {
   }
 
   
-  export interface Brand extends User {
-	companyName: string;
-	industry: string;
+  export interface BrandProfile {
+	id: string;
+	userId: string;
+	email: string;
+	brandName?: string;
 	logoUrl?: string;
-	status: BrandStatus;
-	rejectionReason?: string;
-	requestedInfo?: string;
-	// Any other brand-specific fields
-  }
+	status?: string;
+}

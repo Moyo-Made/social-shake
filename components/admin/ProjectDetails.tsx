@@ -7,14 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ProjectStatus } from "@/types/projects";
 import { ProjectFormData } from "@/types/contestFormData";
-import { Brand } from "@/types/user";
+import { BrandProfile } from "@/types/user";
+import Image from "next/image";
 
 const ProjectDetailsPage: React.FC = () => {
 	const params = useParams();
 	const projectId = params?.projectId as string;
 	const userId = params?.userId as string;
 
-	const [brand, setBrand] = useState<Brand | null>(null);
+	const [brandProfiles, setBrandProfiles] = useState<BrandProfile | null>(null);
+
 	const [project, setProject] = useState<ProjectFormData | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -42,7 +44,9 @@ const ProjectDetailsPage: React.FC = () => {
 					setProject(JSON.parse(storedProject));
 				} else {
 					// If not in localStorage, fetch from API
-					const response = await fetch(`/api/admin/project?projectId=${projectId}`);
+					const response = await fetch(
+						`/api/admin/project/projectId?=${projectId}`
+					);
 
 					if (!response.ok) {
 						throw new Error("Failed to fetch project details");
@@ -76,7 +80,7 @@ const ProjectDetailsPage: React.FC = () => {
 				const storedBrand = localStorage.getItem("viewingBrand");
 
 				if (storedBrand) {
-					setBrand(JSON.parse(storedBrand));
+					setBrandProfiles(JSON.parse(storedBrand));
 				} else {
 					// If not in localStorage, fetch from API using the userId
 					const response = await fetch(`/api/admin/brand/${userId}`);
@@ -86,7 +90,7 @@ const ProjectDetailsPage: React.FC = () => {
 					}
 
 					const data = await response.json();
-					setBrand(data.brand);
+					setBrandProfiles(data.brandProfiles);
 				}
 			} catch (err) {
 				console.error("Error fetching brand profile:", err);
@@ -119,7 +123,7 @@ const ProjectDetailsPage: React.FC = () => {
 					projectId: projectId,
 					action: actionType,
 					message: actionMessage,
-					brandEmail: brand?.email || "",
+					brandEmail: brandProfiles?.email || "",
 				}),
 			});
 
@@ -247,7 +251,7 @@ const ProjectDetailsPage: React.FC = () => {
 		const statusConfig = {
 			active: {
 				color: "bg-[#FFF0C3] border border-[#FDD849] text-[#1A1A1A]",
-				text: "• Accepting Pitches",
+				text: "✓ Accepting Pitches",
 			},
 			completed: {
 				color: "bg-[#EEF4FF] border border-[#A1B3F7] text-[#3538CD]",
@@ -328,145 +332,173 @@ const ProjectDetailsPage: React.FC = () => {
 				</Link>
 			</div>
 
-			{/* Main project card */}
-			<div className="overflow-hidden mb-6">
-				{/* Project header with title and actions */}
-				<div className="flex flex-col md:flex-row justify-between items-start md:items-center pl-6">
-					<div className="flex items-center mb-4 md:mb-0">
-						<div className="flex gap-2">
-							<h1 className="text-xl font-semibold text-gray-900">
-								{project.projectDetails.projectName || "Unknown Project"}
-							</h1>
-							<div className="">
-								<StatusBadge status={project.status} />
-							</div>
-						</div>
-					</div>
-
-					{/* Action buttons */}
-					<div className="flex flex-wrap gap-2 mt-4 md:mt-0">
-						{/* Show Activate Project button when status is pending or canceled */}
-						{(project.status === "pending" ||
-							project.status === "rejected") && (
-							<Button
-								className="px-5 bg-[#067647] text-white rounded-lg hover:bg-green-700 transition-colors duration-200"
-								onClick={() => {
-									setActionType("activate");
-									setShowModal(true);
-								}}
-							>
-								Activate Project
-							</Button>
-						)}
-
-						{/* Show Complete Project button when status is active */}
-						{project.status === "active" && (
-							<Button
-								className="px-6 bg-[#3538CD] text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
-								onClick={() => {
-									setActionType("completed");
-									setShowModal(true);
-								}}
-							>
-								Mark as Completed
-							</Button>
-						)}
-
-						{/* Show Cancel Project button when status is active or pending */}
-						{(project.status === "active" || project.status === "pending") && (
-							<Button
-								className="px-6 bg-[#E61A1A] text-white rounded-lg hover:bg-red-700 transition-colors duration-200"
-								onClick={() => {
-									setActionType("rejected");
-									setShowModal(true);
-								}}
-							>
-								Reject Project
-							</Button>
-						)}
-					</div>
+			{/* Project header with title and status */}
+			<div className="flex flex-col md:flex-row justify-between items-start mb-6">
+				<div className="flex items-center gap-2">
+					<h1 className="text-2xl font-semibold text-gray-900">
+						{project.projectDetails.projectName || "Unknown Project"}
+					</h1>
+					<StatusBadge status={project.status} />
 				</div>
 
-				{/* Project information section */}
-				<div className=" gap-6 mt-6">
-					{/* Left column - Project details */}
-					<div className="">
-						<div className="rounded-xl border border-[#6670854D] p-6">
-							<div className="space-y-6">
-								<div>
-									<p className="text-gray-500 mb-1">Project Type</p>
-									<p className="text-black">
-										{project.projectDetails.productType}
-									</p>
+				{/* Action buttons */}
+				<div className="flex flex-wrap gap-2 mt-4 md:mt-0">
+					{/* Show Activate Project button when status is pending or rejected */}
+					{(project.status === "pending" || project.status === "rejected") && (
+						<Button
+							className="px-5 bg-[#067647] text-white rounded-lg hover:bg-green-700 transition-colors duration-200"
+							onClick={() => {
+								setActionType("activate");
+								setShowModal(true);
+							}}
+						>
+							Activate Project
+						</Button>
+					)}
+
+					{/* Show Complete Project button when status is active */}
+					{project.status === "active" && (
+						<Button
+							className="px-6 bg-[#3538CD] text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+							onClick={() => {
+								setActionType("completed");
+								setShowModal(true);
+							}}
+						>
+							Mark as Completed
+						</Button>
+					)}
+
+					{/* Show Reject Project button when status is active or pending */}
+					{(project.status === "active" || project.status === "pending") && (
+						<Button
+							className="px-6 bg-[#E61A1A] text-white rounded-lg hover:bg-red-700 transition-colors duration-200"
+							onClick={() => {
+								setActionType("rejected");
+								setShowModal(true);
+							}}
+						>
+							Reject Project
+						</Button>
+					)}
+				</div>
+			</div>
+
+			{/* Main content - Two column layout */}
+			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+				{/* Left column - Project details */}
+				<div className="lg:col-span-2">
+					{/* Project details in row layout */}
+					<div className="mb-6">
+						<div className="grid grid-cols-1 md:grid-cols-3 mb-4 pb-2">
+							<div className="font-medium text-gray-500">Project Type</div>
+							<div className="md:col-span-2">
+								{project.projectDetails.projectType}
+							</div>
+						</div>
+
+						<div className="grid grid-cols-1 md:grid-cols-3 mb-4 pb-2">
+							<div className="font-medium text-gray-500">
+								Project Description
+							</div>
+							<div className="md:col-span-2">
+								{project.projectDetails.projectDescription}
+							</div>
+						</div>
+
+						<div className="grid grid-cols-1 md:grid-cols-3 mb-4 pb-2 ">
+							<div className="font-medium text-gray-500">Content Type</div>
+							<div className="md:col-span-2">
+								{(() => {
+									// Make sure we're accessing the correct property path
+									const contentType = project.projectRequirements.contentType;
+
+									// Map technical values to display-friendly names
+									const contentTypeMap = {
+										"product-showcase": "Product Showcase",
+										testimonials: "Testimonials",
+										tutorials: "Tutorials",
+										"trend-participation": "Trend Participation",
+									};
+
+									// Return the mapped name if it exists, otherwise use the original value
+									return (
+										contentTypeMap[
+											contentType as keyof typeof contentTypeMap
+										] ||
+										contentType ||
+										"Not specified"
+									);
+								})()}
+							</div>
+						</div>
+
+						<div className="grid grid-cols-1 md:grid-cols-3 mb-4 pb-2 ">
+							<div className="font-medium text-gray-500">Video Type</div>
+							<div className="md:col-span-2">
+								{(() => {
+									const videoType = project.projectRequirements.videoType;
+
+									const videoTypeMap = {
+										"client-script": "Client's Script",
+										"creator-script": "Creator's Script",
+									};
+
+									// Return the mapped name if it exists, otherwise use the original value
+									return (
+										videoTypeMap[videoType as keyof typeof videoTypeMap] ||
+										videoType ||
+										"Not specified"
+									);
+								})()}
+							</div>
+						</div>
+
+						<div className="grid grid-cols-1 md:grid-cols-3 mb-4 pb-2">
+							<div className="font-medium text-gray-500">Aspect Ratio</div>
+							<div className="md:col-span-2">
+								{project.projectRequirements.aspectRatio || "Not specified"}
+							</div>
+						</div>
+
+						<div className="grid grid-cols-1 md:grid-cols-3 mb-4 pb-2">
+							<div className="font-medium text-gray-500">
+								Client&apos;s Script
+							</div>
+							<div className="md:col-span-2">
+								{project.projectRequirements.script || "No script provided"}
+							</div>
+						</div>
+
+						{project.projectRequirements.contentLinks &&
+							project.projectRequirements.contentLinks.length > 0 && (
+								<div className="grid grid-cols-1 md:grid-cols-3 mb-4 pb-2">
+									<div className="font-medium text-gray-500">
+										Links of Content you like
+									</div>
+									<div className="md:col-span-2 text-orange-500">
+										{project.projectRequirements.contentLinks.map(
+											(link, index) => (
+												<a
+													key={index}
+													href={link}
+													target="_blank"
+													rel="noopener noreferrer"
+													className="block hover:underline mb-1"
+												>
+													{link}
+												</a>
+											)
+										)}
+									</div>
 								</div>
+							)}
 
-								<div>
-									<p className="text-gray-500 mb-1">Project Description</p>
-									<p className="text-black">
-										{project.projectDetails.projectDescription}
-									</p>
-								</div>
-
-								<div className=" gap-y-6 gap-x-8">
-									<div>
-										<p className="text-gray-500 mb-1">Content Type</p>
-										<p className="text-black">
-											{project.projectRequirements.contentType ||
-												"Not specified"}
-										</p>
-									</div>
-
-									<div>
-										<p className="text-gray-500 mb-1">Video Type</p>
-										<p className="text-black">
-											{project.projectRequirements.videoType || "Not specified"}
-										</p>
-									</div>
-
-									<div>
-										<p className="text-gray-500 mb-1">Aspect Ratio</p>
-										<p className="text-black">
-											{project.projectRequirements.aspectRatio ||
-												"Not specified"}
-										</p>
-									</div>
-
-									<div>
-										<p className="text-gray-500 mb-1">Client&apos;s Script</p>
-										<p className="text-black">
-											{project.projectRequirements.script ||
-												"No script provided"}
-										</p>
-									</div>
-								</div>
-
-								{project.projectRequirements.contentLinks &&
-									project.projectRequirements.contentLinks.length > 0 && (
-										<div>
-											<p className="text-gray-500 mb-1">
-												Links of Content you like
-											</p>
-											<div className="text-orange-500">
-												{project.projectRequirements.contentLinks.map(
-													(link, index) => (
-														<a
-															key={index}
-															href={link}
-															target="_blank"
-															rel="noopener noreferrer"
-															className="block hover:underline mb-1"
-														>
-															{link}
-														</a>
-													)
-												)}
-											</div>
-										</div>
-									)}
-
-								{project.projectRequirements.brandAssets && (
-									<div>
-										<p className="text-gray-500 mb-1">Brand Assets</p>
+						{project.projectRequirements.brandAssets &&
+							project.projectRequirements.contentLinks.length > 0 && (
+								<div className="grid grid-cols-1 md:grid-cols-3 mb-4">
+									<div className="font-medium text-gray-500">Brand Assets</div>
+									<div className="md:col-span-2">
 										<a
 											href={project.projectRequirements.brandAssets}
 											target="_blank"
@@ -476,89 +508,140 @@ const ProjectDetailsPage: React.FC = () => {
 											{project.projectRequirements.brandAssets}
 										</a>
 									</div>
-								)}
+								</div>
+							)}
+
+						{/* Target audience info */}
+						<div>
+							<div className="">
+								<div className="grid grid-cols-1 md:grid-cols-3 text-gray-500 mb-4">
+									<p className="font-medium text-gray-500">Age Group</p>
+									<p className="text-black">
+										{project.creatorPricing.creator?.ageGroup || "18-30"}
+									</p>
+								</div>
+
+								<div className="grid grid-cols-1 md:grid-cols-3 text-gray-500 mb-4">
+									<p className="text-gray-500">Gender</p>
+									<p className="text-black">
+										{(() => {
+											const genderType = project.creatorPricing.creator?.gender;
+
+											const genderTypeMap = {
+												male: "Male",
+												female: "Female",
+											};
+
+											// Return the mapped name if it exists, otherwise use the original value
+											return (
+												genderTypeMap[
+													genderType as keyof typeof genderTypeMap
+												] ||
+												genderType ||
+												"Not specified"
+											);
+										})()}
+									</p>
+								</div>
+
+								<div className="grid grid-cols-1 md:grid-cols-3 text-gray-500 mb-4">
+									<p className="text-gray-500">Industry</p>
+									<p className="text-black">
+										{project.creatorPricing.creator?.industry ||
+											"Beauty & Wellness"}
+									</p>
+								</div>
+
+								<div className="grid grid-cols-1 md:grid-cols-3 text-gray-500 mb-4">
+									<p className="text-gray-500">Language</p>
+									<p className="text-black">
+										{project.creatorPricing.creator?.language || "English"}
+									</p>
+								</div>
+
+								<div className="grid grid-cols-1 md:grid-cols-3 text-gray-500 mb-4">
+									<p className="text-gray-500">No of Creators</p>
+									<p className="text-black">
+										{project.creatorPricing.creatorCount || "2"} Creators
+									</p>
+								</div>
 							</div>
 						</div>
 					</div>
+				</div>
 
-					{/* Right column - Brand info and cost */}
-					<div className="lg:col-span-1">
-						{/* Brand info card */}
-						<div className="rounded-xl border border-[#6670854D] p-6 mb-6">
-							{/* <div className="flex items-center mb-4">
-                {project..brandLogoUrl ? (
-                  <Image
-                    src={project.brandLogoUrl}
-                    alt={`${project.brandName} logo`}
-                    width={40}
-                    height={40}
-                    className="rounded-full mr-3"
-                  />
-                ) : (
-                  <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-pink-500 rounded-full flex items-center justify-center mr-3">
-                    <span className="text-white text-xs font-bold">
-                      {project.brandName?.substring(0, 2).toUpperCase() || "BR"}
-                    </span>
-                  </div>
-                )}
-                <p className="font-semibold">{project.brandName || ""}</p>
-              </div> */}
-
-							<div className="space-y-4">
-								<div>
-									<p className="text-gray-500 mb-1">Published On</p>
-									<p className="text-black">
-										{new Date(project.createdAt).toISOString().split("T")[0]}
-									</p>
-								</div>
-
-								<div>
-									<p className="text-gray-500 mb-1">Product Type</p>
-									<p className="text-black">
-										{project.projectDetails.productType || ""}
-									</p>
-								</div>
-
-								<div>
-									<p className="text-gray-500 mb-1">Number of Videos</p>
-									<p className="text-black">
-										{project.creatorPricing.totalVideos || ""} Videos
-									</p>
-								</div>
-							</div>
+				{/* Right column - Brand and cost information */}
+				<div className="lg:col-span-1">
+					{/* Brand info card */}
+					<div className="rounded-xl border border-[#FFBF9B] p-6 mb-6">
+						<div className="flex items-center mb-4">
+							<Image
+								src={brandProfiles?.logoUrl || ""}
+								alt="Brand Logo"
+								width={32}
+								height={32}
+								className="w-8 h-8 rounded-full mr-2"
+							/>
+							<p className="font-semibold">{brandProfiles?.brandName || ""}</p>
 						</div>
 
-						{/* Cost breakdown card */}
-						<div className="rounded-xl border border-[#6670854D] p-6">
-							<h2 className="font-semibold mb-4">Cost Breakdown</h2>
+						<div className="space-y-4">
+							<div>
+								<p className="text-gray-500 mb-1">Published On</p>
+								<p className="text-black">
+									{new Date(project.createdAt).toLocaleDateString()}
+								</p>
+							</div>
 
-							<div className="space-y-4">
+							<div>
+								<p className="text-gray-500 mb-1">Product Type</p>
+								<p className="text-black">
+									{project.projectDetails.productType || "Physical Product"}
+								</p>
+							</div>
+
+							<div className="">
+								<p className="text-gray-500 mb-1">Number of Videos</p>
+								<p className="text-black">
+									{project.creatorPricing.totalVideos || ""} Videos
+								</p>
+							</div>
+						</div>
+						{/* Cost breakdown card */}
+						<div className="rounded-xl bg-[#FFF4EE] mt-5 p-6">
+							<h2 className="font-semibold mb-3">Cost Breakdown</h2>
+
+							<div className="space-y-2">
 								<div>
 									<p className="text-gray-500 mb-1">Total Budget</p>
 									<p className="text-black font-semibold">
 										$
-										{project.creatorPricing.totalBudget?.toLocaleString() || ""}
+										{project.creatorPricing.totalBudget?.toLocaleString() ||
+											"6,000.00"}
 									</p>
 									<p className="text-gray-500 text-sm">
-										(Based on $1,500 per video × 4 videos)
+										(Based on $1,500 per video ×{" "}
+										{project.creatorPricing.totalVideos || "4"} videos)
 									</p>
 								</div>
 
 								<div>
 									<p className="text-gray-500 mb-1">Extras</p>
 									<p className="text-black">
-										${project.creatorPricing.extrasTotal}
+										${project.creatorPricing.extrasTotal || "600.00"}
 									</p>
 									<div className="text-gray-500 text-sm">
 										<p>
-											Music - {project.creatorPricing.extras.musicPrice} ×{" "}
-											{project.creatorPricing.totalVideos} Videos ={" "}
-											{project.creatorPricing.extras.musicTotal}
+											Music - $
+											{project.creatorPricing.extras?.musicPrice || "50"} ×{" "}
+											{project.creatorPricing.totalVideos || "4"} Videos = $
+											{project.creatorPricing.extras?.musicTotal || "200"}
 										</p>
 										<p>
-											Raw Files - {project.creatorPricing.extras.rawFilesPrice}{" "}
-											× {project.creatorPricing.totalVideos} Videos ={" "}
-											{project.creatorPricing.extras.rawFilesTotal}
+											Raw Files - $
+											{project.creatorPricing.extras?.rawFilesPrice || "100"} ×{" "}
+											{project.creatorPricing.totalVideos || "4"} Videos = $
+											{project.creatorPricing.extras?.rawFilesTotal || "400"}
 										</p>
 									</div>
 								</div>
@@ -569,52 +652,10 @@ const ProjectDetailsPage: React.FC = () => {
 										<p className="font-bold text-xl">
 											$
 											{(
-												project.creatorPricing.totalAmount || ""
+												project.creatorPricing.totalAmount || "6,600.00"
 											).toLocaleString()}
 										</p>
 									</div>
-								</div>
-							</div>
-						</div>
-
-						{/* Target audience info */}
-						<div className="rounded-xl border border-[#6670854D] p-6 mt-6">
-							<h2 className="font-semibold mb-4">Target Audience</h2>
-
-							<div className="grid grid-cols-2 gap-4">
-								<div>
-									<p className="text-gray-500 mb-1">Age Group</p>
-									<p className="text-black">
-										{project.creatorPricing.creator.ageGroup || ""}
-									</p>
-								</div>
-
-								<div>
-									<p className="text-gray-500 mb-1">Gender</p>
-									<p className="text-black">
-										{project.creatorPricing.creator.gender || ""}
-									</p>
-								</div>
-
-								<div>
-									<p className="text-gray-500 mb-1">Industry</p>
-									<p className="text-black">
-										{project.creatorPricing.creator.industry || ""}
-									</p>
-								</div>
-
-								<div>
-									<p className="text-gray-500 mb-1">Language</p>
-									<p className="text-black">
-										{project.creatorPricing.creator.language || ""}
-									</p>
-								</div>
-
-								<div>
-									<p className="text-gray-500 mb-1">No of Creators</p>
-									<p className="text-black">
-										{project.creatorPricing.creatorCount || ""} Creators
-									</p>
 								</div>
 							</div>
 						</div>
