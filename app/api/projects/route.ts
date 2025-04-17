@@ -575,7 +575,7 @@ export async function POST(request: NextRequest) {
       const brandEmail = await getBrandEmail(userId);
       if (brandEmail) {
         await adminDb.collection("notifications").add({
-          recipientEmail: "admin@yourplatform.com", // Change to your admin email
+          recipientEmail: "madetechboy@gmail.com",
           message: `New project "${projectDetails.projectName}" requires approval`,
           status: "unread",
           type: "project_approval_requested",

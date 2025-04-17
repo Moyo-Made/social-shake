@@ -89,8 +89,8 @@ export async function GET(request: NextRequest) {
         hasProjectDraft: projectDraft !== null,
         hasContestDraft: contestDraft !== null,
         summary: {
-          activeProjects: projects.filter(p => p.status === "Accepting Pitches").length,
-          completedProjects: projects.filter(p => p.status === "Completed").length,
+          activeProjects: projects.filter(p => p.status === "active").length,
+          completedProjects: projects.filter(p => p.status === "completed").length,
           activeContests: contests.filter(c => c.status === "active").length,
           completedContests: contests.filter(c => c.status === "completed").length,
         }

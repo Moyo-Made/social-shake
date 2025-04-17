@@ -12,6 +12,7 @@ import { Brand } from "@/types/user";
 const ProjectDetailsPage: React.FC = () => {
 	const params = useParams();
 	const projectId = params?.projectId as string;
+	const userId = params?.userId as string;
 
 	const [brand, setBrand] = useState<Brand | null>(null);
 	const [project, setProject] = useState<ProjectFormData | null>(null);
@@ -41,7 +42,7 @@ const ProjectDetailsPage: React.FC = () => {
 					setProject(JSON.parse(storedProject));
 				} else {
 					// If not in localStorage, fetch from API
-					const response = await fetch(`/api/admin/project/${projectId}`);
+					const response = await fetch(`/api/admin/project?projectId=${projectId}`);
 
 					if (!response.ok) {
 						throw new Error("Failed to fetch project details");
@@ -78,7 +79,7 @@ const ProjectDetailsPage: React.FC = () => {
 					setBrand(JSON.parse(storedBrand));
 				} else {
 					// If not in localStorage, fetch from API using the userId
-					const response = await fetch(`/api/admin/brand/${project.userId}`);
+					const response = await fetch(`/api/admin/brand/${userId}`);
 
 					if (!response.ok) {
 						throw new Error("Failed to fetch brand details");

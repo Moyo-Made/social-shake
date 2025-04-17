@@ -193,7 +193,7 @@ export async function POST(request: NextRequest) {
 	}
 }
 
-// The GET and PUT methods remain unchanged
+
 export async function GET(request: NextRequest) {
 	try {
 		const { searchParams } = new URL(request.url);
@@ -229,7 +229,29 @@ export async function GET(request: NextRequest) {
 			);
 		}
 
-		// If email is provided but no profileId, we need to find the associated userId first
+		// If only userId is provided (no email)
+		if (userId && !email) {
+			// Query the brandProfiles collection for documents where userId matches
+			const brandProfilesQuery = await adminDb
+				.collection("brandProfiles")
+				.where("userId", "==", userId)
+				.limit(1)
+				.get();
+
+			if (!brandProfilesQuery.empty) {
+				const profileData = brandProfilesQuery.docs[0].data();
+				console.log("Retrieved profile data by userId:", profileData);
+				return NextResponse.json(profileData);
+			}
+
+			console.warn(`No profile found for userId: ${userId}`);
+			return NextResponse.json(
+				{ error: "Brand profile not found" },
+				{ status: 404 }
+			);
+		}
+
+		// If email is provided but no userId, we need to find the associated userId first
 		if (email && !userId) {
 			console.log("Looking up user by email:", email);
 			const userQuery = await adminDb
@@ -255,37 +277,45 @@ export async function GET(request: NextRequest) {
 			}
 		}
 
+		// If we still have no userId at this point, return an error
 		if (!userId) {
 			console.warn("No userId available for profile lookup");
 			return NextResponse.json(
-				{ error: "UserID is required" },
+				{ error: "UserID or email is required" },
 				{ status: 400 }
 			);
 		}
 
-		if (!email) {
-			console.warn("No email provided for brand profile lookup");
-			return NextResponse.json({ error: "Email is required" }, { status: 400 });
+		// If we have both email and userId, try to get the profile by email first
+		if (email) {
+			const brandRef = adminDb.collection("brandProfiles").doc(email);
+			const docSnap = await brandRef.get();
+			
+			if (docSnap.exists) {
+				const profileData = docSnap.data();
+				console.log("Retrieved profile data by email:", profileData);
+				return NextResponse.json(profileData);
+			}
 		}
 
-		// Get all brand profiles for this user (we'll return the first one by default)
-		const brandRef = adminDb.collection("brandProfiles").doc(email);
-		const docSnap = await brandRef.get();
+		// If we couldn't find by email or no email was provided, try by userId
+		const brandProfilesQuery = await adminDb
+			.collection("brandProfiles")
+			.where("userId", "==", userId)
+			.limit(1)
+			.get();
 
-		console.log("Document exists:", docSnap.exists);
-
-		if (!docSnap.exists) {
-			console.warn(`No profile found for email: ${email}`);
-			return NextResponse.json(
-				{ error: "Brand profile not found" },
-				{ status: 404 }
-			);
+		if (!brandProfilesQuery.empty) {
+			const profileData = brandProfilesQuery.docs[0].data();
+			console.log("Retrieved profile data by userId fallback:", profileData);
+			return NextResponse.json(profileData);
 		}
 
-		const profileData = docSnap.data();
-		console.log("Retrieved profile data:", profileData);
-
-		return NextResponse.json(profileData);
+		console.warn(`No profile found for userId: ${userId}`);
+		return NextResponse.json(
+			{ error: "Brand profile not found" },
+			{ status: 404 }
+		);
 	} catch (error) {
 		console.error("Detailed error fetching brand profile:", error);
 		return NextResponse.json(

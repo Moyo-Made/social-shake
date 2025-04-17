@@ -110,14 +110,11 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "50");
     const page = parseInt(searchParams.get("page") || "1");
     const offset = (page - 1) * limit;
-    
-    console.log("GET brand-approval - Search parameters:", { 
-      userId, email, profileId, status, limit, page 
-    });
+
 
     // If userId is provided, search for brand by userId
     if (userId) {
-      console.log(`Searching for brand with userId: ${userId}`);
+  
       const brandQuery = adminDb.collection("brandProfiles")
         .where("userId", "==", userId)
         .limit(1);
