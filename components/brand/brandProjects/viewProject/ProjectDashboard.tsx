@@ -483,9 +483,9 @@ const ProjectDashboard = () => {
 									</p>
 								</div>
 
-								{/* Project Details Section */}
+								{/* Project Details Section - GRID VIEW - UPDATED TO 3 COLUMNS */}
 								<div className="border-t border-gray-200 pt-4">
-									<div className="flex justify-between items-center gap-4 mb-6">
+									<div className="grid grid-cols-3 gap-4 mb-6">
 										{/* Project Budget */}
 										<div className="flex items-center gap-2">
 											<Image
@@ -537,14 +537,23 @@ const ProjectDashboard = () => {
 
 									{/* Show Submissions conditionally */}
 									{shouldShowSubmissions(project.status) && (
-										<div className="pl-8 mb-6">
-											<p className="text-sm text-orange-500 font-medium">
-												Submissions
-											</p>
-											<p className="text-sm font-normal">
-												{project.submissions.videos} Videos •{" "}
-												{project.submissions.pending} Pending
-											</p>
+										<div className="flex items-center gap-2 mb-6">
+											<Image
+												src="/icons/applied.svg"
+												alt="Submissions icon"
+												width={25}
+												height={25}
+											/>
+											<div>
+												<p className="text-sm text-orange-500 font-medium">
+													Submissions
+												</p>
+
+												<p className="text-sm font-normal">
+													{project.submissions.videos} Videos •{" "}
+													{project.submissions.pending} Pending
+												</p>
+											</div>
 										</div>
 									)}
 
@@ -665,7 +674,8 @@ const ProjectDashboard = () => {
 										{project.description}
 									</p>
 
-									<div className="border-t border-gray-200 pt-4 grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+									{/* Project Details Section - LIST VIEW - UPDATED TO 4 COLUMNS */}
+									<div className="border-t border-gray-200 pt-4 grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
 										{/* Project Budget */}
 										<div className="flex items-center gap-2">
 											<Image
@@ -685,7 +695,6 @@ const ProjectDashboard = () => {
 										</div>
 
 										{/* Creators Required */}
-
 										<div>
 											<p className="text-sm text-orange-500 font-medium">
 												Creators Required
@@ -695,37 +704,46 @@ const ProjectDashboard = () => {
 											</p>
 										</div>
 
-										{/* Conditional third section based on status */}
-										{project.status === "active" ||
-											(project.status === "completed" && (
-												<>
-													<div className="flex items-center gap-2">
-														<Image
-															src="/icons/applied.svg"
-															alt="Creator applied icon"
-															width={25}
-															height={25}
-														/>
-														<div>
-															<p className="text-sm text-orange-500 font-medium">
-																Creators Applied
-															</p>
-															<p className="text-sm font-normal">
-																{project.creatorsApplied} Applied
-															</p>
-														</div>
-													</div>
-													<div>
-														<p className="text-orange-500 font-medium">
-															Submissions
-														</p>
-														<p className="text-lg font-semibold">
-															{project.submissions.videos} Videos •{" "}
-															{project.submissions.pending} Pending
-														</p>
-													</div>
-												</>
-											))}
+										{/* Show Creators Applied conditionally */}
+										{shouldShowSubmissions(project.status) && (
+											<div className="flex items-center gap-2">
+												<Image
+													src="/icons/applied.svg"
+													alt="Creator applied icon"
+													width={25}
+													height={25}
+												/>
+												<div>
+													<p className="text-sm text-orange-500 font-medium">
+														Creators Applied
+													</p>
+													<p className="text-sm font-normal">
+														{project.creatorsApplied} Applied
+													</p>
+												</div>
+											</div>
+										)}
+
+										{/* Show Submissions directly in the grid for list view */}
+										{shouldShowSubmissions(project.status) && (
+											<div className="flex items-center gap-2">
+												<Image
+													src="/icons/applied.svg"
+													alt="Submissions icon"
+													width={25}
+													height={25}
+												/>
+												<div>
+													<p className="text-sm text-orange-500 font-medium">
+														Submissions
+													</p>
+													<p className="text-sm font-normal">
+														{project.submissions.videos} Videos •{" "}
+														{project.submissions.pending} Pending
+													</p>
+												</div>
+											</div>
+										)}
 									</div>
 
 									{/* Action Button */}
