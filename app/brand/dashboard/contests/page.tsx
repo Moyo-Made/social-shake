@@ -1,6 +1,5 @@
 "use client";
 
-import BrandContentWrapper from "@/components/brand/brandProfile/BrandContentWrapper";
 import SideNavLayout from "@/components/brand/brandProfile/dashboard/SideNav";
 import ContestDashboard from "@/components/brand/brandProfile/dashboard/ViewContests/ContestDashboard";
 import React from "react";
@@ -19,9 +18,9 @@ const Page = () => {
 	}
 	return (
 		<SideNavLayout>
-			<BrandContentWrapper userId={currentUser.uid} pageType="contests">
+
 				<ContestDashboard />
-			</BrandContentWrapper>
+
 		</SideNavLayout>
 	);
 };

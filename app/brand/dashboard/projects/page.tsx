@@ -1,6 +1,5 @@
 "use client"
 
-import BrandContentWrapper from "@/components/brand/brandProfile/BrandContentWrapper";
 import SideNavLayout from "@/components/brand/brandProfile/dashboard/SideNav";
 import { ProjectFormProvider } from "@/components/brand/brandProjects/ProjectFormContext";
 import ProjectDashboard from "@/components/brand/brandProjects/viewProject/ProjectDashboard";
@@ -20,9 +19,7 @@ const Page = () => {
 	return (
 		<ProjectFormProvider>
 			<SideNavLayout>
-				<BrandContentWrapper userId={currentUser.uid} pageType="projects">
 					<ProjectDashboard />
-				</BrandContentWrapper>
 			</SideNavLayout>
 		</ProjectFormProvider>
 	);
