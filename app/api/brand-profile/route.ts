@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, adminStorage } from "@/config/firebase-admin";
 import { BrandStatus } from "@/types/user";
-import { v4 as uuidv4 } from "uuid"; // You'll need to install this package
+import { v4 as uuidv4 } from "uuid";
 
 export async function POST(request: NextRequest) {
 	try {
@@ -10,7 +10,6 @@ export async function POST(request: NextRequest) {
 		const email = formData.get("email") as string;
 		const userId = formData.get("userId") as string;
 		const profileId = formData.get("profileId") as string; // For editing existing profiles
-		const completeSignup = formData.get("completeSignup") === "true";
 
 		// Extract form data
 		const formDataObj: Record<string, string> = {};
@@ -24,92 +23,22 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json({ error: "Email is required" }, { status: 400 });
 		}
 
-		// For complete signup process
-		let resolvedUserId = userId || "";
-
-		if (completeSignup) {
-			// For new users completing their registration (from localStorage flow)
-			const firstName = formDataObj.firstName;
-			const lastName = formDataObj.lastName;
-			const userType = formDataObj.userType || "brand";
-
-			if (!firstName || !lastName) {
+		// Assuming the Firebase account already exists, verify userId is provided
+		let resolvedUserId = userId;
+		
+		if (!resolvedUserId) {
+			// Try to find the user by email if userId was not provided
+			try {
+				const userRecord = await adminAuth.getUserByEmail(email);
+				resolvedUserId = userRecord.uid;
+			} catch {
 				return NextResponse.json(
 					{
-						error: "missing-user-data",
-						message: "First name and last name are required for registration",
+						error: "user-not-found",
+						message: "User account not found. Please ensure you're signed in first.",
 					},
-					{ status: 400 }
+					{ status: 404 }
 				);
-			}
-
-			// If userId wasn't provided from auth context, check if the account already exists
-			if (!resolvedUserId) {
-				// Check if the email is already in use in the users collection
-				const userQuery = await adminDb
-					.collection("users")
-					.where("email", "==", email)
-					.get();
-
-				if (!userQuery.empty) {
-					// Email already used - extract existing userId
-					resolvedUserId = userQuery.docs[0].id;
-				} else {
-					// The user record should have been created by the auth system
-					// Let's search by email to find the newly created user
-					try {
-						const userRecord = await adminAuth.getUserByEmail(email);
-						if (userRecord) {
-							resolvedUserId = userRecord.uid;
-
-							// Create the user document in Firestore
-							await adminDb.collection("users").doc(resolvedUserId).set({
-								email,
-								firstName,
-								lastName,
-								userType,
-								role: "user",
-								createdAt: new Date().toISOString(),
-								updatedAt: new Date().toISOString(),
-							});
-						}
-					} catch (authError) {
-						console.error("Auth lookup error:", authError);
-						return NextResponse.json(
-							{
-								error: "user-not-found",
-								message: "User account not found. Please try signing up again.",
-							},
-							{ status: 404 }
-						);
-					}
-				}
-			}
-		} else if (!profileId) {
-			// If not completing signup and not editing an existing profile,
-			// ensure the user exists before creating a new profile
-			if (!resolvedUserId) {
-				const userQuery = await adminDb
-					.collection("users")
-					.where("email", "==", email)
-					.get();
-
-				if (!userQuery.empty) {
-					resolvedUserId = userQuery.docs[0].id;
-				} else {
-					try {
-						const userRecord = await adminAuth.getUserByEmail(email);
-						resolvedUserId = userRecord.uid;
-					} catch {
-						return NextResponse.json(
-							{
-								error: "user-not-found",
-								message: "User account not found. Please sign in first.",
-							},
-							{ status: 404 }
-						);
-					}
-				}
 			}
 		}
 
@@ -117,9 +46,6 @@ export async function POST(request: NextRequest) {
 		const newProfileId = profileId || uuidv4();
 
 		// Using Admin SDK for Firestore operations
-		if (!email) {
-			throw new Error("Email is required and cannot be null");
-		}
 		const brandRef = adminDb.collection("brandProfiles").doc(email);
 		const docSnap = await brandRef.get();
 
@@ -128,10 +54,10 @@ export async function POST(request: NextRequest) {
 			string | number | boolean | null | Record<string, string>
 		> = {
 			...formDataObj,
-			email, // Keep email in the data for easier querying
+			email,
 			userId: resolvedUserId,
 			profileId: newProfileId,
-			status: BrandStatus.PENDING, // Set initial status to pending
+			status: BrandStatus.APPROVED,
 			updatedAt: new Date().toISOString(),
 			createdAt: docSnap.exists
 				? docSnap.data()?.createdAt
@@ -236,47 +162,21 @@ export async function POST(request: NextRequest) {
 		// Save to Firestore regardless of image upload result
 		await brandRef.set(profileData, { merge: true });
 
-		// If this is a new brand profile, create an entry in the notifications collection
-		if (!docSnap.exists) {
-			await adminDb.collection("notifications").add({
-				recipientEmail: email,
-				userId: resolvedUserId,
-				profileId: newProfileId,
-				message:
-					"Your brand profile has been submitted for approval. We'll review it shortly.",
-				status: "unread",
-				type: "status_update",
-				createdAt: new Date().toISOString(),
-				relatedTo: "brand_profile",
-			});
-
-			// Also notify admins about the new brand profile
-			const adminQuery = await adminDb
-				.collection("users")
-				.where("role", "==", "admin")
-				.get();
-			if (!adminQuery.empty) {
-				adminQuery.forEach(async (adminDoc) => {
-					await adminDb.collection("notifications").add({
-						recipientEmail: adminDoc.data().email,
-						message: `New brand profile submission from ${email} is pending your approval.`,
-						status: "unread",
-						type: "new_brand",
-						createdAt: new Date().toISOString(),
-						relatedTo: "brand_profile",
-						brandEmail: email,
-						userId: resolvedUserId,
-						profileId: newProfileId,
-					});
-				});
-			}
-		}
+		// Create a success notification for the user
+		await adminDb.collection("notifications").add({
+			recipientEmail: email,
+			userId: resolvedUserId,
+			profileId: newProfileId,
+			message: "Your brand profile has been created successfully and is now active.",
+			status: "unread",
+			type: "status_update",
+			createdAt: new Date().toISOString(),
+			relatedTo: "brand_profile",
+		});
 
 		return NextResponse.json({
 			success: true,
-			message: completeSignup
-				? "Account created and brand profile saved successfully"
-				: "Brand profile saved successfully and submitted for approval",
+			message: "Brand profile created and activated successfully",
 			data: {
 				email,
 				userId: resolvedUserId,
@@ -293,6 +193,7 @@ export async function POST(request: NextRequest) {
 	}
 }
 
+// The GET and PUT methods remain unchanged
 export async function GET(request: NextRequest) {
 	try {
 		const { searchParams } = new URL(request.url);

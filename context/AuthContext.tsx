@@ -11,6 +11,7 @@ import {
 	GoogleAuthProvider,
 	FacebookAuthProvider,
 	getAdditionalUserInfo,
+	User as FirebaseUser,
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "@/config/firebase";
@@ -21,9 +22,9 @@ interface AuthContextType {
 	isAdmin: boolean;
 	isLoading: boolean;
 	error: string | null;
+	hasProfile: boolean;
 	login: (email: string, password: string) => Promise<void>;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	signup: (email: string, password: string) => Promise<{ user: any }>;
+	signup: (email: string, password: string) => Promise<{ user: FirebaseUser }>;
 	loginWithGoogle: () => Promise<{ isExistingAccount: boolean }>;
 	loginWithFacebook: () => Promise<void>;
 	logout: () => Promise<void>;
@@ -36,9 +37,9 @@ const AuthContext = createContext<AuthContextType>({
 	isAdmin: false,
 	isLoading: true,
 	error: null,
+	hasProfile: false,
 	login: async () => {},
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	signup: async () => ({ user: {} as any }),
+	signup: async () => ({ user: {} as FirebaseUser }),
 	loginWithGoogle: async () => ({ isExistingAccount: false }),
 	loginWithFacebook: async () => {},
 	logout: async () => {},
@@ -55,13 +56,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 	const [isAdmin, setIsAdmin] = useState<boolean>(false);
 	const [isLoading, setIsLoading] = useState<boolean>(true);
 	const [error, setError] = useState<string | null>(null);
+	const [hasProfile, setHasProfile] = useState<boolean>(false);
 
 	// Helper function to update user document in Firestore
 	const updateUserDocument = async (
 		uid: string,
 		email: string,
 		isNewUser: boolean = false
-	) => {
+	): Promise<void> => {
 		const userRef = doc(db, "users", uid);
 
 		if (isNewUser) {
@@ -88,9 +90,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 	};
 
 	// Helper function to fetch and set user data
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const fetchUserData = async (firebaseUser: any) => {
+	const fetchUserData = async (firebaseUser: FirebaseUser): Promise<void> => {
 		try {
+			// Make sure we have a valid email before checking brandProfiles
+			if (firebaseUser.email) {
+			  // Check if user has a brand profile
+			  try {
+				const brandProfileDoc = await getDoc(doc(db, "brandProfiles", firebaseUser.email));
+				setHasProfile(brandProfileDoc.exists());
+			  } catch (profileError) {
+				console.warn("Could not check brand profile:", profileError);
+				// Continue with the rest of the function even if this fails
+				setHasProfile(false);
+			  }
+			} else {
+			  setHasProfile(false);
+			}
+
 			// Force refresh to get latest claims
 			await firebaseUser.getIdToken(true);
 			const tokenResult = await firebaseUser.getIdTokenResult();
@@ -129,6 +145,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 			setCurrentUser(null);
 			setIsAdmin(false);
 			setError("Error fetching user data");
+			throw error; // Re-throw to handle in caller
 		}
 	};
 
@@ -136,106 +153,111 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 		setIsLoading(true);
 		const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
 			if (firebaseUser) {
-				await fetchUserData(firebaseUser);
+				try {
+					await fetchUserData(firebaseUser);
+				} catch (error) {
+					console.error("Error in auth state change:", error);
+					// Errors are already set in fetchUserData
+				}
 			} else {
 				setCurrentUser(null);
 				setIsAdmin(false);
+				setHasProfile(false);
 			}
 			setIsLoading(false);
 		});
 
 		return unsubscribe;
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	const clearError = () => {
+	const clearError = (): void => {
 		setError(null);
 	};
 
-	const login = async (email: string, password: string) => {
+	const login = async (email: string, password: string): Promise<void> => {
 		setIsLoading(true);
 		setError(null);
 		try {
-		  const userCredential = await signInWithEmailAndPassword(auth, email, password);
-		  
-		  // Wait for user data to be fetched explicitly
-		  await fetchUserData(userCredential.user);
-		  
+			const userCredential = await signInWithEmailAndPassword(auth, email, password);
+			
+			// Wait for user data to be fetched explicitly before returning
+			await fetchUserData(userCredential.user);
+			
 		} catch (err) {
-		  console.error("Login error:", err);
-		  if (err instanceof Error) {
-			setError(err.message || "Failed to login");
-		  } else {
-			setError("Failed to login");
-		  }
-		  throw err; // Re-throw to handle in the component
+			console.error("Login error:", err);
+			if (err instanceof Error) {
+				setError(err.message || "Failed to login");
+			} else {
+				setError("Failed to login");
+			}
+			throw err; // Re-throw to handle in the component
 		} finally {
-		  setIsLoading(false);
+			setIsLoading(false);
 		}
-	  };
+	};
 
-	  const signup = async (email: string, password: string) => {
+	const signup = async (email: string, password: string): Promise<{ user: FirebaseUser }> => {
 		setIsLoading(true);
 		setError(null);
 		try {
-		  // Create the user
-		  const result = await createUserWithEmailAndPassword(auth, email, password);
-		  
-		  // Create user document in Firestore
-		  await updateUserDocument(result.user.uid, email, true);
-		  
-		  // Explicitly fetch user data to ensure it's loaded
-		  await fetchUserData(result.user);
-		  
-		  // Return the user information
-		  return { user: result.user };
+			// Create the user
+			const result = await createUserWithEmailAndPassword(auth, email, password);
+			
+			// Create user document in Firestore
+			await updateUserDocument(result.user.uid, email, true);
+			
+			// Explicitly fetch user data to ensure it's loaded
+			await fetchUserData(result.user);
+			
+			// Return the user information
+			return { user: result.user };
 		} catch (err) {
-		  console.error("Signup error:", err);
-		  if (err instanceof Error) {
-			setError(err.message || "Failed to create account");
-		  } else {
-			setError("Failed to create account");
-		  }
-		  throw err; // Re-throw to handle in the component
+			console.error("Signup error:", err);
+			if (err instanceof Error) {
+				setError(err.message || "Failed to create account");
+			} else {
+				setError("Failed to create account");
+			}
+			throw err; // Re-throw to handle in the component
 		} finally {
-		  setIsLoading(false);
+			setIsLoading(false);
 		}
-	  };
+	};
 
-	const loginWithGoogle = async () => {
+	const loginWithGoogle = async (): Promise<{ isExistingAccount: boolean }> => {
 		setIsLoading(true);
 		setError(null);
 		const provider = new GoogleAuthProvider();
 		let isNewUser = false;
-	  
+		
 		try {
-		  const result = await signInWithPopup(auth, provider);
-		  const additionalInfo = getAdditionalUserInfo(result);
-		  isNewUser = additionalInfo?.isNewUser ?? false;
-	  
-		  // Make sure to await this operation
-		  if (result.user.email) {
-			await updateUserDocument(result.user.uid, result.user.email, isNewUser);
-		  }
-		  
-		  // Also await fetchUserData to ensure user data is loaded
-		  await fetchUserData(result.user);
-		  
-		  return { isExistingAccount: !isNewUser };
+			const result = await signInWithPopup(auth, provider);
+			const additionalInfo = getAdditionalUserInfo(result);
+			isNewUser = additionalInfo?.isNewUser ?? false;
+			
+			// Make sure to await this operation
+			if (result.user.email) {
+				await updateUserDocument(result.user.uid, result.user.email, isNewUser);
+			}
+			
+			// Also await fetchUserData to ensure user data is loaded
+			await fetchUserData(result.user);
+			
+			return { isExistingAccount: !isNewUser };
 		} catch (err) {
-		  console.error("Google login error:", err);
-		  if (err instanceof Error) {
-			setError(err.message || "Failed to login with Google");
-		  } else {
-			setError("Failed to login with Google");
-		  }
-		  throw err;  // Make sure to throw the error to handle it in the signup function
+			console.error("Google login error:", err);
+			if (err instanceof Error) {
+				setError(err.message || "Failed to login with Google");
+			} else {
+				setError("Failed to login with Google");
+			}
+			throw err;  // Make sure to throw the error to handle it in the component
 		} finally {
-		  setIsLoading(false);
+			setIsLoading(false);
 		}
-	  };
+	};
 
-	const loginWithFacebook = async () => {
+	const loginWithFacebook = async (): Promise<void> => {
 		setIsLoading(true);
 		setError(null);
 		try {
@@ -248,6 +270,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 			if (result.user.email) {
 				await updateUserDocument(result.user.uid, result.user.email, isNewUser);
 			}
+			
+			// Wait for user data to be fetched explicitly
+			await fetchUserData(result.user);
 		} catch (err) {
 			console.error("Facebook login error:", err);
 			if (err instanceof Error) {
@@ -255,16 +280,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 			} else {
 				setError("Failed to login with Facebook");
 			}
+			throw err; // Re-throw to handle in the component
 		} finally {
 			setIsLoading(false);
 		}
 	};
 
-	const logout = async () => {
+	const logout = async (): Promise<void> => {
 		setIsLoading(true);
 		setError(null);
 		try {
 			await signOut(auth);
+			// Clear user state immediately after logout
+			setCurrentUser(null);
+			setIsAdmin(false);
+			setHasProfile(false);
 		} catch (err) {
 			console.error("Logout error:", err);
 			if (err instanceof Error) {
@@ -272,12 +302,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 			} else {
 				setError("Failed to logout");
 			}
+			throw err; // Re-throw to handle in the component
 		} finally {
 			setIsLoading(false);
 		}
 	};
 
-	const resetPassword = async (email: string) => {
+	const resetPassword = async (email: string): Promise<void> => {
 		setIsLoading(true);
 		setError(null);
 		try {
@@ -289,7 +320,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 			} else {
 				setError("Failed to send password reset email");
 			}
-			throw err;
+			throw err; // Re-throw to handle in the component
 		} finally {
 			setIsLoading(false);
 		}
@@ -300,13 +331,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 		isAdmin,
 		isLoading,
 		error,
+		hasProfile,
 		login,
 		signup,
 		loginWithGoogle,
 		loginWithFacebook,
 		logout,
 		resetPassword,
-		clearError,
+		clearError
 	};
 
 	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import UserDashboard from "@/components/brand/brandProfile/dashboard/DashboardOverview";
 import SideNavLayout from "@/components/brand/brandProfile/dashboard/SideNav";
 import { useAuth } from "@/context/AuthContext";
-import BrandContentWrapper from "@/components/brand/brandProfile/BrandContentWrapper";
 import ProtectedRoute from "@/components/brand/brandProfile/ProtectedRoute";
 
 export default function DashboardPage() {
@@ -37,9 +36,8 @@ export default function DashboardPage() {
     <SideNavLayout>
       <div className="p-6">
         <ProtectedRoute>
-          <BrandContentWrapper userId={currentUser.uid} pageType="dashboard">
             <UserDashboard userId={currentUser.uid} />
-          </BrandContentWrapper>
+
         </ProtectedRoute>
       </div>
     </SideNavLayout>

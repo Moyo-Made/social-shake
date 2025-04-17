@@ -330,7 +330,7 @@ const ProjectDetailsPage: React.FC = () => {
 			{/* Main project card */}
 			<div className="overflow-hidden mb-6">
 				{/* Project header with title and actions */}
-				<div className="p-6 flex flex-col md:flex-row justify-between items-start md:items-center ">
+				<div className="flex flex-col md:flex-row justify-between items-start md:items-center pl-6">
 					<div className="flex items-center mb-4 md:mb-0">
 						<div className="flex gap-2">
 							<h1 className="text-xl font-semibold text-gray-900">
@@ -387,9 +387,9 @@ const ProjectDetailsPage: React.FC = () => {
 				</div>
 
 				{/* Project information section */}
-				<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+				<div className=" gap-6 mt-6">
 					{/* Left column - Project details */}
-					<div className="lg:col-span-2">
+					<div className="">
 						<div className="rounded-xl border border-[#6670854D] p-6">
 							<div className="space-y-6">
 								<div>
@@ -406,7 +406,7 @@ const ProjectDetailsPage: React.FC = () => {
 									</p>
 								</div>
 
-								<div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-8">
+								<div className=" gap-y-6 gap-x-8">
 									<div>
 										<p className="text-gray-500 mb-1">Content Type</p>
 										<p className="text-black">

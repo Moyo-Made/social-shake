@@ -11,18 +11,31 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 
+interface FormData {
+	email: string;
+	password: string;
+}
+
+interface FieldErrors {
+	email?: string;
+	password?: string;
+}
+
 const Login = () => {
-	const { login, error: authError, isLoading, clearError } = useAuth();
-	const [formData, setFormData] = useState({
+	const {
+		login,
+		error: authError,
+		isLoading,
+		clearError,
+		hasProfile,
+	} = useAuth();
+	const [formData, setFormData] = useState<FormData>({
 		email: "",
 		password: "",
 	});
 	const [formError, setFormError] = useState<string | null>(null);
-	const [fieldErrors, setFieldErrors] = useState<{
-		email?: string;
-		password?: string;
-	}>({});
-	const [, setIsSubmitting] = useState(false);
+	const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+	const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 	const router = useRouter();
 
 	// Map auth errors to user-friendly form errors when they occur
@@ -65,12 +78,12 @@ const Login = () => {
 	}, [authError]);
 
 	// Clear form errors when inputs change
-	const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+	const handleChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
 		const { id, value } = e.target;
 
 		setFormData({
 			...formData,
-			[id]: value,
+			[id]: value.trim(),
 		});
 
 		// Clear field-specific error when that field changes
@@ -93,10 +106,7 @@ const Login = () => {
 	};
 
 	const validateForm = (): boolean => {
-		const errors: {
-			email?: string;
-			password?: string;
-		} = {};
+		const errors: FieldErrors = {};
 		let isValid = true;
 
 		// Validate email
@@ -118,7 +128,9 @@ const Login = () => {
 		return isValid;
 	};
 
-	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+	const handleSubmit = async (
+		e: React.FormEvent<HTMLFormElement>
+	): Promise<void> => {
 		e.preventDefault();
 
 		// Clear previous errors
@@ -136,11 +148,38 @@ const Login = () => {
 		try {
 			// Attempt to log in
 			await login(formData.email, formData.password);
-			router.push("/brand/dashboard");
+
+			// Check if user has a brand profile
+			try {
+				const response = await fetch(
+					`/api/brand-profile?email=${encodeURIComponent(formData.email)}`
+				);
+
+				if (response.ok) {
+					// User has a profile, go to dashboard
+					router.push("/brand/dashboard");
+				} else if (response.status === 404) {
+					// User doesn't have a profile, go to profile creation
+					router.push("/brand/create-profile");
+				} else {
+					// Handle other API errors
+					setFormError(
+						"There was a problem checking your profile. Please try again."
+					);
+				}
+			} catch (err) {
+				console.error("Profile check error:", err);
+				// If we can't check the profile but authentication succeeded, make a decision based on hasProfile
+				if (hasProfile) {
+					router.push("/brand/dashboard");
+				} else {
+					router.push("/brand/create-profile");
+				}
+			}
 		} catch (err: unknown) {
-			// This catches any errors not handled by the auth context
 			console.error("Login error:", err);
-			setFormError("We're having trouble signing you in. Please try again.");
+			// Don't set the error here as it's already handled by the useEffect that watches authError
+		} finally {
 			setIsSubmitting(false);
 		}
 	};
@@ -151,8 +190,10 @@ const Login = () => {
 				<Image
 					src="/images/social-shake-bg.png"
 					alt="Background Image"
-					layout="fill"
-					objectFit="cover"
+					width={1920}
+					height={1080}
+					priority
+					className="object-cover w-full h-full"
 				/>
 			</div>
 
@@ -235,18 +276,23 @@ const Login = () => {
 
 							<Button
 								type="submit"
-								disabled={isLoading}
+								disabled={isLoading || isSubmitting}
 								className={`w-full bg-[#FD5C02] hover:bg-orange-600 text-white text-[17px] py-5 font-normal ${
-									isLoading ? "opacity-50 cursor-not-allowed" : ""
+									isLoading || isSubmitting
+										? "opacity-50 cursor-not-allowed"
+										: ""
 								}`}
 							>
-								{isLoading ? (
-									"Logging in..."
+								{isLoading || isSubmitting ? (
+									<div className="flex items-center justify-center">
+										<div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white-500 mr-2"></div>
+										<span>Logging in...</span>
+									</div>
 								) : (
-									<>
+									<div className="flex items-center justify-center">
 										Log in
-										<FaArrowRight className="w-5 h-5 ml-2 mt-0.5" />
-									</>
+										<FaArrowRight className="w-5 h-5 ml-2" />
+									</div>
 								)}
 							</Button>
 						</form>

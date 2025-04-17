@@ -131,7 +131,7 @@ export default function BrandContentWrapper({
               <p className="text-gray-600 mb-6">
                 You need to create a brand profile before you can {getPageTypeText()}.
               </p>
-              <Link href="/brand/profile/create">
+              <Link href="/brand/signup">
                 <Button className="w-full">Create Brand Profile</Button>
               </Link>
             </div>

@@ -34,11 +34,9 @@ export const metadata: Metadata = {
 	title: "Social Shake",
 	description: "",
 	icons: {
-		icon: [
-		  { url: '/images/logo.svg', type: 'image/svg+xml' },
-		],
-		apple: { url: '/images/logo.svg', sizes: '180x180' },
-	  }
+		icon: [{ url: "/images/logo.svg", type: "image/svg+xml" }],
+		apple: { url: "/images/logo.svg", sizes: "180x180" },
+	},
 };
 
 export default function RootLayout({
@@ -49,7 +47,7 @@ export default function RootLayout({
 	return (
 		<html lang="en">
 			<body className={`${inter.variable} ${satoshi.variable}`}>
-				<AuthProvider>{children}</AuthProvider>
+					<AuthProvider>{children}</AuthProvider>
 			</body>
 		</html>
 	);
