@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { CheckCircle, Clock, Menu } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { useContestForm } from "../newContest/ContestFormContext";
+import { Incentive, useContestForm } from "../newContest/ContestFormContext";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import Applications from "./Applications";
@@ -14,50 +14,16 @@ import AnalyticsDashboard from "./Metrics";
 import GMVMetrics from "./GMVMetrics";
 import Leaderboard from "./Leaderboard";
 import GMVData from "./GMVData";
-
-// Define types for the contest data structure
-interface PrizeTimeline {
-  startDate?: string;
-  endDate?: string;
-  totalPrize?: number;
-  totalBudget?: number;
-  winnerCount?: number;
-  positions?: number[];
-  criteria?: string;
-}
-
-interface BasicInfo {
-  contestName?: string;
-  description?: string;
-  contestType?: "Leaderboard" | "GMV";
-  industry?: string;
-  rules?: string;
-  thumbnail?: string;
-  script?: string;
-}
-
-interface Requirements {
-  duration?: string;
-  videoType?: string;
-  contentLinks?: string | string[];
-  brandAssets?: string;
-  whoCanJoin?: string;
-}
-
-interface Incentive {
-  name: string;
-  worth: number;
-  description: string;
-}
+import { BasicFormData, ContestType, PrizeTimelineFormData, RequirementsFormData } from "@/types/contestFormData";
 
 interface ContestData {
-  basic?: BasicInfo;
-  prizeTimeline?: PrizeTimeline;
-  requirements?: Requirements;
+  basic?: BasicFormData;
+  prizeTimeline?: PrizeTimelineFormData;
+  requirements?: RequirementsFormData;
   incentives?: Incentive[] | { prizeBreakdown?: string };
   status?: string;
   createdAt?: string;
-  contestType?: "Leaderboard" | "GMV";
+  contestType?: ContestType;
 }
 
 interface ContestDetailPageProps {
@@ -75,13 +41,13 @@ export default function ContestDetailPage({ contestId }: ContestDetailPageProps)
   const contestType = contestData?.contestType || formData?.basic?.contestType?.toLowerCase() || "Leaderboard";
   
   // Format date for display
-  const formatDate = (dateString?: string): string => {
-    if (!dateString) return "Not Set";
-    const date = new Date(dateString);
-    return date instanceof Date && !isNaN(date.getTime()) 
-      ? date.toLocaleDateString("en-US", { year: 'numeric', month: 'long', day: 'numeric' })
-      : "Not Set";
-  };
+  const formatDate = (dateInput?: string | Date): string => {
+      if (!dateInput) return "Not Set";
+      const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+      return date instanceof Date && !isNaN(date.getTime()) 
+        ? date.toLocaleDateString("en-US", { year: 'numeric', month: 'long', day: 'numeric' })
+        : "Not Set";
+    };
   
   // Format status based on dates
   const getContestStatus = (data: ContestData | null): string => {
@@ -165,14 +131,14 @@ export default function ContestDetailPage({ contestId }: ContestDetailPageProps)
   const contestStatus = getContestStatus(contestData);
   const startDate = formatDate(contestData?.prizeTimeline?.startDate);
   const endDate = formatDate(contestData?.prizeTimeline?.endDate);
-  const totalBudget = contestData?.prizeTimeline?.totalPrize || contestData?.prizeTimeline?.totalBudget || 0;
+  const totalBudget =  contestData?.prizeTimeline?.totalBudget || 0;
   const publishedDate = formatDate(contestData?.createdAt);
   const description = contestData?.basic?.description || "No description provided.";
   const rules = contestData?.basic?.rules?.split('\n') || ["No rules specified."];
   const industry = contestData?.basic?.industry || "Not specified";
   const duration = contestData?.requirements?.duration || "Not specified";
   const videoType = contestData?.requirements?.videoType || "Not specified";
-  const clientScript = contestData?.basic?.script?.split('\n') || ["No script provided."];
+  const clientScript = contestData?.requirements?.script || "No script provided.";
   const contentLinksRaw = contestData?.requirements?.contentLinks;
   const contentLinks = Array.isArray(contentLinksRaw) 
     ? contentLinksRaw 
@@ -464,9 +430,7 @@ export default function ContestDetailPage({ contestId }: ContestDetailPageProps)
               <div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
                 <h3 className="text-base text-[#667085] mb-2">Client&apos;s Script</h3>
                 <div className="space-y-2">
-                  {clientScript.map((line, index) => (
-                    <p key={index} className="text-base">{line}</p>
-                  ))}
+                  {clientScript}
                 </div>
               </div>
 

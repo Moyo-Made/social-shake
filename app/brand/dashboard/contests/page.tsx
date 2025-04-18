@@ -18,9 +18,7 @@ const Page = () => {
 	}
 	return (
 		<SideNavLayout>
-
-				<ContestDashboard />
-
+			<ContestDashboard />
 		</SideNavLayout>
 	);
 };

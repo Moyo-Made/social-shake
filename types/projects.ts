@@ -1,13 +1,19 @@
+export enum ContestStatus {
+	PENDING = "pending",
+	ACTIVE = "active",
+	COMPLETED = "completed",
+	REJECTED = "rejected",
+	REQUEST_EDIT = "request_edit",
+}
 
-  export enum ProjectStatus{
-	PENDING = 'pending',
-	ACTIVE = 'active',
-	COMPLETED = 'completed',
-	REJECTED = 'rejected',
-	REQUEST_EDIT = 'request_edit'
+export enum ProjectStatus {
+	PENDING = "pending",
+	ACTIVE = "active",
+	COMPLETED = "completed",
+	REJECTED = "rejected",
+	REQUEST_EDIT = "request_edit",
+}
 
-  }
-
-  export interface DraftStatus{
-	draftStatus: "draft"; 
-  }
+export interface DraftStatus {
+	draftStatus: "draft";
+}

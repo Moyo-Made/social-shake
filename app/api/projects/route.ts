@@ -425,7 +425,7 @@ export async function POST(request: NextRequest) {
       if (isThumbnailMissing || isBudgetNotSet || isProjectNameEmpty) {
         determinedStatus = "draft";
       } else {
-        // Change from "Accepting Pitches" to "pending" to require admin approval
+        // Status is "pending" to require admin approval
         determinedStatus = ProjectStatus.PENDING;
       }
     }

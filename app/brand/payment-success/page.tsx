@@ -1,12 +1,6 @@
-import PaymentSuccessful from "@/components/brand/brandProfile/dashboard/PaymentSuccessful";
-import React, { Suspense } from "react";
+import PaymentSuccessHandler from "@/components/brand/brandProfile/dashboard/PaymentSuccessHandler";
 
-const page = () => {
-	return (
-		<Suspense>
-			<PaymentSuccessful />
-		</Suspense>
-	);
-};
 
-export default page;
+export default function PaymentSuccessPage() {
+  return <PaymentSuccessHandler />;
+}
