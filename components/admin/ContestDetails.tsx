@@ -162,16 +162,16 @@ const ContestDetailsPage: React.FC = () => {
 			let newStatus: ContestStatus;
 
 			switch (actionType) {
-				case "approve":
+				case "activate":
 					newStatus = "active" as ContestStatus;
 					break;
-				case "reject":
+				case "rejected":
 					newStatus = "rejected" as ContestStatus;
 					break;
-				case "request_info":
+				case "request_edit":
 					newStatus = "request_edit" as ContestStatus;
 					break;
-				case "suspend":
+				case "rejected":
 					newStatus = "rejected" as ContestStatus;
 					break;
 				default:
@@ -302,7 +302,7 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
 			text: "• Pending",
 		},
 		active: {
-			color: "bg-[#FFF0C3] border border-[#FDD849] text-[#1A1A1A]",
+			color: "bg-[#ABEFC6] border border-green-100 text-[#067647]",
 			text: "✓ Active",
 		},
 		rejected: {
@@ -349,9 +349,9 @@ const ContestHeader = ({
 		{/* Action buttons */}
 		<div className="flex flex-wrap gap-2 mt-4 md:mt-0">
 			{/* Show Approve Contest button when status is pending or request_edit */}
-			{(contest.status === "pending" || contest.status === "request_edit") && (
+			{(contest.status === "pending" || contest.status === "request_edit" || contest.status === "rejected") && (
 				<Button
-					onClick={() => initiateAction("approve")}
+					onClick={() => initiateAction("activate")}
 					className="px-5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200"
 				>
 					Approve Contest
@@ -361,7 +361,7 @@ const ContestHeader = ({
 			{/* Show Reject Contest button when status is pending or active */}
 			{(contest.status === "pending" || contest.status === "active") && (
 				<Button
-					onClick={() => initiateAction("reject")}
+					onClick={() => initiateAction("rejected")}
 					className="px-5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200"
 				>
 					Reject Contest
@@ -371,7 +371,7 @@ const ContestHeader = ({
 			{/* Show Request Info button when status is pending */}
 			{contest.status === "pending" && (
 				<Button
-					onClick={() => initiateAction("request_info")}
+					onClick={() => initiateAction("request_edit")}
 					className="px-5 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors duration-200"
 				>
 					Request Info
@@ -381,7 +381,7 @@ const ContestHeader = ({
 			{/* Show Suspend Contest button when status is active */}
 			{contest.status === "active" && (
 				<Button
-					onClick={() => initiateAction("suspend")}
+					onClick={() => initiateAction("rejected")}
 					className="px-5 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors duration-200"
 				>
 					Suspend Contest
@@ -561,14 +561,14 @@ const ActionModal: React.FC<ActionModalProps> = ({
 	let needsMessage = false;
 
 	switch (actionType) {
-		case "approve":
+		case "activate":
 			title = "Approve Contest";
 			description =
 				"Once approved, the contest will be visible to creators and they can participate";
 			buttonText = "Approve Contest";
 			buttonColor = "bg-green-600 hover:bg-green-700";
 			break;
-		case "reject":
+		case "rejected":
 			title = "Reject Contest";
 			description =
 				"Please provide a reason for rejection. This feedback will be shared with the Brand.";
@@ -577,7 +577,7 @@ const ActionModal: React.FC<ActionModalProps> = ({
 			buttonColor = "bg-red-600 hover:bg-red-700";
 			needsMessage = true;
 			break;
-		case "request_info":
+		case "request_edit":
 			title = "Request More Information";
 			description =
 				"Type in the Information you need from the Brand to approve their contest";
@@ -586,7 +586,7 @@ const ActionModal: React.FC<ActionModalProps> = ({
 			buttonColor = "bg-orange-500 hover:bg-orange-600";
 			needsMessage = true;
 			break;
-		case "suspend":
+		case "rejected":
 			title = "Suspend Contest";
 			description = "Please provide a reason for suspension.";
 			placeholder = "Type Reason for Suspension";

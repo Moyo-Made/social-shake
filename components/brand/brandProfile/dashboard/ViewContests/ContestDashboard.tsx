@@ -476,7 +476,7 @@ const ContestCard = ({
 									? "bg-[#FDD849] text-[#1A1A1A]"
 									: contest.status === "Scheduled"
 										? "bg-[#DBEAFE] text-[#3B82F6]"
-										: "bg-[#FFE5FB] text-[#FC52E4]"
+										: "bg-[#FFE9E7] border border-[#F04438] text-[#F04438]"
 					}`}
 				>
 					{contest.status === "Active" ? (

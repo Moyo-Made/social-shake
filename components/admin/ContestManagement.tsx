@@ -22,6 +22,7 @@ import {
 import { Incentive } from "../brand/brandProfile/dashboard/newContest/ContestFormContext";
 import { ContestStatus } from "@/types/projects";
 
+
 export interface Contest {
 	id: string;
 	userId?: string;
@@ -47,13 +48,7 @@ interface PaginationInfo {
 interface TabItem {
 	id: string;
 	label: string;
-	status?:
-		| ContestStatus
-		| "all"
-		| "pending"
-		| "active"
-		| "rejected"
-		| "completed";
+	status?: ContestStatus | "all" | "pending" | "active" | "rejected" | "completed";
 	emptyMessage: string;
 }
 
@@ -68,9 +63,9 @@ const ContestManagement: React.FC = () => {
 	const [loadingBrands, setLoadingBrands] = useState<{
 		[key: string]: boolean;
 	}>({});
-	const [statusFilter, setStatusFilter] = useState<
-		ContestStatus | "all" | "pending" | "active" | "rejected" | "completed"
-	>("all");
+	const [statusFilter, setStatusFilter] = useState<ContestStatus | "all" | "pending" | "active" | "rejected" | "completed">(
+		"all"
+	);
 	const [pagination, setPagination] = useState<PaginationInfo>({
 		total: 0,
 		page: 1,
@@ -338,9 +333,7 @@ const ContestManagement: React.FC = () => {
 
 		// Apply search filter
 		const searchMatch =
-			contest.basic.contestName
-				.toLowerCase()
-				.includes(searchTerm.toLowerCase()) ||
+			contest.basic.contestName.toLowerCase().includes(searchTerm.toLowerCase()) ||
 			contest.id.toLowerCase().includes(searchTerm.toLowerCase());
 
 		return statusMatch && searchMatch;
@@ -484,7 +477,7 @@ const ContestManagement: React.FC = () => {
 				text: "• Pending",
 			},
 			active: {
-				color: "bg-[#FFF0C3] border border-[#FDD849] text-[#1A1A1A]",
+				color: "bg-[#ABEFC6] border border-green-100 text-[#067647]",
 				text: "✓ Active",
 			},
 			rejected: {
@@ -614,9 +607,7 @@ const ContestManagement: React.FC = () => {
 									<BrandInfo userId={contest.userId || ""} />
 								</td>
 								<td className="px-6 py-4 whitespace-nowrap">
-									<div className="text-[#101828]">
-										{contest.basic.contestName}
-									</div>
+									<div className="text-[#101828]">{contest.basic.contestName}</div>
 								</td>
 								<td className="px-6 py-4 whitespace-nowrap text-sm text-[#101828]">
 									{contest.contestType}
