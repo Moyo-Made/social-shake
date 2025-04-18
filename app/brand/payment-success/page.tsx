@@ -1,6 +1,10 @@
 import PaymentSuccessHandler from "@/components/brand/brandProfile/dashboard/PaymentSuccessHandler";
-
+import { Suspense } from "react";
 
 export default function PaymentSuccessPage() {
-  return <PaymentSuccessHandler />;
+	return (
+		<Suspense>
+			<PaymentSuccessHandler />
+		</Suspense>
+	);
 }
