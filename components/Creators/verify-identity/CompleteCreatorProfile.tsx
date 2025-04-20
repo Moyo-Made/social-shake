@@ -50,7 +50,17 @@ const CompleteCreatorProfile = () => {
 		facebook: "",
 		youtube: "",
 	});
+	const { validateProfileData } = useCreatorVerification();
 
+	useEffect(() => {
+		// Validate whenever important fields change
+		const timeoutId = setTimeout(() => {
+		  const { isValid } = validateProfileData();
+		  console.log("Form validation status:", isValid);
+		}, 300);
+		
+		return () => clearTimeout(timeoutId);
+	  }, [bio, tiktokUrl, profileData.picture, dateOfBirth, gender, selectedCountry, validateProfileData]);
 
 	// Load data from context when profileData changes
 	useEffect(() => {
@@ -80,19 +90,22 @@ const CompleteCreatorProfile = () => {
 		}
 	}, [profileData]); // Add selectedFile as a dependency
 
-  useEffect(() => {
-    if (profileData?.picture && (!selectedFile || selectedFile.name !== profileData.picture.name)) {
-      setSelectedFile(profileData.picture);
-      const objectUrl = URL.createObjectURL(profileData.picture);
-      setPreviewUrl(objectUrl);
-      
-      // Cleanup function
-      return () => {
-        if (objectUrl) URL.revokeObjectURL(objectUrl);
-      };
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileData.picture]);
+	useEffect(() => {
+		if (
+			profileData?.picture &&
+			(!selectedFile || selectedFile.name !== profileData.picture.name)
+		) {
+			setSelectedFile(profileData.picture);
+			const objectUrl = URL.createObjectURL(profileData.picture);
+			setPreviewUrl(objectUrl);
+
+			// Cleanup function
+			return () => {
+				if (objectUrl) URL.revokeObjectURL(objectUrl);
+			};
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [profileData.picture]);
 
 	// Ensure cleanup of object URL for memory management
 	useEffect(() => {
@@ -123,7 +136,7 @@ const CompleteCreatorProfile = () => {
 		} catch (error) {
 			console.error("Error creating file preview:", error);
 		}
-	// eslint-disable-next-line react-hooks/exhaustive-deps
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [selectedFile]);
 
 	const handleContentTypeKeyDown = (
@@ -268,32 +281,35 @@ const CompleteCreatorProfile = () => {
 		updateProfileData({ contentLinks: newLinks });
 	};
 
-  const renderFieldError = (fieldName: string) => {
-    if (fieldErrors[fieldName]) {
-      return <p className="text-red-500 text-sm mt-1">{fieldErrors[fieldName]}</p>;
-    }
-    return null;
-  };
-  
+	const renderFieldError = (fieldName: string) => {
+		if (fieldErrors[fieldName]) {
+			return (
+				<p className="text-red-500 text-sm mt-1">{fieldErrors[fieldName]}</p>
+			);
+		}
+		return null;
+	};
 
 	return (
 		<div className="">
 			<label className="block text-base font-medium text-gray-700 mt-3 mb-2">
 				Upload your Picture
 			</label>
-      <div
-        className={cn(
-          "border rounded-lg p-6 text-center cursor-pointer",
-          dragActive ? "border-[#FD5C02] bg-orange-50" : "border-gray-300",
-          selectedFile && "border-green-500 bg-green-50",
-          fieldErrors.picture && !selectedFile ? "border-red-500" : "border-[#D0D5DD]"
-        )}
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={handleDrop}
-        onClick={() => document.getElementById("file-upload")?.click()}
-      >
+			<div
+				className={cn(
+					"border rounded-lg p-6 text-center cursor-pointer",
+					dragActive ? "border-[#FD5C02] bg-orange-50" : "border-gray-300",
+					selectedFile && "border-green-500 bg-green-50",
+					fieldErrors.picture && !selectedFile
+						? "border-red-500"
+						: "border-[#D0D5DD]"
+				)}
+				onDragEnter={handleDrag}
+				onDragLeave={handleDrag}
+				onDragOver={handleDrag}
+				onDrop={handleDrop}
+				onClick={() => document.getElementById("file-upload")?.click()}
+			>
 				{previewUrl ? (
 					<div className="space-y-3">
 						<div className="relative w-full max-w-md mx-auto h-48 rounded-lg overflow-hidden">
@@ -333,41 +349,41 @@ const CompleteCreatorProfile = () => {
 					onChange={handleFileChange}
 				/>
 			</div>
-      {renderFieldError('picture')}
+			{renderFieldError("picture")}
 
 			{/* Bio */}
 			<label className="block text-base font-medium text-gray-700 mt-4">
 				Your Bio
 			</label>
-      <Textarea
-        className={`mt-1 ${fieldErrors.bio ? "border-red-500" : "border-[#D0D5DD]"}`}
-        rows={5}
-        placeholder="Hi, I'm Alex, a passionate content creator specializing in lifestyle, travel, and fashion. With a knack for storytelling and creating engaging visuals, I love collaborating with brands to bring their vision to life!"
-        value={bio}
-        onChange={handleBioChange}
-        onBlur={() => handleBlur("bio")}
-      />
-      {renderFieldError('bio')}
-      <div className="flex justify-between items-center mt-1">
-        <span
-          className={`text-sm ${bioWarning ? "text-red-500 font-medium" : "text-[#475467]"}`}
-        >
-          {bioWarning || `(${bio.length}/${maxBioLength} characters)`}
-        </span>
-      </div>
+			<Textarea
+				className={`mt-1 ${fieldErrors.bio ? "border-red-500" : "border-[#D0D5DD]"}`}
+				rows={5}
+				placeholder="Hi, I'm Alex, a passionate content creator specializing in lifestyle, travel, and fashion. With a knack for storytelling and creating engaging visuals, I love collaborating with brands to bring their vision to life!"
+				value={bio}
+				onChange={handleBioChange}
+				onBlur={() => handleBlur("bio")}
+			/>
+			{renderFieldError("bio")}
+			<div className="flex justify-between items-center mt-1">
+				<span
+					className={`text-sm ${bioWarning ? "text-red-500 font-medium" : "text-[#475467]"}`}
+				>
+					{bioWarning || `(${bio.length}/${maxBioLength} characters)`}
+				</span>
+			</div>
 
 			{/* TikTok URL */}
 			<label className="block text-base font-medium text-gray-700 mt-4">
 				Your Tiktok Profile URL
 			</label>
-      <Input
-        className={`mt-1 ${fieldErrors.tiktokUrl ? "border-red-500" : ""}`}
-        placeholder="https://www.tiktok.com/@username"
-        value={tiktokUrl}
-        onChange={(e) => handleTextInputChange(e, "tiktokUrl")}
-        onBlur={() => handleBlur("tiktokUrl")}
-      />
-      {renderFieldError('tiktokUrl')}
+			<Input
+				className={`mt-1 ${fieldErrors.tiktokUrl ? "border-red-500" : ""}`}
+				placeholder="https://www.tiktok.com/@username"
+				value={tiktokUrl}
+				onChange={(e) => handleTextInputChange(e, "tiktokUrl")}
+				onBlur={() => handleBlur("tiktokUrl")}
+			/>
+			{renderFieldError("tiktokUrl")}
 
 			{/* Ethnicity */}
 			<label className="block text-base font-medium text-gray-700 mt-4">
@@ -380,20 +396,20 @@ const CompleteCreatorProfile = () => {
 				onChange={(e) => handleTextInputChange(e, "ethnicity")}
 				onBlur={() => handleBlur("ethnicity")}
 			/>
-      {renderFieldError('ethnicity')}
+			{renderFieldError("ethnicity")}
 
 			{/* Your Date of Birth */}
 			<label className="block text-base font-medium text-gray-700 mt-4">
 				Your Date of Birth
 			</label>
 			<Input
-				className="mt-1 placeholder:text-[#667085]"
-				placeholder="12/8/1999"
+				className="mt-1 placeholder:text-[#667085] placeholder:text-sm"
+				placeholder="DD/MM/YYYY"
 				value={dateOfBirth}
 				onChange={(e) => handleTextInputChange(e, "dateOfBirth")}
 				onBlur={() => handleBlur("dateOfBirth")}
 			/>
-      {renderFieldError('dateOfBirth')}
+			{renderFieldError("dateOfBirth")}
 
 			{/* Your Gender */}
 			<label className="block text-base font-medium text-gray-700 mt-4">
@@ -406,7 +422,7 @@ const CompleteCreatorProfile = () => {
 				onChange={(e) => handleTextInputChange(e, "gender")}
 				onBlur={() => handleBlur("gender")}
 			/>
-      {renderFieldError('gender')}
+			{renderFieldError("gender")}
 
 			{/* What types of content do you specialize in? */}
 			<label className="block text-base font-medium text-gray-700 mt-4">
@@ -443,7 +459,7 @@ const CompleteCreatorProfile = () => {
 			<p className="text-sm text-[#475467] mt-1">
 				Press Enter or comma after each content type
 			</p>
-      {renderFieldError('contentTypes')}
+			{renderFieldError("contentTypes")}
 
 			{/* Social Media Handles */}
 			<div className="space-y-2 mt-4" id="socialMedia">
@@ -520,8 +536,7 @@ const CompleteCreatorProfile = () => {
 					/>
 				</div>
 			</div>
-      {renderFieldError('socialMedia')}
-
+			{renderFieldError("socialMedia")}
 
 			{/* Your Country? */}
 			<div className="space-y-1 mt-4">
@@ -544,7 +559,7 @@ const CompleteCreatorProfile = () => {
 					</SelectContent>
 				</Select>
 			</div>
-      {renderFieldError('country')}
+			{renderFieldError("country")}
 
 			{/* Best Tiktok Links */}
 			<div className="space-y-1 mt-4">
@@ -554,14 +569,14 @@ const CompleteCreatorProfile = () => {
 
 				{contentLinks.map((link, index) => (
 					<div key={index} className="flex gap-2 mt-2">
-						   <Input
-              type="text"
-              value={link}
-              onChange={(e) => updateLink(index, e.target.value)}
-              onBlur={() => handleBlur(`contentLink-${index}`)}
-              placeholder="https://vt.tiktok.com/ZS6KEanvB/"
-              className={`flex-1 ${fieldErrors.contentLinks && index === 0 ? "border-red-500" : ""}`}
-            />
+						<Input
+							type="text"
+							value={link}
+							onChange={(e) => updateLink(index, e.target.value)}
+							onBlur={() => handleBlur(`contentLink-${index}`)}
+							placeholder="https://vt.tiktok.com/ZS6KEanvB/"
+							className={`flex-1 ${fieldErrors.contentLinks && index === 0 ? "border-red-500" : ""}`}
+						/>
 						<div className="flex gap-2">
 							{index === contentLinks.length - 1 && (
 								<Button
@@ -586,7 +601,7 @@ const CompleteCreatorProfile = () => {
 						</div>
 					</div>
 				))}
-           {renderFieldError('contentLinks')}
+				{renderFieldError("contentLinks")}
 			</div>
 		</div>
 	);

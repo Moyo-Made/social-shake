@@ -37,7 +37,6 @@ export default function DashboardPage() {
       <div className="p-6">
         <ProtectedRoute>
             <UserDashboard userId={currentUser.uid} />
-
         </ProtectedRoute>
       </div>
     </SideNavLayout>

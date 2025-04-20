@@ -5,8 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useBrandProfile } from "@/hooks/useBrandProfile";
-import BrandProfileDropdown from "@/components/brand/brandProfile/BrandProfileDropdown";
+import CreatorProfileDropdown from "../CreatorProfileDropdown";
+import { useCreatorProfile } from "@/hooks/useCreatorProfile";
 
 interface MenuItemProps {
 	icon: React.ReactNode;
@@ -33,21 +33,19 @@ const MenuItem: React.FC<MenuItemProps> = ({
 	// Modified isActive condition to handle special case for contests
 	const isActive =
 		pathname === href ||
-		(href === "/brand/dashboard" && pathname === "/brand/dashboard") ||
-		(href === "/brand/dashboard/contests" &&
-			pathname.startsWith("/brand/dashboard/contests/")) ||
-		(href === "/brand/dashboard/projects" &&
-			pathname.startsWith("/brand/dashboard/projects/")) ||
-		(href === "/brand/dashboard/creators" &&
-			pathname.startsWith("/brand/dashboard/creators/")) ||
-		(href === "/brand/dashboard/messages" &&
-			pathname.startsWith("/brand/dashboard/messages/")) ||
-		(href === "/brand/dashboard/transactions" &&
-			pathname.startsWith("/brand/dashboard/transactions/")) ||
-		(href === "/brand/dashboard/settings" &&
-			pathname.startsWith("/brand/dashboard/settings/")) ||
-		(href === "/brand/dashboard/help-support" &&
-			pathname.startsWith("/brand/dashboard/help-support/"));
+		(href === "/creator/dashboard" && pathname === "/creator/dashboard") ||
+		(href === "/creator/dashboard/contest" &&
+			pathname.startsWith("/creator/dashboard/contest/")) ||
+		(href === "/creator/dashboard/project" &&
+			pathname.startsWith("/creator/dashboard/project/")) ||
+		(href === "/creator/dashboard/messages" &&
+			pathname.startsWith("/creator/dashboard/messages/")) ||
+		(href === "/creator/dashboard/transactions" &&
+			pathname.startsWith("/creator/dashboard/transactions/")) ||
+		(href === "/creator/dashboard/settings" &&
+			pathname.startsWith("/creator/dashboard/settings/")) ||
+		(href === "/creator/dashboard/help-support" &&
+			pathname.startsWith("/creator/dashboard/help-support/"));
 
 	const hasActiveSubItem =
 		hasSubItems && subItems.some((item) => pathname === item.href);
@@ -71,7 +69,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
 				<div
 					onClick={toggleDropdown}
 					className={`flex items-center space-x-3 px-4 py-2 rounded-lg cursor-pointer font-satoshi
-		  ${
+          ${
 						isActive || hasActiveSubItem ? "bg-orange-500" : "hover:bg-gray-700"
 					}`}
 				>
@@ -113,7 +111,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
 		<Link
 			href={href}
 			className={`flex items-center space-x-3 px-4 py-2 rounded-lg cursor-pointer font-satoshi
-	  ${isActive ? "bg-orange-500" : "hover:bg-gray-700"}`}
+      ${isActive ? "bg-orange-500" : "hover:bg-gray-700"}`}
 		>
 			{icon}
 			<span className="ml-3">{text}</span>
@@ -132,7 +130,7 @@ const SideNav: React.FC = () => {
 			<nav className="p-4 mt-9">
 				<div className="space-y-2">
 					<MenuItem
-						href="/brand/dashboard"
+						href="/creator/dashboard"
 						icon={
 							<Image
 								src="/icons/dashboard.svg"
@@ -145,7 +143,7 @@ const SideNav: React.FC = () => {
 					/>
 
 					<MenuItem
-						href="/brand/dashboard/projects"
+						href="/creator/dashboard/projects"
 						icon={
 							<Image
 								src="/icons/projects.svg"
@@ -155,9 +153,19 @@ const SideNav: React.FC = () => {
 							/>
 						}
 						text="Projects"
+						subItems={[
+							{
+								href: "/creator/dashboard/project/all",
+								text: "Available Projects",
+							},
+							{
+								href: "/creator/dashboard/project/applied",
+								text: "My Projects",
+							},
+						]}
 					/>
 					<MenuItem
-						href="/brand/dashboard/contests"
+						href="/creator/dashboard/contests"
 						icon={
 							<Image
 								src="/icons/contests.svg"
@@ -167,25 +175,20 @@ const SideNav: React.FC = () => {
 							/>
 						}
 						text="Contests"
-					/>
-					<MenuItem
-						href="/brand/dashboard/creators"
-						icon={
-							<Image
-								src="/icons/creators.svg"
-								alt="creators"
-								width={20}
-								height={20}
-							/>
-						}
-						text="Creators"
 						subItems={[
-							{ href: "/brand/dashboard/creators/all", text: "All creators" },
-							{ href: "/brand/dashboard/creators/saved", text: "Saved creators" },
+							{
+								href: "/creator/dashboard/contest/all",
+								text: "Available Contests",
+							},
+							{
+								href: "/creator/dashboard/contest/applied",
+								text: "My Contests",
+							},
 						]}
 					/>
+
 					<MenuItem
-						href="/brand/dashboard/messages"
+						href="/creator/dashboard/messages"
 						icon={
 							<Image
 								src="/icons/messages.svg"
@@ -198,7 +201,7 @@ const SideNav: React.FC = () => {
 						badge="1"
 					/>
 					<MenuItem
-						href="/brand/dashboard/transactions"
+						href="/creator/dashboard/transactions"
 						icon={
 							<Image
 								src="/icons/transactions.svg"
@@ -214,7 +217,7 @@ const SideNav: React.FC = () => {
 
 			<div className="p-4 space-y-2">
 				<MenuItem
-					href="/brand/dashboard/settings"
+					href="/creator/dashboard/settings"
 					icon={
 						<Image
 							src="/icons/settings.svg"
@@ -226,7 +229,7 @@ const SideNav: React.FC = () => {
 					text="Settings"
 				/>
 				<MenuItem
-					href="/brand/dashboard/help-support"
+					href="/creator/dashboard/help-support"
 					icon={
 						<Image
 							src="/icons/help-icon.svg"
@@ -237,15 +240,6 @@ const SideNav: React.FC = () => {
 					}
 					text="Help & Support"
 				/>
-				{/* <div className="flex items-center justify-between text-white pt-3">
-					{brandProfile ? (
-						<BrandProfileDropdown
-							brandProfile={brandProfile}
-							loading={loading}
-							dropdownPosition="sidenav"
-						/>
-					) : null}
-				</div> */}
 			</div>
 		</div>
 	);
@@ -255,19 +249,15 @@ const SideNav: React.FC = () => {
 const getPageTitle = (pathname: string): string => {
 	// You can expand this object with all your routes that need specific titles
 	const routeTitles: Record<string, string> = {
-		"/brand/dashboard": "Dashboard",
-		"/brand/dashboard/projects": "Projects",
-		"/brand/dashboard/projects/new": "Add New Project",
-		"/brand/dashboard/contests": "Contests",
-		"/brand/dashboard/contests/new": "New Contest",
-		"/brand/dashboard/contests/edit": "Edit Contest",
-		"/brand/dashboard/creators": "Creators",
-		"/brand/dashboard/creators/all": "All Creators",
-		"/brand/dashboard/creators/saved": "Saved Creators",
-		"/brand/dashboard/messages": "Messages",
-		"/brand/dashboard/transactions": "Transactions",
-		"/brand/dashboard/settings": "Settings",
-		"/brand/dashboard/help-support": "Help & Support",
+		"/creator/dashboard": "Dashboard",
+		"/creator/dashboard/project/all": "Available Projects",
+		"/creator/dashboard/project/applied": "My Projects",
+		"/creator/dashboard/contest/all": "Available Contests",
+		"/creator/dashboard/contest/applied": "My Contests",
+		"/creator/dashboard/messages": "Messages",
+		"/creator/dashboard/transactions": "Transactions",
+		"/creator/dashboard/settings": "Settings",
+		"/creator/dashboard/help-support": "Help & Support",
 	};
 
 	// Check for exact match first
@@ -275,36 +265,32 @@ const getPageTitle = (pathname: string): string => {
 		return routeTitles[pathname];
 	}
 	// More specific matching for different route sections
-	if (pathname.startsWith("/brand/dashboard/contests/")) {
-		return "Contests";
+	if (pathname.startsWith("/creator/dashboard/contest/all")) {
+		return "Available Contests";
 	}
 
-	if (pathname.startsWith("/brand/dashboard/new-contest/")) {
-		return "New Contest";
+	if (pathname.startsWith("/creator/dashboard/contest/applied")) {
+		return "My Contests";
 	}
 
-	if (pathname.startsWith("/brand/dashboard/projects")) {
-		return "Projects";
+	if (pathname.startsWith("/creator/dashboard/project/all")) {
+		return "Available Projects";
 	}
-	if (pathname.startsWith("/brand/dashboard/projects/new")) {
-		return "Add New Project";
-	}
-
-	if (pathname.startsWith("/brand/dashboard/creators/")) {
-		return "Creators";
+	if (pathname.startsWith("/creator/dashboard/project/applied")) {
+		return "My Projects";
 	}
 
-	if (pathname.startsWith("/brand/dashboard/settings/")) {
+	if (pathname.startsWith("/creator/dashboard/settings/")) {
 		return "Settings";
 	}
-	if (pathname.startsWith("/brand/dashboard/messages/")) {
+	if (pathname.startsWith("/creator/dashboard/messages/")) {
 		return "Messages";
 	}
-	if (pathname.startsWith("/brand/dashboard/transactions/")) {
+	if (pathname.startsWith("/creator/dashboard/transactions/")) {
 		return "Transactions";
 	}
 
-	if (pathname.startsWith("/brand/dashboard/help-support/")) {
+	if (pathname.startsWith("/creator/dashboard/help-support/")) {
 		return "Help & Support";
 	}
 
@@ -317,7 +303,7 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 }) => {
 	const pathname = usePathname();
 	const pageTitle = getPageTitle(pathname);
-	const { brandProfile, loading } = useBrandProfile();
+	const { creatorProfile } = useCreatorProfile();
 
 	return (
 		<div className="flex min-h-screen">
@@ -326,7 +312,7 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 				<header className="bg-white p-4 w-full flex justify-between items-center border-b border-[#FD5C02]">
 					<h1 className="text-xl font-semibold">{pageTitle}</h1>
 					<div className="flex items-center">
-						<Link href="/brand/dashboard/notifications">
+						<Link href="/creator/dashboard/notifications">
 							<Image
 								src="/icons/notification.svg"
 								alt="Notifications"
@@ -335,12 +321,11 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 								className="mr-4"
 							/>
 						</Link>
-						{brandProfile && (
-							<BrandProfileDropdown
-								brandProfile={brandProfile}
-								loading={loading}
-								dropdownPosition="header"
-							/>
+						{creatorProfile && (
+							<CreatorProfileDropdown 
+							creatorProfile={creatorProfile}
+							dropdownPosition="header"
+						  />
 						)}
 					</div>
 				</header>

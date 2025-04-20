@@ -34,7 +34,7 @@ interface CreatorProfileData {
 interface FieldErrors {
 	[key: string]: string;
 }
-  
+
 interface CreatorVerificationContextType {
 	verificationData: VerificationData;
 	profileData: CreatorProfileData;
@@ -45,7 +45,7 @@ interface CreatorVerificationContextType {
 	submitVerification: () => Promise<{ success: boolean; message: string }>;
 	loading: boolean;
 	fieldErrors: FieldErrors;
-	validateProfileData: () => {isValid: boolean; missingFields: string[]};
+	validateProfileData: () => { isValid: boolean; missingFields: string[] };
 	clearFieldError: (field: string) => void;
 }
 
@@ -225,7 +225,6 @@ export const CreatorVerificationProvider = ({
 		}
 	};
 
-
 	// Initialize database
 	useEffect(() => {
 		const initializeDB = async () => {
@@ -328,7 +327,7 @@ export const CreatorVerificationProvider = ({
 						}
 
 						setProfileData(restoredProfileData);
-						
+
 						// Check if profile is complete after loading data
 						validateProfileComplete(restoredProfileData);
 					}
@@ -402,48 +401,57 @@ export const CreatorVerificationProvider = ({
 	// Add this validation function
 	const validateProfileData = () => {
 		const requiredFields = [
-			{ key: 'picture', label: 'Profile Picture' },
-			{ key: 'bio', label: 'Bio' },
-			{ key: 'tiktokUrl', label: 'TikTok URL' },
-			{ key: 'dateOfBirth', label: 'Date of Birth' },
-			{ key: 'gender', label: 'Gender' },
-			{ key: 'country', label: 'Country' }
+			{ key: "picture", label: "Profile Picture" },
+			{ key: "bio", label: "Bio" },
+			{ key: "tiktokUrl", label: "TikTok URL" },
+			{ key: "dateOfBirth", label: "Date of Birth" },
+			{ key: "gender", label: "Gender" },
+			{ key: "country", label: "Country" },
 		];
-		
+
 		const missingFields: string[] = [];
 		const errors: FieldErrors = {};
-		
-		requiredFields.forEach(field => {
-			if (field.key === 'picture') {
+
+		requiredFields.forEach((field) => {
+			if (field.key === "picture") {
 				if (!profileData.picture) {
 					missingFields.push(field.label);
 					errors[field.key] = `${field.label} is required`;
 				}
-			} else if (!profileData[field.key as keyof CreatorProfileData] || 
-						(typeof profileData[field.key as keyof CreatorProfileData] === 'string' && 
-						(profileData[field.key as keyof CreatorProfileData] as string).trim() === '')) {
+			} else if (
+				!profileData[field.key as keyof CreatorProfileData] ||
+				(typeof profileData[field.key as keyof CreatorProfileData] ===
+					"string" &&
+					(
+						profileData[field.key as keyof CreatorProfileData] as string
+					).trim() === "")
+			) {
 				missingFields.push(field.label);
 				errors[field.key] = `${field.label} is required`;
 			}
 		});
-		
+
 		// Also check content links - at least one should be filled
-		if (profileData.contentLinks.length === 0 || !profileData.contentLinks[0] || profileData.contentLinks[0].trim() === '') {
-			missingFields.push('Content Links');
-			errors.contentLinks = 'At least one content link is required';
+		if (
+			profileData.contentLinks.length === 0 ||
+			!profileData.contentLinks[0] ||
+			profileData.contentLinks[0].trim() === ""
+		) {
+			missingFields.push("Content Links");
+			errors.contentLinks = "At least one content link is required";
 		}
-		
+
 		setFieldErrors(errors);
-		
+
 		return {
 			isValid: missingFields.length === 0,
-			missingFields
+			missingFields,
 		};
 	};
-	  
+
 	// Add this function to clear individual errors
 	const clearFieldError = (field: string) => {
-		setFieldErrors(prev => {
+		setFieldErrors((prev) => {
 			const updated = { ...prev };
 			delete updated[field];
 			return updated;
@@ -460,7 +468,7 @@ export const CreatorVerificationProvider = ({
 					...data,
 					picture: data.picture !== undefined ? data.picture : prev.picture,
 				};
-		
+
 				// Store profile data without the picture
 				const profileDataToStore = {
 					bio: updatedData.bio,
@@ -473,13 +481,13 @@ export const CreatorVerificationProvider = ({
 					contentLinks: updatedData.contentLinks,
 					socialMedia: updatedData.socialMedia,
 				};
-		
+
 				// Save to local storage
 				localStorage.setItem(
 					PROFILE_DATA_KEY,
 					JSON.stringify(profileDataToStore)
 				);
-		
+
 				// If there's a new profile picture, save it separately
 				if (data.picture) {
 					// Save picture data
@@ -494,23 +502,27 @@ export const CreatorVerificationProvider = ({
 							JSON.stringify(pictureData)
 						);
 					});
-					
+
 					// Clear any error for picture field
-					clearFieldError('picture');
+					clearFieldError("picture");
 				}
-				
+
 				// Clear field errors for updated fields
-				Object.keys(data).forEach(key => {
-					if (key !== 'picture') {
+				Object.keys(data).forEach((key) => {
+					if (key !== "picture") {
 						clearFieldError(key);
 					}
 				});
-				
-				// Dynamically recheck completeness after data update
-				validateProfileComplete(updatedData);
-				
+
 				return updatedData;
 			});
+
+			// IMPORTANT: Move this outside the setState callback to ensure it runs with the updated state
+			setTimeout(() => {
+				const currentProfileData = { ...profileData, ...data };
+				const isValid = validateProfileComplete(currentProfileData);
+				console.log("Profile complete check:", isValid);
+			}, 0);
 		} catch (error) {
 			console.error("Error updating profile data in local storage:", error);
 		}
@@ -520,22 +532,22 @@ export const CreatorVerificationProvider = ({
 	const validateProfileComplete = (data: CreatorProfileData) => {
 		const isComplete = Boolean(
 			data.picture &&
-			data.bio &&
-			data.bio.trim().length > 0 &&
-			data.tiktokUrl &&
-			data.tiktokUrl.trim().length > 0 &&
-			data.dateOfBirth &&
-			data.dateOfBirth.trim().length > 0 &&
-			data.gender &&
-			data.gender.trim().length > 0 &&
-			data.country &&
-			data.contentLinks.length > 0 &&
-			data.contentLinks[0].trim() !== ""
+				data.bio &&
+				data.bio.trim().length > 0 &&
+				data.tiktokUrl &&
+				data.tiktokUrl.trim().length > 0 &&
+				data.dateOfBirth &&
+				data.dateOfBirth.trim().length > 0 &&
+				data.gender &&
+				data.gender.trim().length > 0 &&
+				data.country &&
+				data.contentLinks.length > 0 &&
+				data.contentLinks[0].trim() !== ""
 		);
-		
+
 		// Update state properly by calling the setter function
 		setIsProfileComplete(isComplete);
-		
+
 		return isComplete;
 	};
 
@@ -666,22 +678,22 @@ export const CreatorVerificationProvider = ({
 
 	return (
 		<CreatorVerificationContext.Provider
-      value={{
-        verificationData,
-        profileData,
-        updateVerificationData,
-        updateProfileData,
-        isVerificationComplete,
-        isProfileComplete,
-        submitVerification,
-        loading,
-        fieldErrors,
-        validateProfileData,
-        clearFieldError,
-      }}
-    >
-      {children}
-    </CreatorVerificationContext.Provider>
+			value={{
+				verificationData,
+				profileData,
+				updateVerificationData,
+				updateProfileData,
+				isVerificationComplete,
+				isProfileComplete,
+				submitVerification,
+				loading,
+				fieldErrors,
+				validateProfileData,
+				clearFieldError,
+			}}
+		>
+			{children}
+		</CreatorVerificationContext.Provider>
 	);
 };
 

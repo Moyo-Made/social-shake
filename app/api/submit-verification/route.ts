@@ -1,3 +1,13 @@
+// For handling large files, you can set config at runtime
+export const config = {
+	api: {
+	  bodyParser: {
+		sizeLimit: '50mb',
+	  },
+	  responseLimit: false,
+	},
+  };
+
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/config/firebase-admin";
 import { adminStorage } from "@/config/firebase-admin";
@@ -6,7 +16,7 @@ import { v4 as uuidv4 } from "uuid";
 
 // For handling large files, you can set config at runtime
 export const dynamic = "force-dynamic";
-export const runtime = "nodejs"; // Optional: Use Node.js runtime for file processing
+export const runtime = "nodejs"; 
 
 // Export a POST function instead of a default export
 export async function POST(request: NextRequest) {

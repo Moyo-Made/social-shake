@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader } from "../ui/card";
 import Image from "next/image";
 import { Label } from "../ui/label";
@@ -11,8 +11,13 @@ import { Button } from "../ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 
+interface PasswordStrength {
+	level: "weak" | "medium" | "strong";
+	color: string;
+}
+
 const CreateCreatorAccount = () => {
-	const { error: authError, clearError } = useAuth();
+	const { signup, error: authError, clearError } = useAuth();
 	const [formData, setFormData] = useState({
 		firstName: "",
 		lastName: "",
@@ -25,6 +30,8 @@ const CreateCreatorAccount = () => {
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [usernameChecking, setUsernameChecking] = useState(false);
 	const [emailChecking, setEmailChecking] = useState(false);
+	const usernameCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const emailCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const router = useRouter();
 
 	// Map auth errors to form errors when they occur
@@ -62,9 +69,14 @@ const CreateCreatorAccount = () => {
 
 	// Check if username is available with debouncing
 	useEffect(() => {
-		const checkUsername = async () => {
-			if (!formData.username || formData.username.length < 3) return;
+		// Clear any existing timeout
+		if (usernameCheckTimeoutRef.current) {
+			clearTimeout(usernameCheckTimeoutRef.current);
+		}
 
+		if (!formData.username || formData.username.length < 3) return;
+
+		usernameCheckTimeoutRef.current = setTimeout(async () => {
 			setUsernameChecking(true);
 			try {
 				const response = await fetch(
@@ -96,22 +108,26 @@ const CreateCreatorAccount = () => {
 			} finally {
 				setUsernameChecking(false);
 			}
-		};
-
-		const timeoutId = setTimeout(() => {
-			if (formData.username) {
-				checkUsername();
-			}
 		}, 500); // 500ms debounce
 
-		return () => clearTimeout(timeoutId);
+		return () => {
+			// Clean up timeout on component unmount or when username changes
+			if (usernameCheckTimeoutRef.current) {
+				clearTimeout(usernameCheckTimeoutRef.current);
+			}
+		};
 	}, [formData.username]);
 
 	// Check if email is already registered with debouncing
 	useEffect(() => {
-		const checkEmail = async () => {
-			if (!formData.email || !/\S+@\S+\.\S+/.test(formData.email)) return;
+		// Clear any existing timeout
+		if (emailCheckTimeoutRef.current) {
+			clearTimeout(emailCheckTimeoutRef.current);
+		}
 
+		if (!formData.email || !/\S+@\S+\.\S+/.test(formData.email)) return;
+
+		emailCheckTimeoutRef.current = setTimeout(async () => {
 			setEmailChecking(true);
 			try {
 				const response = await fetch(
@@ -143,15 +159,14 @@ const CreateCreatorAccount = () => {
 			} finally {
 				setEmailChecking(false);
 			}
-		};
-
-		const timeoutId = setTimeout(() => {
-			if (formData.email) {
-				checkEmail();
-			}
 		}, 500); // 500ms debounce
 
-		return () => clearTimeout(timeoutId);
+		return () => {
+			// Clean up timeout on component unmount or when email changes
+			if (emailCheckTimeoutRef.current) {
+				clearTimeout(emailCheckTimeoutRef.current);
+			}
+		};
 	}, [formData.email]);
 
 	// Clear form errors when inputs change
@@ -182,6 +197,24 @@ const CreateCreatorAccount = () => {
 		}
 	};
 
+	// Password strength indicator
+	const getPasswordStrength = (): PasswordStrength | null => {
+		if (!formData.password) return null;
+
+		let strength = 0;
+		if (formData.password.length >= 8) strength++;
+		if (/[A-Z]/.test(formData.password)) strength++;
+		if (/[a-z]/.test(formData.password)) strength++;
+		if (/[0-9]/.test(formData.password)) strength++;
+		if (/[!@#$%^&*(),.?":{}|<>]/.test(formData.password)) strength++;
+
+		if (strength <= 2) return { level: "weak", color: "bg-red-500" };
+		if (strength <= 4) return { level: "medium", color: "bg-yellow-500" };
+		return { level: "strong", color: "bg-green-500" };
+	};
+	
+	const passwordStrength = getPasswordStrength();
+
 	const validateForm = () => {
 		const errors: Record<string, string> = {};
 		let isValid = true;
@@ -202,24 +235,46 @@ const CreateCreatorAccount = () => {
 		if (!formData.username.trim()) {
 			errors.username = "Username is required";
 			isValid = false;
+		} else if (formData.username.length < 3) {
+			errors.username = "Username must be at least 3 characters";
+			isValid = false;
 		}
 
 		// Validate email
 		if (!formData.email.trim()) {
 			errors.email = "Email is required";
 			isValid = false;
-		} else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-			errors.email = "Email is invalid";
+		} else if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
+			errors.email = "Please enter a valid email address";
 			isValid = false;
 		}
 
-		// Validate password
+		// Enhanced password validation
 		if (!formData.password) {
 			errors.password = "Password is required";
 			isValid = false;
-		} else if (formData.password.length < 8) {
-			errors.password = "Password must be at least 8 characters long";
-			isValid = false;
+		} else {
+			const passwordChecks = {
+				length: formData.password.length >= 8,
+				hasUppercase: /[A-Z]/.test(formData.password),
+				hasLowercase: /[a-z]/.test(formData.password),
+				hasNumber: /[0-9]/.test(formData.password),
+			};
+
+			if (!passwordChecks.length) {
+				errors.password = "Password must be at least 8 characters long";
+				isValid = false;
+			} else if (
+				!(
+					passwordChecks.hasUppercase &&
+					passwordChecks.hasLowercase &&
+					passwordChecks.hasNumber
+				)
+			) {
+				errors.password =
+					"Password must include uppercase, lowercase, and numbers";
+				isValid = false;
+			}
 		}
 
 		setFieldErrors(errors);
@@ -273,9 +328,21 @@ const CreateCreatorAccount = () => {
 				return;
 			}
 
-			// If we get here, both username and email are available
-			// Now proceed with creating the account
+			// First sign up with Firebase Authentication
+			const { user } = await signup(formData.email, formData.password);
 			
+			// Store creator data for profile completion if needed
+			sessionStorage.setItem(
+				"creatorSignupData",
+				JSON.stringify({
+					email: formData.email,
+					firstName: formData.firstName,
+					lastName: formData.lastName,
+					username: formData.username,
+					userId: user.uid,
+				})
+			);
+
 			// After successful signup, create creator profile
 			const response = await fetch("/api/creator-profile", {
 				method: "POST",
@@ -283,6 +350,7 @@ const CreateCreatorAccount = () => {
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
+					userId: user.uid,
 					email: formData.email,
 					firstName: formData.firstName,
 					lastName: formData.lastName,
@@ -312,8 +380,11 @@ const CreateCreatorAccount = () => {
 		}
 	};
 
-	// Use combined loading state from auth and local form state
-	const isLoading =  isSubmitting;
+	// Use combined loading state
+	const isLoading = isSubmitting;
+	
+	// Determine error message to display (prioritize auth error over form error)
+	const displayError = authError || formError;
 
 	return (
 		<main className="relative min-h-screen overflow-y-auto">
@@ -369,6 +440,26 @@ const CreateCreatorAccount = () => {
 					</CardHeader>
 
 					<CardContent className="space-y-3 md:space-y-4">
+						{/* General Form Error */}
+						{displayError && (
+							<div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-md mb-4">
+								<p className="text-sm">
+									{displayError}
+									{displayError.includes("already in use") && (
+										<>
+											{" "}
+											<Link
+												href="/login"
+												className="text-[#FD5C02] font-medium hover:underline"
+											>
+												Log in here
+											</Link>
+										</>
+									)}
+								</p>
+							</div>
+						)}
+						
 						<form onSubmit={handleSubmit} noValidate>
 							{/* Name Fields Row */}
 							<div className="grid grid-cols-2 gap-4">
@@ -425,19 +516,26 @@ const CreateCreatorAccount = () => {
 								<Label htmlFor="username" className="text-sm font-medium">
 									Username <span className="text-red-500">*</span>
 								</Label>
-								<Input
-									id="username"
-									type="text"
-									value={formData.username}
-									onChange={handleChange}
-									placeholder="Your Preferred Username"
-									className={`w-full placeholder:text-sm py-3 ${
-										fieldErrors.username
-											? "border-red-500 focus:ring-red-500"
-											: ""
-									}`}
-									required
-								/>
+								<div className="relative">
+									<Input
+										id="username"
+										type="text"
+										value={formData.username}
+										onChange={handleChange}
+										placeholder="Your Preferred Username"
+										className={`w-full placeholder:text-sm py-3 ${
+											fieldErrors.username
+												? "border-red-500 focus:ring-red-500"
+												: ""
+										}`}
+										required
+									/>
+									{usernameChecking && (
+										<div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+											<div className="inline-block h-5 w-5 animate-spin rounded-full border-t-2 border-b-2 border-solid border-orange-500 border-r-transparent"></div>
+										</div>
+									)}
+								</div>
 								{!fieldErrors.username && (
 									<p className="text-gray-600 text-sm font-normal pt-px">
 										This can be the same as your TikTok Username
@@ -448,11 +546,6 @@ const CreateCreatorAccount = () => {
 										{fieldErrors.username}
 									</p>
 								)}
-								{usernameChecking && (
-									<p className="text-blue-500 text-sm mt-1">
-										Checking username availability...
-									</p>
-								)}
 							</div>
 
 							{/* Email Field */}
@@ -460,25 +553,27 @@ const CreateCreatorAccount = () => {
 								<Label htmlFor="email" className="text-sm font-medium">
 									Email <span className="text-red-500">*</span>
 								</Label>
-								<Input
-									id="email"
-									type="email"
-									value={formData.email}
-									onChange={handleChange}
-									placeholder="Enter your business email"
-									className={`w-full placeholder:text-sm py-3 ${
-										fieldErrors.email ? "border-red-500 focus:ring-red-500" : ""
-									}`}
-									required
-								/>
+								<div className="relative">
+									<Input
+										id="email"
+										type="email"
+										value={formData.email}
+										onChange={handleChange}
+										placeholder="Enter your business email"
+										className={`w-full placeholder:text-sm py-3 ${
+											fieldErrors.email ? "border-red-500 focus:ring-red-500" : ""
+										}`}
+										required
+									/>
+									{emailChecking && (
+										<div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+											<div className="inline-block h-5 w-5 animate-spin rounded-full border-t-2 border-b-2 border-solid border-orange-500 border-r-transparent"></div>
+										</div>
+									)}
+								</div>
 								{fieldErrors.email && (
 									<p className="text-red-500 text-sm mt-1">
 										{fieldErrors.email}
-									</p>
-								)}
-								{emailChecking && (
-									<p className="text-blue-500 text-sm mt-1">
-										Checking email availability...
 									</p>
 								)}
 							</div>
@@ -501,14 +596,45 @@ const CreateCreatorAccount = () => {
 									}`}
 									minLength={8}
 									required
+									autoComplete="new-password"
 								/>
+								
+								{/* Password strength indicator */}
+								{formData.password && (
+									<div className="mt-2">
+										<div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+											<div
+												className={`h-full ${passwordStrength?.color || ""}`}
+												style={{
+													width: `${passwordStrength ? (passwordStrength.level === "weak" ? "33%" : passwordStrength.level === "medium" ? "66%" : "100%") : "0%"}`,
+												}}
+											></div>
+										</div>
+										<p
+											className={`text-xs mt-1 ${
+												passwordStrength?.level === "weak"
+													? "text-red-500"
+													: passwordStrength?.level === "medium"
+														? "text-yellow-600"
+														: "text-green-600"
+											}`}
+										>
+											{passwordStrength?.level === "weak"
+												? "Weak password"
+												: passwordStrength?.level === "medium"
+													? "Medium strength"
+													: "Strong password"}
+										</p>
+									</div>
+								)}
+
 								{fieldErrors.password ? (
 									<p className="text-red-500 text-sm mt-1">
 										{fieldErrors.password}
 									</p>
 								) : (
 									<p className="text-gray-600 text-sm font-normal pt-px">
-										Must be at least 8 characters.
+										Must be at least 8 characters with uppercase, lowercase, and numbers.
 									</p>
 								)}
 							</div>
@@ -516,18 +642,30 @@ const CreateCreatorAccount = () => {
 							{/* Submit Button */}
 							<Button
 								type="submit"
-								disabled={isLoading || Object.keys(fieldErrors).length > 0}
-								className={`w-full bg-[#FD5C02] hover:bg-orange-600 text-white text-[17px] py-5 font-normal mt-4 ${
-									isLoading || Object.keys(fieldErrors).length > 0 ? "opacity-50 cursor-not-allowed" : ""
+								disabled={
+									isLoading || 
+									Object.keys(fieldErrors).length > 0 ||
+									usernameChecking ||
+									emailChecking
+								}
+								className={`w-full bg-[#FD5C02] hover:bg-orange-600 text-white text-[17px] py-5 font-normal mt-6 ${
+									isLoading || 
+									Object.keys(fieldErrors).length > 0 ||
+									usernameChecking ||
+									emailChecking
+										? "opacity-50 cursor-not-allowed" : ""
 								}`}
 							>
 								{isLoading ? (
-									"Creating account..."
+									<div className="flex items-center justify-center">
+										<div className="inline-block h-5 w-5 animate-spin rounded-full border-t-2 border-b-2 border-solid border-white border-r-transparent mr-2"></div>
+										<span>Creating account...</span>
+									</div>
 								) : (
-									<>
-										Create Account{" "}
-										<FaArrowRight className="w-5 h-5 ml-2 mt-0.5" />
-									</>
+									<div className="flex items-center justify-center">
+										Create Account
+										<FaArrowRight className="w-5 h-5 ml-2" />
+									</div>
 								)}
 							</Button>
 

@@ -1,5 +1,4 @@
-import Footer from "@/components/Footer";
-import Navbar from "@/components/Navbar";
+import SideNavLayout from "@/components/Creators/dashboard/CreatorSideNavbar";
 
 export default function RootLayout({
 	children,
@@ -9,9 +8,7 @@ export default function RootLayout({
 	return (
 		<html lang="en">
 			<body className="">
-				<Navbar />
-				{children}
-				<Footer />
+				<SideNavLayout>{children}</SideNavLayout>
 			</body>
 		</html>
 	);
