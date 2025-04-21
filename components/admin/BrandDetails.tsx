@@ -7,26 +7,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-
-interface Brand {
-	email: string;
-	userId: string;
-	brandName: string;
-	logoUrl?: string;
-	status: BrandStatus;
-	createdAt: string;
-	updatedAt: string;
-	industry?: string;
-	phoneNumber?: string;
-	address?: string;
-	website?: string;
-	socialMedia?: {
-		facebook?: string;
-		twitter?: string;
-		instagram?: string;
-		youtube?: string;
-	};
-}
+import { Brand } from "@/types/brand";
 
 const BrandDetailsPage: React.FC = () => {
 	const params = useParams();
@@ -42,37 +23,36 @@ const BrandDetailsPage: React.FC = () => {
 	const [actionMessage, setActionMessage] = useState<string>("");
 
 	// Fetch brand details
+	// In BrandDetailsPage.tsx
 	useEffect(() => {
 		const fetchBrandDetails = async () => {
 			try {
 				setLoading(true);
 
-				// In a real app, you'd fetch from API
-				// For this example, we'll get from localStorage (simulating navigation from the list)
-				const storedBrand = localStorage.getItem("viewingBrand");
+				// 👇 Update this URL to use the brand-approval endpoint with userId as a query parameter
+				const response = await fetch(
+					`/api/admin/brand-approval?userId=${userId}`
+				);
 
-				if (storedBrand) {
-					setBrand(JSON.parse(storedBrand));
-				} else {
-					// If not in localStorage, fetch from API
-					const response = await fetch(`/api/admin/brand/${userId}`);
-
-					if (!response.ok) {
-						throw new Error("Failed to fetch brand details");
-					}
-
-					const data = await response.json();
-					setBrand(data.brand);
+				if (!response.ok) {
+					throw new Error("Failed to fetch brand details");
 				}
+
+				const data = await response.json();
+
+				// The API returns the brand directly, not wrapped in a "brand" property
+				setBrand(data);
 			} catch (err) {
-				setError(err instanceof Error ? err.message : "An error occurred");
 				console.error("Error fetching brand details:", err);
+				setError(err instanceof Error ? err.message : "An error occurred");
 			} finally {
 				setLoading(false);
 			}
 		};
 
-		fetchBrandDetails();
+		if (userId) {
+			fetchBrandDetails();
+		}
 	}, [userId]);
 
 	// Handle brand action (approve, reject, request info)
@@ -272,7 +252,10 @@ const BrandDetailsPage: React.FC = () => {
 					{error || "Brand not found"}
 				</div>
 				<div className="mt-4">
-					<Link href="/admin/manage-users/brands" className="text-blue-600 hover:underline">
+					<Link
+						href="/admin/manage-users/brands"
+						className="text-blue-600 hover:underline"
+					>
 						&larr; Back to Brands
 					</Link>
 				</div>

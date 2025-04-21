@@ -4,9 +4,8 @@ import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { usePathname } from "next/navigation";
-import { useBrandProfile } from "@/hooks/useBrandProfile";
-import BrandProfileDropdown from "@/components/brand/brandProfile/BrandProfileDropdown";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
 interface MenuItemProps {
 	icon: React.ReactNode;
@@ -181,7 +180,7 @@ const SideNav: React.FC = () => {
 							},
 							{
 								href: "/admin/manage-users/creators",
-								text: "Creator",
+								text: "Creators",
 							},
 						]}
 					/>
@@ -252,47 +251,47 @@ const getPageTitle = (pathname: string): string => {
 		"/admin/payouts": "Payouts",
 	};
 
-	 // Check for paths with IDs first (more specific routes)
-	 if (pathname.startsWith("/admin/manage-users/brands/")) {
+	// Check for paths with IDs first (more specific routes)
+	if (pathname.startsWith("/admin/manage-users/brands/")) {
 		return "Manage Brands";
-	  }
-	  if (pathname.startsWith("/admin/manage-users/creators/")) {
+	}
+	if (pathname.startsWith("/admin/manage-users/creators/")) {
 		return "Manage Creators";
-	  }
-	  if (pathname.startsWith("/admin/manage-projects/")) {
+	}
+	if (pathname.startsWith("/admin/manage-projects/")) {
 		return "Campaign - Projects";
-	  }
-	  if (pathname.startsWith("/admin/manage-contests/")) {
+	}
+	if (pathname.startsWith("/admin/manage-contests/")) {
 		return "Campaign - Contests";
-	  }
-	
-	  // Check for exact match
-	  if (routeTitles[pathname]) {
+	}
+
+	// Check for exact match
+	if (routeTitles[pathname]) {
 		return routeTitles[pathname];
-	  }
-	  
-	  // More general route matching
-	  if (pathname.startsWith("/admin/dashboard/")) {
+	}
+
+	// More general route matching
+	if (pathname.startsWith("/admin/dashboard/")) {
 		return "Admin Dashboard";
-	  }
-	  if (pathname.startsWith("/admin/manage-users/brands")) {
+	}
+	if (pathname.startsWith("/admin/manage-users/brands")) {
 		return "Manage Brands";
-	  }
-	  if (pathname.startsWith("/admin/manage-users/creators")) {
+	}
+	if (pathname.startsWith("/admin/manage-users/creators")) {
 		return "Manage Creators";
-	  }
-	  if (pathname.startsWith("/admin/manage-users")) {
+	}
+	if (pathname.startsWith("/admin/manage-users")) {
 		return "Manage Users";
-	  }
-	  if (pathname.startsWith("/admin/manage-projects")) {
+	}
+	if (pathname.startsWith("/admin/manage-projects")) {
 		return "Campaign - Projects";
-	  }
-	  if (pathname.startsWith("/admin/payouts")) {
+	}
+	if (pathname.startsWith("/admin/payouts")) {
 		return "Payouts";
-	  }
-	
-	  // Default fallback
-	  return "Admin Dashboard";
+	}
+
+	// Default fallback
+	return "Admin Dashboard";
 };
 
 const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
@@ -300,7 +299,13 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 }) => {
 	const pathname = usePathname();
 	const pageTitle = getPageTitle(pathname);
-	const { brandProfile, loading } = useBrandProfile();
+	const { currentUser, logout } = useAuth();
+	const router = useRouter();
+
+	const handleLogout = async () => {
+		await logout();
+		router.push("/admin/login");
+	};
 
 	return (
 		<div className="flex min-h-screen">
@@ -318,13 +323,17 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 								className="mr-4"
 							/>
 						</Link>
-						{brandProfile && (
-							<BrandProfileDropdown
-								brandProfile={brandProfile}
-								loading={loading}
-								dropdownPosition="header"
-							/>
-						)}
+						<div className="flex items-center">
+							<span className="mr-4 text-sm text-gray-500">
+								{currentUser?.email}
+							</span>
+							<button
+								onClick={handleLogout}
+								className="px-3 py-1 text-sm text-white bg-red-600 rounded-md hover:bg-red-700"
+							>
+								Logout
+							</button>
+						</div>
 					</div>
 				</header>
 				<div className="flex-1 flex items-center justify-center w-full">

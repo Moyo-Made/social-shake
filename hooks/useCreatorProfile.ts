@@ -28,117 +28,112 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 	const [loading, setLoading] = useState<boolean>(false);
 	const [error, setError] = useState<string | null>(null);
 	const [mode, setMode] = useState<ProfileMode>(initialMode);
-  const fetchCreatorProfile = async () => {
-    if (!currentUser?.uid) {
-      setLoading(false);
-      return;
-    }
-  
-    setLoading(true);
-    setError(null);
-  
-    try {
-      // First fetch basic profile data
-      const profileApiUrl = `/api/creator-profile?email=${encodeURIComponent(currentUser.email)}&userId=${currentUser.uid}`;
-      console.log(`Fetching creator profile from API: ${profileApiUrl}`);
-  
-      const profileResponse = await fetch(profileApiUrl);
-      let combinedProfileData: CreatorProfile = {};
-  
-      if (profileResponse.ok) {
-        const profileData = await profileResponse.json();
-        console.log("Received basic profile data:", profileData);
-        combinedProfileData = { ...profileData };
-  
-        // Log entire profile data to check structure
-        console.log("Full profile data structure:", JSON.stringify(profileData, null, 2));
-        
-        // Check for verification ID in all possible locations
-        const verificationId = 
-          profileData.verificationId || 
-          profileData.verification_id ||
-          (profileData.verification && profileData.verification.id) ||
-          null;
-        
-        console.log("Found verification ID:", verificationId);
-  
-        // If we found a verificationId, fetch the verification data
-        if (verificationId) {
-          try {
-            console.log("Attempting to fetch verification with ID:", verificationId);
-            const verificationResponse = await fetch(
-              `/api/verification?id=${verificationId}&userId=${currentUser.uid}`
-            );
-  
-            console.log("Verification API status:", verificationResponse.status);
-            
-            if (verificationResponse.ok) {
-              const verificationData = await verificationResponse.json();
-              console.log("Verification data received:", verificationData);
-              
-              // Merge verification data with profile data
-              combinedProfileData = {
-                ...combinedProfileData,
-                verificationVideoUrl: verificationData.verificationVideoUrl,
-                verifiableIDUrl: verificationData.verifiableIDUrl,
-                profilePictureUrl:
-                  combinedProfileData.profilePictureUrl ||
-                  verificationData.profilePictureUrl,
-                profileData: verificationData.profileData,
-                status: verificationData.status || verificationData.verificationStatus,
-                verificationId: verificationId // Ensure it's included in the combined data
-              };
-            } else {
-              console.warn("Failed to fetch verification data:", await verificationResponse.text());
-            }
-          } catch (verificationErr) {
-            console.error("Error fetching verification data:", verificationErr);
-          }
-        } else {
-          // Even if no verification ID found, still try to fetch by user ID as fallback
-          try {
-            console.log("No verification ID found, trying to fetch by userId:", currentUser.uid);
-            const verificationResponse = await fetch(
-              `/api/verification?userId=${currentUser.uid}`
-            );
-            
-            if (verificationResponse.ok) {
-              const verificationData = await verificationResponse.json();
-              console.log("Verification data by userId received:", verificationData);
-              
-              // Merge verification data with profile data
-              combinedProfileData = {
-                ...combinedProfileData,
-                verificationVideoUrl: verificationData.verificationVideoUrl,
-                verifiableIDUrl: verificationData.verifiableIDUrl,
-                profilePictureUrl:
-                  combinedProfileData.profilePictureUrl ||
-                  verificationData.profilePictureUrl,
-                profileData: verificationData.profileData,
-                status: verificationData.status || verificationData.verificationStatus,
-                verificationId: verificationData.id || verificationData._id || verificationData.verificationId
-              };
-            }
-          } catch (fallbackErr) {
-            console.log("Fallback verification fetch failed:", fallbackErr);
-          }
-        }
-  
-        console.log("Final combined profile data:", combinedProfileData);
-        setCreatorProfile(combinedProfileData);
-      } else {
-        const errorData = await profileResponse.json();
-        console.error("API error:", errorData);
-        setCreatorProfile(null);
-        setError(errorData.error || "Failed to fetch profile");
-      }
-    } catch (err) {
-      console.error("Error fetching creator profile:", err);
-      setError("Failed to fetch creator profile");
-    } finally {
-      setLoading(false);
-    }
-  };
+	const fetchCreatorProfile = async () => {
+		if (!currentUser?.uid) {
+			setLoading(false);
+			return;
+		}
+
+		setLoading(true);
+		setError(null);
+
+		try {
+			// First fetch basic profile data
+			const profileApiUrl = `/api/creator-profile?email=${encodeURIComponent(currentUser.email)}&userId=${currentUser.uid}`;
+
+			const profileResponse = await fetch(profileApiUrl);
+			let combinedProfileData: CreatorProfile = {};
+
+			if (profileResponse.ok) {
+				const profileData = await profileResponse.json();
+				combinedProfileData = { ...profileData };
+
+				// Check for verification ID in all possible locations
+				const verificationId =
+					profileData.verificationId ||
+					profileData.verification_id ||
+					(profileData.verification && profileData.verification.id) ||
+					null;
+
+				// If we found a verificationId, fetch the verification data
+				if (verificationId) {
+					try {
+						const verificationResponse = await fetch(
+							`/api/verification?id=${verificationId}&userId=${currentUser.uid}`
+						);
+
+						if (verificationResponse.ok) {
+							const verificationData = await verificationResponse.json();
+
+							// Merge verification data with profile data
+							combinedProfileData = {
+								...combinedProfileData,
+								verificationVideoUrl: verificationData.verificationVideoUrl,
+								verifiableIDUrl: verificationData.verifiableIDUrl,
+								profilePictureUrl:
+									combinedProfileData.profilePictureUrl ||
+									verificationData.profilePictureUrl,
+								profileData: verificationData.profileData,
+								status:
+									verificationData.status ||
+									verificationData.verificationStatus,
+								verificationId: verificationId, // Ensure it's included in the combined data
+							};
+						} else {
+							console.warn(
+								"Failed to fetch verification data:",
+								await verificationResponse.text()
+							);
+						}
+					} catch (verificationErr) {
+						console.error("Error fetching verification data:", verificationErr);
+					}
+				} else {
+					// Even if no verification ID found, still try to fetch by user ID as fallback
+					try {
+						const verificationResponse = await fetch(
+							`/api/verification?userId=${currentUser.uid}`
+						);
+
+						if (verificationResponse.ok) {
+							const verificationData = await verificationResponse.json();
+
+							// Merge verification data with profile data
+							combinedProfileData = {
+								...combinedProfileData,
+								verificationVideoUrl: verificationData.verificationVideoUrl,
+								verifiableIDUrl: verificationData.verifiableIDUrl,
+								profilePictureUrl:
+									combinedProfileData.profilePictureUrl ||
+									verificationData.profilePictureUrl,
+								profileData: verificationData.profileData,
+								status:
+									verificationData.status ||
+									verificationData.verificationStatus,
+								verificationId:
+									verificationData.id ||
+									verificationData._id ||
+									verificationData.verificationId,
+							};
+						}
+					} catch (fallbackErr) {
+						console.error("Fallback verification fetch failed:", fallbackErr);
+					}
+				}
+				setCreatorProfile(combinedProfileData);
+			} else {
+				const errorData = await profileResponse.json();
+				console.error("API error:", errorData);
+				setCreatorProfile(null);
+				setError(errorData.error || "Failed to fetch profile");
+			}
+		} catch (err) {
+			console.error("Error fetching creator profile:", err);
+			setError("Failed to fetch creator profile");
+		} finally {
+			setLoading(false);
+		}
+	};
 
 	useEffect(() => {
 		// Only fetch profile data if we're in edit or view mode

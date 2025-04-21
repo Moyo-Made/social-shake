@@ -38,15 +38,18 @@ interface FieldErrors {
 interface CreatorVerificationContextType {
 	verificationData: VerificationData;
 	profileData: CreatorProfileData;
-	updateVerificationData: (data: Partial<VerificationData>) => void;
-	updateProfileData: (data: Partial<CreatorProfileData>) => void;
+	updateVerificationData: (data: Partial<VerificationData>) => Promise<void>;
+	updateProfileData: (data: Partial<CreatorProfileData>) => Promise<void>;
 	isVerificationComplete: boolean;
 	isProfileComplete: boolean;
 	submitVerification: () => Promise<{ success: boolean; message: string }>;
 	loading: boolean;
 	fieldErrors: FieldErrors;
-	validateProfileData: () => { isValid: boolean; missingFields: string[] };
+	validateProfileData: (updateErrorState?: boolean) => { isValid: boolean; missingFields: string[] };
 	clearFieldError: (field: string) => void;
+	touched: Record<string, boolean>;
+	setTouched: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+	resetForm: () => Promise<void>;
 }
 
 const defaultVerificationData: VerificationData = {
@@ -84,10 +87,16 @@ const VERIFICATION_STORE = "verification";
 // LocalStorage keys instead of SessionStorage
 const PROFILE_DATA_KEY = "creatorProfileData";
 const PROFILE_PICTURE_KEY = "creatorProfilePicture";
+const TOUCHED_FIELDS_KEY = "creatorTouchedFields";
 
 // IndexedDB utility functions
 const openDatabase = (): Promise<IDBDatabase> => {
 	return new Promise((resolve, reject) => {
+		if (typeof indexedDB === 'undefined') {
+			reject(new Error("IndexedDB is not available"));
+			return;
+		}
+
 		const request = indexedDB.open(DB_NAME, DB_VERSION);
 
 		request.onerror = (event) => {
@@ -111,24 +120,29 @@ const openDatabase = (): Promise<IDBDatabase> => {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const getFromDB = async (storeName: string, key: string): Promise<any> => {
-	const db = await openDatabase();
-	return new Promise((resolve, reject) => {
-		const transaction = db.transaction(storeName, "readonly");
-		const store = transaction.objectStore(storeName);
-		const request = store.get(key);
+	try {
+		const db = await openDatabase();
+		return new Promise((resolve, reject) => {
+			const transaction = db.transaction(storeName, "readonly");
+			const store = transaction.objectStore(storeName);
+			const request = store.get(key);
 
-		request.onsuccess = () => {
-			resolve(request.result);
-		};
+			request.onsuccess = () => {
+				resolve(request.result);
+			};
 
-		request.onerror = (event) => {
-			reject((event.target as IDBRequest).error);
-		};
+			request.onerror = (event) => {
+				reject((event.target as IDBRequest).error);
+			};
 
-		transaction.oncomplete = () => {
-			db.close();
-		};
-	});
+			transaction.oncomplete = () => {
+				db.close();
+			};
+		});
+	} catch (error) {
+		console.error("Error getting from DB:", error);
+		return null;
+	}
 };
 
 const putIntoDB = async (
@@ -136,45 +150,85 @@ const putIntoDB = async (
 	key: string,
 	value: Record<string, unknown>
 ): Promise<void> => {
-	const db = await openDatabase();
-	return new Promise((resolve, reject) => {
-		const transaction = db.transaction(storeName, "readwrite");
-		const store = transaction.objectStore(storeName);
-		const request = store.put(value, key);
+	try {
+		const db = await openDatabase();
+		return new Promise((resolve, reject) => {
+			const transaction = db.transaction(storeName, "readwrite");
+			const store = transaction.objectStore(storeName);
+			const request = store.put(value, key);
 
-		request.onsuccess = () => {
-			resolve();
-		};
+			request.onsuccess = () => {
+				resolve();
+			};
 
-		request.onerror = (event) => {
-			reject((event.target as IDBRequest).error);
-		};
+			request.onerror = (event) => {
+				reject((event.target as IDBRequest).error);
+			};
 
-		transaction.oncomplete = () => {
-			db.close();
-		};
-	});
+			transaction.oncomplete = () => {
+				db.close();
+			};
+		});
+	} catch (error) {
+		console.error("Error putting into DB:", error);
+		throw error;
+	}
 };
 
 const deleteFromDB = async (storeName: string, key: string): Promise<void> => {
-	const db = await openDatabase();
+	try {
+		const db = await openDatabase();
+		return new Promise((resolve, reject) => {
+			const transaction = db.transaction(storeName, "readwrite");
+			const store = transaction.objectStore(storeName);
+			const request = store.delete(key);
+
+			request.onsuccess = () => {
+				resolve();
+			};
+
+			request.onerror = (event) => {
+				reject((event.target as IDBRequest).error);
+			};
+
+			transaction.oncomplete = () => {
+				db.close();
+			};
+		});
+	} catch (error) {
+		console.error("Error deleting from DB:", error);
+	}
+};
+
+// File utility functions
+const fileToBase64 = (file: File): Promise<string> => {
 	return new Promise((resolve, reject) => {
-		const transaction = db.transaction(storeName, "readwrite");
-		const store = transaction.objectStore(storeName);
-		const request = store.delete(key);
-
-		request.onsuccess = () => {
-			resolve();
-		};
-
-		request.onerror = (event) => {
-			reject((event.target as IDBRequest).error);
-		};
-
-		transaction.oncomplete = () => {
-			db.close();
-		};
+		const reader = new FileReader();
+		reader.readAsDataURL(file);
+		reader.onload = () => resolve(reader.result as string);
+		reader.onerror = (error) => reject(error);
 	});
+};
+
+const base64ToFile = (
+	base64String: string,
+	filename: string,
+	type: string
+): File => {
+	try {
+		const arr = base64String.split(",");
+		const mime = arr[0].match(/:(.*?);/)?.[1] || type;
+		const bstr = atob(arr[1]);
+		let n = bstr.length;
+		const u8arr = new Uint8Array(n);
+		while (n--) {
+			u8arr[n] = bstr.charCodeAt(n);
+		}
+		return new File([u8arr], filename, { type: mime });
+	} catch (error) {
+		console.error("Error converting base64 to file:", error);
+		throw error;
+	}
 };
 
 export const CreatorVerificationProvider = ({
@@ -190,40 +244,10 @@ export const CreatorVerificationProvider = ({
 	const [profileData, setProfileData] =
 		useState<CreatorProfileData>(defaultProfileData);
 	const [loading, setLoading] = useState(false);
-	const [dbInitialized, setDbInitialized] = useState(false); // New state to trigger data reloads
+	const [dbInitialized, setDbInitialized] = useState(false);
 	const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 	const [isProfileComplete, setIsProfileComplete] = useState(false);
-
-	// Add these utility functions
-	const fileToBase64 = (file: File): Promise<string> => {
-		return new Promise((resolve, reject) => {
-			const reader = new FileReader();
-			reader.readAsDataURL(file);
-			reader.onload = () => resolve(reader.result as string);
-			reader.onerror = (error) => reject(error);
-		});
-	};
-
-	const base64ToFile = (
-		base64String: string,
-		filename: string,
-		type: string
-	): File => {
-		try {
-			const arr = base64String.split(",");
-			const mime = arr[0].match(/:(.*?);/)?.[1] || type;
-			const bstr = atob(arr[1]);
-			let n = bstr.length;
-			const u8arr = new Uint8Array(n);
-			while (n--) {
-				u8arr[n] = bstr.charCodeAt(n);
-			}
-			return new File([u8arr], filename, { type: mime });
-		} catch (error) {
-			console.error("Error converting base64 to file:", error);
-			throw error;
-		}
-	};
+	const [touched, setTouched] = useState<Record<string, boolean>>({});
 
 	// Initialize database
 	useEffect(() => {
@@ -241,7 +265,17 @@ export const CreatorVerificationProvider = ({
 		initializeDB();
 	}, []);
 
-	// Load data from IndexedDB and LocalStorage on initial render or when refresh is triggered
+	// Save touched state to localStorage whenever it changes
+	useEffect(() => {
+		if (typeof window === "undefined") return;
+		try {
+			localStorage.setItem(TOUCHED_FIELDS_KEY, JSON.stringify(touched));
+		} catch (error) {
+			console.error("Error saving touched state to localStorage:", error);
+		}
+	}, [touched]);
+
+	// Load data from IndexedDB and LocalStorage on initial render
 	useEffect(() => {
 		// Only run this in the browser and when DB is initialized
 		if (typeof window === "undefined" || !dbInitialized) return;
@@ -296,10 +330,11 @@ export const CreatorVerificationProvider = ({
 					setVerificationData(restoredVerificationData);
 				}
 
-				//Load profile data from LocalStorage
+				// Load profile data from LocalStorage
 				try {
 					const profileDataStr = localStorage.getItem(PROFILE_DATA_KEY);
 					const profilePictureStr = localStorage.getItem(PROFILE_PICTURE_KEY);
+					const touchedFieldsStr = localStorage.getItem(TOUCHED_FIELDS_KEY);
 
 					if (profileDataStr) {
 						const storedProfile = JSON.parse(profileDataStr);
@@ -328,8 +363,18 @@ export const CreatorVerificationProvider = ({
 
 						setProfileData(restoredProfileData);
 
+						// Restore touched fields if they exist
+						if (touchedFieldsStr) {
+							try {
+								const restoredTouched = JSON.parse(touchedFieldsStr);
+								setTouched(restoredTouched);
+							} catch (error) {
+								console.error("Error restoring touched fields:", error);
+							}
+						}
+
 						// Check if profile is complete after loading data
-						validateProfileComplete(restoredProfileData);
+						validateProfileComplete(restoredProfileData, false);
 					}
 				} catch (error) {
 					console.error(
@@ -343,7 +388,7 @@ export const CreatorVerificationProvider = ({
 		};
 
 		loadData();
-	}, [dbInitialized]); // Added dataLoadAttempt dependency
+	}, [dbInitialized]);
 
 	// Update verification data in state and IndexedDB
 	const updateVerificationData = async (data: Partial<VerificationData>) => {
@@ -355,11 +400,23 @@ export const CreatorVerificationProvider = ({
 			// Process any file data to convert to base64 for storage
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const storageData: any = { ...existingFiles }; // Start with existing files
+			
+			// Update state first
+			const updatedVerificationData = {
+				verificationVideo:
+					data.verificationVideo !== undefined
+						? data.verificationVideo
+						: verificationData.verificationVideo,
+				verifiableID:
+					data.verifiableID !== undefined
+						? data.verifiableID
+						: verificationData.verifiableID,
+			};
+			
+			// Set flags based on updated data
 			const storageFlags = {
-				verificationVideoExists:
-					!!data.verificationVideo || !!verificationData.verificationVideo,
-				verifiableIDExists:
-					!!data.verifiableID || !!verificationData.verifiableID,
+				verificationVideoExists: !!updatedVerificationData.verificationVideo,
+				verifiableIDExists: !!updatedVerificationData.verifiableID,
 			};
 
 			// If there's a new verification video, encode it
@@ -382,24 +439,26 @@ export const CreatorVerificationProvider = ({
 			await putIntoDB(VERIFICATION_STORE, "flags", storageFlags);
 			await putIntoDB(VERIFICATION_STORE, "files", storageData);
 
-			// Update state with the original file objects - preserve existing if not updated
-			setVerificationData((prev) => ({
-				verificationVideo:
-					data.verificationVideo !== undefined
-						? data.verificationVideo
-						: prev.verificationVideo,
-				verifiableID:
-					data.verifiableID !== undefined
-						? data.verifiableID
-						: prev.verifiableID,
-			}));
+			// Update state after successful storage
+			setVerificationData(updatedVerificationData);
+			
+			// Mark fields as touched
+			if (data.verificationVideo !== undefined) {
+				setTouched(prev => ({...prev, verificationVideo: true}));
+			}
+			if (data.verifiableID !== undefined) {
+				setTouched(prev => ({...prev, verifiableID: true}));
+			}
+			
+			return;
 		} catch (error) {
 			console.error("Error updating verification data in IndexedDB:", error);
+			throw error;
 		}
 	};
 
-	// Add this validation function
-	const validateProfileData = () => {
+	// Validation function with option to not update the error state
+	const validateProfileData = (updateErrorState = true) => {
 		const requiredFields = [
 			{ key: "picture", label: "Profile Picture" },
 			{ key: "bio", label: "Bio" },
@@ -441,15 +500,19 @@ export const CreatorVerificationProvider = ({
 			errors.contentLinks = "At least one content link is required";
 		}
 
-		setFieldErrors(errors);
+		// Only update the errors state if requested
+		if (updateErrorState) {
+			setFieldErrors(errors);
+		}
 
+		const isValid = missingFields.length === 0;
 		return {
-			isValid: missingFields.length === 0,
+			isValid,
 			missingFields,
 		};
 	};
 
-	// Add this function to clear individual errors
+	// Clear individual errors
 	const clearFieldError = (field: string) => {
 		setFieldErrors((prev) => {
 			const updated = { ...prev };
@@ -461,75 +524,75 @@ export const CreatorVerificationProvider = ({
 	// Update profile data in state and LocalStorage
 	const updateProfileData = async (data: Partial<CreatorProfileData>) => {
 		try {
-			// Update the state first
-			setProfileData((prev) => {
-				const updatedData = {
-					...prev,
-					...data,
-					picture: data.picture !== undefined ? data.picture : prev.picture,
-				};
+			// Create updated data by merging current state with new data
+			const updatedData = {
+				...profileData,
+				...data,
+				picture: data.picture !== undefined ? data.picture : profileData.picture,
+			};
 
-				// Store profile data without the picture
-				const profileDataToStore = {
-					bio: updatedData.bio,
-					tiktokUrl: updatedData.tiktokUrl,
-					ethnicity: updatedData.ethnicity,
-					dateOfBirth: updatedData.dateOfBirth,
-					gender: updatedData.gender,
-					country: updatedData.country,
-					contentTypes: updatedData.contentTypes,
-					contentLinks: updatedData.contentLinks,
-					socialMedia: updatedData.socialMedia,
-				};
+			// Prepare data for storage (without the File object)
+			const profileDataToStore = {
+				bio: updatedData.bio,
+				tiktokUrl: updatedData.tiktokUrl,
+				ethnicity: updatedData.ethnicity,
+				dateOfBirth: updatedData.dateOfBirth,
+				gender: updatedData.gender,
+				country: updatedData.country,
+				contentTypes: updatedData.contentTypes,
+				contentLinks: updatedData.contentLinks,
+				socialMedia: updatedData.socialMedia,
+			};
 
-				// Save to local storage
+			// Save to local storage
+			localStorage.setItem(
+				PROFILE_DATA_KEY,
+				JSON.stringify(profileDataToStore)
+			);
+
+			// If there's a new profile picture, save it separately
+			if (data.picture) {
+				// Save picture data
+				const base64 = await fileToBase64(data.picture);
+				const pictureData = {
+					base64,
+					name: data.picture.name,
+					type: data.picture.type,
+				};
 				localStorage.setItem(
-					PROFILE_DATA_KEY,
-					JSON.stringify(profileDataToStore)
+					PROFILE_PICTURE_KEY,
+					JSON.stringify(pictureData)
 				);
+			}
 
-				// If there's a new profile picture, save it separately
-				if (data.picture) {
-					// Save picture data
-					fileToBase64(data.picture).then((base64) => {
-						const pictureData = {
-							base64,
-							name: data.picture?.name,
-							type: data.picture?.type,
-						};
-						localStorage.setItem(
-							PROFILE_PICTURE_KEY,
-							JSON.stringify(pictureData)
-						);
-					});
+			// Update touched state for all fields in data
+			const newTouched = { ...touched };
+			Object.keys(data).forEach(key => {
+				newTouched[key] = true;
+			});
+			setTouched(newTouched);
+			localStorage.setItem(TOUCHED_FIELDS_KEY, JSON.stringify(newTouched));
 
-					// Clear any error for picture field
-					clearFieldError("picture");
-				}
-
-				// Clear field errors for updated fields
-				Object.keys(data).forEach((key) => {
-					if (key !== "picture") {
-						clearFieldError(key);
-					}
-				});
-
-				return updatedData;
+			// Clear field errors for updated fields
+			Object.keys(data).forEach((key) => {
+				clearFieldError(key);
 			});
 
-			// IMPORTANT: Move this outside the setState callback to ensure it runs with the updated state
-			setTimeout(() => {
-				const currentProfileData = { ...profileData, ...data };
-				const isValid = validateProfileComplete(currentProfileData);
-				console.log("Profile complete check:", isValid);
-			}, 0);
+			// Update state after storage is complete
+			setProfileData(updatedData);
+			
+			// Validate profile completeness with the updated data
+			validateProfileComplete(updatedData, false);
+			
+			return;
 		} catch (error) {
 			console.error("Error updating profile data in local storage:", error);
+			throw error;
 		}
 	};
 
 	// Define a separate function for checking profile completeness
-	const validateProfileComplete = (data: CreatorProfileData) => {
+	const validateProfileComplete = (data: CreatorProfileData, updateErrors = false) => {
 		const isComplete = Boolean(
 			data.picture &&
 				data.bio &&
@@ -541,14 +604,43 @@ export const CreatorVerificationProvider = ({
 				data.gender &&
 				data.gender.trim().length > 0 &&
 				data.country &&
+				data.country.trim().length > 0 &&
 				data.contentLinks.length > 0 &&
+				data.contentLinks[0] &&
 				data.contentLinks[0].trim() !== ""
 		);
 
-		// Update state properly by calling the setter function
+		// Update state
 		setIsProfileComplete(isComplete);
+		
+		if (updateErrors) {
+			validateProfileData(); // Only validate with error updates when explicitly requested
+		}
 
 		return isComplete;
+	};
+
+	// Reset form data
+	const resetForm = async () => {
+		try {
+			// Clear IndexedDB
+			await deleteFromDB(VERIFICATION_STORE, "flags");
+			await deleteFromDB(VERIFICATION_STORE, "files");
+			
+			// Clear localStorage
+			localStorage.removeItem(PROFILE_DATA_KEY);
+			localStorage.removeItem(PROFILE_PICTURE_KEY);
+			localStorage.removeItem(TOUCHED_FIELDS_KEY);
+			
+			// Reset state
+			setVerificationData(defaultVerificationData);
+			setProfileData(defaultProfileData);
+			setFieldErrors({});
+			setTouched({});
+			setIsProfileComplete(false);
+		} catch (error) {
+			console.error("Error resetting form:", error);
+		}
 	};
 
 	// Check if verification step is complete
@@ -562,30 +654,30 @@ export const CreatorVerificationProvider = ({
 			return { success: false, message: "User ID is required" };
 		}
 
-		if (!isVerificationComplete || !isProfileComplete) {
+		// Force validation before submission
+		const profileValidation = validateProfileData(true);
+		
+		if (!isVerificationComplete) {
+			setFieldErrors(prev => ({
+				...prev,
+				verificationVideo: !verificationData.verificationVideo ? "Verification video is required" : "",
+				verifiableID: !verificationData.verifiableID ? "ID verification is required" : ""
+			}));
 			return {
 				success: false,
-				message: "Please complete all required fields",
+				message: "Please complete all required verification fields",
+			};
+		}
+
+		if (!profileValidation.isValid) {
+			return {
+				success: false,
+				message: `Please complete all required profile fields: ${profileValidation.missingFields.join(", ")}`,
 			};
 		}
 
 		setLoading(true);
 		try {
-			// Convert files to base64 for API transmission
-			const fileToBase64 = async (file: File): Promise<string> => {
-				return new Promise((resolve, reject) => {
-					const reader = new FileReader();
-					reader.readAsDataURL(file);
-					reader.onload = () => {
-						const base64String = reader.result as string;
-						// Remove the data:mime/type;base64, prefix
-						const base64 = base64String.split(",")[1];
-						resolve(base64);
-					};
-					reader.onerror = (error) => reject(error);
-				});
-			};
-
 			// Prepare files for API upload
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const apiPayload: any = {
@@ -612,7 +704,7 @@ export const CreatorVerificationProvider = ({
 					name: verificationData.verificationVideo.name,
 					type: verificationData.verificationVideo.type,
 					size: verificationData.verificationVideo.size,
-					data: videoBase64,
+					data: videoBase64.split(",")[1], // Remove the data:mime/type;base64, prefix
 				};
 			}
 
@@ -623,7 +715,7 @@ export const CreatorVerificationProvider = ({
 					name: verificationData.verifiableID.name,
 					type: verificationData.verifiableID.type,
 					size: verificationData.verifiableID.size,
-					data: idBase64,
+					data: idBase64.split(",")[1], // Remove the data:mime/type;base64, prefix
 				};
 			}
 
@@ -634,9 +726,12 @@ export const CreatorVerificationProvider = ({
 					name: profileData.picture.name,
 					type: profileData.picture.type,
 					size: profileData.picture.size,
-					data: pictureBase64,
+					data: pictureBase64.split(",")[1], // Remove the data:mime/type;base64, prefix
 				};
 			}
+
+			// Log the payload size to identify any issues with large uploads
+			console.log("API Payload size:", JSON.stringify(apiPayload).length, "bytes");
 
 			const response = await fetch("/api/submit-verification", {
 				method: "POST",
@@ -652,11 +747,9 @@ export const CreatorVerificationProvider = ({
 			}
 
 			const result = await response.json();
-			// Clear IndexedDB stores and local storage after successful submission
-			await deleteFromDB(VERIFICATION_STORE, "flags");
-			await deleteFromDB(VERIFICATION_STORE, "files");
-			localStorage.removeItem(PROFILE_DATA_KEY);
-			localStorage.removeItem(PROFILE_PICTURE_KEY);
+			
+			// Clear data after successful submission
+			await resetForm();
 
 			return {
 				success: true,
@@ -690,6 +783,9 @@ export const CreatorVerificationProvider = ({
 				fieldErrors,
 				validateProfileData,
 				clearFieldError,
+				touched,
+				setTouched,
+				resetForm
 			}}
 		>
 			{children}

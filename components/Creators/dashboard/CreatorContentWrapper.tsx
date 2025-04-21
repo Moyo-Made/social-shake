@@ -1,10 +1,15 @@
-"use client"
+"use client";
 
 import { ReactNode, useState, useEffect } from "react";
-import { db } from "@/config/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { useCreatorProfile } from "@/hooks/useCreatorProfile";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { Clock, AlertTriangle, CheckCircle, X, FileQuestion } from "lucide-react";
+import {
+  Clock,
+  AlertTriangle,
+  CheckCircle,
+  X,
+  FileQuestion,
+} from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -14,67 +19,49 @@ interface CreatorContentWrapperProps {
   pageType?: "dashboard" | "contests" | "projects" | "portfolio";
 }
 
-export default function CreatorContentWrapper({ 
-  userId, 
-  children, 
-  pageType = "dashboard" 
+export default function CreatorContentWrapper({
+  children,
+  pageType = "dashboard",
 }: CreatorContentWrapperProps) {
-  const [creatorStatus, setCreatorStatus] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [showApprovedMessage, setShowApprovedMessage] = useState(false);
+  
+  // Use the hook with complete profile data access
+  const { 
+    creatorProfile, 
+    loading, 
+    error 
+  } = useCreatorProfile("view");
 
+  // Get verification status from creatorProfile data
+  const getCreatorStatus = () => {
+    // If we couldn't load the profile at all
+    if (error) return "error";
+    
+    // If no profile exists yet
+    if (!creatorProfile) return "missing";
+    
+    // Get status from verification data first, then fall back to profile data
+    const status = creatorProfile?.status || 
+                   creatorProfile?.verificationStatus || 
+                   (creatorProfile?.profileData?.status as string);
+    
+    // If we have a profile but no status info, assume pending
+    return status?.toLowerCase() || "pending";
+  };
+
+  // Handle showing the approved message when status changes to approved
   useEffect(() => {
-    async function checkCreatorStatus() {
-      if (!userId) return;
-      
-      try {
-        const creatorsRef = collection(db, "creatorProfiles");
-        const q = query(creatorsRef, where("userId", "==", userId));
-        const querySnapshot = await getDocs(q);
-        
-        if (querySnapshot.empty) {
-          // No creator profile found
-          setCreatorStatus("missing");
-        } else {
-          const creatorData = querySnapshot.docs[0].data();
-          const status = creatorData.verificationStatus || "pending";
-          setCreatorStatus(status);
-          
-          // Check if we should show the approved message
-          if (status === "approved") {
-            // Check local storage to see if we've already shown this message
-            const key = `creator-approval-shown-${userId}`;
-            const alreadyShown = localStorage.getItem(key);
-            
-            if (!alreadyShown) {
-              setShowApprovedMessage(true);
-              
-              // Set timeout to hide after 10 seconds
-              setTimeout(() => {
-                setShowApprovedMessage(false);
-              }, 10000);
-              
-              // Mark as shown in localStorage so it doesn't appear again
-              localStorage.setItem(key, "true");
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching creator status:", error);
-        setCreatorStatus("error");
-      } finally {
-        setIsLoading(false);
-      }
+    const status = getCreatorStatus();
+    if (status === "approved") {
+      setShowApprovedMessage(true);
     }
-
-    checkCreatorStatus();
-  }, [userId]);
+  }, [creatorProfile]);
 
   const dismissApprovedMessage = () => {
     setShowApprovedMessage(false);
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="w-8 h-8 border-t-2 border-b-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
@@ -96,6 +83,8 @@ export default function CreatorContentWrapper({
     }
   };
 
+  const creatorStatus = getCreatorStatus();
+
   // Show the appropriate message based on creator status
   if (creatorStatus !== "approved") {
     return (
@@ -106,14 +95,17 @@ export default function CreatorContentWrapper({
               <div className="flex items-start">
                 <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 mr-2" />
                 <div>
-                  <AlertTitle className="text-green-800 font-medium">Creator Profile Approved!</AlertTitle>
+                  <AlertTitle className="text-green-800 font-medium">
+                    Creator Profile Approved!
+                  </AlertTitle>
                   <AlertDescription className="text-green-700">
-                    Congratulations! Your creator profile has been approved. You can now participate in contests and accept projects.
+                    Congratulations! Your creator profile has been approved. You
+                    can now participate in contests and accept projects.
                   </AlertDescription>
                 </div>
               </div>
-              <button 
-                onClick={dismissApprovedMessage} 
+              <button
+                onClick={dismissApprovedMessage}
                 className="text-green-600 hover:text-green-800"
                 aria-label="Close"
               >
@@ -129,9 +121,12 @@ export default function CreatorContentWrapper({
               <div className="flex justify-center mb-4">
                 <FileQuestion className="h-16 w-16 text-orange-500" />
               </div>
-              <h2 className="text-xl font-semibold mb-2">Creator Profile Required</h2>
+              <h2 className="text-xl font-semibold mb-2">
+                Creator Profile Required
+              </h2>
               <p className="text-gray-600 mb-6">
-                You need to create a creator profile before you can {getPageTypeText()}.
+                You need to create a creator profile before you can{" "}
+                {getPageTypeText()}.
               </p>
               <Link href="/creator/signup">
                 <Button className="w-full">Create Creator Profile</Button>
@@ -144,12 +139,16 @@ export default function CreatorContentWrapper({
               <div className="flex justify-center mb-4">
                 <Clock className="h-16 w-16 text-orange-500" />
               </div>
-              <h2 className="text-xl font-semibold mb-2">Profile Under Review</h2>
+              <h2 className="text-xl font-semibold mb-2">
+                Profile Under Review
+              </h2>
               <p className="text-gray-600 mb-2">
                 Your creator profile is currently being reviewed by our team.
               </p>
               <p className="text-gray-600 mb-4">
-                Once approved, you&apos;ll be able to {getPageTypeText()}. We&apos;ll notify you via email when your profile has been approved.
+                Once approved, you&apos;ll be able to {getPageTypeText()}.
+                We&apos;ll notify you via email when your profile has been
+                approved.
               </p>
               <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
                 <div className="bg-orange-500 h-2 rounded-full w-1/2"></div>
@@ -163,12 +162,17 @@ export default function CreatorContentWrapper({
               <div className="flex justify-center mb-4">
                 <AlertTriangle className="h-16 w-16 text-red-500" />
               </div>
-              <h2 className="text-xl font-semibold mb-2">Profile Needs Updates</h2>
+              <h2 className="text-xl font-semibold mb-2">
+                Profile Needs Updates
+              </h2>
               <p className="text-gray-600 mb-6">
-                Your creator profile was not approved. Please review the feedback and update your profile to {getPageTypeText()}.
+                Your creator profile was not approved. Please review the
+                feedback and update your profile to {getPageTypeText()}.
               </p>
               <Link href="/creator/dashboard/settings">
-                <Button variant="destructive" className="w-full">Edit Creator Profile</Button>
+                <Button variant="destructive" className="w-full">
+                  Edit Creator Profile
+                </Button>
               </Link>
             </div>
           )}
@@ -178,12 +182,15 @@ export default function CreatorContentWrapper({
               <div className="flex justify-center mb-4">
                 <AlertTriangle className="h-16 w-16 text-red-500" />
               </div>
-              <h2 className="text-xl font-semibold mb-2">Error Checking Creator Status</h2>
+              <h2 className="text-xl font-semibold mb-2">
+                Error Checking Creator Status
+              </h2>
               <p className="text-gray-600 mb-6">
-                We couldn&apos;t verify your creator profile status. Please try refreshing the page or contact support.
+                We couldn&apos;t verify your creator profile status. Please try
+                refreshing the page or contact support.
               </p>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full"
                 onClick={() => window.location.reload()}
               >
@@ -205,14 +212,17 @@ export default function CreatorContentWrapper({
             <div className="flex items-start">
               <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 mr-2" />
               <div>
-                <AlertTitle className="text-green-800 font-medium">Creator Profile Approved!</AlertTitle>
+                <AlertTitle className="text-green-800 font-medium">
+                  Creator Profile Approved!
+                </AlertTitle>
                 <AlertDescription className="text-green-700">
-                  Congratulations! Your creator profile has been approved. You can now participate in contests and accept projects.
+                  Congratulations! Your creator profile has been approved. You
+                  can now participate in contests and accept projects.
                 </AlertDescription>
               </div>
             </div>
-            <button 
-              onClick={dismissApprovedMessage} 
+            <button
+              onClick={dismissApprovedMessage}
               className="text-green-600 hover:text-green-800"
               aria-label="Close"
             >

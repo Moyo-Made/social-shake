@@ -22,8 +22,14 @@ import {
 } from "@/components/Creators/verify-identity/CreatorVerificationContext";
 
 const CompleteCreatorProfile = () => {
-	const { profileData, updateProfileData, fieldErrors } =
-		useCreatorVerification();
+	const { 
+		profileData, 
+		updateProfileData, 
+		fieldErrors, 
+		setTouched, 
+		validateProfileData,
+		clearFieldError
+	} = useCreatorVerification();
 
 	// State for form fields
 	const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -35,7 +41,6 @@ const CompleteCreatorProfile = () => {
 
 	const [contentTypes, setContentTypes] = useState<string[]>([]);
 	const [contentTypeInput, setContentTypeInput] = useState("");
-	const [, setTouched] = useState<Record<string, boolean>>({});
 
 	const [tiktokUrl, setTiktokUrl] = useState("");
 	const [ethnicity, setEthnicity] = useState("");
@@ -50,17 +55,17 @@ const CompleteCreatorProfile = () => {
 		facebook: "",
 		youtube: "",
 	});
-	const { validateProfileData } = useCreatorVerification();
 
+	// Validate on important field changes with debounce
 	useEffect(() => {
-		// Validate whenever important fields change
 		const timeoutId = setTimeout(() => {
-		  const { isValid } = validateProfileData();
-		  console.log("Form validation status:", isValid);
+			// Use the function as defined in context - pass false to not update error state during typing
+			const { isValid } = validateProfileData(false);
+			console.log("Form validation status:", isValid);
 		}, 300);
 		
 		return () => clearTimeout(timeoutId);
-	  }, [bio, tiktokUrl, profileData.picture, dateOfBirth, gender, selectedCountry, validateProfileData]);
+	}, [bio, tiktokUrl, dateOfBirth, gender, selectedCountry, validateProfileData]);
 
 	// Load data from context when profileData changes
 	useEffect(() => {
@@ -88,8 +93,9 @@ const CompleteCreatorProfile = () => {
 				youtube: profileData.socialMedia?.youtube || "",
 			});
 		}
-	}, [profileData]); // Add selectedFile as a dependency
+	}, [profileData]);
 
+	// Handle profile picture from context
 	useEffect(() => {
 		if (
 			profileData?.picture &&
@@ -116,7 +122,7 @@ const CompleteCreatorProfile = () => {
 		};
 	}, [previewUrl]);
 
-	// Create preview URL when selected file changes
+	// Update context when selected file changes
 	useEffect(() => {
 		if (!selectedFile) return;
 
@@ -175,6 +181,8 @@ const CompleteCreatorProfile = () => {
 			setBio(inputText);
 			updateProfileData({ bio: inputText });
 			setBioWarning("");
+			// Clear any existing error for bio field
+			clearFieldError("bio");
 		} else {
 			// Keep the first 500 characters only
 			const truncated = inputText.slice(0, maxBioLength);
@@ -213,12 +221,17 @@ const CompleteCreatorProfile = () => {
 		if (e.target.files && e.target.files[0]) {
 			const file = e.target.files[0];
 			setSelectedFile(file);
+			clearFieldError("picture");
 		}
 	};
 
 	// Handle input blur to track touched fields
 	const handleBlur = (name: string) => {
 		setTouched((prev) => ({ ...prev, [name]: true }));
+		
+		// Validate the field when user leaves it
+		const { isValid } = validateProfileData(true);
+		console.log(`Field ${name} blurred, form valid: ${isValid}`);
 	};
 
 	const handleTextInputChange = (
@@ -245,6 +258,9 @@ const CompleteCreatorProfile = () => {
 				break;
 		}
 
+		// Clear any existing error for this field
+		clearFieldError(fieldName);
+		
 		// Update context
 		updateProfileData({ [fieldName]: value });
 	};
@@ -258,6 +274,7 @@ const CompleteCreatorProfile = () => {
 
 	const handleCountryChange = (value: string) => {
 		setSelectedCountry(value);
+		clearFieldError("country");
 		updateProfileData({ country: value });
 	};
 
@@ -278,6 +295,12 @@ const CompleteCreatorProfile = () => {
 		const newLinks = [...contentLinks];
 		newLinks[index] = value;
 		setContentLinks(newLinks);
+		
+		// Clear any content links error when user starts typing
+		if (index === 0 && value.trim() !== "") {
+			clearFieldError("contentLinks");
+		}
+		
 		updateProfileData({ contentLinks: newLinks });
 	};
 
@@ -403,7 +426,7 @@ const CompleteCreatorProfile = () => {
 				Your Date of Birth
 			</label>
 			<Input
-				className="mt-1 placeholder:text-[#667085] placeholder:text-sm"
+				className={`mt-1 placeholder:text-[#667085] placeholder:text-sm ${fieldErrors.dateOfBirth ? "border-red-500" : ""}`}
 				placeholder="DD/MM/YYYY"
 				value={dateOfBirth}
 				onChange={(e) => handleTextInputChange(e, "dateOfBirth")}
@@ -416,7 +439,7 @@ const CompleteCreatorProfile = () => {
 				Your Gender
 			</label>
 			<Input
-				className="mt-1 placeholder:text-[#667085]"
+				className={`mt-1 placeholder:text-[#667085] ${fieldErrors.gender ? "border-red-500" : ""}`}
 				placeholder="Male"
 				value={gender}
 				onChange={(e) => handleTextInputChange(e, "gender")}
@@ -547,12 +570,15 @@ const CompleteCreatorProfile = () => {
 					Your Country?
 				</label>
 				<Select value={selectedCountry} onValueChange={handleCountryChange}>
-					<SelectTrigger id="country-select" className="w-full">
+					<SelectTrigger 
+                        id="country-select" 
+                        className={`w-full ${fieldErrors.country ? "border-red-500" : ""}`}
+                    >
 						<SelectValue placeholder="Select your country" />
 					</SelectTrigger>
 					<SelectContent className="bg-[#f7f7f7]">
-						{countries.map((country) => (
-							<SelectItem key={country.code} value={country.code}>
+						{countries.map((country) => (  
+							<SelectItem key={country.code} value={country.name}>
 								{country.name}
 							</SelectItem>
 						))}

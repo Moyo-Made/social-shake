@@ -10,97 +10,119 @@ import { useCreatorVerification } from "@/components/Creators/verify-identity/Cr
 function VerificationVideo() {
   const { 
     verificationData, 
-    updateVerificationData 
+    updateVerificationData,
+    fieldErrors,
+    clearFieldError,
+    touched,
+    setTouched
   } = useCreatorVerification();
   
   const { verificationVideo, verifiableID } = verificationData;
   
-// Add better error handling to the useEffect for loading stored flags
-useEffect(() => {
-  // Check if verification data is already loaded from context
-  if (verificationVideo || verifiableID) {
-    return; // Don't show toast if we already have the files loaded
-  }
-  
-  // Only check sessionStorage as a fallback if context loading failed
-  const storedFlags = sessionStorage.getItem("verificationDataFlags");
-  if (storedFlags) {
+  // Improved useEffect for loading stored flags and handling errors
+  useEffect(() => {
+    // Check if verification data is already loaded from context
+    if (verificationVideo || verifiableID) {
+      return; // Don't show toast if we already have the files loaded
+    }
+    
+    // Set these fields as touched if user revisits the page and files were previously loaded
+    if (!touched.verificationVideo && !touched.verifiableID) {
+      const storedFlags = sessionStorage.getItem("verificationDataFlags");
+      if (storedFlags) {
+        try {
+          const flags = JSON.parse(storedFlags);
+          // Update touched state if files were previously uploaded
+          const updatedTouched = { ...touched };
+          if (flags.verificationVideoExists) {
+            updatedTouched.verificationVideo = true;
+            toast.info("Your verification video was previously uploaded but couldn't be loaded. Please re-upload.");
+          }
+          if (flags.verifiableIDExists) {
+            updatedTouched.verifiableID = true;
+            toast.info("Your ID was previously uploaded but couldn't be loaded. Please re-upload.");
+          }
+          setTouched(updatedTouched);
+        } catch (error) {
+          console.error("Error parsing verification flags:", error);
+        }
+      }
+    }
+  }, [verificationVideo, verifiableID, touched, setTouched]);
+
+  // Enhanced upload handler for videos with better context integration
+  const handleVideoUpload = async (file: File) => {
+    // Clear any previous errors
+    clearFieldError("verificationVideo");
+    
+    // Validate file type (should be a video)
+    const validVideoTypes = ["video/mp4", "video/webm", "video/quicktime"];
+    if (!validVideoTypes.includes(file.type)) {
+      toast.error("Invalid file type. Please upload a valid video file.");
+      return;
+    }
+    
     try {
-      const flags = JSON.parse(storedFlags);
-      // If flags indicate files existed but we don't have them in state,
-      // we'll just show a message to the user
-      if (flags.verificationVideoExists && !verificationVideo) {
-        toast.info("Your verification video was previously uploaded but couldn't be loaded. Please re-upload.");
+      // Check file size before processing (50MB limit)
+      if (file.size > 50 * 1024 * 1024) {
+        toast.error("File too large. Maximum video size is 50MB.");
+        return;
       }
-      if (flags.verifiableIDExists && !verifiableID) {
-        toast.info("Your ID was previously uploaded but couldn't be loaded. Please re-upload.");
-      }
+      
+      // Update context data with proper async handling
+      await toast.promise(
+        updateVerificationData({ verificationVideo: file }),
+        {
+          loading: "Uploading verification video...",
+          success: "Your verification video has been uploaded successfully.",
+          error: "Failed to upload video. Please try again."
+        }
+      );
+      
+      // Mark field as touched after upload
+      setTouched(prev => ({ ...prev, verificationVideo: true }));
     } catch (error) {
-      console.error("Error parsing verification flags:", error);
+      console.error("Error in video upload:", error);
+      toast.error("An error occurred while processing your video. Please try again.");
     }
-  }
-}, [verificationVideo, verifiableID]);
+  };
 
-// Fix the upload handlers to better handle errors
-const handleVideoUpload = (file: File) => {
-  // Validate file type (should be a video)
-  const validVideoTypes = ["video/mp4", "video/webm", "video/quicktime"];
-  if (!validVideoTypes.includes(file.type)) {
-    toast.error("Invalid file type. Please upload a valid video file.");
-    return;
-  }
-  
-  try {
-    // Check file size before processing (50MB limit)
-    if (file.size > 50 * 1024 * 1024) {
-      toast.error("File too large. Maximum video size is 50MB.");
+  // Enhanced upload handler for ID with better context integration
+  const handleIDUpload = async (file: File) => {
+    // Clear any previous errors
+    clearFieldError("verifiableID");
+    
+    // Validate file type (should be an image)
+    const validImageTypes = ["image/png", "image/jpeg", "image/jpg"];
+    if (!validImageTypes.includes(file.type)) {
+      toast.error("Invalid file type. Please upload a PNG or JPG image.");
       return;
     }
     
-    // Update context data - show loading state
-    toast.promise(
-      Promise.resolve(updateVerificationData({ verificationVideo: file })),
-      {
-        loading: "Uploading verification video...",
-        success: "Your verification video has been uploaded successfully.",
-        error: "Failed to upload video. Please try again."
+    try {
+      // Check file size before processing (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("File too large. Maximum image size is 5MB.");
+        return;
       }
-    );
-  } catch (error) {
-    console.error("Error in video upload:", error);
-    toast.error("An error occurred while processing your video. Please try again.");
-  }
-};
-
-const handleIDUpload = (file: File) => {
-  // Validate file type (should be an image)
-  const validImageTypes = ["image/png", "image/jpeg", "image/jpg"];
-  if (!validImageTypes.includes(file.type)) {
-    toast.error("Invalid file type. Please upload a PNG or JPG image.");
-    return;
-  }
-  
-  try {
-    // Check file size before processing (5MB limit)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("File too large. Maximum image size is 5MB.");
-      return;
+      
+      // Update context data with proper async handling
+      await toast.promise(
+        updateVerificationData({ verifiableID: file }),
+        {
+          loading: "Uploading ID...",
+          success: "Your ID has been uploaded successfully.",
+          error: "Failed to upload ID. Please try again."
+        }
+      );
+      
+      // Mark field as touched after upload
+      setTouched(prev => ({ ...prev, verifiableID: true }));
+    } catch (error) {
+      console.error("Error in ID upload:", error);
+      toast.error("An error occurred while processing your ID. Please try again.");
     }
-    
-    // Update context data - show loading state
-    toast.promise(
-      Promise.resolve(updateVerificationData({ verifiableID: file })),
-      {
-        loading: "Uploading ID...",
-        success: "Your ID has been uploaded successfully.",
-        error: "Failed to upload ID. Please try again."
-      }
-    );
-  } catch (error) {
-    console.error("Error in ID upload:", error);
-    toast.error("An error occurred while processing your ID. Please try again.");
-  }
-};
+  };
 
   return (
     <div>
@@ -125,7 +147,7 @@ const handleIDUpload = (file: File) => {
               {formatDate(new Date())}.
             </p>
           </div>
-          <div className="flex  gap-3">
+          <div className="flex gap-3">
             <Image src="/icons/id.svg" alt="ID" width={20} height={20} />
             <p className="text-[#667085]">
               Hold up a valid ID for a few seconds, ensuring it&apos;s clearly
@@ -167,13 +189,18 @@ const handleIDUpload = (file: File) => {
             Video uploaded: {verificationVideo.name}
           </p>
         )}
+        {touched.verificationVideo && fieldErrors.verificationVideo && (
+          <p className="text-sm text-red-500 mt-2">
+            {fieldErrors.verificationVideo}
+          </p>
+        )}
       </div>
 
       <div className="mb-8">
         <h2 className="text-lg font-semibold mb-2">
           Upload your Verifiable ID
         </h2>
-        <p className="text-sm text-gray-500 mb-4">
+        <p className="text-sm text-[#667085] mb-4">
           All documents and files you upload will be kept strictly confidential
           and used only for verification purposes.
         </p>
@@ -188,6 +215,11 @@ const handleIDUpload = (file: File) => {
         {verifiableID && (
           <p className="text-sm text-green-600 mt-2">
             ID uploaded: {verifiableID.name}
+          </p>
+        )}
+        {touched.verifiableID && fieldErrors.verifiableID && (
+          <p className="text-sm text-red-500 mt-2">
+            {fieldErrors.verifiableID}
           </p>
         )}
       </div>

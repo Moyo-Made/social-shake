@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { BrandStatus } from "@/types/user";
+import { CreatorStatus } from "@/types/user";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
@@ -13,10 +13,16 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { EyeIcon } from "lucide-react";
-import { Brand } from "@/types/brand";
+import Link from "next/link";
+import { Creator } from "@/types/creators";
 
+// For the complete response structure
+interface CreatorsResponse {
+	creators: Creator[];
+	pagination: PaginationInfo;
+}
 
-
+// Define PaginationInfo interface that was missing
 interface PaginationInfo {
 	total: number;
 	page: number;
@@ -28,22 +34,29 @@ interface TabItem {
 	id: string;
 	label: string;
 	status?:
-		| BrandStatus
+		| CreatorStatus
 		| "all"
 		| "pending"
 		| "approved"
 		| "rejected"
-		| "suspended";
+		| "suspended"
+		| "info_requested";
 	emptyMessage: string;
 }
 
-const BrandManagement: React.FC = () => {
+const CreatorManagement: React.FC = () => {
 	const router = useRouter();
-	const [brands, setBrands] = useState<Brand[]>([]);
+	const [creators, setCreators] = useState<Creator[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [statusFilter, setStatusFilter] = useState<
-		BrandStatus | "all" | "pending" | "approved" | "rejected" | "suspended"
+		| CreatorStatus
+		| "all"
+		| "pending"
+		| "approved"
+		| "rejected"
+		| "suspended"
+		| "info_requested"
 	>("all");
 	const [pagination, setPagination] = useState<PaginationInfo>({
 		total: 0,
@@ -51,150 +64,174 @@ const BrandManagement: React.FC = () => {
 		limit: 10,
 		pages: 0,
 	});
-	const [actionBrand, setActionBrand] = useState<Brand | null>(null);
+	const [actionCreator, setActionCreator] = useState<Creator | null>(null);
 	const [actionType, setActionType] = useState<string>("");
 	const [actionMessage, setActionMessage] = useState<string>("");
 	const [searchTerm, setSearchTerm] = useState<string>("");
-	const [activeTab, setActiveTab] = useState<string>("all-brands");
+	const [activeTab, setActiveTab] = useState<string>("all-creators");
 
 	// Define available tabs with their corresponding status and empty messages
 	const tabs: TabItem[] = [
 		{
-			id: "all-brands",
-			label: "All Brands",
+			id: "all-creators",
+			label: "All Creators",
 			status: "all",
 			emptyMessage:
-				"No brands have been registered yet. As brands register, they'll appear here.",
+				"No creators have been registered yet. As creators register, they'll appear here.",
 		},
 		{
-			id: "pending-verifcation",
+			id: "pending-verification",
 			label: "Pending Verification",
 			status: "pending",
 			emptyMessage:
-				"No brands are currently awaiting verification. When brands register, they'll appear here for approval.",
+				"No creators are currently awaiting verification. When creators register, they'll appear here for approval.",
 		},
 		{
-			id: "verified-brands",
-			label: "Verified Brands",
+			id: "verified-creators",
+			label: "Verified Creators",
 			status: "approved",
 			emptyMessage:
-				"No brands have been verified yet. Once you approve brands, they'll appear in this section.",
+				"No creators have been verified yet. Once you approve creators, they'll appear in this section.",
 		},
 		{
-			id: "rejected-brands",
-			label: "Rejected Brands",
+			id: "rejected-creators",
+			label: "Rejected Creators",
 			status: "rejected",
 			emptyMessage:
-				"No brands have been rejected. Brands that don't meet verification criteria will appear here.",
+				"No creators have been rejected. Creators that don't meet verification criteria will appear here.",
 		},
 		{
-			id: "suspended-brands",
-			label: "Suspended Brands",
+			id: "suspended-creators",
+			label: "Suspended Creators",
 			status: "suspended",
 			emptyMessage:
-				"No brands have been suspended. Suspended brands will be listed here.",
+				"No creators have been suspended. Suspended creators will be listed here.",
+		},
+		{
+			id: "info-requested-creators",
+			label: "Info Requested",
+			status: "info_requested",
+			emptyMessage:
+				"No creators currently have info requested. Creators requiring additional information will appear here.",
 		},
 	];
 
-	// Fetch brands
-	const fetchBrands = async () => {
+	// Fetch creators
+	const fetchCreators = async () => {
 		try {
 			setLoading(true);
-			const url = `/api/admin/brand-approval?page=${pagination.page}&limit=${pagination.limit}`;
+			let url = `/api/admin/creator-approval?page=${pagination.page}&limit=${pagination.limit}`;
+
+			// Only add status filter if not 'all'
+			if (statusFilter !== "all") {
+				url += `&status=${statusFilter}`;
+			}
 
 			const response = await fetch(url);
 
 			if (!response.ok) {
-				throw new Error("Failed to fetch brands");
+				throw new Error("Failed to fetch creators");
 			}
 
-			const data = await response.json();
-			setBrands(data.brands);
+			const data: CreatorsResponse = await response.json();
+
+			// Use data.creators from the updated CreatorsResponse interface
+			setCreators(data.creators);
 			setPagination(data.pagination);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "An error occurred");
-			console.error("Error fetching brands:", err);
+			console.error("Error fetching creators:", err);
 		} finally {
 			setLoading(false);
 		}
 	};
 
+	// Fetch creators when status filter, page, or limit changes
 	useEffect(() => {
-		fetchBrands();
+		fetchCreators();
 	}, [statusFilter, pagination.page, pagination.limit]);
 
-	// When a tab is changed, update the status filter
+	// When a tab is changed, update the status filter and reset page
 	useEffect(() => {
 		const selectedTab = tabs.find((tab) => tab.id === activeTab);
 		if (selectedTab && selectedTab.status) {
 			setStatusFilter(selectedTab.status);
+			setPagination((prev) => ({ ...prev, page: 1 })); // Reset to first page when changing tabs
 		}
 	}, [activeTab]);
 
-	// Handle brand action (approve, reject, request info)
-	const handleBrandAction = async () => {
-		if (!actionBrand || !actionType) return;
+	// Handle creator action (approve, reject, request info)
+	const handleCreatorAction = async () => {
+		if (!actionCreator || !actionType) return;
 
 		try {
-			const response = await fetch("/api/admin/brand-approval", {
+			// Use email for creatorEmail parameter according to API expectation
+			const creatorEmail = actionCreator.email;
+
+			const response = await fetch("/api/admin/creator-approval", {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
-					brandEmail: actionBrand.id,
+					creatorEmail,
+					userId: actionCreator.userId,
+					verificationId: actionCreator.verificationId,
 					action: actionType,
 					message: actionMessage,
 				}),
 			});
 
 			if (!response.ok) {
-				throw new Error("Failed to perform action");
+				const errorData = await response.json();
+				throw new Error(errorData.error || "Failed to perform action");
 			}
 
-			// Refresh brands list
-			fetchBrands();
+			// Refresh creators list
+			fetchCreators();
 
 			// Reset action state
-			setActionBrand(null);
+			setActionCreator(null);
 			setActionType("");
 			setActionMessage("");
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "An error occurred");
-			console.error("Error performing brand action:", err);
+			console.error("Error performing creator action:", err);
 		}
 	};
 
-	// Filter brands by search term and active tab status
-  const filteredBrands = brands.filter((brand) => {
-    // For the "all-brands" tab, use the explicit status filter selection
-    // For other tabs, use the tab's predefined status
-    const effectiveStatus = 
-      activeTab === "all-brands" ? statusFilter : 
-      tabs.find((tab) => tab.id === activeTab)?.status || "all";
-    
-    // Apply status filter
-    const statusMatch = effectiveStatus === "all" || brand.status === effectiveStatus;
-    
-    // Apply search filter
-    const searchMatch = 
-      brand.brandName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      brand.id.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    return statusMatch && searchMatch;
-  });
+	// Filter creators by search term
+	const filteredCreators = creators?.filter((creator) => {
+		if (!creator) return false;
 
-	// Get the empty message for the current tab
+		// Apply search filter
+		return (
+			creator.creator?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+			creator.email?.toLowerCase().includes(searchTerm.toLowerCase())
+		);
+	});
+
+	// Get the empty message for the current tab or status filter
 	const getCurrentTabEmptyMessage = () => {
+		// When on the all-creators tab with a status filter other than "all"
+		if (activeTab === "all-creators" && statusFilter !== "all") {
+			// Find the tab that corresponds to the current status filter
+			const statusTab = tabs.find((tab) => tab.status === statusFilter);
+			if (statusTab) {
+				return statusTab.emptyMessage;
+			}
+		}
+
+		// Otherwise use the message for the active tab
 		const currentTab = tabs.find((tab) => tab.id === activeTab);
 		return (
-			currentTab?.emptyMessage || "No brands found matching your criteria."
+			currentTab?.emptyMessage || "No creators found matching your criteria."
 		);
 	};
 
 	// Render action modal
 	const renderActionModal = () => {
-		if (!actionBrand) return null;
+		if (!actionCreator) return null;
 
 		let title = "";
 		let description = "";
@@ -205,35 +242,35 @@ const BrandManagement: React.FC = () => {
 
 		switch (actionType) {
 			case "approve":
-				title = "Approve Brand";
+				title = "Approve Creator";
 				description =
-					"Once approved, the brand will receive a notification and can start creating projects and contests";
-				buttonText = "Yes, Approve Brand";
+					"Once approved, the creator will receive a notification and can start creating projects and contests";
+				buttonText = "Yes, Approve Creator";
 				buttonColor = "bg-green-600 hover:bg-green-700";
 				break;
 			case "reject":
-				title = "Reject Brand";
+				title = "Reject Creator";
 				description =
-					"Please provide a reason for rejection. This feedback will be shared with the Brand.";
+					"Please provide a reason for rejection. This feedback will be shared with the Creator.";
 				placeholder = "Type Reason for Rejection";
-				buttonText = "Reject Brand";
+				buttonText = "Reject Creator";
 				buttonColor = "bg-red-600 hover:bg-red-700";
 				needsMessage = true;
 				break;
 			case "request_info":
 				title = "Request More Information";
 				description =
-					"Type in the Information you need from the Brand to go ahead with Verification";
+					"Type in the Information you need from the Creator to go ahead with Verification";
 				placeholder = "Type Requests";
 				buttonText = "Send";
 				buttonColor = "bg-orange-500 hover:bg-orange-600";
 				needsMessage = true;
 				break;
 			case "suspend":
-				title = "Suspend Brand";
+				title = "Suspend Creator";
 				description = "Please provide a reason for suspension.";
 				placeholder = "Type Reason for Suspension";
-				buttonText = "Suspend Brand";
+				buttonText = "Suspend Creator";
 				buttonColor = "bg-yellow-600 hover:bg-yellow-700";
 				needsMessage = true;
 				break;
@@ -262,7 +299,7 @@ const BrandManagement: React.FC = () => {
 							<button
 								className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
 								onClick={() => {
-									setActionBrand(null);
+									setActionCreator(null);
 									setActionType("");
 									setActionMessage("");
 								}}
@@ -271,34 +308,10 @@ const BrandManagement: React.FC = () => {
 							</button>
 							<button
 								className={`px-4 py-2 text-white rounded ${buttonColor} flex items-center`}
-								onClick={handleBrandAction}
+								onClick={handleCreatorAction}
 								disabled={needsMessage && !actionMessage.trim()}
 							>
 								{buttonText}
-								{actionType === "request_info" && (
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										className="h-5 w-5 ml-2"
-										viewBox="0 0 20 20"
-										fill="currentColor"
-									>
-										<path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-									</svg>
-								)}
-								{(actionType === "approve" || actionType === "reject") && (
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										className="h-5 w-5 ml-2"
-										viewBox="0 0 20 20"
-										fill="currentColor"
-									>
-										<path
-											fillRule="evenodd"
-											d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-											clipRule="evenodd"
-										/>
-									</svg>
-								)}
 							</button>
 						</div>
 					</div>
@@ -313,14 +326,14 @@ const BrandManagement: React.FC = () => {
 		setPagination({ ...pagination, page: newPage });
 	};
 
-	// Navigate to brand details page
-	const viewBrandDetails = (brand: Brand) => {
-		router.push(`/admin/manage-users/brands/${brand.userId}`);
+	// Navigate to creator details page
+	const viewCreatorDetails = (creator: Creator) => {
+		router.push(`/admin/manage-users/creators/${creator.userId}`);
 	};
 
 	// Status badge component
-	const StatusBadge = ({ status }: { status: BrandStatus }) => {
-		const statusConfig = {
+	const StatusBadge = ({ status }: { status: string }) => {
+		const statusConfig: Record<string, { color: string; text: string }> = {
 			pending: {
 				color: "bg-[#FFF0C3] border border-[#FDD849] text-[#1A1A1A]",
 				text: "• Pending",
@@ -338,8 +351,8 @@ const BrandManagement: React.FC = () => {
 				text: "• Suspended",
 			},
 			info_requested: {
-				color: "bg-blue-100 text-blue-800",
-				text: "Info Requested",
+				color: "bg-blue-100 border border-blue-400 text-blue-800",
+				text: "• Info Requested",
 			},
 		};
 
@@ -354,8 +367,8 @@ const BrandManagement: React.FC = () => {
 		);
 	};
 
-	// Render brand table content based on current tab
-	const renderBrandTable = () => {
+	// Render creator table content based on current tab
+	const renderCreatorTable = () => {
 		if (loading) {
 			return (
 				<div className="flex justify-center items-center py-10">
@@ -364,7 +377,7 @@ const BrandManagement: React.FC = () => {
 			);
 		}
 
-		if (filteredBrands.length === 0) {
+		if (!filteredCreators || filteredCreators.length === 0) {
 			return (
 				<div className="text-center py-16 bg-gray-50 rounded-lg">
 					<p className="text-gray-500">{getCurrentTabEmptyMessage()}</p>
@@ -381,10 +394,10 @@ const BrandManagement: React.FC = () => {
 								Date Joined
 							</th>
 							<th className="px-6 py-3 text-left text-xs font-medium text-gray-500">
-								Brand
+								Creator
 							</th>
 							<th className="px-6 py-3 text-left text-xs font-medium text-gray-500">
-								Email Address
+								TikTok Profile
 							</th>
 							<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 ">
 								Status
@@ -395,48 +408,67 @@ const BrandManagement: React.FC = () => {
 						</tr>
 					</thead>
 					<tbody className="bg-white divide-y divide-gray-200">
-						{filteredBrands.map((brand) => (
-							<tr key={brand.id}>
+						{filteredCreators.map((creator) => (
+							<tr key={creator.id || creator.verificationId}>
 								<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-									{new Date(brand.createdAt).toLocaleDateString()}
+									{creator.createdAt
+										? new Date(creator.createdAt).toLocaleDateString()
+										: "N/A"}
 								</td>
 								<td className="px-6 py-4 whitespace-nowrap">
 									<div className="flex items-center">
-										{brand.logoUrl ? (
+										{creator.logoUrl ? (
 											<Image
-												className="h-10 w-10 rounded-full mr-3"
-												src={brand.logoUrl}
-												alt={`${brand.brandName} logo`}
+												className="h-10 w-10 object-cover rounded-full mr-3"
+												src={creator.logoUrl}
+												alt={`${creator.creator} logo`}
 												width={40}
 												height={40}
 											/>
 										) : (
 											<div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center mr-3">
 												<span className="text-gray-500 font-medium">
-													{brand.brandName.charAt(0).toUpperCase()}
+													{creator.creator &&
+														creator.creator.charAt(0).toUpperCase()}
 												</span>
 											</div>
 										)}
 										<div>
 											<div className="font-medium text-gray-900">
-												{brand.brandName}
+												{creator.creator}
+											</div>
+											<div className="text-sm text-gray-500">
+												{creator.email}
 											</div>
 										</div>
 									</div>
 								</td>
 								<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-									{brand.id}
+									{creator.socialMedia?.tiktok ? (
+										<Link
+											href={creator.socialMedia.tiktok}
+											className="text-blue-500 hover:underline"
+											target="_blank"
+											rel="noopener noreferrer"
+										>
+											<p className="text-orange-500 hover:underline">
+												View TikTok
+											</p>
+										</Link>
+									) : (
+										<span className="text-gray-400">No TikTok</span>
+									)}
 								</td>
 								<td className="px-6 py-4 whitespace-nowrap">
-									<StatusBadge status={brand.status} />
+									<StatusBadge status={creator.status} />
 								</td>
 								<td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-									<div className="flex items-center space-x-2">
+									<div className="flex flex-col space-y-2">
 										<button
 											className="text-orange-500 hover:underline flex items-center gap-1"
-											onClick={() => viewBrandDetails(brand)}
+											onClick={() => viewCreatorDetails(creator)}
 										>
-											<span>View Brand</span>
+											<span>View Creator</span>
 											<EyeIcon className="w-4 h-4 text-orange-500" />
 										</button>
 									</div>
@@ -450,7 +482,7 @@ const BrandManagement: React.FC = () => {
 	};
 
 	return (
-		<div className="flex flex-col md:flex-row bg-white p-4 ">
+		<div className="flex flex-col md:flex-row bg-white p-4">
 			{/* Left sidebar for tabs */}
 			<div className="w-full md:w-64 p-6">
 				<div className="flex flex-col space-y-2">
@@ -492,12 +524,21 @@ const BrandManagement: React.FC = () => {
 						/>
 					</div>
 
-					{activeTab === "all-brands" && (
+					{activeTab === "all-creators" && (
 						<div>
 							<Select
 								value={statusFilter}
 								onValueChange={(value) =>
-									setStatusFilter(value as BrandStatus | "all" | "pending" | "approved" | "rejected" | "suspended")
+									setStatusFilter(
+										value as
+											| CreatorStatus
+											| "all"
+											| "pending"
+											| "approved"
+											| "rejected"
+											| "suspended"
+											| "info_requested"
+									)
 								}
 							>
 								<SelectTrigger className="w-[180px]">
@@ -516,10 +557,10 @@ const BrandManagement: React.FC = () => {
 					)}
 				</div>
 
-				{renderBrandTable()}
+				{renderCreatorTable()}
 
 				{/* Pagination */}
-				{!loading && pagination.pages > 1 && filteredBrands.length > 0 && (
+				{!loading && pagination.pages > 1 && (
 					<div className="flex justify-center mt-6">
 						<nav className="flex items-center">
 							<button
@@ -535,21 +576,37 @@ const BrandManagement: React.FC = () => {
 							</button>
 
 							<div className="flex">
-								{Array.from({ length: pagination.pages }, (_, i) => i + 1).map(
-									(page) => (
-										<button
-											key={page}
-											onClick={() => handlePageChange(page)}
-											className={`px-3 py-1 border-t border-b ${
-												pagination.page === page
-													? "bg-blue-600 text-white"
-													: "bg-white text-blue-600 hover:bg-blue-50"
-											}`}
-										>
-											{page}
-										</button>
-									)
-								)}
+								{Array.from(
+									{ length: Math.min(5, pagination.pages) },
+									(_, i) => {
+										// Calculate which page numbers to show
+										let pageNum;
+										if (pagination.pages <= 5) {
+											// Show all pages if 5 or fewer
+											pageNum = i + 1;
+										} else {
+											// Show a window of pages around current page
+											const start = Math.max(1, pagination.page - 2);
+											const end = Math.min(pagination.pages, start + 4);
+											pageNum = start + i;
+											if (pageNum > end) return null;
+										}
+
+										return (
+											<button
+												key={pageNum}
+												onClick={() => handlePageChange(pageNum)}
+												className={`px-3 py-1 border-t border-b ${
+													pagination.page === pageNum
+														? "bg-blue-600 text-white"
+														: "bg-white text-blue-600 hover:bg-blue-50"
+												}`}
+											>
+												{pageNum}
+											</button>
+										);
+									}
+								).filter(Boolean)}
 							</div>
 
 							<button
@@ -574,4 +631,4 @@ const BrandManagement: React.FC = () => {
 	);
 };
 
-export default BrandManagement;
+export default CreatorManagement;

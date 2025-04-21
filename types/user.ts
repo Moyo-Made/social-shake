@@ -24,6 +24,14 @@ export interface User {
 	INFO_REQUESTED = 'info_requested'
   }
 
+  export enum CreatorStatus{
+	PENDING = 'pending',
+	APPROVED = 'approved',
+	SUSPENDED = 'suspended',
+	REJECTED = 'rejected',
+	INFO_REQUESTED = 'info_requested'
+  }
+
   
   export interface BrandProfile {
 	id: string;

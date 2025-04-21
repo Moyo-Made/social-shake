@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/config/firebase-admin";
 
-// Use the correct type structure for App Router
 export async function GET(
   request: NextRequest,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  { params }: any
+  { params }: { params: { userId: string } }
 ) {
   try {
     const userId = params.userId;
@@ -24,20 +22,38 @@ export async function GET(
     
     const brandData = brandDoc.data();
     
-    // Make sure status field exists
-    if (brandData && (!brandData.status || 
-        !['pending', 'approved', 'rejected', 'suspended', 'info_requested'].includes(brandData.status))) {
+    // Ensure all required fields exist
+    if (!brandData) {
+      return NextResponse.json({ error: "Brand data is empty" }, { status: 404 });
+    }
+    
+    // Ensure status field exists
+    if (!brandData.status || 
+        !['pending', 'approved', 'rejected', 'suspended', 'info_requested'].includes(brandData.status)) {
       brandData.status = 'pending';
     }
     
-    // Return the brand data with correct id
-    return NextResponse.json({ 
-      brand: {
-        id: userId,
-        userId: userId,
-        ...brandData
-      } 
-    });
+    // Structure the response to match what your component expects
+    const brand = {
+      userId: userId,
+      email: brandData.email || '',
+      brandName: brandData.brandName || '',
+      logoUrl: brandData.logoUrl || '',
+      address: brandData.address || '',
+      phoneNumber: brandData.phoneNumber || '',
+      website: brandData.website || '',
+      status: brandData.status,
+      socialMedia: brandData.socialMedia || {
+        instagram: '',
+        facebook: '',
+        twitter: '',
+        youtube: ''
+      },
+      createdAt: brandData.createdAt || new Date().toISOString()
+    };
+    
+    // Return the brand data
+    return NextResponse.json({ brand });
   } catch (error) {
     console.error("Error fetching brand details:", error);
     const errorMessage = error instanceof Error ? error.message : "Failed to fetch brand details";
