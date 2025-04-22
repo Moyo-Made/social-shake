@@ -116,6 +116,25 @@ function extractTags(data: any): string[] {
   return Array.from(tags);
 }
 
+// Helper function to get brand email for notifications
+async function getBrandEmail(userId: string): Promise<string | null> {
+  try {
+    const brandsSnapshot = await adminDb.collection("brandProfiles")
+      .where("userId", "==", userId)
+      .limit(1)
+      .get();
+      
+    if (!brandsSnapshot.empty) {
+      const brandData = brandsSnapshot.docs[0].data();
+      return brandData.email || null;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error getting brand email:", error);
+    return null;
+  }
+}
+
 // GET handler to retrieve contests with enhanced filtering and pagination
 export async function GET(request: NextRequest) {
   try {
@@ -231,8 +250,8 @@ export async function GET(request: NextRequest) {
         
         // Filter by price if needed (can't do this in query directly)
         if (
-          (filters.minPrize > 0 && (!contestData.prizeTimeline.prizeAmount || contestData.prizeTimeline.prizeAmount < filters.minPrize)) ||
-          (filters.maxPrize !== null && contestData.prizeTimeline.prizeAmount > filters.maxPrize)
+          (filters.minPrize > 0 && (!contestData.prizeTimeline?.prizeAmount || contestData.prizeTimeline?.prizeAmount < filters.minPrize)) ||
+          (filters.maxPrize !== null && contestData.prizeTimeline?.prizeAmount > filters.maxPrize)
         ) {
           continue;
         }
@@ -476,7 +495,8 @@ export async function POST(request: NextRequest) {
       };
 
       // Create the complete contest data object with enhanced fields
-      const contestData = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const contestData: any = {
         userId,
         contestId,
         basic: {
@@ -500,8 +520,8 @@ export async function POST(request: NextRequest) {
           ...incentives,
           paymentModel: incentives.paymentModel || "fixed"
         },
-        status: "active",
-        applicationStatus: "open", // "open", "reviewing", "closed"
+        status: "pending", // Changed from "active" to "pending" to require admin approval
+        applicationStatus: "closed", // Changed from "open" to "closed" until approved
         metrics: {
           views: 0,
           applications: 0,
@@ -514,6 +534,41 @@ export async function POST(request: NextRequest) {
         updatedAt: new Date().toISOString(),
       };
 
+      // Add this to your POST handler in the contest API
+      // This handles contest creation after payment
+      // Look for the paid flag in the request data
+      const paid = requestData.paid === true;
+      const paymentId = requestData.paymentId;
+      // If this is a paid contest being created after payment success
+      if (paid && paymentId) {
+        // Verify the payment exists and is completed
+        const paymentDoc = await adminDb.collection("payments").doc(paymentId).get();
+        
+        if (!paymentDoc.exists) {
+          return NextResponse.json(
+            { error: "Payment not found" },
+            { status: 400 }
+          );
+        }
+        
+        const paymentData = paymentDoc.data();
+        if (!paymentData || paymentData.status !== "completed") {
+          return NextResponse.json(
+            { error: "Invalid or incomplete payment" },
+            { status: 400 }
+          );
+        }
+        
+        // Set the contest to active immediately since payment is verified
+        contestData.status = "active";
+        contestData.applicationStatus = "open";
+        contestData.paymentId = paymentId;
+        
+        // Add any other payment-specific fields
+        contestData.paid = true;
+        contestData.paymentAmount = paymentData.paymentAmount;
+      }
+
       // Save to Firestore using admin SDK
       await adminDb.collection("contests").doc(contestId).set(contestData);
 
@@ -523,9 +578,28 @@ export async function POST(request: NextRequest) {
         .doc(userId)
         .set({ submitted: true, contestId });
 
+      // Create notification for admin about new contest that needs approval
+      // Only create notification if it's not a paid contest (since paid ones are auto-approved)
+      if (!paid) {
+        const brandEmail = await getBrandEmail(userId);
+        if (brandEmail) {
+          await adminDb.collection("notifications").add({
+            recipientEmail: "madetechboy@gmail.com", // Admin email
+            message: `New contest "${basic.contestName}" requires approval`,
+            status: "unread",
+            type: "contest_approval_requested",
+            createdAt: new Date().toISOString(),
+            relatedTo: "contest",
+            contestId: contestId,
+            contestName: basic.contestName || "Untitled Contest",
+            brandEmail: brandEmail,
+          });
+        }
+      }
+
       return NextResponse.json({
         success: true,
-        message: "Contest created successfully",
+        message: paid ? "Contest created and activated successfully" : "Contest created successfully and pending approval",
         data: contestData,
       });
     }
@@ -591,6 +665,7 @@ export async function PUT(request: NextRequest) {
       userId,
       isDraft,
       contestId,
+      status
     } = requestData;
 
     // Either userId or contestId is required
@@ -651,7 +726,7 @@ export async function PUT(request: NextRequest) {
         );
       }
 
-      // Optional: Verify the user has permission to update this contest
+      // Verify the user has permission to update this contest
       const contestData = contestDoc.data();
       if (contestData && contestData.userId !== userId) {
         return NextResponse.json(
@@ -727,6 +802,30 @@ export async function PUT(request: NextRequest) {
         experienceLevel: requirements.experienceLevel || "any"
       };
 
+      // Determine status: if contest was rejected and is being edited, set back to pending
+      let updatedStatus = status;
+      const applicationStatus = contestData?.applicationStatus;
+      
+      if (contestData?.status === "rejected") {
+        updatedStatus = "pending";
+        
+        // Create notification for admin about updated contest that needs re-approval
+        const brandEmail = await getBrandEmail(userId);
+        if (brandEmail) {
+          await adminDb.collection("notifications").add({
+            recipientEmail: "madetechboy@gmail.com", // Admin email
+            message: `Updated contest "${basic.contestName}" requires re-approval`,
+            status: "unread",
+            type: "contest_edit_submitted",
+            createdAt: new Date().toISOString(),
+            relatedTo: "contest",
+            contestId: contestId,
+            contestName: basic.contestName || contestData?.basic?.contestName || "Untitled Contest",
+            brandEmail: brandEmail,
+          });
+        }
+      }
+
       // Create the updated contest data object
       const updatedContestData = {
         basic: {
@@ -750,6 +849,8 @@ export async function PUT(request: NextRequest) {
           ...incentives,
           paymentModel: incentives.paymentModel || "fixed"
         },
+        status: updatedStatus,
+        applicationStatus: applicationStatus,
         tags: tags,
         featured: requestData.featured !== undefined ? requestData.featured : contestData?.featured || false,
         updatedAt: new Date().toISOString(),

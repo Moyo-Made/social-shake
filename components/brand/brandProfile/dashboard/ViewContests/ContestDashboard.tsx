@@ -16,8 +16,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
 import { auth, db } from "@/config/firebase";
+import { ContestFormData } from "@/types/contestFormData";
 
-interface Contest {
+// Format the contest data from Firestore to match our component's expected structure
+interface DisplayContest {
 	id: string;
 	status: string;
 	title: string;
@@ -33,27 +35,7 @@ interface Contest {
 		likes: number;
 		comments: number;
 	};
-	rawData: {
-		basic?: {
-			contestName?: string;
-			thumbnail?: string;
-		};
-		prizeTimeline?: {
-			startDate?: string;
-			endDate?: string;
-			totalPrize?: number;
-			totalBudget?: number;
-			criteria?: string;
-		};
-		contestType?: string;
-		participants?: number;
-		metrics?: {
-			views?: number;
-			likes?: number;
-			comments?: number;
-		};
-		[key: string]: unknown;
-	};
+	rawData: ContestFormData;
 }
 
 const ContestDashboard = () => {
@@ -62,8 +44,8 @@ const ContestDashboard = () => {
 	const [statusFilter, setStatusFilter] = useState<string | null>(null);
 	const [budgetFilter, setBudgetFilter] = useState<string | null>(null);
 	const [rankingFilter, setRankingFilter] = useState<string | null>(null);
-	const [filteredContests, setFilteredContests] = useState<Contest[]>([]);
-	const [contests, setContests] = useState<Contest[]>([]);
+	const [filteredContests, setFilteredContests] = useState<DisplayContest[]>([]);
+	const [contests, setContests] = useState<DisplayContest[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -114,7 +96,7 @@ const ContestDashboard = () => {
 
 				// Format the data to match our component's expected structure
 				const contestsData = querySnapshot.docs.map((doc) => {
-					const data = doc.data();
+					const data = doc.data() as ContestFormData;
 
 					// Determine status based on dates and status field
 					let status = data.status || "Draft";
@@ -166,29 +148,28 @@ const ContestDashboard = () => {
 
 					// Extract total budget from prizeTimeline
 					const totalBudget =
-						data.prizeTimeline?.totalPrize ||
 						data.prizeTimeline?.totalBudget ||
 						0;
 
 					// Get thumbnail URL from the basic section
-					const thumbnailUrl = data.basic?.thumbnail;
+					const thumbnailUrl = data.basic?.thumbnail as string;
 
 					return {
 						id: doc.id,
 						status: status.charAt(0).toUpperCase() + status.slice(1), // Capitalize status
 						title: data.basic?.contestName || "Untitled Contest",
 						totalBudget: totalBudget,
-						startDate: formatDate(data.prizeTimeline?.startDate),
-						endDate: formatDate(data.prizeTimeline?.endDate),
+						startDate: formatDate(data.prizeTimeline?.startDate || "Not Set"),
+						endDate: formatDate(data.prizeTimeline?.endDate || "Not Set"),
 						rankingMethod: data.prizeTimeline?.criteria || "Not Set",
 						contestType: data.contestType || "Leaderboard",
-						contestants: data.participants || 0,
+						contestants: data.participantsCount || 0,
 						thumbnailUrl: thumbnailUrl,
 						// Initialize with empty metrics if not available yet
 						metrics: {
-							views: data.metrics?.views || 0,
-							likes: data.metrics?.likes || 0,
-							comments: data.metrics?.comments || 0,
+							views: 0,
+							likes: 0,
+							comments: 0,
 						},
 						// Store the raw data for any additional needs
 						rawData: data,
@@ -282,7 +263,7 @@ const ContestDashboard = () => {
 	};
 
 	// Function to handle contest click
-	const handleContestClick = (contest: Contest, e: React.MouseEvent) => {
+	const handleContestClick = (contest: DisplayContest, e: React.MouseEvent) => {
 		if (contest.status === "Draft") {
 			e.preventDefault();
 			router.push(`/brand/dashboard/contests/edit/${contest.id}`);
@@ -446,7 +427,7 @@ const ContestCard = ({
 	contest,
 	handleImageError,
 }: {
-	contest: Contest;
+	contest: DisplayContest;
 	handleImageError: (e: React.SyntheticEvent<HTMLImageElement, Event>) => void;
 }) => {
 	return (
@@ -543,9 +524,7 @@ const ContestCard = ({
 					<p className="text-xs text-[#475467]">
 						{contest.status === "Draft" ? "Status" : "Contestants"}
 					</p>
-					<p className="text-sm">
-						{contest.status === "Draft" ? "In Progress" : contest.contestants}
-					</p>
+					<p className="text-sm">{contest.contestants}</p>
 				</div>
 				<div>
 					<p className="text-xs text-[#475467]">Metrics</p>

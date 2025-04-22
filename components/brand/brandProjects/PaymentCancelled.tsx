@@ -17,7 +17,7 @@ export default function PaymentCancelled() {
   const handleTryAgain = () => {
     // Navigate back to the form's last step
     sessionStorage.setItem('contestFormStep', '4'); // Set to review step
-    router.push('/contests/new');
+    router.push('/brand/contests/new');
   };
 
   return (

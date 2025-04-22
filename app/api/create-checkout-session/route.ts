@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       ],
       mode: "payment",
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-success?payment_id=${paymentId}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/brand/create-contest?canceled=true`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/brand/dashboard/contests/new?canceled=true`,
       customer_email: userEmail,
       metadata: {
         paymentId,

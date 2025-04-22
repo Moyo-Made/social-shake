@@ -32,6 +32,15 @@ export interface PrizeTimelineFormData {
 export type ContestType = "Leaderboard" | "GMV";
 
 export interface ContestFormData {
+	userId: string;
+	brandInfo: {
+		name: string;
+		logo: string;
+		website?: string;
+		description?: string;
+	};
+	participantsCount: number;
+	createdAt: string;
 	brandEmail: string;
 	status: string;
 	contestType: ContestType | undefined;

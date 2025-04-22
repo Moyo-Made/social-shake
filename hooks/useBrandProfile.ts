@@ -68,7 +68,7 @@ export const useBrandProfile = (initialMode: ProfileMode = "view") => {
 			setBrandProfile(null);
 		}
 	}, [currentUser, mode]);
-
+	
 	const updateBrandProfile = async (formData: FormData) => {
 		try {
 			setLoading(true);

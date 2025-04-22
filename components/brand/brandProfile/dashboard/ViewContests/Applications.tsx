@@ -9,8 +9,21 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Check, ChevronLeft, Mail, Search, X } from "lucide-react";
+import Link from "next/link";
 
-const Applications = () => {
+interface ApplicationsProps {
+	contestData: {
+		requirements: {
+			whoCanJoin: string;
+		};
+	};
+}
+
+const Applications: React.FC<ApplicationsProps> = ({ contestData }) => {
+	// Get whoCanJoin value from contest data with a default fallback
+	const whoCanJoin =
+		contestData?.requirements?.whoCanJoin || "allow-applications";
+
 	// Sample data for creators
 	const initialCreators = [
 		{
@@ -28,11 +41,11 @@ I'm thrilled about the opportunity to participate in your contest! As a content 
 I understand that your campaign focuses on young adults who love trending shoes, and I'm confident in my ability to deliver content that aligns with your vision and stands out. Whether it's incorporating creative transitions, storytelling, or unique movement styles, I'll ensure the video captures attention while adhering to your guidelines.
 
 I've worked on similar projects before, and I'm always eager to experiment and push creative boundaries. Let's collaborate to create something impactful that showcases the best of your brand!`,
-bestTikTokVideos: [
-	"https://www.tiktok.com/@colinedzfr",
-	 "https://www.tiktok.com/@colinedzfr",
-	"https://www.tiktok.com/@colinedzfr",
-],
+			bestTikTokVideos: [
+				"https://www.tiktok.com/@colinedzfr",
+				"https://www.tiktok.com/@colinedzfr",
+				"https://www.tiktok.com/@colinedzfr",
+			],
 		},
 		{
 			id: 2,
@@ -49,11 +62,11 @@ As a sneaker enthusiast and fashion content creator, I believe I'm the perfect f
 My videos feature a unique blend of streetwear fashion and urban culture that resonates well with your target demographic. I've previously collaborated with three shoe brands, creating content that achieved above-average engagement rates.
 
 I'm excited about the creative direction of your campaign and have several ideas for how to showcase your products in an authentic way that will connect with potential customers.`,
-bestTikTokVideos: [
-	"https://www.tiktok.com/@colinedzfr",
-	 "https://www.tiktok.com/@colinedzfr",
-	"https://www.tiktok.com/@colinedzfr",
-],
+			bestTikTokVideos: [
+				"https://www.tiktok.com/@colinedzfr",
+				"https://www.tiktok.com/@colinedzfr",
+				"https://www.tiktok.com/@colinedzfr",
+			],
 		},
 		{
 			id: 3,
@@ -70,11 +83,11 @@ I would love to be part of your contest as I believe my content style would be a
 With 8,500 followers who are primarily interested in fashion trends, I can create content that will showcase your products in real-world situations that resonate with your audience.
 
 My strength is in creating relatable content that feels genuine rather than promotional, which helps drive higher engagement and conversion rates.`,
-bestTikTokVideos: [
-	"https://www.tiktok.com/@colinedzfr",
-	 "https://www.tiktok.com/@colinedzfr",
-	"https://www.tiktok.com/@colinedzfr",
-],
+			bestTikTokVideos: [
+				"https://www.tiktok.com/@colinedzfr",
+				"https://www.tiktok.com/@colinedzfr",
+				"https://www.tiktok.com/@colinedzfr",
+			],
 		},
 		{
 			id: 4,
@@ -91,11 +104,11 @@ I'm excited to be part of this contest! With my background in fashion content cr
 My content style focuses on authentic storytelling and creative visuals that capture attention in the first few seconds - perfect for TikTok's fast-paced environment.
 
 I've worked with similar brands before and achieved great engagement rates. Looking forward to the opportunity to collaborate!`,
-bestTikTokVideos: [
-	"https://www.tiktok.com/@colinedzfr",
-	 "https://www.tiktok.com/@colinedzfr",
-	"https://www.tiktok.com/@colinedzfr",
-],
+			bestTikTokVideos: [
+				"https://www.tiktok.com/@colinedzfr",
+				"https://www.tiktok.com/@colinedzfr",
+				"https://www.tiktok.com/@colinedzfr",
+			],
 		},
 		{
 			id: 5,
@@ -112,11 +125,11 @@ I'm excited about this opportunity! With 18,000 followers who are actively engag
 My content has a unique aesthetic that combines street style with high fashion elements, making it perfect for showcasing versatile footwear products.
 
 I have experience working with brands in the fashion industry and know how to create content that drives both engagement and conversions.`,
-bestTikTokVideos: [
-	"https://www.tiktok.com/@colinedzfr",
-	 "https://www.tiktok.com/@colinedzfr",
-	"https://www.tiktok.com/@colinedzfr",
-],
+			bestTikTokVideos: [
+				"https://www.tiktok.com/@colinedzfr",
+				"https://www.tiktok.com/@colinedzfr",
+				"https://www.tiktok.com/@colinedzfr",
+			],
 		},
 		{
 			id: 6,
@@ -135,9 +148,9 @@ With my audience of 14,000 followers who are primarily interested in streetwear 
 My videos maintain a balance between being entertaining and informative, which helps drive higher engagement and conversion rates.`,
 			bestTikTokVideos: [
 				"https://www.tiktok.com/@colinedzfr",
-				 "https://www.tiktok.com/@colinedzfr",
 				"https://www.tiktok.com/@colinedzfr",
-		],
+				"https://www.tiktok.com/@colinedzfr",
+			],
 		},
 	];
 
@@ -400,6 +413,35 @@ My videos maintain a balance between being entertaining and informative, which h
 		);
 	};
 
+	// Open to all creators message
+	const OpenToAllCreatorsMessage = () => {
+		return (
+			<div className="w-full -mt-3 mx-auto bg-white p-8 rounded-lg border border-gray-200 text-center">
+				<div className="max-w-md mx-auto">
+					<div className="flex justify-center mb-4">
+						<div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center">
+							<Check size={32} className="text-orange-500" />
+						</div>
+					</div>
+					<h2 className="text-xl font-semibold mb-3">
+						Contest is Open to All Creators
+					</h2>
+					<p className="text-gray-600 mb-6">
+						This contest has been configured to allow all creators to
+						participate without requiring application approval. Any creator can
+						join and submit content for this contest.
+					</p>
+					<Link href="/brand/dashboard/messages">
+						<Button className="bg-orange-500 hover:bg-orange-600 text-white">
+							<Mail className="mr-1 h-4 w-4" />
+							Message Participants
+						</Button>
+					</Link>
+				</div>
+			</div>
+		);
+	};
+
 	// If an application is selected, show its details
 	if (selectedApplication) {
 		return (
@@ -459,7 +501,7 @@ My videos maintain a balance between being entertaining and informative, which h
 
 						<div>
 							<p className="text-sm text-[#667085]">
-							Some samples of your best tiktok:
+								Some samples of your best tiktok:
 							</p>
 							<div className="font-normal flex flex-col gap-1 mt-1">
 								{selectedApplication.bestTikTokVideos.map((video, idx) => (
@@ -540,6 +582,11 @@ My videos maintain a balance between being entertaining and informative, which h
 				<RejectModal />
 			</div>
 		);
+	}
+
+	// Render different content based on whoCanJoin value
+	if (whoCanJoin === "allow-all-creators") {
+		return <OpenToAllCreatorsMessage />;
 	}
 
 	return (
@@ -636,7 +683,7 @@ My videos maintain a balance between being entertaining and informative, which h
 						))
 					) : (
 						<div className="p-8 text-center text-gray-500">
-							Applications were not enabled for this contest.
+							No applications have been received for this contest.
 						</div>
 					)}
 				</div>

@@ -215,11 +215,7 @@ export default function UserDashboard({ userId }: UserDashboardProps) {
 						</thead>
 						<tbody className="bg-white divide-y divide-gray-200">
 							{userData.projects
-								.filter(
-									(project) =>
-										project.status === "active" ||
-										project.status === "accepting pitches"
-								)
+								.filter((project) => project.status === "active" || project.status === "accepting pitches")
 								.slice(0, 5) // Limit to 5 projects for the dashboard
 								.map((project, index) => (
 									<tr key={project.projectId || index}>

@@ -165,7 +165,7 @@ const SideNav: React.FC = () => {
 						]}
 					/>
 					<MenuItem
-						href="/creator/dashboard/contests"
+						href="/creator/dashboard/contest"
 						icon={
 							<Image
 								src="/icons/contests.svg"
@@ -253,6 +253,7 @@ const getPageTitle = (pathname: string): string => {
 		"/creator/dashboard/project/all": "Available Projects",
 		"/creator/dashboard/project/applied": "My Projects",
 		"/creator/dashboard/contest/all": "Available Contests",
+		"/creator/dashboard/contest": "Available Contests",
 		"/creator/dashboard/contest/applied": "My Contests",
 		"/creator/dashboard/messages": "Messages",
 		"/creator/dashboard/transactions": "Transactions",
@@ -266,6 +267,10 @@ const getPageTitle = (pathname: string): string => {
 	}
 	// More specific matching for different route sections
 	if (pathname.startsWith("/creator/dashboard/contest/all")) {
+		return "Available Contests";
+	}
+
+	if (pathname.startsWith("/creator/dashboard/contest")) {
 		return "Available Contests";
 	}
 
