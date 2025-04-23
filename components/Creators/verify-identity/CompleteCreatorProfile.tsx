@@ -14,21 +14,28 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { countries } from "@/types/countries";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, ArrowRight } from "lucide-react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
 	CreatorVerificationProvider,
 	useCreatorVerification,
 } from "@/components/Creators/verify-identity/CreatorVerificationContext";
+import { useAuth } from "@/context/AuthContext";
 
 const CompleteCreatorProfile = () => {
-	const { 
-		profileData, 
-		updateProfileData, 
-		fieldErrors, 
-		setTouched, 
+	const router = useRouter();
+	const {
+		profileData,
+		updateProfileData,
+		fieldErrors,
+		setTouched,
 		validateProfileData,
-		clearFieldError
+		clearFieldError,
+		submitVerification,
+		loading,
+		isFormValid,
 	} = useCreatorVerification();
 
 	// State for form fields
@@ -56,6 +63,9 @@ const CompleteCreatorProfile = () => {
 		youtube: "",
 	});
 
+	// State to track submission attempts
+	const [isSubmitting, setIsSubmitting] = useState(false);
+
 	// Validate on important field changes with debounce
 	useEffect(() => {
 		const timeoutId = setTimeout(() => {
@@ -63,9 +73,16 @@ const CompleteCreatorProfile = () => {
 			const { isValid } = validateProfileData(false);
 			console.log("Form validation status:", isValid);
 		}, 300);
-		
+
 		return () => clearTimeout(timeoutId);
-	}, [bio, tiktokUrl, dateOfBirth, gender, selectedCountry, validateProfileData]);
+	}, [
+		bio,
+		tiktokUrl,
+		dateOfBirth,
+		gender,
+		selectedCountry,
+		validateProfileData,
+	]);
 
 	// Load data from context when profileData changes
 	useEffect(() => {
@@ -228,7 +245,7 @@ const CompleteCreatorProfile = () => {
 	// Handle input blur to track touched fields
 	const handleBlur = (name: string) => {
 		setTouched((prev) => ({ ...prev, [name]: true }));
-		
+
 		// Validate the field when user leaves it
 		const { isValid } = validateProfileData(true);
 		console.log(`Field ${name} blurred, form valid: ${isValid}`);
@@ -260,7 +277,7 @@ const CompleteCreatorProfile = () => {
 
 		// Clear any existing error for this field
 		clearFieldError(fieldName);
-		
+
 		// Update context
 		updateProfileData({ [fieldName]: value });
 	};
@@ -295,12 +312,12 @@ const CompleteCreatorProfile = () => {
 		const newLinks = [...contentLinks];
 		newLinks[index] = value;
 		setContentLinks(newLinks);
-		
+
 		// Clear any content links error when user starts typing
 		if (index === 0 && value.trim() !== "") {
 			clearFieldError("contentLinks");
 		}
-		
+
 		updateProfileData({ contentLinks: newLinks });
 	};
 
@@ -312,6 +329,54 @@ const CompleteCreatorProfile = () => {
 		}
 		return null;
 	};
+
+	// Handle form submission
+	const handleSubmitRegistration = async (e: {
+		preventDefault: () => void;
+	}) => {
+		e.preventDefault(); // Prevent default form submission behavior
+		console.log("Submit button clicked");
+
+		// Set submitting state to true
+		setIsSubmitting(true);
+
+		try {
+			// Force validation of all fields
+			const { isValid, missingFields } = validateProfileData(true);
+			console.log("Form validation:", isValid, "Missing:", missingFields);
+
+			if (!isValid) {
+				toast.error(
+					`Please complete these required fields: ${missingFields.join(", ")}`
+				);
+				setIsSubmitting(false);
+				return;
+			}
+
+			// Submit both verification and profile data
+			console.log("Attempting to submit verification data");
+			const result = await submitVerification();
+			console.log("Submission result:", result);
+
+			if (result.success) {
+				toast.success(result.message || "Profile submitted successfully!");
+				// Delay navigation slightly to allow toast to be seen
+				setTimeout(() => {
+					router.push("/creator/dashboard");
+				}, 500);
+			} else {
+				toast.error(result.message || "Submission failed. Please try again.");
+			}
+		} catch (error) {
+			console.error("Error during submission:", error);
+			toast.error("An error occurred during submission. Please try again.");
+		} finally {
+			setIsSubmitting(false);
+		}
+	};
+
+	// Compute button disabled state
+	const isButtonDisabled = loading || isSubmitting || !isFormValid;
 
 	return (
 		<div className="">
@@ -570,14 +635,14 @@ const CompleteCreatorProfile = () => {
 					Your Country?
 				</label>
 				<Select value={selectedCountry} onValueChange={handleCountryChange}>
-					<SelectTrigger 
-                        id="country-select" 
-                        className={`w-full ${fieldErrors.country ? "border-red-500" : ""}`}
-                    >
+					<SelectTrigger
+						id="country-select"
+						className={`w-full ${fieldErrors.country ? "border-red-500" : ""}`}
+					>
 						<SelectValue placeholder="Select your country" />
 					</SelectTrigger>
 					<SelectContent className="bg-[#f7f7f7]">
-						{countries.map((country) => (  
+						{countries.map((country) => (
 							<SelectItem key={country.code} value={country.name}>
 								{country.name}
 							</SelectItem>
@@ -629,13 +694,34 @@ const CompleteCreatorProfile = () => {
 				))}
 				{renderFieldError("contentLinks")}
 			</div>
+
+			{/* Submit Button - Fixed with proper event parameter and loading state */}
+			<div className="mt-8 flex justify-end mb-10">
+				<Button
+					onClick={handleSubmitRegistration}
+					className={`text-white px-4 py-2 rounded-md flex items-center ${
+						isButtonDisabled
+							? "bg-gray-400 cursor-not-allowed"
+							: "bg-orange-500 hover:bg-orange-600"
+					}`}
+					disabled={isButtonDisabled}
+					type="button"
+				>
+					{loading || isSubmitting ? "Submitting..." : "Submit Registration"}
+					{!loading && !isSubmitting && (
+						<ArrowRight size={20} className="ml-2" />
+					)}
+				</Button>
+			</div>
 		</div>
 	);
 };
 
 export default function CreatorProfileForm() {
+	const { currentUser } = useAuth();
+
 	return (
-		<CreatorVerificationProvider>
+		<CreatorVerificationProvider userId={currentUser?.uid}>
 			<CompleteCreatorProfile />
 		</CreatorVerificationProvider>
 	);

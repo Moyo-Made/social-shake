@@ -12,6 +12,7 @@ import { ContestFormData } from "@/types/contestFormData";
 import { useContestForm } from "@/components/brand/brandProfile/dashboard/newContest/ContestFormContext";
 import ContestModal from "./available/JoinContestModal";
 import { useAuth } from "@/context/AuthContext";
+import ApplyModal from "./available/ApplyModal";
 
 interface ContestDetailPageProps {
 	contestId: string;
@@ -24,9 +25,14 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 	const [error, setError] = useState<string | null>(null);
 	const [isOpen, setIsOpen] = useState(false);
 	const [isContestModalOpen, setIsContestModalOpen] = useState(false);
-	const [, setCurrentParticipantCount] = useState<number>(0);
+	const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
+	const [, setCurrentParticipantCount] =
+		useState<number>(0);
 	const [hasJoined, setHasJoined] = useState<boolean>(false);
+	const [hasApplied, setHasApplied] = useState<boolean>(false);
 	const [joinCheckComplete, setJoinCheckComplete] = useState<boolean>(false);
+	const [applicationCheckComplete, setApplicationCheckComplete] =
+		useState<boolean>(false);
 
 	// Function to check if user has joined the contest - made reusable
 	const checkIfJoined = useCallback(async () => {
@@ -48,6 +54,26 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 		return false;
 	}, [currentUser?.uid, contestId]);
 
+	// Function to check if user has applied for the contest
+	const checkIfApplied = useCallback(async () => {
+		if (!currentUser?.uid || !contestId) return false;
+
+		try {
+			const response = await fetch(
+				`/api/contests/check-applied?userId=${currentUser.uid}&contestId=${contestId}`
+			);
+			if (response.ok) {
+				const data = await response.json();
+				setHasApplied(data.hasApplied);
+				setApplicationCheckComplete(true);
+				return data.hasApplied;
+			}
+		} catch (error) {
+			console.error("Error checking contest application status:", error);
+		}
+		return false;
+	}, [currentUser?.uid, contestId]);
+
 	const openContestModal = () => {
 		setIsContestModalOpen(true);
 	};
@@ -56,14 +82,22 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 		setIsContestModalOpen(false);
 	};
 
+	const openApplyModal = () => {
+		setIsApplyModalOpen(true);
+	};
+
+	const closeApplyModal = () => {
+		setIsApplyModalOpen(false);
+	};
+
 	// This function will be called when submission is successful
 	const handleSubmitSuccess = async (newParticipantCount: number) => {
 		// Update participant count
 		setCurrentParticipantCount(newParticipantCount);
-		
+
 		// Force a re-check of join status
 		await checkIfJoined();
-		
+
 		// Also update the contestData state to reflect the new count
 		if (contestData) {
 			setContestData({
@@ -71,23 +105,37 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 				participantsCount: newParticipantCount,
 			});
 		}
-		
+
 		// Close the modal
 		closeContestModal();
 	};
 
-	// Check if user has joined this contest on component mount
+	// Handle application success
+	const handleApplySuccess = async () => {
+		// Set the user as applied
+		setHasApplied(true);
+
+		// Close the apply modal
+		closeApplyModal();
+	};
+
+	// Check if user has joined or applied to this contest on component mount
 	useEffect(() => {
 		if (currentUser?.uid && contestId) {
 			checkIfJoined();
+			checkIfApplied();
 		}
-	}, [currentUser?.uid, contestId, checkIfJoined]);
+	}, [currentUser?.uid, contestId, checkIfJoined, checkIfApplied]);
 
 	const { formData } = useContestForm();
 	const contestType =
 		contestData?.contestType ||
 		formData?.basic?.contestType?.toLowerCase() ||
 		"Leaderboard";
+
+	// Get who can join criteria
+	const whoCanJoin =
+		contestData?.requirements?.whoCanJoin || "Open to all Creators";
 
 	// Format date for display
 	const formatDate = (dateInput?: string | Date): string => {
@@ -209,10 +257,14 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 		? contestData?.incentives
 		: [];
 
+	// Check if content should be blurred based on join criteria and user status
+	const shouldBlurContent =
+		whoCanJoin === "allow-applications" && !hasApplied && !hasJoined;
+
 	// Button component to reuse for both mobile and desktop
-	const JoinContestButton = () => {
-		// Render a loading state while checking join status
-		if (!joinCheckComplete && currentUser) {
+	const ContestActionButton = () => {
+		// Render a loading state while checking join/application status
+		if ((!joinCheckComplete || !applicationCheckComplete) && currentUser) {
 			return (
 				<button
 					className="mt-4 block w-full text-center py-2 bg-gray-400 text-white rounded-md cursor-wait"
@@ -226,31 +278,62 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 			);
 		}
 
-		// Render the appropriate button based on join status
+		// Render the appropriate button based on join/application status
+		if (hasJoined) {
+			return (
+				<button
+					className="mt-4 block w-full text-center py-2 bg-green-500 cursor-not-allowed text-white rounded-md"
+					disabled
+				>
+					<svg
+						className="w-4 h-4 inline mr-2 mb-1"
+						viewBox="0 0 20 20"
+						fill="currentColor"
+					>
+						<path d="M0 11l2-2 5 5L18 3l2 2L7 18z" />
+					</svg>
+					Contest Joined
+				</button>
+			);
+		}
+
+		if (hasApplied) {
+			return (
+				<button
+					className="mt-4 block w-full text-center py-2 bg-blue-500 cursor-not-allowed text-white rounded-md"
+					disabled
+				>
+					<svg
+						className="w-4 h-4 inline mr-2 mb-1"
+						viewBox="0 0 20 20"
+						fill="currentColor"
+					>
+						<path d="M0 11l2-2 5 5L18 3l2 2L7 18z" />
+					</svg>
+					Application Submitted
+				</button>
+			);
+		}
+
+		// Show Apply button or Join button based on whoCanJoin criteria
+		if (whoCanJoin === "allow-applications") {
+			return (
+				<button
+					onClick={openApplyModal}
+					className="mt-4 block w-full text-center py-2 bg-orange-500 hover:bg-orange-600 cursor-pointer text-white rounded-md transition-colors"
+				>
+					Apply to Contest
+				</button>
+			);
+		}
+
+		// Default to Join Contest button
 		return (
 			<button
-				onClick={hasJoined ? undefined : openContestModal}
-				className={`mt-4 block w-full text-center py-2 ${
-					hasJoined
-						? "bg-green-500 cursor-not-allowed"
-						: "bg-orange-500 hover:bg-orange-600 cursor-pointer"
-				} text-white rounded-md transition-colors`}
-				disabled={hasJoined}
+				onClick={openContestModal}
+				className="mt-4 block w-full text-center py-2 bg-orange-500 hover:bg-orange-600 cursor-pointer text-white rounded-md transition-colors"
 			>
-				{hasJoined ? (
-					<>
-						<svg
-							className="w-4 h-4 inline mr-2 mb-1"
-							viewBox="0 0 20 20"
-							fill="currentColor"
-						>
-							<path d="M0 11l2-2 5 5L18 3l2 2L7 18z" />
-						</svg>
-						Contest Joined
-					</>
-				) : (
-					"Join Contest"
-				)}
+				Join Contest
 			</button>
 		);
 	};
@@ -334,6 +417,17 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 								<p className="mb-2 text-[#667085]">Winner Count </p>
 								<span>{winnerCount} Winners</span>
 							</div>
+
+							{/* Who Can Join Information */}
+							<div className="flex justify-between items-center pb-4 text-sm w-full px-4">
+								<p className="mb-2 text-[#667085]">Participation</p>
+								<span className="capitalize">
+									{whoCanJoin === "allow-applications"
+										? "By Application"
+										: "Open to all Creators"}
+								</span>
+							</div>
+
 							<button
 								onClick={() => setIsOpen(!isOpen)}
 								className="text-sm font-medium text-start mb-2 flex items-center justify-start gap-2 w-full px-4"
@@ -365,9 +459,9 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 								)}
 							</div>
 
-							{/* Join Contest Button - Mobile */}
+							{/* Contest Action Button - Mobile */}
 							<div className="px-4 w-full">
-								<JoinContestButton />
+								<ContestActionButton />
 							</div>
 
 							{/* Contest Modal */}
@@ -377,6 +471,9 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 								contestId={contestId}
 								onSubmitSuccess={handleSubmitSuccess}
 							/>
+
+							{/* We would need to create an ApplyModal component */}
+							{/* (Implementation of ApplyModal component would be needed) */}
 
 							<Link
 								href=""
@@ -388,40 +485,51 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 						</Card>
 					</div>
 
-					{/* Contest Overview Content */}
-					<div className="space-y-6 mt-4">
-						<div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
+					{/* Contest Overview Content - with conditional blur overlay */}
+					<div className="space-y-6 mt-4 relative">
+						{/* Main content (will be blurred if needed) */}
+						<div className={`grid grid-cols-1 md:grid-cols-2 border-b pb-4 `}>
 							<h3 className="text-base text-[#667085] mb-2">
 								Contest Description
 							</h3>
 							<p>{description}</p>
 						</div>
 
-						<div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
+						<div className={`grid grid-cols-1 md:grid-cols-2 border-b pb-4`}>
 							<h3 className="text-base text-[#667085] mb-2">Contest Rules</h3>
 							<p>{rules}</p>
 						</div>
 
-						<div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
+						<div className={`grid grid-cols-1 md:grid-cols-2 border-b pb-4 `}>
 							<h3 className="text-base text-[#667085] mb-2">
 								Contest Industry
 							</h3>
 							<p>{industry.charAt(0).toUpperCase() + industry.slice(1)}</p>
 						</div>
 
-						<div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
+						<div className={`grid grid-cols-1 md:grid-cols-2 border-b pb-4 `}>
 							<h3 className="text-base text-[#667085] mb-2">Duration</h3>
 							<p className="capitalize">{duration.replace(/-/g, " ")}</p>
 						</div>
 
-						<div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
+						<div className={`grid grid-cols-1 md:grid-cols-2 border-b pb-4 `}>
 							<h3 className="text-base text-[#667085] mb-2">Video Type</h3>
 							<p className="capitalize">{videoType.replace(/-/g, " ")}</p>
 						</div>
 
+						{/* How to Join */}
+						<div className={`grid grid-cols-1 md:grid-cols-2 border-b pb-4 `}>
+							<h3 className="text-base text-[#667085] mb-2">How to Join</h3>
+							<p>
+								{whoCanJoin === "allow-applications"
+									? "This contest requires application approval. Please apply using the 'Apply for Contest' button."
+									: "This contest is open to join for all eligible creators."}
+							</p>
+						</div>
+
 						{/* Additional Incentives */}
 						{incentives.length > 0 && (
-							<div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
+							<div className={`grid grid-cols-1 md:grid-cols-2 border-b pb-4 `}>
 								<h3 className="text-base text-[#667085] mb-2">
 									Additional Incentives
 								</h3>
@@ -437,11 +545,35 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 						)}
 
 						{/* Content Creation Guidance */}
-						<div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
-							<h3 className="text-base text-[#667085] mb-2">
-								Client&apos;s Script
-							</h3>
-							<div className="space-y-2">{clientScript}</div>
+						<div>
+							<div className="relative border-b pb-4">
+								{/* Content to be blurred */}
+								<div
+									className={`grid grid-cols-1 md:grid-cols-2 ${shouldBlurContent ? "filter blur-sm" : ""}`}
+								>
+									<h3 className="text-base text-[#667085] mb-2">
+										Client&apos;s Script
+									</h3>
+									<div className="space-y-2">{clientScript}</div>
+								</div>
+
+								{/* Overlay with clear text and button */}
+								{shouldBlurContent && (
+									<div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-center px-4">
+										<div className=" backdrop-blur-sm">
+											<h2 className="text-lg font-bold mb-2 text-gray-800">
+												Join the contest to unlock full details and get started!
+											</h2>
+											<button
+												onClick={openApplyModal}
+												className="px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-md transition-colors text-base font-medium"
+											>
+												Apply to Join
+											</button>
+										</div>
+									</div>
+								)}
+							</div>
 						</div>
 					</div>
 				</div>
@@ -468,6 +600,16 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 						<div className="flex justify-between items-center pb-4 text-sm w-full">
 							<p className="mb-2 text-[#667085]">Winner Count </p>
 							<span>{winnerCount} Winners</span>
+						</div>
+
+						{/* Who Can Join Information */}
+						<div className="flex justify-between items-center pb-4 text-sm w-full">
+							<p className="mb-2 text-[#667085]">Participation</p>
+							<span className="capitalize">
+								{whoCanJoin === "allow-applications"
+									? "By Application"
+									: "Open to all Creators"}
+							</span>
 						</div>
 
 						<div className="w-full">
@@ -506,8 +648,8 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 							</div>
 						</div>
 
-						{/* Join Contest Button - Desktop */}
-						<JoinContestButton />
+						{/* Contest Action Button - Desktop */}
+						<ContestActionButton />
 
 						{/* Contest Modal */}
 						<ContestModal
@@ -515,6 +657,13 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 							onClose={closeContestModal}
 							contestId={contestId}
 							onSubmitSuccess={handleSubmitSuccess}
+						/>
+
+						<ApplyModal	
+							isOpen={isApplyModalOpen}
+							onClose={closeApplyModal}
+							contestId={contestId}
+							onSubmitSuccess={handleApplySuccess}
 						/>
 
 						<Link

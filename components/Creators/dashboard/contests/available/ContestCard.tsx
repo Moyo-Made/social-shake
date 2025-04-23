@@ -22,8 +22,6 @@ export const ContestCard: React.FC<ContestCardProps> = ({ contest }) => {
 	const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
 	const [, setBrandEmail] = useState<string>("");
 
-	
-
 	useEffect(() => {
 		const fetchBrandProfile = async () => {
 			if (!contest || !contest.userId) return;
@@ -68,6 +66,42 @@ export const ContestCard: React.FC<ContestCardProps> = ({ contest }) => {
 	}, [contest, brandProfile]);
 
 	const getStatusBadge = () => {
+		// First check if contest is in draft state
+		if (status === "draft") {
+			return (
+				<Badge className="bg-gray-100 text-gray-800 border-gray-800">
+					Draft
+				</Badge>
+			);
+		}
+
+		// If completed, show completed badge
+		if (status === "completed") {
+			return (
+				<Badge className="bg-blue-100 text-blue-800 border-blue-800">
+					Completed
+				</Badge>
+			);
+		}
+
+		// For active contests, check the whoCanJoin value
+		if (contest.requirements && contest.requirements.whoCanJoin) {
+			if (contest.requirements.whoCanJoin === "allow-applications") {
+				return (
+					<Badge className="bg-[#FFF0C3] text-[#1A1A1A] border-[#FDD849] rounded-full py-1 font-normal">
+						Application Required
+					</Badge>
+				);
+			} else {
+				return (
+					<Badge className="bg-[#ECFDF3] text-[#067647] border-[#ABEFC6] rounded-full py-1 font-normal">
+						Open to All Creators
+					</Badge>
+				);
+			}
+		}
+
+		// Fallback to the previous logic based on status
 		switch (status) {
 			case "active":
 				return (
@@ -77,20 +111,8 @@ export const ContestCard: React.FC<ContestCardProps> = ({ contest }) => {
 				);
 			case "review":
 				return (
-					<Badge className="bg-[#FFF0C3] text-[#1A1A1A] border-[#FDD849]">
+					<Badge className="bg-[#FFF0C3] text-[#1A1A1A] border-[#FDD849] rounded-full py-1 font-normal">
 						Application Required
-					</Badge>
-				);
-			case "completed":
-				return (
-					<Badge className="bg-blue-100 text-blue-800 border-blue-800">
-						Completed
-					</Badge>
-				);
-			case "draft":
-				return (
-					<Badge className="bg-gray-100 text-gray-800 border-gray-800">
-						Draft
 					</Badge>
 				);
 			default:
@@ -158,7 +180,8 @@ export const ContestCard: React.FC<ContestCardProps> = ({ contest }) => {
 					</div>
 					<div className="">
 						<p className="text-xs text-gray-500">
-							Posted: <span className="text-black font-medium">{getTimeAgo()}</span>
+							Posted:{" "}
+							<span className="text-black font-medium">{getTimeAgo()}</span>
 						</p>
 					</div>
 				</div>
@@ -194,7 +217,7 @@ export const ContestCard: React.FC<ContestCardProps> = ({ contest }) => {
 					href={`/creator/dashboard/contest/${contestId}`}
 					className="mt-4 block w-full text-center py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors"
 				>
-					{status === "draft" ? "Edit Contest" : "Join Contest"} {" "} &rarr;
+					{status === "draft" ? "Edit Contest" : "Join Contest"} &rarr;
 				</Link>
 			</div>
 		</div>

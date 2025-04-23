@@ -433,7 +433,7 @@ const CreatorDetailsPage: React.FC = () => {
 
 							<div>
 								<p className="text-gray-500 mb-1">Date of Birth</p>
-								<p className="text-black">
+								<p className="text-black text-sm">
 									{creator.dateOfBirth} (
 									{new Date().getFullYear() -
 										new Date(creator.dateOfBirth).getFullYear()}{" "}
@@ -453,9 +453,14 @@ const CreatorDetailsPage: React.FC = () => {
 								</p>
 							</div>
 
-							<div>
+							<div className="md:col-span-2">
 								<p className="text-gray-500 mb-1">Tiktok Profile</p>
-								<p className="text-black">{creator.socialMedia.tiktok}</p>
+								<Link
+									href={creator.socialMedia.tiktok || ""}
+									className="text-black hover:underline"
+								>
+									<span className="">{creator.socialMedia.tiktok}</span>
+								</Link>
 							</div>
 
 							<div>

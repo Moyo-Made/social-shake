@@ -42,6 +42,7 @@ interface CreatorVerificationContextType {
 	updateProfileData: (data: Partial<CreatorProfileData>) => Promise<void>;
 	isVerificationComplete: boolean;
 	isProfileComplete: boolean;
+	isFormValid: boolean; // Added isFormValid state
 	submitVerification: () => Promise<{ success: boolean; message: string }>;
 	loading: boolean;
 	fieldErrors: FieldErrors;
@@ -247,6 +248,7 @@ export const CreatorVerificationProvider = ({
 	const [dbInitialized, setDbInitialized] = useState(false);
 	const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 	const [isProfileComplete, setIsProfileComplete] = useState(false);
+	const [isFormValid, setIsFormValid] = useState(false); // Added isFormValid state
 	const [touched, setTouched] = useState<Record<string, boolean>>({});
 
 	// Initialize database
@@ -373,8 +375,8 @@ export const CreatorVerificationProvider = ({
 							}
 						}
 
-						// Check if profile is complete after loading data
-						validateProfileComplete(restoredProfileData, false);
+						// Validate profile data after loading
+						validateProfileData(false);
 					}
 				} catch (error) {
 					console.error(
@@ -457,7 +459,7 @@ export const CreatorVerificationProvider = ({
 		}
 	};
 
-	// Validation function with option to not update the error state
+	// Enhanced validation function that updates isFormValid state
 	const validateProfileData = (updateErrorState = true) => {
 		const requiredFields = [
 			{ key: "picture", label: "Profile Picture" },
@@ -471,6 +473,7 @@ export const CreatorVerificationProvider = ({
 		const missingFields: string[] = [];
 		const errors: FieldErrors = {};
 
+		// Check required fields
 		requiredFields.forEach((field) => {
 			if (field.key === "picture") {
 				if (!profileData.picture) {
@@ -479,18 +482,15 @@ export const CreatorVerificationProvider = ({
 				}
 			} else if (
 				!profileData[field.key as keyof CreatorProfileData] ||
-				(typeof profileData[field.key as keyof CreatorProfileData] ===
-					"string" &&
-					(
-						profileData[field.key as keyof CreatorProfileData] as string
-					).trim() === "")
+				(typeof profileData[field.key as keyof CreatorProfileData] === "string" &&
+				(profileData[field.key as keyof CreatorProfileData] as string).trim() === "")
 			) {
 				missingFields.push(field.label);
 				errors[field.key] = `${field.label} is required`;
 			}
 		});
 
-		// Also check content links - at least one should be filled
+		// Check content links - at least one should be filled
 		if (
 			profileData.contentLinks.length === 0 ||
 			!profileData.contentLinks[0] ||
@@ -500,17 +500,39 @@ export const CreatorVerificationProvider = ({
 			errors.contentLinks = "At least one content link is required";
 		}
 
+		// URL format validation
+		if (
+			profileData.tiktokUrl && 
+			profileData.tiktokUrl.trim() !== "" && 
+			!profileData.tiktokUrl.includes('tiktok.com')
+		) {
+			missingFields.push("TikTok URL");
+			errors.tiktokUrl = "Please enter a valid TikTok URL";
+		}
+
 		// Only update the errors state if requested
 		if (updateErrorState) {
 			setFieldErrors(errors);
 		}
 
 		const isValid = missingFields.length === 0;
+		
+		// Always update form validity state
+		setIsFormValid(isValid);
+		setIsProfileComplete(isValid);
+
 		return {
 			isValid,
 			missingFields,
 		};
 	};
+
+	// Validate profile data whenever it changes
+	useEffect(() => {
+		if (Object.keys(profileData).length > 0) {
+			validateProfileData(false);
+		}
+	}, [profileData]);
 
 	// Clear individual errors
 	const clearFieldError = (field: string) => {
@@ -581,43 +603,14 @@ export const CreatorVerificationProvider = ({
 			// Update state after storage is complete
 			setProfileData(updatedData);
 			
-			// Validate profile completeness with the updated data
-			validateProfileComplete(updatedData, false);
+			// The validateProfileData will be called automatically 
+			// via the useEffect when profileData changes
 			
 			return;
 		} catch (error) {
 			console.error("Error updating profile data in local storage:", error);
 			throw error;
 		}
-	};
-
-	// Define a separate function for checking profile completeness
-	const validateProfileComplete = (data: CreatorProfileData, updateErrors = false) => {
-		const isComplete = Boolean(
-			data.picture &&
-				data.bio &&
-				data.bio.trim().length > 0 &&
-				data.tiktokUrl &&
-				data.tiktokUrl.trim().length > 0 &&
-				data.dateOfBirth &&
-				data.dateOfBirth.trim().length > 0 &&
-				data.gender &&
-				data.gender.trim().length > 0 &&
-				data.country &&
-				data.country.trim().length > 0 &&
-				data.contentLinks.length > 0 &&
-				data.contentLinks[0] &&
-				data.contentLinks[0].trim() !== ""
-		);
-
-		// Update state
-		setIsProfileComplete(isComplete);
-		
-		if (updateErrors) {
-			validateProfileData(); // Only validate with error updates when explicitly requested
-		}
-
-		return isComplete;
 	};
 
 	// Reset form data
@@ -638,6 +631,7 @@ export const CreatorVerificationProvider = ({
 			setFieldErrors({});
 			setTouched({});
 			setIsProfileComplete(false);
+			setIsFormValid(false);
 		} catch (error) {
 			console.error("Error resetting form:", error);
 		}
@@ -739,6 +733,7 @@ export const CreatorVerificationProvider = ({
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify(apiPayload),
+				
 			});
 
 			if (!response.ok) {
@@ -778,6 +773,7 @@ export const CreatorVerificationProvider = ({
 				updateProfileData,
 				isVerificationComplete,
 				isProfileComplete,
+				isFormValid,
 				submitVerification,
 				loading,
 				fieldErrors,
