@@ -1,5 +1,6 @@
 "use client";
 
+import { doc, getDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
@@ -7,7 +8,7 @@ import { CheckCircle, Clock, Menu } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Incentive, useContestForm } from "../newContest/ContestFormContext";
-import { doc, getDoc } from "firebase/firestore";
+
 import { db } from "@/config/firebase";
 import Applications from "./Applications";
 import AnalyticsDashboard from "./Metrics";
@@ -418,7 +419,6 @@ export default function ContestDetailPage({
 									Contest Industry
 								</h3>
 								<p>{industry.charAt(0).toUpperCase() + industry.slice(1)}</p>
-
 							</div>
 
 							<div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
@@ -519,8 +519,10 @@ export default function ContestDetailPage({
 							{contestData && (
 								<Applications
 									contestData={{
+										id: contestId,
 										requirements: {
-											whoCanJoin: contestData.requirements?.whoCanJoin || "Not specified",
+											whoCanJoin:
+												contestData.requirements?.whoCanJoin || "Not specified",
 										},
 									}}
 								/>

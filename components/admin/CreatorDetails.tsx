@@ -453,13 +453,13 @@ const CreatorDetailsPage: React.FC = () => {
 								</p>
 							</div>
 
-							<div className="md:col-span-2">
+							<div className="">
 								<p className="text-gray-500 mb-1">Tiktok Profile</p>
 								<Link
 									href={creator.socialMedia.tiktok || ""}
 									className="text-black hover:underline"
 								>
-									<span className="">{creator.socialMedia.tiktok}</span>
+									View Profile
 								</Link>
 							</div>
 

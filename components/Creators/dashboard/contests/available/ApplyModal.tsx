@@ -85,69 +85,78 @@ const ApplicationModal: React.FC<ApplicationModalProps> = ({
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-
+	  
 		if (!validateForm()) {
-			return;
+		  return;
 		}
-
+	  
+		// Check if user is logged in first
+		if (!currentUser || !currentUser.uid) {
+		  toast.error("You must be logged in to apply");
+		  return;
+		}
+	  
 		setIsSubmitting(true);
-
+	  
 		try {
-			// Filter out empty sample URLs
-			const filteredSamples = sampleUrls.filter((url) => url.trim() !== "");
-
-			// Send the application to the API
-			const response = await fetch("/api/contests/apply", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					userId: currentUser?.uid || "",
-					contestId,
-					postUrl,
-					applicationText,
-					sampleUrls: filteredSamples,
-					hasBusinessAccount: hasBusinessAccount === true,
-				}),
-			});
-
-			const data = await response.json();
-
-			if (!response.ok) {
-				throw new Error(data.error || "Failed to submit application");
-			}
-
-			// Show success modal
-			setShowSuccessModal(true);
-
-			// Call success callback if provided
-			if (onSubmitSuccess) {
-				onSubmitSuccess();
-			}
+		  // Filter out empty sample URLs
+		  const filteredSamples = sampleUrls.filter((url) => url.trim() !== "");
+		  
+		  // Send the application to the API
+		  const response = await fetch("/api/contests/apply", {
+			method: "POST",
+			headers: {
+			  "Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+			  userId: currentUser.uid, 
+			  contestId,
+			  postUrl,
+			  applicationText,
+			  sampleUrls: filteredSamples,
+			  hasBusinessAccount: hasBusinessAccount === true,
+			}),
+		  });
+	  
+		  const data = await response.json();
+	  
+		  if (!response.ok) {
+			throw new Error(data.error || "Failed to submit application");
+		  }
+	  
+		  // Show success modal without closing the original modal
+		  setShowSuccessModal(true);
+	  
+		  // Call success callback if provided
+		  if (onSubmitSuccess) {
+			onSubmitSuccess();
+		  }
 		} catch (error) {
-			console.error("Error submitting application:", error);
-			toast.error("Failed to submit application. Please try again.");
+		  console.error("Error submitting application:", error);
+		  toast.error(error instanceof Error ? error.message : "Failed to submit application. Please try again.");
 		} finally {
-			setIsSubmitting(false);
+		  setIsSubmitting(false);
 		}
 	};
 
-	const handleCloseAll = () => {
+	const handleSuccessModalClose = () => {
+		// Close the success modal
 		setShowSuccessModal(false);
-		onClose();
+		
 	};
 
 	if (!isOpen) return null;
 
-	// Show success modal if submission was successful
+	// If showing success modal, render it on top of the application modal
 	if (showSuccessModal) {
 		return (
-			<ApplicationSuccessModal
-				isOpen={showSuccessModal}
-				onClose={handleCloseAll}
-				message="Your application has been submitted for review. We'll notify you once it's approved."
-			/>
+			<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+				<ApplicationSuccessModal 
+					isOpen={true}
+					onClose={handleSuccessModalClose}
+					message="Your application has been submitted for review. We'll notify you once it's approved."
+				/>
+			</div>
 		);
 	}
 
@@ -193,14 +202,14 @@ const ApplicationModal: React.FC<ApplicationModalProps> = ({
 
 							<RadioGroup
 								className="flex flex-wrap gap-3 mt-2"
-								value={hasBusinessAccount ? "yes" : "no"}
+								value={hasBusinessAccount === null ? undefined : hasBusinessAccount ? "yes" : "no"}
 								onValueChange={(value) =>
 									setHasBusinessAccount(value === "yes")
 								}
 							>
 								<div
 									className="flex items-center space-x-2 cursor-pointer text-[#667085] border-[#667085] border px-6 py-2 rounded-lg data-[state=checked]:bg-[#f26f38] data-[state=checked]:text-[#fff] data-[state=checked]:border-none"
-									data-state={hasBusinessAccount ? "checked" : "unchecked"}
+									data-state={hasBusinessAccount === true ? "checked" : "unchecked"}
 								>
 									<RadioGroupItem value="yes" id="yes" className="" />
 									<Label htmlFor="yes">Yes</Label>
@@ -208,7 +217,7 @@ const ApplicationModal: React.FC<ApplicationModalProps> = ({
 
 								<div
 									className="flex items-center space-x-2 cursor-pointer text-[#667085] border border-[#667085] px-6 py-2 rounded-lg data-[state=checked]:bg-[#f26f38] data-[state=checked]:text-white data-[state=checked]:border-none"
-									data-state={!hasBusinessAccount ? "checked" : "unchecked"}
+									data-state={hasBusinessAccount === false ? "checked" : "unchecked"}
 								>
 									<RadioGroupItem value="no" id="no" className="" />
 									<Label htmlFor="no">No</Label>
@@ -304,11 +313,11 @@ const ApplicationModal: React.FC<ApplicationModalProps> = ({
 						<button
 							type="submit"
 							disabled={isSubmitting}
-							className={`w-full py-3 ${
+							className={`w-full py-2 ${
 								isSubmitting
 									? "bg-orange-400"
 									: "bg-orange-500 hover:bg-orange-600"
-							} text-white font-medium rounded-md transition-colors`}
+							} text-white rounded-md transition-colors`}
 						>
 							{isSubmitting ? "Submitting..." : "Submit Application"}
 						</button>

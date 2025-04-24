@@ -14,30 +14,22 @@ export async function GET(request: NextRequest) {
   }
   
   try {
-    // Query the contest_applications collection to check if the user has applied
-    const applicationsRef = adminDb.collection('contest_applications');
-    const query = applicationsRef
+    // Query the contest_interests collection to check if the user has saved this contest
+    const interestsRef = adminDb.collection('contest_interests');
+    const query = interestsRef
       .where('userId', '==', userId)
       .where('contestId', '==', contestId)
       .limit(1);
     
     const snapshot = await query.get();
+    const isSaved = !snapshot.empty;
     
-    if (snapshot.empty) {
-      return NextResponse.json({ hasApplied: false });
-    }
+    // If saved, return the document ID for easy toggling later
+    const interestId = isSaved ? snapshot.docs[0].id : null;
     
-    // User has applied, get the application data and status
-    const applicationDoc = snapshot.docs[0];
-    const applicationData = applicationDoc.data();
-    
-    return NextResponse.json({
-      hasApplied: true,
-      applicationStatus: applicationData.status || 'pending',
-      applicationId: applicationDoc.id
-    });
+    return NextResponse.json({ isSaved, interestId });
   } catch (error) {
-    console.error('Error checking if user applied for contest:', error);
+    console.error('Error checking if user saved contest:', error);
     return NextResponse.json(
       { message: 'Internal server error' },
       { status: 500 }

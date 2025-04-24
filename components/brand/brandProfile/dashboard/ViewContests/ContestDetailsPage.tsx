@@ -4,18 +4,20 @@ import ContestDetails from "@/components/brand/brandProfile/dashboard/ViewContes
 import React from "react";
 
 interface PageParams {
-	contestId: string;
+  contestId: string;
 }
 
-const ContestDetailsPage = async ({ params }: { params: PageParams }) => {
-	const { contestId } = params;
-	return (
-		<SideNavLayout>
-			<ContestFormProvider>
-				<ContestDetails contestId={contestId} />
-			</ContestFormProvider>
-		</SideNavLayout>
-	);
+const ContestDetailsPage =  ({ params }: { params: PageParams }) => {
+  // Make sure params is resolved before destructuring
+  const contestId =  params.contestId;
+
+  return (
+    <SideNavLayout>
+      <ContestFormProvider>
+        <ContestDetails contestId={contestId} />
+      </ContestFormProvider>
+    </SideNavLayout>
+  );
 };
 
 export default ContestDetailsPage;

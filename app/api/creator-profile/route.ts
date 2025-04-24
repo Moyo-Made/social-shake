@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb, adminStorage } from "@/config/firebase-admin";
+import { adminDb, adminStorage, adminAuth } from "@/config/firebase-admin";
 
 export async function POST(request: NextRequest) {
   try {
@@ -147,42 +147,135 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const profileId = searchParams.get("profileId");
+    let userId = searchParams.get("userId");
     const email = searchParams.get("email");
 
-    console.log('Received email for creator profile lookup:', email);
+    console.log("Received query for creator profile lookup:", {
+      profileId,
+      userId,
+      email,
+    });
 
-    if (!email) {
-      console.warn('No email provided in request');
-      return NextResponse.json(
-        { error: "Email is required" },
-        { status: 400 }
-      );
-    }
+    // If profileId is provided directly, we can look it up across all users
+    if (profileId) {
+      // First try to find the profile using a query across all users
+      const profilesQuery = await adminDb
+        .collectionGroup("creatorProfiles")
+        .where("profileId", "==", profileId)
+        .limit(1)
+        .get();
 
-    // Using Admin SDK for Firestore
-    const creatorRef = adminDb.collection("creatorProfiles").doc(email);
-    const docSnap = await creatorRef.get();
+      if (!profilesQuery.empty) {
+        const profileData = profilesQuery.docs[0].data();
+        console.log("Retrieved creator profile data:", profileData);
+        return NextResponse.json(profileData);
+      }
 
-    console.log('Document exists:', docSnap.exists);
-
-    if (!docSnap.exists) {
-      console.warn(`No creator profile found for email: ${email}`);
+      console.warn(`No creator profile found for profileId: ${profileId}`);
       return NextResponse.json(
         { error: "Creator profile not found" },
         { status: 404 }
       );
     }
 
-    const profileData = docSnap.data();
-    console.log('Retrieved creator profile data:', profileData);
+    // If only userId is provided (no email)
+    if (userId && !email) {
+      // Query the creatorProfiles collection for documents where userId matches
+      const creatorProfilesQuery = await adminDb
+        .collection("creatorProfiles")
+        .where("userId", "==", userId)
+        .limit(1)
+        .get();
 
-    return NextResponse.json(profileData);
+      if (!creatorProfilesQuery.empty) {
+        const profileData = creatorProfilesQuery.docs[0].data();
+        console.log("Retrieved creator profile data by userId:", profileData);
+        return NextResponse.json(profileData);
+      }
+
+      console.warn(`No creator profile found for userId: ${userId}`);
+      return NextResponse.json(
+        { error: "Creator profile not found" },
+        { status: 404 }
+      );
+    }
+
+    // If email is provided but no userId, we need to find the associated userId first
+    if (email && !userId) {
+      console.log("Looking up user by email:", email);
+      const userQuery = await adminDb
+        .collection("users")
+        .where("email", "==", email)
+        .limit(1)
+        .get();
+
+      if (userQuery.empty) {
+        // Try Auth system as fallback
+        try {
+          const userRecord = await adminAuth.getUserByEmail(email);
+          userId = userRecord.uid;
+        } catch {
+          console.warn(`No user found for email: ${email}`);
+          return NextResponse.json(
+            { error: "User not found" },
+            { status: 404 }
+          );
+        }
+      } else {
+        userId = userQuery.docs[0].id;
+      }
+    }
+
+    // If we still have no userId at this point, return an error
+    if (!userId) {
+      console.warn("No userId available for creator profile lookup");
+      return NextResponse.json(
+        { error: "UserID or email is required" },
+        { status: 400 }
+      );
+    }
+
+    // If we have both email and userId, try to get the profile by email first
+    if (email) {
+      const creatorRef = adminDb.collection("creatorProfiles").doc(email);
+      const docSnap = await creatorRef.get();
+      
+      if (docSnap.exists) {
+        const profileData = {
+          id: docSnap.id,
+          ...docSnap.data(),
+          email: email,
+        };
+        console.log("Retrieved creator profile data by email:", profileData);
+        return NextResponse.json(profileData);
+      }
+    }
+
+    // If we couldn't find by email or no email was provided, try by userId
+    const creatorProfilesQuery = await adminDb
+      .collection("creatorProfiles")
+      .where("userId", "==", userId)
+      .limit(1)
+      .get();
+
+    if (!creatorProfilesQuery.empty) {
+      const profileData = creatorProfilesQuery.docs[0].data();
+      console.log("Retrieved creator profile data by userId fallback:", profileData);
+      return NextResponse.json(profileData);
+    }
+
+    console.warn(`No creator profile found for userId: ${userId}`);
+    return NextResponse.json(
+      { error: "Creator profile not found" },
+      { status: 404 }
+    );
   } catch (error) {
     console.error("Detailed error fetching creator profile:", error);
     return NextResponse.json(
-      { 
-        error: "Failed to fetch creator profile", 
-        details: error instanceof Error ? error.message : String(error)
+      {
+        error: "Failed to fetch creator profile",
+        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );

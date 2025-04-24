@@ -13,6 +13,7 @@ import { useContestForm } from "@/components/brand/brandProfile/dashboard/newCon
 import ContestModal from "./available/JoinContestModal";
 import { useAuth } from "@/context/AuthContext";
 import ApplyModal from "./available/ApplyModal";
+import IncentivesModal from "./available/IncentivesModal";
 
 interface ContestDetailPageProps {
 	contestId: string;
@@ -26,13 +27,17 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [isContestModalOpen, setIsContestModalOpen] = useState(false);
 	const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
-	const [, setCurrentParticipantCount] =
-		useState<number>(0);
+	const [, setCurrentParticipantCount] = useState<number>(0);
 	const [hasJoined, setHasJoined] = useState<boolean>(false);
 	const [hasApplied, setHasApplied] = useState<boolean>(false);
 	const [joinCheckComplete, setJoinCheckComplete] = useState<boolean>(false);
 	const [applicationCheckComplete, setApplicationCheckComplete] =
 		useState<boolean>(false);
+	const [applicationStatus, setApplicationStatus] = useState<string>("pending");
+	const [isSaved, setIsSaved] = useState<boolean>(false);
+	const [interestId, setInterestId] = useState<string | null>(null);
+	const [saveLoading, setSaveLoading] = useState<boolean>(false);
+	const [isIncentivesModalOpen, setIsIncentivesModalOpen] = useState(false);
 
 	// Function to check if user has joined the contest - made reusable
 	const checkIfJoined = useCallback(async () => {
@@ -54,7 +59,7 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 		return false;
 	}, [currentUser?.uid, contestId]);
 
-	// Function to check if user has applied for the contest
+	// Function to check if user has applied for the contest and get application status
 	const checkIfApplied = useCallback(async () => {
 		if (!currentUser?.uid || !contestId) return false;
 
@@ -65,6 +70,10 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 			if (response.ok) {
 				const data = await response.json();
 				setHasApplied(data.hasApplied);
+				// Store application status if available
+				if (data.applicationStatus) {
+					setApplicationStatus(data.applicationStatus);
+				}
 				setApplicationCheckComplete(true);
 				return data.hasApplied;
 			}
@@ -73,6 +82,66 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 		}
 		return false;
 	}, [currentUser?.uid, contestId]);
+
+	// Create a function to check if the contest is saved
+	const checkIfSaved = useCallback(async () => {
+		if (!currentUser?.uid || !contestId) return;
+
+		try {
+			const response = await fetch(
+				`/api/contests/check-saved?userId=${currentUser.uid}&contestId=${contestId}`
+			);
+
+			if (response.ok) {
+				const data = await response.json();
+				setIsSaved(data.isSaved);
+				setInterestId(data.interestId);
+			}
+		} catch (error) {
+			console.error("Error checking saved status:", error);
+		}
+	}, [currentUser?.uid, contestId]);
+
+	// Create a function to toggle saved status
+	const toggleSaved = async () => {
+		if (!currentUser?.uid || !contestId) return;
+
+		try {
+			setSaveLoading(true);
+
+			const response = await fetch("/api/contests/toggle-saved", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					userId: currentUser.uid,
+					contestId,
+					currentSavedState: isSaved,
+					interestId,
+				}),
+			});
+
+			if (response.ok) {
+				const data = await response.json();
+				setIsSaved(data.isSaved);
+				setInterestId(data.isSaved ? data.interestId : null);
+			}
+		} catch (error) {
+			console.error("Error toggling saved status:", error);
+		} finally {
+			setSaveLoading(false);
+		}
+	};
+
+	// Add functions to open/close the incentives modal
+	const openIncentivesModal = () => {
+		setIsIncentivesModalOpen(true);
+	};
+
+	const closeIncentivesModal = () => {
+		setIsIncentivesModalOpen(false);
+	};
 
 	const openContestModal = () => {
 		setIsContestModalOpen(true);
@@ -105,18 +174,12 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 				participantsCount: newParticipantCount,
 			});
 		}
-
-		// Close the modal
-		closeContestModal();
 	};
 
 	// Handle application success
 	const handleApplySuccess = async () => {
 		// Set the user as applied
 		setHasApplied(true);
-
-		// Close the apply modal
-		closeApplyModal();
 	};
 
 	// Check if user has joined or applied to this contest on component mount
@@ -124,8 +187,15 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 		if (currentUser?.uid && contestId) {
 			checkIfJoined();
 			checkIfApplied();
+			checkIfSaved();
 		}
-	}, [currentUser?.uid, contestId, checkIfJoined, checkIfApplied]);
+	}, [
+		currentUser?.uid,
+		contestId,
+		checkIfJoined,
+		checkIfApplied,
+		checkIfSaved,
+	]);
 
 	const { formData } = useContestForm();
 	const contestType =
@@ -259,7 +329,9 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 
 	// Check if content should be blurred based on join criteria and user status
 	const shouldBlurContent =
-		whoCanJoin === "allow-applications" && !hasApplied && !hasJoined;
+		whoCanJoin === "allow-applications" &&
+		!hasJoined &&
+		(!hasApplied || (hasApplied && applicationStatus !== "approved"));
 
 	// Button component to reuse for both mobile and desktop
 	const ContestActionButton = () => {
@@ -297,10 +369,25 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 			);
 		}
 
+		// Show "Join Contest" button for approved applications
+		if (hasApplied && applicationStatus === "approved") {
+			return (
+				<button
+					onClick={openContestModal}
+					className="mt-4 block w-full text-center py-2 bg-orange-500 hover:bg-orange-600 cursor-pointer text-white rounded-md transition-colors"
+				>
+					Join Contest
+				</button>
+			);
+		}
+
+		// Show pending or rejected application status
 		if (hasApplied) {
 			return (
 				<button
-					className="mt-4 block w-full text-center py-2 bg-blue-500 cursor-not-allowed text-white rounded-md"
+					className={`mt-4 block w-full text-center py-2 ${
+						applicationStatus === "rejected" ? "bg-red-500" : "bg-blue-500"
+					} cursor-not-allowed text-white rounded-md`}
 					disabled
 				>
 					<svg
@@ -310,7 +397,9 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 					>
 						<path d="M0 11l2-2 5 5L18 3l2 2L7 18z" />
 					</svg>
-					Application Submitted
+					{applicationStatus === "rejected"
+						? "Application Rejected"
+						: "Application Pending"}
 				</button>
 			);
 		}
@@ -400,23 +489,35 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 						<Card className="bg-[#fff] border border-[#FFBF9B] shadow-none py-3 w-full h-auto min-h-36 flex flex-col items-center justify-start">
 							<div className="flex justify-between items-center pb-4 text-sm w-full px-4 pt-1">
 								<p className="text-[#667085]">Published On</p>
-								<span className=" text-black font-normal">{publishedDate}</span>
+								<span className="text-black font-normal">{publishedDate}</span>
 							</div>
 
-							{/* Contest Type Specific Criteria */}
-							<div className="flex justify-between items-center pb-4 text-sm w-full px-4">
-								<h3 className="text-sm text-[#667085]">
-									{contestType === "Leaderboard"
-										? "Leaderboard Criteria"
-										: "GMV Criteria"}
-								</h3>
-								<p className="capitalize">{criteria.replace(/-/g, " ")}</p>
-							</div>
+							{/* Conditionally display based on contest type */}
+							{contestType.toLowerCase() === "leaderboard" ? (
+								<div className="flex justify-between items-center pb-4 text-sm w-full px-4">
+									<h3 className="text-sm text-[#667085]">
+										Leaderboard Criteria
+									</h3>
+									<p className="capitalize">{criteria.replace(/-/g, " ")}</p>
+								</div>
+							) : (
+								<div className="flex justify-between items-center pb-4 text-sm w-full px-4">
+									<h3 className="text-sm text-[#667085]">GMV Criteria</h3>
+									<p className="capitalize">GMV Sales</p>
+								</div>
+							)}
 
-							<div className="flex justify-between items-center pb-4 text-sm w-full px-4">
-								<p className="mb-2 text-[#667085]">Winner Count </p>
-								<span>{winnerCount} Winners</span>
-							</div>
+							{contestType.toLowerCase() === "leaderboard" ? (
+								<div className="flex justify-between items-center pb-4 text-sm w-full px-4">
+									<p className="mb-2 text-[#667085]">Winner Count </p>
+									<span>{winnerCount} Winners</span>
+								</div>
+							) : (
+								<div className="flex justify-between items-center pb-4 text-sm w-full px-4">
+									<p className="mb-2 text-[#667085]">Number of Incentives</p>
+									<span>{incentives.length} Incentives</span>
+								</div>
+							)}
 
 							{/* Who Can Join Information */}
 							<div className="flex justify-between items-center pb-4 text-sm w-full px-4">
@@ -428,36 +529,56 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 								</span>
 							</div>
 
-							<button
-								onClick={() => setIsOpen(!isOpen)}
-								className="text-sm font-medium text-start mb-2 flex items-center justify-start gap-2 w-full px-4"
-							>
-								Prize Breakdown
-								{isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-							</button>
+							{contestType.toLowerCase() === "leaderboard" ? (
+								<>
+									<button
+										onClick={() => setIsOpen(!isOpen)}
+										className="text-sm font-medium text-start mb-2 flex items-center justify-start gap-2 w-full px-4"
+									>
+										Prize Breakdown
+										{isOpen ? (
+											<ChevronUp size={18} />
+										) : (
+											<ChevronDown size={18} />
+										)}
+									</button>
 
-							<div
-								className={`text-start transition-all duration-300 ease-in-out overflow-hidden ${
-									isOpen ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
-								}`}
-							>
-								{positions.length > 0 && (
-									<div className="px-4">
-										<ul className="flex flex-col justify-start text-start space-y-2 text-sm pt-2">
-											{positions.map((prize, index) => (
-												<li key={index} className="flex space-x-10 items-start">
-													<span>Position {index + 1}</span>
-													<span className="font-medium">${prize}</span>
-												</li>
-											))}
-										</ul>
-										<div className="mt-3 pt-3 border-t border-gray-700 flex justify-between items-center">
-											<span>Total</span>
-											<span className="font-medium">${totalBudget}</span>
-										</div>
+									<div
+										className={`text-start transition-all duration-300 ease-in-out overflow-hidden ${
+											isOpen
+												? "max-h-[1000px] opacity-100"
+												: "max-h-0 opacity-0"
+										}`}
+									>
+										{positions.length > 0 && (
+											<div className="px-4">
+												<ul className="flex flex-col justify-start text-start space-y-2 text-sm pt-2">
+													{positions.map((prize, index) => (
+														<li
+															key={index}
+															className="flex space-x-10 items-start"
+														>
+															<span>Position {index + 1}</span>
+															<span className="font-medium">${prize}</span>
+														</li>
+													))}
+												</ul>
+												<div className="mt-3 pt-3 border-t border-gray-700 flex justify-between items-center">
+													<span>Total</span>
+													<span className="font-medium">${totalBudget}</span>
+												</div>
+											</div>
+										)}
 									</div>
-								)}
-							</div>
+								</>
+							) : (
+								<button
+									onClick={openIncentivesModal}
+									className="w-full px-4 text-[#FD5C02] flex items-center justify-center"
+								>
+									See What You Can Win! 🏆
+								</button>
+							)}
 
 							{/* Contest Action Button - Mobile */}
 							<div className="px-4 w-full">
@@ -472,16 +593,32 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 								onSubmitSuccess={handleSubmitSuccess}
 							/>
 
-							{/* We would need to create an ApplyModal component */}
-							{/* (Implementation of ApplyModal component would be needed) */}
+							<ApplyModal
+								isOpen={isApplyModalOpen}
+								onClose={closeApplyModal}
+								contestId={contestId}
+								onSubmitSuccess={handleApplySuccess}
+							/>
 
-							<Link
-								href=""
-								className="mt-2  flex justify-center items-center w-full text-center py-2 bg-black text-white rounded-md hover:bg-gray-800 transition-colors"
-							>
-								<p>Save for Later </p>
-								<BookmarkIcon size={18} className="ml-2" />
-							</Link>
+							<div className="block px-4 w-full">
+								<button
+									onClick={toggleSaved}
+									disabled={saveLoading}
+									className="mt-2 flex justify-center items-center w-full text-center py-2 bg-black text-white rounded-md hover:bg-gray-800 transition-colors"
+								>
+									{saveLoading ? (
+										<div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+									) : (
+										<>
+											<p>{isSaved ? "Unsave Contest" : "Save for Later"}</p>
+											<BookmarkIcon
+												size={18}
+												className={`ml-2 ${isSaved ? "fill-white" : ""}`}
+											/>
+										</>
+									)}
+								</button>
+							</div>
 						</Card>
 					</div>
 
@@ -582,25 +719,35 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 				<div className="hidden lg:block w-1/4 mt-14">
 					{/* Prize breakdown card */}
 					<Card className="bg-[#fff] border border-[#FFBF9B] shadow-none w-full h-auto min-h-36 flex flex-col items-center justify-start p-4">
-						<div className="flex justify-between items-center pb-4 text-sm w-full ">
+						<div className="flex justify-between items-center pb-4 text-sm w-full">
 							<p className="text-[#667085]">Published On</p>
-							<span className=" text-black font-normal">{publishedDate}</span>
+							<span className="text-black font-normal">{publishedDate}</span>
 						</div>
 
 						{/* Contest Type Specific Criteria */}
-						<div className="flex justify-between items-center pb-4 text-sm w-full">
-							<h3 className="text-sm text-[#667085]">
-								{contestType === "Leaderboard"
-									? "Leaderboard Criteria"
-									: "GMV Criteria"}
-							</h3>
-							<p className="capitalize">{criteria.replace(/-/g, " ")}</p>
-						</div>
+						{contestType.toLowerCase() === "leaderboard" ? (
+							<div className="flex justify-between items-center pb-4 text-sm w-full">
+								<h3 className="text-sm text-[#667085]">Leaderboard Criteria</h3>
+								<p className="capitalize">{criteria.replace(/-/g, " ")}</p>
+							</div>
+						) : (
+							<div className="flex justify-between items-center pb-4 text-sm w-full">
+								<h3 className="text-sm text-[#667085]">GMV Criteria</h3>
+								<p className="capitalize">GMV Sales</p>
+							</div>
+						)}
 
-						<div className="flex justify-between items-center pb-4 text-sm w-full">
-							<p className="mb-2 text-[#667085]">Winner Count </p>
-							<span>{winnerCount} Winners</span>
-						</div>
+						{contestType.toLowerCase() === "leaderboard" ? (
+							<div className="flex justify-between items-center pb-4 text-sm w-full">
+								<p className="mb-2 text-[#667085]">Winner Count </p>
+								<span>{winnerCount} Winners</span>
+							</div>
+						) : (
+							<div className="flex justify-between items-center pb-4 text-sm w-full">
+								<p className="mb-2 text-[#667085]">Number of Incentives</p>
+								<span>{incentives.length} Incentives</span>
+							</div>
+						)}
 
 						{/* Who Can Join Information */}
 						<div className="flex justify-between items-center pb-4 text-sm w-full">
@@ -612,41 +759,50 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 							</span>
 						</div>
 
-						<div className="w-full">
-							<button
-								onClick={() => setIsOpen(!isOpen)}
-								className="text-sm font-medium text-start mb-2 flex items-center justify-start gap-2 w-full"
-							>
-								Prize Breakdown
-								{isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-							</button>
+						{contestType.toLowerCase() === "leaderboard" ? (
+							<div className="w-full">
+								<button
+									onClick={() => setIsOpen(!isOpen)}
+									className="text-sm font-medium text-start mb-2 flex items-center justify-start gap-2 w-full"
+								>
+									Prize Breakdown
+									{isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+								</button>
 
-							<div
-								className={`transition-all duration-300 ease-in-out overflow-hidden ${
-									isOpen ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
-								}`}
-							>
-								{positions.length > 0 && (
-									<div className="px-4 w-full">
-										<ul className="space-y-2 text-sm pt-2">
-											{positions.map((prize, index) => (
-												<li
-													key={index}
-													className="flex justify-between items-center"
-												>
-													<span>Position {index + 1}</span>
-													<span className="font-medium">${prize}</span>
-												</li>
-											))}
-										</ul>
-										<div className="mt-3 pt-3 border-t border-gray-700 flex justify-between items-center">
-											<span>Total</span>
-											<span className="font-medium">${totalBudget}</span>
+								<div
+									className={`transition-all duration-300 ease-in-out overflow-hidden ${
+										isOpen ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
+									}`}
+								>
+									{positions.length > 0 && (
+										<div className="px-4 w-full">
+											<ul className="space-y-2 text-sm pt-2">
+												{positions.map((prize, index) => (
+													<li
+														key={index}
+														className="flex justify-between items-center"
+													>
+														<span>Position {index + 1}</span>
+														<span className="font-medium">${prize}</span>
+													</li>
+												))}
+											</ul>
+											<div className="mt-3 pt-3 border-t border-gray-700 flex justify-between items-center">
+												<span>Total</span>
+												<span className="font-medium">${totalBudget}</span>
+											</div>
 										</div>
-									</div>
-								)}
+									)}
+								</div>
 							</div>
-						</div>
+						) : (
+							<button
+								onClick={openIncentivesModal}
+								className="w-full text-[#FD5C02] flex items-center justify-center"
+							>
+								See What You Can Win! 🏆
+							</button>
+						)}
 
 						{/* Contest Action Button - Desktop */}
 						<ContestActionButton />
@@ -659,20 +815,36 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 							onSubmitSuccess={handleSubmitSuccess}
 						/>
 
-						<ApplyModal	
+						<ApplyModal
 							isOpen={isApplyModalOpen}
 							onClose={closeApplyModal}
 							contestId={contestId}
 							onSubmitSuccess={handleApplySuccess}
 						/>
 
-						<Link
-							href=""
+						<IncentivesModal
+							isOpen={isIncentivesModalOpen}
+							onClose={closeIncentivesModal}
+							incentives={incentives}
+						/>
+
+						<button
+							onClick={toggleSaved}
+							disabled={saveLoading}
 							className="mt-2 flex justify-center items-center w-full text-center py-2 bg-black text-white rounded-md hover:bg-gray-800 transition-colors"
 						>
-							<p>Save for Later </p>
-							<BookmarkIcon size={18} className="ml-2" />
-						</Link>
+							{saveLoading ? (
+								<div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+							) : (
+								<>
+									<p>{isSaved ? "Unsave Contest" : "Save for Later"}</p>
+									<BookmarkIcon
+										size={18}
+										className={`ml-2 ${isSaved ? "fill-white" : ""}`}
+									/>
+								</>
+							)}
+						</button>
 					</Card>
 				</div>
 			</div>

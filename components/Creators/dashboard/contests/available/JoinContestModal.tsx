@@ -81,7 +81,7 @@ const ContestModal: React.FC<ContestModalProps> = ({
 				return;
 			}
 
-			// Check file size - 30MB max
+			// Check file size - 500MB max
 			const maxSize = 500 * 1024 * 1024; // 500MB
 
 			if (file.size > maxSize) {
@@ -140,18 +140,29 @@ const ContestModal: React.FC<ContestModalProps> = ({
 		setIsSubmitting(true);
 
 		try {
-			const formData = new FormData();
-			formData.append("postUrl", postUrl);
-			formData.append("postDescription", postDescription);
-			formData.append("contestId", contestId);
+			let mediaUrlToSave = null;
 
+			// If there's a file to upload, handle that first
 			if (fileToUpload) {
-				formData.append("file", fileToUpload);
+				const fileUploadFormData = new FormData();
+				fileUploadFormData.append("file", fileToUpload);
+				fileUploadFormData.append("userId", currentUser?.uid || "");
+
+				// Upload the file to your file upload endpoint
+				const uploadResponse = await fetch("/api/upload", {
+					method: "POST",
+					body: fileUploadFormData,
+				});
+
+				if (!uploadResponse.ok) {
+					throw new Error("Failed to upload file");
+				}
+
+				const uploadData = await uploadResponse.json();
+				mediaUrlToSave = uploadData.fileUrl; // Get the URL from your upload service
 			}
 
-			// Send the submission to the API
-			// Note: In a real implementation, you would use formData for file uploads
-			// This example keeps the existing JSON approach for compatibility
+			// Now send the contest join request with the file URL
 			const response = await fetch("/api/contests/join", {
 				method: "POST",
 				headers: {
@@ -162,13 +173,14 @@ const ContestModal: React.FC<ContestModalProps> = ({
 					contestId,
 					postUrl,
 					postDescription,
+					mediaUrl: mediaUrlToSave, // Include the media URL in the request
 				}),
 			});
 
 			const data = await response.json();
 
 			if (!response.ok) {
-				throw new Error("Failed to submit contest entry");
+				throw new Error(data.error || "Failed to submit contest entry");
 			}
 
 			// If provided, call onSubmitSuccess with the new participant count
@@ -181,6 +193,9 @@ const ContestModal: React.FC<ContestModalProps> = ({
 
 			// Show success modal instead of closing
 			setShowSuccessModal(true);
+			
+			// Important: Don't close the contest modal yet
+			// The parent component shouldn't call closeContestModal() after submission success
 		} catch (error) {
 			console.error("Error submitting contest entry:", error);
 			toast.error("Failed to submit contest entry. Please try again.");
@@ -189,8 +204,10 @@ const ContestModal: React.FC<ContestModalProps> = ({
 		}
 	};
 
-	const handleCloseAll = () => {
+	const handleSuccessModalClose = () => {
+		// Close the success modal
 		setShowSuccessModal(false);
+		// Then close the contest modal
 		onClose();
 	};
 
@@ -224,9 +241,16 @@ const ContestModal: React.FC<ContestModalProps> = ({
 
 	if (!isOpen) return null;
 
-	// Show success modal if submission was successful
+	// If showing success modal, render it on top of the contest modal
 	if (showSuccessModal) {
-		return <SuccessModal isOpen={showSuccessModal} onClose={handleCloseAll} />;
+		return (
+			<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+				<SuccessModal
+					isOpen={showSuccessModal}
+					onClose={handleSuccessModalClose}
+				/>
+			</div>
+		);
 	}
 
 	return (
@@ -347,7 +371,7 @@ const ContestModal: React.FC<ContestModalProps> = ({
 										</p>
 										<p className="text-gray-500 text-xs mt-1">
 											PNG, JPG, or video files (MP4, QuickTime, WebM) accepted
-											(max 30MB)
+											(max 500MB)
 										</p>
 									</>
 								)}

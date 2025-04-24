@@ -1,44 +1,64 @@
 "use client";
 
 import { CheckCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface ApplicationSuccessModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  message?: string;
+	isOpen: boolean;
+	onClose: () => void;
+	message?: string;
 }
 
 const ApplicationSuccessModal: React.FC<ApplicationSuccessModalProps> = ({
-  isOpen,
-  onClose,
-  message = "Your submission has been received successfully!"
+	isOpen,
+	onClose,
+	message = "Your application has been submitted for review. You’ll receive a notification once the brand reviews your entry.",
 }) => {
-  if (!isOpen) return null;
+	const router = useRouter();
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg w-full max-w-md shadow-lg p-6 text-center">
-        <div className="flex justify-center mb-4">
-          <div className="bg-green-100 p-3 rounded-full">
-            <CheckCircle size={48} className="text-green-600" />
-          </div>
-        </div>
-        
-        <h2 className="text-2xl font-bold mb-2">Application Submitted!</h2>
-        
-        <p className="text-gray-600 mb-6">
-          {message}
-        </p>
-        
-        <button
-          onClick={onClose}
-          className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-md transition-colors"
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  );
+	if (!isOpen) return null;
+
+	return (
+		<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+			<div className="bg-white rounded-lg w-full max-w-xl shadow-lg p-6 flex flex-col justify-center items-center">
+				<div className="flex justify-center mb-4">
+					<div className="bg-green-100 p-3 rounded-full">
+						<CheckCircle size={48} className="text-green-600" />
+					</div>
+				</div>
+				<div className="flex items-center gap-1 mb-1">
+					<span role="img" aria-label="celebration" className="text-3xl">
+						🎉
+					</span>
+					<h2 className="text-2xl font-bold mb-2">
+						Application Submitted Successfully!
+					</h2>
+				</div>
+
+				<p className="text-gray-600 text-center mb-6">{message}</p>
+
+				<button
+					onClick={() => {
+						router.push("/creator/dashboard/contest/applied");
+						onClose();
+					}}
+					className="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-md transition-colors mb-3"
+				>
+					Go to My Contests
+				</button>
+
+				<button
+					onClick={() => {
+						router.push("/creator/dashboard/contest/all");
+						onClose();
+					}}
+					className="w-full bg-transparent font-medium"
+				>
+					&larr; Available Contests
+				</button>
+			</div>
+		</div>
+	);
 };
 
 export default ApplicationSuccessModal;

@@ -63,6 +63,15 @@ const defaultFormData: ContestFormData = {
 	status: "",
 	brandEmail: "",
 	contestId: "",
+	userId: "",
+	brandInfo: {
+		name: "",
+		logo: "",
+		website: undefined,
+		description: undefined
+	},
+	participantsCount: 0,
+	createdAt: ""
 };
 
 interface ContestFormContextType {
