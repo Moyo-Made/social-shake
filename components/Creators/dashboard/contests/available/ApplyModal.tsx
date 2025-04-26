@@ -142,6 +142,9 @@ const ApplicationModal: React.FC<ApplicationModalProps> = ({
 	const handleSuccessModalClose = () => {
 		// Close the success modal
 		setShowSuccessModal(false);
+
+		// Close the main application modal
+		onClose();
 		
 	};
 

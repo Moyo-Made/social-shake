@@ -1,245 +1,405 @@
-import { format } from 'date-fns';
+import React, { useEffect, useState } from "react";
+import { format } from "date-fns";
+import Image from "next/image";
+import { Contest } from "@/types/contests";
+import RenderActionButtons from "./RenderActionButton";
 
-interface ContestProps {
-  contest: {
-    id: string;
-    title: string;
-    description: string;
-    endDate: string;
-    status: string;
-    contestType: string;
-    creatorCount: number;
-    organizationId: string;
-    organizationName: string;
-    organizationLogo: string;
-    joinedAt?: string;
-    applicationId?: string;
-    interestId?: string;
-  };
+// Brand profile interface matching first component
+interface BrandProfile {
+	id?: string;
+	userId: string;
+	email?: string;
+	brandName: string;
+	logoUrl: string;
 }
 
-export default function ContestCard({ contest }: ContestProps) {
-  const formattedDate = format(new Date(contest.endDate), 'MMMM d, yyyy');
-  
-  // Function to get status label and color
-  const getStatusInfo = (status: string) => {
-    switch(status) {
-      case 'joined':
-        return { label: 'Joined', color: 'text-green-600', bgColor: 'bg-green-100' };
-      case 'pending':
-        return { label: 'Pending Approval', color: 'text-yellow-600', bgColor: 'bg-yellow-100' };
-      case 'interested':
-        return { label: 'Interested', color: 'text-pink-600', bgColor: 'bg-pink-100' };
-      case 'rejected':
-        return { label: 'Rejected', color: 'text-red-600', bgColor: 'bg-red-100' };
-      case 'completed':
-        return { label: 'Completed', color: 'text-gray-600', bgColor: 'bg-gray-100' };
-      default:
-        return { label: 'Unknown', color: 'text-gray-600', bgColor: 'bg-gray-100' };
-    }
-  };
+interface ContestCardProps {
+	contest: Contest;
+}
 
-  // Function to determine what action buttons to show based on status
-  const renderActionButtons = (status: string) => {
-    switch(status) {
-      case 'joined':
-        return (
-          <>
-            <ActionButton text="View Leaderboard" icon="arrow-right" primary />
-            <ActionButton text="View Channel" icon="mail" secondary />
-          </>
-        );
-      case 'pending':
-        return (
-          <>
-            <ActionButton text="View Contest" icon="arrow-right" primary />
-            <ActionButton text="Cancel Application" icon="x" danger />
-          </>
-        );
-      case 'interested':
-        return (
-          <>
-            <ActionButton text="View Contest" icon="arrow-right" primary />
-            <ActionButton text="Remove Interest" icon="bookmark" secondary />
-          </>
-        );
-      case 'rejected':
-        return (
-          <ActionButton text="View Details" icon="arrow-right" primary />
-        );
-      case 'completed':
-        return (
-          <>
-            <ActionButton text="View Results" icon="arrow-right" primary />
-            <ActionButton text="View Channel" icon="mail" secondary />
-          </>
-        );
-      default:
-        return <ActionButton text="View Contest" icon="arrow-right" primary />;
-    }
-  };
+export default function ContestCard({ contest }: ContestCardProps) {
+	// Add state for brand profile
+	const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
+	const [, setBrandEmail] = useState<string>("");
 
-  const { label, color, bgColor } = getStatusInfo(contest.status);
-  
-  // Helper component for action buttons
-  interface ActionButtonProps {
-    text: string;
-    icon: 'arrow-right' | 'mail' | 'x' | 'bookmark';
-    primary?: boolean;
-    secondary?: boolean;
-    danger?: boolean;
-  }
+	// Add useEffect to fetch brand profile
+	useEffect(() => {
+		const fetchBrandProfile = async () => {
+			if (!contest || !contest.userId) return;
 
-  function ActionButton({ text, icon, primary = false, secondary = false, danger = false }: ActionButtonProps) {
-    let buttonClasses = "flex items-center justify-center py-2 px-4 rounded font-medium";
-    
-    if (primary) {
-      buttonClasses += " bg-orange-500 hover:bg-orange-600 text-white";
-    } else if (secondary) {
-      buttonClasses += " bg-gray-900 hover:bg-black text-white";
-    } else if (danger) {
-      buttonClasses += " bg-red-500 hover:bg-red-600 text-white";
-    }
-    
-    return (
-      <button className={buttonClasses}>
-        {text}
-        {icon === 'arrow-right' && (
-          <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-          </svg>
-        )}
-        {icon === 'mail' && (
-          <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-          </svg>
-        )}
-        {icon === 'x' && (
-          <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        )}
-        {icon === 'bookmark' && (
-          <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-          </svg>
-        )}
-      </button>
-    );
-  }
+			try {
+				// Skip if we already have this brand profile
+				if (brandProfile && brandProfile.userId === contest.userId) {
+					return;
+				}
 
-  // Helper component for time labels (joined, applied, published)
-  function TimeLabel({ status, time }: { status: string; time: string }) {
-    let label = '';
-    
-    switch(status) {
-      case 'joined':
-        label = 'Joined:';
-        break;
-      case 'pending':
-        label = 'Applied:';
-        break;
-      case 'interested':
-      case 'rejected':
-        label = 'Published:';
-        break;
-      default:
-        label = 'Date:';
-    }
-    
-    return (
-      <div className="text-gray-500 text-sm">
-        {label} <span className="text-gray-700">{time}</span>
-      </div>
-    );
-  }
+				//  fetch from API
+				const response = await fetch(
+					`/api/admin/brand-approval?userId=${contest.userId}`
+				);
 
-  return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm">
-      <div className="flex">
-        {/* Contest Image */}
-        <div className="w-1/4 bg-gray-200">
-          <img 
-            src="/api/placeholder/300/200" 
-            alt={contest.title}
-            className="w-full h-full object-cover"
-          />
-        </div>
-        
-        {/* Contest Details */}
-        <div className="w-3/4 p-4">
-          {/* Status and Title */}
-          <div className="flex items-start justify-between mb-2">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${bgColor} ${color}`}>
-                  {status === 'joined' && (
-                    <svg className="-ml-0.5 mr-1.5 h-2 w-2 text-green-400" fill="currentColor" viewBox="0 0 8 8">
-                      <circle cx="4" cy="4" r="3" />
-                    </svg>
-                  )}
-                  {status === 'pending' && (
-                    <svg className="-ml-0.5 mr-1.5 h-2 w-2 text-yellow-400" fill="currentColor" viewBox="0 0 8 8">
-                      <circle cx="4" cy="4" r="3" />
-                    </svg>
-                  )}
-                  {status === 'interested' && (
-                    <svg className="-ml-0.5 mr-1.5 h-2 w-2 text-pink-400" fill="currentColor" viewBox="0 0 8 8">
-                      <circle cx="4" cy="4" r="3" />
-                    </svg>
-                  )}
-                  {status === 'rejected' && (
-                    <svg className="-ml-0.5 mr-1.5 h-2 w-2 text-red-400" fill="currentColor" viewBox="0 0 8 8">
-                      <circle cx="4" cy="4" r="3" />
-                    </svg>
-                  )}
-                  {label}
-                </span>
-              </div>
-              <h3 className="text-lg font-semibold mt-1">{contest.title}</h3>
-            </div>
-            <TimeLabel status={contest.status} time="2 days ago" />
-          </div>
-          
-          {/* Organization */}
-          <div className="flex items-center mb-3">
-            <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
-              <img 
-                src="/api/placeholder/32/32" 
-                alt={contest.organizationName}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <span className="ml-2 text-sm font-medium text-gray-700">{contest.organizationName || "Social Shake"}</span>
-          </div>
-          
-          {/* Description */}
-          <p className="text-gray-600 mb-4 text-sm">
-            {contest.description || "We're looking for an energetic and engaging TikTok ad for XYZ Shoes. Highlight comfort and style, and encourage users to try them out!"}
-          </p>
-          
-          {/* Contest Details */}
-          <div className="grid grid-cols-3 gap-4 mb-4">
-            <div>
-              <h4 className="text-sm font-normal text-orange-500">Contest Type</h4>
-              <p className="text-sm font-medium">{contest.contestType || "Leaderboard"}</p>
-            </div>
-            <div>
-              <h4 className="text-sm font-normal text-orange-500">Contest End Date</h4>
-              <p className="text-sm font-medium">{formattedDate}</p>
-            </div>
-            <div>
-              <h4 className="text-sm font-normal text-orange-500">Creators Joined</h4>
-              <p className="text-sm font-medium">{contest.creatorCount || 10} Creators</p>
-            </div>
-          </div>
-          
-          {/* Action Buttons */}
-          <div className="flex gap-3">
-            {renderActionButtons(contest.status)}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+				if (response.ok) {
+					const data = await response.json();
+					setBrandProfile(data);
+					if (data.email) {
+						setBrandEmail(data.email);
+					}
+				} else {
+					// Handle 404 or other errors by setting a placeholder
+					setBrandProfile({
+						id: contest.userId,
+						userId: contest.userId,
+						email: "Unknown",
+						brandName: "Unknown Brand",
+						logoUrl: "",
+					});
+				}
+			} catch (error) {
+				console.error(
+					`Error fetching brand profile for userId ${contest.userId}:`,
+					error
+				);
+			}
+		};
+
+		if (contest) {
+			fetchBrandProfile();
+		}
+	});
+
+	// Add error handling for date formatting
+	const formattedDate = contest.prizeTimeline?.endDate
+		? format(new Date(contest.prizeTimeline.endDate), "MMMM d, yyyy")
+		: "No date specified";
+
+	// Function to get the appropriate date for the current status
+	const getActionDate = (contest: Contest) => {
+		try {
+			switch (contest.status) {
+				case "joined":
+					if (contest.joinedAt && contest.joinedAt._seconds) {
+						return new Date(contest.joinedAt._seconds * 1000);
+					} else if (contest.submissionCreatedAt) {
+						// Handle different timestamp formats
+						if (
+							typeof contest.submissionCreatedAt === "object" &&
+							contest.submissionCreatedAt._seconds
+						) {
+							return new Date(contest.submissionCreatedAt._seconds * 1000);
+						}
+						if (typeof contest.submissionCreatedAt === "string") {
+							return new Date(contest.submissionCreatedAt);
+						} else if (
+							contest.submissionCreatedAt &&
+							contest.submissionCreatedAt._seconds
+						) {
+							return new Date(contest.submissionCreatedAt._seconds * 1000);
+						}
+						return null;
+					}
+					break;
+				case "pending":
+					if (contest.applicationCreatedAt) {
+						// Handle different timestamp formats
+						if (
+							typeof contest.applicationCreatedAt === "object" &&
+							contest.applicationCreatedAt._seconds
+						) {
+							return new Date(contest.applicationCreatedAt._seconds * 1000);
+						}
+						if (typeof contest.applicationCreatedAt === "string") {
+							return new Date(contest.applicationCreatedAt);
+						} else if (
+							contest.applicationCreatedAt &&
+							contest.applicationCreatedAt._seconds
+						) {
+							return new Date(contest.applicationCreatedAt._seconds * 1000);
+						}
+						return null;
+					} else if (contest.createdAt) {
+						// Handle different timestamp formats
+						if (
+							typeof contest.createdAt === "object" &&
+							contest.createdAt._seconds
+						) {
+							return new Date(contest.createdAt._seconds * 1000);
+						}
+						if (
+							typeof contest.createdAt === "object" &&
+							contest.createdAt._seconds
+						) {
+							return new Date(contest.createdAt._seconds * 1000);
+						}
+						return new Date(contest.createdAt as string);
+					}
+					break;
+				case "interested":
+					if (contest.interestCreatedAt) {
+						// Handle different timestamp formats
+						if (
+							typeof contest.interestCreatedAt === "object" &&
+							contest.interestCreatedAt._seconds
+						) {
+							return new Date(contest.interestCreatedAt._seconds * 1000);
+						}
+						if (typeof contest.interestCreatedAt === "string") {
+							return new Date(contest.interestCreatedAt);
+						} else if (
+							contest.interestCreatedAt &&
+							contest.interestCreatedAt._seconds
+						) {
+							return new Date(contest.interestCreatedAt._seconds * 1000);
+						}
+						return null;
+					} else if (contest.createdAt) {
+						// Handle different timestamp formats
+						if (
+							typeof contest.createdAt === "object" &&
+							contest.createdAt._seconds
+						) {
+							return new Date(contest.createdAt._seconds * 1000);
+						}
+						if (
+							typeof contest.createdAt === "object" &&
+							contest.createdAt._seconds
+						) {
+							return new Date(contest.createdAt._seconds * 1000);
+						}
+						return new Date(contest.createdAt as string);
+					}
+					break;
+				case "rejected":
+				case "completed":
+				case "approved":
+					if (contest.updatedAt) {
+						// Handle different timestamp formats
+						if (
+							typeof contest.updatedAt === "object" &&
+							contest.updatedAt._seconds
+						) {
+							if (
+								typeof contest.updatedAt === "object" &&
+								"_seconds" in contest.updatedAt
+							) {
+								return new Date(contest.updatedAt._seconds * 1000);
+							}
+							return new Date(contest.updatedAt as string);
+						}
+						if (
+							typeof contest.updatedAt === "object" &&
+							"_seconds" in contest.updatedAt
+						) {
+							return new Date(contest.updatedAt._seconds * 1000);
+						}
+						return new Date(contest.updatedAt as string);
+					}
+					break;
+			}
+			return null;
+		} catch (error) {
+			console.error("Error parsing date:", error, contest);
+			return null;
+		}
+	};
+
+	// Use the action date or fall back to updatedAt or createdAt
+	const actionDate = getActionDate(contest);
+	const formattedActionDate = actionDate
+		? format(actionDate, "MMMM d, yyyy")
+		: "No date available";
+
+	// Function to get status label and color
+	const getStatusInfo = (status: string) => {
+		switch (status) {
+			case "joined":
+				return {
+					prefix: "Status:",
+					label: "√ Joined",
+					color: "text-[#067647]",
+					bgColor: "bg-[#ECFDF3]",
+					borderColor: "border-[#ABEFC6]",
+				};
+			case "pending":
+				return {
+					prefix: "Status:",
+					label: "• Pending Approval",
+					color: "text-[#1A1A1A]",
+					bgColor: "bg-[#FFF0C3]",
+					borderColor: "border-[#FDD849]",
+				};
+			case "interested":
+				return {
+					prefix: "Status:",
+					label: "• Interested",
+					color: "text-[#FC52E4]",
+					bgColor: "bg-[#FFE5FB]",
+					borderColor: "border-[#FC52E4]",
+				};
+			case "rejected":
+				return {
+					prefix: "Status:",
+					label: "• Rejected",
+					color: "text-[#F04438]",
+					bgColor: "bg-[#FFE9E7]",
+					borderColor: "border-[#F04438]",
+				};
+			case "completed":
+				return {
+					prefix: "Status:",
+					label: "• Completed",
+					color: "text-gray-600",
+					bgColor: "bg-gray-100",
+					borderColor: "border-gray-600",
+				};
+			case "approved":
+				return {
+					prefix: "Status:",
+					label: "√ Approved",
+					color: "text-blue-600",
+					bgColor: "bg-blue-100",
+					borderColor: "border-blue-600",
+				};
+			default:
+				return {
+					prefix: "Status:",
+					label: status.charAt(0).toUpperCase() + status.slice(1),
+					color: "text-gray-600",
+					bgColor: "bg-gray-100",
+					borderColor: "border-gray-600",
+				};
+		}
+	};
+
+	const { prefix, label, color, bgColor, borderColor } = getStatusInfo(
+		contest.status
+	);
+
+	// Helper function to get status time label
+	function getStatusTimeLabel(status: string) {
+		switch (status) {
+			case "joined":
+				return "Joined:";
+			case "pending":
+				return "Applied:";
+			case "interested":
+				return "Interested:";
+			case "rejected":
+				return "Rejected:";
+			case "approved":
+				return "Approved:";
+			default:
+				return "Published:";
+		}
+	}
+
+	// Get a shortened description
+	const shortDescription = contest.basic?.description
+		? contest.basic.description.length > 400
+			? contest.basic.description.substring(0, 400) + "..."
+			: contest.basic.description
+		: "No description available";
+
+	return (
+		<div className="border border-[#D2D2D2] rounded-lg overflow-hidden bg-white shadow-sm mb-1">
+			<div className="flex">
+				<div className="w-1/3">
+					<Image
+						src={contest.basic?.thumbnail || "/api/placeholder/300/200"}
+						alt={contest.basic?.contestName || "Contest thumbnail"}
+						className="w-full h-[20rem] object-cover rounded-xl p-2"
+						width={300}
+						height={100}
+					/>
+				</div>
+
+				{/* Contest Details */}
+				<div className="w-3/4 p-4 flex flex-col">
+					{/* Status and Title */}
+					<div className="flex items-start justify-between mb-2">
+						<div>
+							<div className="flex items-center gap-1 mb-2">
+								<span className="text-sm">{prefix}</span>
+								<span
+									className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${bgColor} ${color} ${borderColor}`}
+								>
+									{label}
+								</span>
+							</div>
+							<h3 className="text-lg font-semibold mt-1">
+								{contest.basic?.contestName || contest.id}
+							</h3>
+						</div>
+						<div className="text-gray-500 text-sm">
+							{getStatusTimeLabel(contest.status)}{" "}
+							<span className="text-gray-700">{formattedActionDate}</span>
+						</div>
+					</div>
+
+					{/* Organization */}
+					<div className="flex items-center mb-3">
+						<div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+							<Image
+								src={brandProfile?.logoUrl || "/api/placeholder/32/32"}
+								alt={brandProfile?.brandName || "Brand"}
+								className="w-full h-full object-cover"
+								width={32}
+								height={32}
+							/>
+						</div>
+						<span className="ml-2 text-sm font-medium text-gray-700">
+							{brandProfile?.brandName || "Loading..."}
+						</span>
+					</div>
+
+					{/* Description */}
+					<p className="text-gray-600 mb-4 text-sm">{shortDescription}</p>
+
+					{/* Contest Details */}
+					<div className="grid grid-cols-3 gap-4 mb-4">
+						<div>
+							<h4 className="text-sm font-normal text-orange-500">
+								Contest Type
+							</h4>
+							<p className="text-sm">{contest.contestType || "Unknown"}</p>
+						</div>
+						<div>
+							<h4 className="text-sm font-normal text-orange-500">
+								Contest End Date
+							</h4>
+							<p className="text-sm">{formattedDate}</p>
+						</div>
+						<div>
+							<h4 className="text-sm font-normal text-orange-500">
+								Creators Joined
+							</h4>
+							<p className="text-sm ">
+								{contest.participantsCount !== undefined
+									? `${contest.participantsCount} Creator${contest.participantsCount !== 1 ? "s" : ""}`
+									: contest.applicantsCount !== undefined
+										? `${contest.applicantsCount} Applicant${contest.applicantsCount !== 1 ? "s" : ""}`
+										: "0 Creators"}
+							</p>
+						</div>
+					</div>
+
+					{/* Action Buttons - Now taking full width with flex-1 */}
+					<div className="flex gap-3 mt-auto w-full">
+						<RenderActionButtons
+							contest={{
+								contestId: contest.id,
+								contestType: contest.contestType || "Unknown",
+								status: contest.status,
+								interestId: contest.interestId,
+								// channelId: contest.channelId,
+							}}
+							refreshData={() => {
+								// Add actual refresh logic here
+								window.location.reload(); // Simple refresh option
+							}}
+						/>
+					</div>
+				</div>
+			</div>
+		</div>
+	);
 }

@@ -22,8 +22,8 @@ const ApplicationSuccessModal: React.FC<ApplicationSuccessModalProps> = ({
 		<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
 			<div className="bg-white rounded-lg w-full max-w-xl shadow-lg p-6 flex flex-col justify-center items-center">
 				<div className="flex justify-center mb-4">
-					<div className="bg-green-100 p-3 rounded-full">
-						<CheckCircle size={48} className="text-green-600" />
+					<div className="bg-orange-100 p-3 rounded-full">
+						<CheckCircle size={48} className="text-orange-500" />
 					</div>
 				</div>
 				<div className="flex items-center gap-1 mb-1">

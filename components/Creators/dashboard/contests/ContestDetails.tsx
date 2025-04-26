@@ -322,9 +322,9 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 		contestData?.requirements?.script || "No script provided.";
 	const winnerCount = contestData?.prizeTimeline?.winnerCount || 0;
 	const positions = contestData?.prizeTimeline?.positions || [];
-	const criteria = contestData?.prizeTimeline?.criteria || "Not specified";
-	const incentives = Array.isArray(contestData?.incentives)
-		? contestData?.incentives
+
+	const incentives = contestData?.incentives
+		? Object.values(contestData.incentives)
 		: [];
 
 	// Check if content should be blurred based on join criteria and user status
@@ -498,7 +498,10 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 									<h3 className="text-sm text-[#667085]">
 										Leaderboard Criteria
 									</h3>
-									<p className="capitalize">{criteria.replace(/-/g, " ")}</p>
+									<p className="capitalize">
+										{contestData?.prizeTimeline?.criteria.replace(/-/g, " ") ||
+											"Not specified"}
+									</p>
 								</div>
 							) : (
 								<div className="flex justify-between items-center pb-4 text-sm w-full px-4">
@@ -665,7 +668,7 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 						</div>
 
 						{/* Additional Incentives */}
-						{incentives.length > 0 && (
+						{/* {incentives.length > 0 && (
 							<div className={`grid grid-cols-1 md:grid-cols-2 border-b pb-4 `}>
 								<h3 className="text-base text-[#667085] mb-2">
 									Additional Incentives
@@ -679,7 +682,7 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 									))}
 								</ul>
 							</div>
-						)}
+						)} */}
 
 						{/* Content Creation Guidance */}
 						<div>
@@ -728,7 +731,9 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 						{contestType.toLowerCase() === "leaderboard" ? (
 							<div className="flex justify-between items-center pb-4 text-sm w-full">
 								<h3 className="text-sm text-[#667085]">Leaderboard Criteria</h3>
-								<p className="capitalize">{criteria.replace(/-/g, " ")}</p>
+								<p className="capitalize">
+									{contestData?.prizeTimeline?.criteria.replace(/-/g, " ")}
+								</p>
 							</div>
 						) : (
 							<div className="flex justify-between items-center pb-4 text-sm w-full">

@@ -34,7 +34,7 @@ const SuccessModal: React.FC<SuccessModalProps> = ({ isOpen, onClose }) => {
           
           <button
             onClick={() => {
-              router.push('/leaderboard');
+              router.push('/contests/dashboard/leaderboard');
               onClose();
             }}
             className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors"
