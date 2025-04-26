@@ -67,7 +67,7 @@ const RenderActionButtons = ({
 				<>
 					{contest.contestType === "GMV" ? (
 						<Link
-							href={`/creator/dashboard/contest/gmv/${contest.contestId}`}
+							href={`/creator/dashboard/contest/gmv`}
 							className="flex-1"
 						>
 							<ActionButton
@@ -79,7 +79,7 @@ const RenderActionButtons = ({
 						</Link>
 					) : (
 						<Link
-							href={`/creator/dashboard/contest/leaderboard/${contest.contestId}`}
+							href={`/creator/dashboard/contest/leaderboard`}
 							className="flex-1"
 						>
 							<ActionButton

@@ -335,7 +335,6 @@ const CompleteCreatorProfile = () => {
 		preventDefault: () => void;
 	}) => {
 		e.preventDefault(); // Prevent default form submission behavior
-		console.log("Submit button clicked");
 
 		// Set submitting state to true
 		setIsSubmitting(true);

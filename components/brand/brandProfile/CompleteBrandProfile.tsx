@@ -366,7 +366,7 @@ const BrandProfileForm = () => {
 			// Clear session storage since registration is complete
 			sessionStorage.removeItem("userSignupData");
 
-			router.push("/brand/pricing");
+			router.push("/brand/dashboard");
 		} catch (error) {
 			console.error("Submission error:", error);
 			setError(error instanceof Error ? error.message : String(error));
