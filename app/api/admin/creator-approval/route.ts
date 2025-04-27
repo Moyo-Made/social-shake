@@ -181,6 +181,10 @@ export async function GET(request: NextRequest) {
 		const creatorPromises = verificationSnapshot.docs.map(async (doc) => {
 			const verificationData = doc.data();
 			const userId = verificationData.userId;
+
+			console.log("Verification data for creator:", userId, JSON.stringify(verificationData, null, 2));
+			console.log("Pricing data:", JSON.stringify(verificationData.pricing, null, 2));
+			
 			let creatorProfileData = null;
 
 			// Try to fetch profile data from creatorProfiles collection
@@ -267,13 +271,14 @@ export async function GET(request: NextRequest) {
 				verifiableIDUrl: verificationData.verifiableIDUrl || null,
 				verificationVideoUrl: verificationData.verificationVideoUrl || null,
 
-				pricing: verificationData.pricing || {
+				pricing: profileData.pricing || {
 					oneVideo: 0,
 					threeVideos: 0,
 					fiveVideos: 0,
 					bulkVideos: 0,
 					bulkVideosNote: ""
 				  }
+				  
 
 			};
 		});
