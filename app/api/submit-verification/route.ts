@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
 		await verificationRef.set({
 			createdAt: FieldValue.serverTimestamp(),
 			status: "pending", // Initial status
-			userId, // Include the userId explicitly
+			userId,
 			...fileUrls,
 			profileData: parsedProfileData,
 		  });

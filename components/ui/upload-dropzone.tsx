@@ -10,6 +10,7 @@ interface UploadDropzoneProps {
 	selectedFile: File | null;
 	instructionText: string;
 	fileTypeText: string;
+	disabled?: boolean;
 }
 
 export function UploadDropzone({

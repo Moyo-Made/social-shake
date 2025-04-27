@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
 import {
 	Select,
 	SelectContent,
@@ -63,6 +64,14 @@ const CompleteCreatorProfile = () => {
 		youtube: "",
 	});
 
+	const [pricing, setPricing] = useState({
+		oneVideo: "",
+		threeVideos: "",
+		fiveVideos: "",
+		bulkVideos: "",
+		bulkVideosNote: "",
+	});
+
 	// State to track submission attempts
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -108,6 +117,22 @@ const CompleteCreatorProfile = () => {
 				twitter: profileData.socialMedia?.twitter || "",
 				facebook: profileData.socialMedia?.facebook || "",
 				youtube: profileData.socialMedia?.youtube || "",
+			});
+
+			setPricing({
+				oneVideo: profileData.pricing?.oneVideo
+					? String(profileData.pricing.oneVideo)
+					: "",
+				threeVideos: profileData.pricing?.threeVideos
+					? String(profileData.pricing.threeVideos)
+					: "",
+				fiveVideos: profileData.pricing?.fiveVideos
+					? String(profileData.pricing.fiveVideos)
+					: "",
+				bulkVideos: profileData.pricing?.bulkVideos
+					? String(profileData.pricing.bulkVideos)
+					: "",
+				bulkVideosNote: profileData.pricing?.bulkVideosNote || "",
 			});
 		}
 	}, [profileData]);
@@ -321,6 +346,43 @@ const CompleteCreatorProfile = () => {
 		updateProfileData({ contentLinks: newLinks });
 	};
 
+	const handlePricingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const { name, value } = e.target;
+
+		// Create updated pricing object
+		const updatedPricing = { ...pricing };
+
+		// Handle numeric fields differently from text fields
+		if (name === "bulkVideosNote") {
+			// For the note field, accept any text
+			updatedPricing[name as keyof typeof pricing] = value;
+		} else {
+			// For numeric fields, apply validation
+			if (value === "" || /^\d+(\.\d{0,2})?$/.test(value)) {
+				updatedPricing[name as keyof typeof pricing] = value;
+			} else {
+				// If invalid, don't update
+				return;
+			}
+		}
+
+		// Update local state
+		setPricing(updatedPricing);
+
+		// Update context with proper typing
+		updateProfileData({
+			pricing: {
+				oneVideo: parseFloat(updatedPricing.oneVideo) || 0,
+				threeVideos: parseFloat(updatedPricing.threeVideos) || 0,
+				fiveVideos: parseFloat(updatedPricing.fiveVideos) || 0,
+				bulkVideos: parseFloat(updatedPricing.bulkVideos) || 0,
+				bulkVideosNote: updatedPricing.bulkVideosNote, // Pass the note as is
+			},
+		});
+
+		clearFieldError("pricing");
+	};
+
 	const renderFieldError = (fieldName: string) => {
 		if (fieldErrors[fieldName]) {
 			return (
@@ -342,7 +404,6 @@ const CompleteCreatorProfile = () => {
 		try {
 			// Force validation of all fields
 			const { isValid, missingFields } = validateProfileData(true);
-			console.log("Form validation:", isValid, "Missing:", missingFields);
 
 			if (!isValid) {
 				toast.error(
@@ -353,9 +414,7 @@ const CompleteCreatorProfile = () => {
 			}
 
 			// Submit both verification and profile data
-			console.log("Attempting to submit verification data");
 			const result = await submitVerification();
-			console.log("Submission result:", result);
 
 			if (result.success) {
 				toast.success(result.message || "Profile submitted successfully!");
@@ -692,6 +751,105 @@ const CompleteCreatorProfile = () => {
 					</div>
 				))}
 				{renderFieldError("contentLinks")}
+			</div>
+
+			<div className="mt-8">
+				<h3 className="text-lg font-semibold text-gray-800 mb-3">
+					Your Content Pricing
+				</h3>
+				<p className="text-sm text-gray-600 mb-4">
+					Set your pricing rates for different content packages. These rates
+					will be visible to brands looking to work with you.
+				</p>
+
+				<Card className="p-5 border border-[#D0D5DD] rounded-lg">
+					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+						<div>
+							<Label className="text-sm font-medium text-gray-700">
+								Single Video (Basic Rate) *
+							</Label>
+							<div className="relative mt-1">
+								<span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+									$
+								</span>
+								<Input
+									name="oneVideo"
+									value={pricing.oneVideo}
+									onChange={handlePricingChange}
+									onBlur={() => handleBlur("pricing")}
+									placeholder="49.99"
+									className={`pl-7 ${fieldErrors.pricing ? "border-red-500" : ""}`}
+								/>
+							</div>
+							{renderFieldError("pricing")}
+						</div>
+
+						<div>
+							<Label className="text-sm font-medium text-gray-700">
+								Package: 3 Videos
+							</Label>
+							<div className="relative mt-1">
+								<span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+									$
+								</span>
+								<Input
+									name="threeVideos"
+									value={pricing.threeVideos}
+									onChange={handlePricingChange}
+									placeholder="129.99"
+									className="pl-7"
+								/>
+							</div>
+						</div>
+
+						<div>
+							<Label className="text-sm font-medium text-gray-700">
+								Package: 5 Videos
+							</Label>
+							<div className="relative mt-1">
+								<span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+									$
+								</span>
+								<Input
+									name="fiveVideos"
+									value={pricing.fiveVideos}
+									onChange={handlePricingChange}
+									placeholder="199.99"
+									className="pl-7"
+								/>
+							</div>
+						</div>
+
+						<div>
+							<Label className="text-sm font-medium text-gray-700">
+								Bulk Rate (for Agencies)
+							</Label>
+							<div className="relative mt-1">
+								<span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+									$
+								</span>
+								<Input
+									name="bulkVideos"
+									value={pricing.bulkVideos}
+									onChange={handlePricingChange}
+									placeholder="399.99"
+									className="pl-7"
+								/>
+							</div>
+							<div className="mt-2">
+								<Input
+									name="bulkVideosNote"
+									value={pricing.bulkVideosNote || ""}
+									onChange={handlePricingChange}
+									placeholder="Contact for custom pricing packages"
+								/>
+							</div>
+							<p className="text-xs text-gray-500 mt-1">
+								Optional: Add a note or starting price for bulk orders
+							</p>
+						</div>
+					</div>
+				</Card>
 			</div>
 
 			{/* Submit Button - Fixed with proper event parameter and loading state */}

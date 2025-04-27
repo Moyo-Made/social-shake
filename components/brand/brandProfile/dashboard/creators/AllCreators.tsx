@@ -14,99 +14,40 @@ import { useRouter, usePathname } from "next/navigation";
 
 // Define types
 interface Creator {
-	id: number;
+	id: string;
 	name: string;
 	username: string;
 	bio: string;
 	totalGMV: number;
 	avgGMVPerVideo: number;
-	avgImpressions: string;
+	avgImpressions?: string;
 	pricing: {
-		singleVideo: number;
+		oneVideo: number;
+		threeVideos: number;
 		fiveVideos: number;
-		tenVideos: number;
+		bulkVideos: number;
+		bulkVideosNote?: string;
 	};
-	avatar: string;
+	profilePictureUrl: string;
+	contentTypes: string[];
+	country: string;
+	socialMedia?: {
+		instagram: string;
+		twitter: string;
+		facebook: string;
+		youtube: string;
+	};
+	tiktokUrl: string;
+	status: string;
+	dateOfBirth: string;
+	gender: string;
+	ethnicity: string;
+	contentLinks: string[];
+	verificationVideoUrl?: string;
+	verifiableIDUrl?: string;
 }
 
-// Sample creator data - moved outside component to avoid recreation on renders
-const sampleCreators: Creator[] = [
-	{
-		id: 1,
-		name: "Melinda Jackson",
-		username: "@melindaJackson",
-		bio: "Hey there! I'm Melinda, a passionate content creator specializing in viral TikTok campaigns and engaging short-form videos.",
-		totalGMV: 2000,
-		avgGMVPerVideo: 500,
-		avgImpressions: "10.6k",
-		pricing: {
-			singleVideo: 1000,
-			fiveVideos: 2000,
-			tenVideos: 10000,
-		},
-		avatar: "/icons/creator-icon.svg",
-	},
-	{
-		id: 2,
-		name: "Olumise Web",
-		username: "@olumiseWeb",
-		bio: "Hey there! I'm Olumise, a passionate content creator specializing in viral TikTok campaigns and engaging short-form videos.",
-		totalGMV: 2000,
-		avgGMVPerVideo: 500,
-		avgImpressions: "10.6k",
-		pricing: {
-			singleVideo: 1000,
-			fiveVideos: 2000,
-			tenVideos: 10000,
-		},
-		avatar: "/icons/creator-icon.svg",
-	},
-	{
-		id: 3,
-		name: "Mabel Yurika",
-		username: "@mabelyurika",
-		bio: "Hey there! I'm Mabel, a passionate content creator specializing in viral TikTok campaigns and engaging short-form videos.",
-		totalGMV: 2000,
-		avgGMVPerVideo: 500,
-		avgImpressions: "10.6k",
-		pricing: {
-			singleVideo: 1000,
-			fiveVideos: 2000,
-			tenVideos: 10000,
-		},
-		avatar: "/icons/creator-icon.svg",
-	},
-	{
-		id: 4,
-		name: "Mabel Yurika",
-		username: "@mabelyurika",
-		bio: "Hey there! I'm Mabel, a passionate content creator specializing in viral TikTok campaigns and engaging short-form videos.",
-		totalGMV: 2000,
-		avgGMVPerVideo: 500,
-		avgImpressions: "10.6k",
-		pricing: {
-			singleVideo: 1000,
-			fiveVideos: 2000,
-			tenVideos: 10000,
-		},
-		avatar: "/icons/creator-icon.svg",
-	},
-	{
-		id: 5,
-		name: "Mabel Yurika",
-		username: "@mabelyurika",
-		bio: "Hey there! I'm Mabel, a passionate content creator specializing in viral TikTok campaigns and engaging short-form videos.",
-		totalGMV: 2000,
-		avgGMVPerVideo: 500,
-		avgImpressions: "10.6k",
-		pricing: {
-			singleVideo: 1000,
-			fiveVideos: 2000,
-			tenVideos: 10000,
-		},
-		avatar: "/icons/creator-icon.svg",
-	},
-];
+const defaultProfileImg = "";
 
 const CreatorMarketplace = () => {
 	const router = useRouter();
@@ -118,8 +59,111 @@ const CreatorMarketplace = () => {
 	const [showAlert, setShowAlert] = useState<boolean>(false);
 	const [savedCreators, setSavedCreators] = useState<Creator[]>([]);
 	const [alertMessage, setAlertMessage] = useState<string>("");
-	const [creators] = useState<Creator[]>(sampleCreators);
+	const [creators, setCreators] = useState<Creator[]>([]);
 	const [isClient, setIsClient] = useState(false);
+	const [isLoading, setIsLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
+
+	// Fetch creators from Firebase
+	useEffect(() => {
+		const fetchCreators = async () => {
+			try {
+				setIsLoading(true);
+
+				// Fetch from API endpoint instead of direct Firebase access
+				const url = `/api/admin/creator-approval?status=approved`;
+				const response = await fetch(url);
+
+				if (!response.ok) {
+					throw new Error(`Error: ${response.status}`);
+				}
+
+				const data = await response.json();
+
+				// Map the API response data to our Creator interface
+				const mappedCreators = data.creators.map(
+					(creator: {
+						userId: string;
+						firstName?: string;
+						lastName?: string;
+						username?: string;
+						bio?: string;
+						totalGMV?: number;
+						avgGMVPerVideo?: number;
+						pricing: {
+							oneVideo?: number;
+							threeVideos?: number;
+							fiveVideos?: number;
+							bulkVideos?: number;
+							bulkVideosNote?: string;
+						};
+						logoUrl?: string;
+						contentTypes?: string[];
+						country?: string;
+						socialMedia?: {
+							tiktok?: string;
+						};
+						status?: string;
+						dateOfBirth?: string;
+						gender?: string;
+						ethnicity?: string;
+						contentLinks?: string[];
+						verificationVideoUrl?: string;
+						verifiableIDUrl?: string;
+					}) => ({
+						id: creator.userId,
+						name: `${creator.firstName || ""} ${creator.lastName || ""}`.trim(),
+						username: creator.username || "",
+						bio: creator.bio || "",
+						totalGMV: creator.totalGMV || 0,
+						avgGMVPerVideo: creator.avgGMVPerVideo || 0,
+						avgImpressions: "0",
+						pricing: {
+							oneVideo: creator.pricing?.oneVideo || 0,
+							threeVideos: creator.pricing?.threeVideos || 0,
+							fiveVideos: creator.pricing?.fiveVideos || 0,
+							bulkVideos: creator.pricing?.bulkVideos || 0,
+							bulkVideosNote: creator.pricing?.bulkVideosNote || "",
+						},
+						profilePictureUrl: creator.logoUrl || defaultProfileImg,
+						contentTypes: creator.contentTypes || [],
+						country: creator.country || "",
+						socialMedia: creator.socialMedia || {
+							instagram: "",
+							twitter: "",
+							facebook: "",
+							youtube: "",
+						},
+						tiktokUrl: creator.socialMedia?.tiktok || "",
+						status: creator.status || "pending",
+						dateOfBirth: creator.dateOfBirth || "",
+						gender: creator.gender || "",
+						ethnicity: creator.ethnicity || "",
+						contentLinks: creator.contentLinks || [],
+						verificationVideoUrl: creator.verificationVideoUrl || "",
+						verifiableIDUrl: creator.verifiableIDUrl || "",
+					})
+				);
+
+				// Filter out creators with undefined totalGMV
+				const filteredCreators = mappedCreators.filter(
+					(creator: { totalGMV: undefined } | null) =>
+						creator !== null &&
+						creator.totalGMV !== undefined &&
+						typeof creator.totalGMV === "number"
+				);
+
+				setCreators(filteredCreators);
+			} catch (err) {
+				console.error("Error fetching creators:", err);
+				setError("Failed to load creators. Please try again later.");
+			} finally {
+				setIsLoading(false);
+			}
+		};
+
+		fetchCreators();
+	}, []);
 
 	// Ensure we only access localStorage after component mounts on client
 	useEffect(() => {
@@ -154,7 +198,7 @@ const CreatorMarketplace = () => {
 		setSelectedCreator(null);
 	};
 
-	const isCreatorSaved = (creatorId: number): boolean => {
+	const isCreatorSaved = (creatorId: string): boolean => {
 		return savedCreators.some((creator) => creator.id === creatorId);
 	};
 
@@ -193,25 +237,30 @@ const CreatorMarketplace = () => {
 		router.push("/brand/dashboard/creators/all");
 	};
 
-	// Empty state for saved creators
-	const EmptyState = () => (
+	// Empty state for saved creators or while loading
+	const EmptyState = ({ message }: { message: string }) => (
 		<div className="flex flex-col items-center justify-center py-8 md:py-16">
-			<div className="rounded-full bg-gray-100 p-4 md:p-6 mb-4">
-				<Heart size={32} className="text-gray-400 md:h-12 md:w-12" />
+			<div className="">
+			<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
 			</div>
-			<h3 className="text-lg md:text-xl font-medium mb-2 text-center">
-				No Saved Creators
+			<h3 className="mt-2 text-center">
+				{isLoading ? "Loading Creators..." : message}
 			</h3>
 			<p className="text-gray-500 mb-6 text-center max-w-md text-sm md:text-base px-4">
-				You haven&apos;t saved any creators to your favorites yet. Browse the
-				marketplace and click the heart icon to save creators.
+				{isLoading
+					? ""
+					: isSavedCreatorsPage
+						? "You haven't saved any creators to your favorites yet. Browse the marketplace and click the heart icon to save creators."
+						: "No creators found. Please check back later or try different search criteria."}
 			</p>
-			<button
-				onClick={handleNavigateToMarketplace}
-				className="px-4 py-2 bg-orange-500 text-white rounded-md font-medium text-sm md:text-base"
-			>
-				Browse Marketplace
-			</button>
+			{!isLoading && isSavedCreatorsPage && (
+				<button
+					onClick={handleNavigateToMarketplace}
+					className="px-4 py-2 bg-orange-500 text-white rounded-md font-medium text-sm md:text-base"
+				>
+					Browse Marketplace
+				</button>
+			)}
 		</div>
 	);
 
@@ -225,6 +274,24 @@ const CreatorMarketplace = () => {
 		</div>
 	);
 
+	// Show error state
+	if (error) {
+		return (
+			<div className="container mx-auto p-3 md:p-4">
+				<div className="bg-red-50 border border-red-200 p-4 rounded-lg text-center">
+					<h3 className="font-medium text-red-800 mb-2">Error</h3>
+					<p className="text-red-600">{error}</p>
+					<button
+						onClick={() => window.location.reload()}
+						className="mt-4 px-4 py-2 bg-red-500 text-white rounded-md"
+					>
+						Try Again
+					</button>
+				</div>
+			</div>
+		);
+	}
+
 	// Detail profile view
 	if (selectedCreator) {
 		return (
@@ -237,7 +304,7 @@ const CreatorMarketplace = () => {
 							<div className="flex flex-col md:flex-row md:items-center gap-4">
 								<div className="h-24 w-24 md:h-32 md:w-32 lg:h-40 lg:w-40 rounded-full overflow-hidden border-4 border-orange-100 mx-auto md:mx-0">
 									<Image
-										src={selectedCreator.avatar}
+										src={selectedCreator.profilePictureUrl || defaultProfileImg}
 										alt={selectedCreator.name}
 										className="h-full w-full object-cover"
 										width={160}
@@ -249,10 +316,10 @@ const CreatorMarketplace = () => {
 										{selectedCreator.name}
 									</h2>
 									<p className="text-gray-600 text-sm md:text-base">
-										Fashion | Lifestyle | Tech Reviews
+										{selectedCreator.contentTypes.join(" | ")}
 									</p>
 									<p className="text-gray-500 text-sm md:text-base">
-										{selectedCreator.username}
+										@{selectedCreator.username}
 									</p>
 								</div>
 							</div>
@@ -260,7 +327,7 @@ const CreatorMarketplace = () => {
 								<div className="flex gap-1 text-sm">
 									<p className="text-[#667085]">Video Pricing:</p>
 									<p className="font-normal">
-										${selectedCreator.pricing.singleVideo / 5}/Video
+										${selectedCreator.pricing.oneVideo}/Video
 									</p>
 								</div>
 								<div className="flex gap-3">
@@ -300,27 +367,35 @@ const CreatorMarketplace = () => {
 							<div className="space-y-3 md:space-y-4 text-sm md:text-base">
 								<div className="grid grid-cols-2 gap-2 md:gap-4">
 									<div>
-										<p className="text-gray-500">Tiktok Username</p>
-										<p>@melinda_tiktok</p>
+										<p className="text-gray-500">TikTok Username</p>
+										<p>
+											{selectedCreator.tiktokUrl.split("@")[1] ||
+												"Not specified"}
+										</p>
 									</div>
 
 									<div>
 										<p className="text-gray-500">Nationality</p>
-										<p>Australian</p>
+										<p>{selectedCreator.country || "Not specified"}</p>
 									</div>
 								</div>
 
 								<div className="grid grid-cols-2 gap-2 md:gap-4">
 									<div>
 										<p className="text-gray-500">Member Since:</p>
-										<p>January 2025</p>
+										<p>
+											{new Date().toLocaleDateString("en-US", {
+												month: "long",
+												year: "numeric",
+											})}
+										</p>
 									</div>
 
 									<div>
 										<p className="text-gray-500">Ratings</p>
 										<div className="flex items-center">
 											<span className="text-yellow-500">★</span>
-											<span className="ml-1">4.9 (20)</span>
+											<span className="ml-1">New Creator</span>
 										</div>
 									</div>
 								</div>
@@ -328,33 +403,30 @@ const CreatorMarketplace = () => {
 								<div>
 									<p className="text-gray-500 mb-1 md:mb-2">Creator Bio</p>
 									<p className="text-sm md:text-base">
-										{selectedCreator.bio} With 500K+ followers and an average of
-										1M views per post, I help brands boost visibility and
-										connect with their audience through authentic and creative
-										storytelling.
+										{selectedCreator.bio || "No bio available."}
 									</p>
 								</div>
 
 								<div>
 									<p className="text-gray-500 mb-1 md:mb-2">Languages</p>
-									<p>English, Spanish</p>
+									<p>English</p>
 								</div>
 
 								<div className="grid grid-cols-3 gap-2 md:gap-4 pt-2 md:pt-4">
 									<div className="text-center md:text-start">
-										<p className="text-lg md:text-xl font-medium">20</p>
+										<p className="text-lg md:text-xl font-medium">0</p>
 										<p className="text-gray-500 text-xs md:text-sm">
 											Total Projects
 										</p>
 									</div>
 									<div className="text-center md:text-start">
-										<p className="text-lg md:text-xl font-medium">5k+</p>
+										<p className="text-lg md:text-xl font-medium">0+</p>
 										<p className="text-gray-500 text-xs md:text-sm">
 											Total Views
 										</p>
 									</div>
 									<div className="text-center md:text-start">
-										<p className="text-lg md:text-xl font-medium">5</p>
+										<p className="text-lg md:text-xl font-medium">0</p>
 										<p className="text-gray-500 text-xs md:text-sm">
 											Contests Won
 										</p>
@@ -368,17 +440,39 @@ const CreatorMarketplace = () => {
 								Portfolio Videos
 							</h3>
 							<div className="grid grid-cols-2 gap-2 md:gap-4">
-								{[1, 2, 3, 4].map((item) => (
-									<div key={item} className="rounded-lg relative aspect-square">
-										<Image
-											src="/icons/Vid.svg"
-											alt="Creator Video"
-											className="w-full h-full object-cover"
-											width={200}
-											height={200}
-										/>
+								{selectedCreator.contentLinks &&
+								selectedCreator.contentLinks.length > 0 ? (
+									selectedCreator.contentLinks
+										.slice(0, 4)
+										.map((link, index) => (
+											<div
+												key={index}
+												className="rounded-lg relative aspect-square"
+											>
+												<Image
+													src="/icons/Vid.svg" // Placeholder image
+													alt={`Creator Video ${index + 1}`}
+													className="w-full h-full object-cover"
+													width={200}
+													height={200}
+												/>
+												<a
+													href={link}
+													target="_blank"
+													rel="noopener noreferrer"
+													className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 hover:bg-opacity-40 transition-all"
+												>
+													<div className="text-white font-medium">View</div>
+												</a>
+											</div>
+										))
+								) : (
+									<div className="col-span-2 flex items-center justify-center h-40 bg-gray-50 rounded-lg">
+										<p className="text-gray-500">
+											No portfolio videos available
+										</p>
 									</div>
-								))}
+								)}
 							</div>
 						</div>
 					</div>
@@ -397,6 +491,15 @@ const CreatorMarketplace = () => {
 		);
 	}
 
+	// Loading state
+	if (isLoading) {
+		return (
+			<div className="container mx-auto p-3 md:p-4">
+				<EmptyState message="Loading Creators" />
+			</div>
+		);
+	}
+
 	// Saved Creators View
 	if (isSavedCreatorsPage) {
 		return (
@@ -404,7 +507,7 @@ const CreatorMarketplace = () => {
 				{showAlert && <AlertNotification />}
 
 				{!isClient || savedCreators.length === 0 ? (
-					<EmptyState />
+					<EmptyState message="No Saved Creators" />
 				) : (
 					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 ">
 						{savedCreators.map((creator) => (
@@ -414,7 +517,7 @@ const CreatorMarketplace = () => {
 										<div className="flex items-center">
 											<div className="w-12 h-12 md:w-16 md:h-16 rounded-full overflow-hidden mr-3 md:mr-4">
 												<Image
-													src={creator.avatar}
+													src={creator.profilePictureUrl || defaultProfileImg}
 													alt={creator.name}
 													className="w-full h-full object-cover"
 													width={64}
@@ -426,7 +529,7 @@ const CreatorMarketplace = () => {
 													{creator.name}
 												</h3>
 												<p className="text-orange-500 text-sm md:text-base">
-													{creator.username}
+													@{creator.username}
 												</p>
 											</div>
 										</div>
@@ -441,7 +544,7 @@ const CreatorMarketplace = () => {
 
 								<CardContent className="pt-3 md:pt-4 text-sm md:text-base">
 									<p className="text-gray-600 line-clamp-2 h-10 md:h-12">
-										{creator.bio}
+										{creator.bio || "No bio available"}
 									</p>
 
 									<div className="space-y-2 md:space-y-3 mt-3 md:mt-4">
@@ -454,7 +557,7 @@ const CreatorMarketplace = () => {
 												</span>
 											</div>
 											<span className="font-medium text-sm md:text-base">
-												${creator.totalGMV}
+												${creator.totalGMV || 0}
 											</span>
 										</div>
 
@@ -466,7 +569,7 @@ const CreatorMarketplace = () => {
 												</span>
 											</div>
 											<span className="font-medium text-sm md:text-base">
-												${creator.avgGMVPerVideo}
+												${creator.avgGMVPerVideo || 0}
 											</span>
 										</div>
 
@@ -491,7 +594,7 @@ const CreatorMarketplace = () => {
 												</span>
 											</div>
 											<span className="font-medium text-sm md:text-base">
-												{creator.avgImpressions}
+												{creator.avgImpressions || "0"}
 											</span>
 										</div>
 									</div>
@@ -629,155 +732,159 @@ const CreatorMarketplace = () => {
 				</div>
 			</div>
 
-			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-				{creators.map((creator) => (
-					<Card key={creator.id} className="overflow-hidden">
-						<CardHeader className="pb-0">
-							<div className="flex justify-between items-start">
-								<div className="flex items-center">
-									<div className="w-12 h-12 md:w-16 md:h-16 rounded-full overflow-hidden mr-3 md:mr-4">
-										<Image
-											src={creator.avatar}
-											alt={creator.name}
-											className="w-full h-full object-cover"
-											width={64}
-											height={64}
-										/>
-									</div>
-									<div>
-										<h3 className="text-base md:text-lg font-bold">
-											{creator.name}
-										</h3>
-										<p className="text-orange-500 text-sm md:text-base">
-											{creator.username}
-										</p>
-									</div>
-								</div>
-								<button
-									onClick={() => handleSaveCreator(creator)}
-									className={`p-2 rounded-full ${
-										isCreatorSaved(creator.id)
-											? "bg-pink-500 text-white"
-											: "bg-[#FFF4EE] text-[#000000]"
-									}`}
-								>
-									<Heart
-										size={18}
-										fill={isCreatorSaved(creator.id) ? "white" : "none"}
-									/>
-								</button>
-							</div>
-						</CardHeader>
-
-						<CardContent className="pt-3 md:pt-4 text-sm md:text-base">
-							<p className="text-gray-600 line-clamp-2 h-10 md:h-12">
-								{creator.bio}
-							</p>
-
-							<div className="space-y-2 md:space-y-3 mt-3 md:mt-4">
-								<div className="flex justify-between items-center bg-[#FFF4EE] py-1.5 md:py-2 px-2 md:px-3 rounded-lg">
+			{creators.length === 0 ? (
+				<EmptyState message="No Creators Found" />
+			) : (
+				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+					{creators.map((creator) => (
+						<Card key={creator.id} className="overflow-hidden">
+							<CardHeader className="pb-0">
+								<div className="flex justify-between items-start">
 									<div className="flex items-center">
-										<span className="text-orange-500 mr-1 md:mr-2">$</span>
-										<span className="text-xs md:text-sm">
-											Total GMV{" "}
-											<span className="text-gray-500">(Last 30 days)</span>
-										</span>
+										<div className="w-12 h-12 md:w-16 md:h-16 rounded-full overflow-hidden mr-3 md:mr-4">
+											<Image
+												src={creator.profilePictureUrl || defaultProfileImg}
+												alt={creator.name}
+												className="w-full h-full object-cover"
+												width={64}
+												height={64}
+											/>
+										</div>
+										<div>
+											<h3 className="text-base md:text-lg font-bold">
+												{creator.name}
+											</h3>
+											<p className="text-orange-500 text-sm md:text-base">
+												@{creator.username}
+											</p>
+										</div>
 									</div>
-									<span className="font-medium text-sm md:text-base">
-										${creator.totalGMV}
-									</span>
-								</div>
-
-								<div className="flex justify-between items-center bg-[#FFF4EE] py-1.5 md:py-2 px-2 md:px-3 rounded-lg">
-									<div className="flex items-center">
-										<span className="text-orange-500 mr-1 md:mr-2">$</span>
-										<span className="text-xs md:text-sm">
-											Avg. GMV per Video
-										</span>
-									</div>
-									<span className="font-medium text-sm md:text-base">
-										${creator.avgGMVPerVideo}
-									</span>
-								</div>
-
-								<div className="flex justify-between items-center bg-[#FFF4EE] py-1.5 md:py-2 px-2 md:px-3 rounded-lg">
-									<div className="flex items-center">
-										<span className="text-orange-500 mr-1 md:mr-2">
-											<svg
-												className="w-4 h-4 md:w-5 md:h-5"
-												fill="currentColor"
-												viewBox="0 0 20 20"
-											>
-												<path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-												<path
-													fillRule="evenodd"
-													d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
-													clipRule="evenodd"
-												/>
-											</svg>
-										</span>
-										<span className="text-xs md:text-sm">
-											Avg. Impressions per Video
-										</span>
-									</div>
-									<span className="font-medium text-sm md:text-base">
-										{creator.avgImpressions}
-									</span>
-								</div>
-							</div>
-
-							<div className="mt-8 bg-[#FFF4EE] p-4 rounded-lg">
-								<div className="flex justify-center items-center mb-4 bg-white rounded-lg px-4 py-2">
-									<svg
-										className="w-5 h-5 mr-2 text-orange-500"
-										fill="currentColor"
-										viewBox="0 0 20 20"
+									<button
+										onClick={() => handleSaveCreator(creator)}
+										className={`p-2 rounded-full ${
+											isCreatorSaved(creator.id)
+												? "bg-pink-500 text-white"
+												: "bg-[#FFF4EE] text-[#000000]"
+										}`}
 									>
-										<path
-											fillRule="evenodd"
-											d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A2 2 0 0011.172 3H8.828a2 2 0 00-1.414.586L6.293 4.707A1 1 0 015.586 5H4zm6 9a3 3 0 100-6 3 3 0 000 6z"
-											clipRule="evenodd"
+										<Heart
+											size={18}
+											fill={isCreatorSaved(creator.id) ? "white" : "none"}
 										/>
-									</svg>
-									<span className="font-medium">Videos</span>
+									</button>
+								</div>
+							</CardHeader>
+
+							<CardContent className="pt-3 md:pt-4 text-sm md:text-base">
+								<p className="text-gray-600 line-clamp-2 h-10 md:h-12">
+									{creator.bio || "No bio available"}
+								</p>
+
+								<div className="space-y-2 md:space-y-3 mt-3 md:mt-4">
+									<div className="flex justify-between items-center bg-[#FFF4EE] py-1.5 md:py-2 px-2 md:px-3 rounded-lg">
+										<div className="flex items-center">
+											<span className="text-orange-500 mr-1 md:mr-2">$</span>
+											<span className="text-xs md:text-sm">
+												Total GMV{" "}
+												<span className="text-gray-500">(Last 30 days)</span>
+											</span>
+										</div>
+										<span className="font-medium text-sm md:text-base">
+											${creator.totalGMV || 0}
+										</span>
+									</div>
+
+									<div className="flex justify-between items-center bg-[#FFF4EE] py-1.5 md:py-2 px-2 md:px-3 rounded-lg">
+										<div className="flex items-center">
+											<span className="text-orange-500 mr-1 md:mr-2">$</span>
+											<span className="text-xs md:text-sm">
+												Avg. GMV per Video
+											</span>
+										</div>
+										<span className="font-medium text-sm md:text-base">
+											${creator.avgGMVPerVideo || 0}
+										</span>
+									</div>
+
+									<div className="flex justify-between items-center bg-[#FFF4EE] py-1.5 md:py-2 px-2 md:px-3 rounded-lg">
+										<div className="flex items-center">
+											<span className="text-orange-500 mr-1 md:mr-2">
+												<svg
+													className="w-4 h-4 md:w-5 md:h-5"
+													fill="currentColor"
+													viewBox="0 0 20 20"
+												>
+													<path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+													<path
+														fillRule="evenodd"
+														d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+														clipRule="evenodd"
+													/>
+												</svg>
+											</span>
+											<span className="text-xs md:text-sm">
+												Avg. Impressions per Video
+											</span>
+										</div>
+										<span className="font-medium text-sm md:text-base">
+											{creator.avgImpressions || "0"}
+										</span>
+									</div>
 								</div>
 
-								<div className="space-y-3">
-									<div className="flex justify-between">
-										<span>1 Video</span>
-										<span className="font-medium">
-											${creator.pricing.singleVideo}
-										</span>
+								<div className="mt-8 bg-[#FFF4EE] p-4 rounded-lg">
+									<div className="flex justify-center items-center mb-4 bg-white rounded-lg px-4 py-2">
+										<svg
+											className="w-5 h-5 mr-2 text-orange-500"
+											fill="currentColor"
+											viewBox="0 0 20 20"
+										>
+											<path
+												fillRule="evenodd"
+												d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A2 2 0 0011.172 3H8.828a2 2 0 00-1.414.586L6.293 4.707A1 1 0 015.586 5H4zm6 9a3 3 0 100-6 3 3 0 000 6z"
+												clipRule="evenodd"
+											/>
+										</svg>
+										<span className="font-medium">Videos</span>
 									</div>
 
-									<div className="flex justify-between">
-										<span>5 Videos per Month</span>
-										<span className="font-medium">
-											${creator.pricing.fiveVideos}
-										</span>
-									</div>
+									<div className="space-y-3">
+										<div className="flex justify-between">
+											<span>1 Video</span>
+											<span className="font-medium">
+												${creator.pricing.oneVideo}
+											</span>
+										</div>
 
-									<div className="flex justify-between">
-										<span>10 Videos per Month</span>
-										<span className="font-medium">
-											${creator.pricing.tenVideos}
-										</span>
+										<div className="flex justify-between">
+											<span>3 Videos</span>
+											<span className="font-medium">
+												${creator.pricing.threeVideos}
+											</span>
+										</div>
+
+										<div className="flex justify-between">
+											<span>5 Videos</span>
+											<span className="font-medium">
+												${creator.pricing.fiveVideos}
+											</span>
+										</div>
 									</div>
 								</div>
-							</div>
-						</CardContent>
+							</CardContent>
 
-						<CardFooter>
-							<button
-								onClick={() => handleViewProfile(creator)}
-								className="w-full py-2 bg-orange-500 text-white rounded-md font-medium"
-							>
-								View Profile
-							</button>
-						</CardFooter>
-					</Card>
-				))}
-			</div>
+							<CardFooter>
+								<button
+									onClick={() => handleViewProfile(creator)}
+									className="w-full py-1.5 md:py-2 bg-orange-500 text-white rounded-md font-medium text-sm md:text-base"
+								>
+									View Profile
+								</button>
+							</CardFooter>
+						</Card>
+					))}
+				</div>
+			)}
 		</div>
 	);
 };

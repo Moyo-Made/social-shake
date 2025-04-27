@@ -266,6 +266,15 @@ export async function GET(request: NextRequest) {
 					profileData.dateOfBirth || creatorProfileData?.dateOfBirth || null,
 				verifiableIDUrl: verificationData.verifiableIDUrl || null,
 				verificationVideoUrl: verificationData.verificationVideoUrl || null,
+
+				pricing: verificationData.pricing || {
+					oneVideo: 0,
+					threeVideos: 0,
+					fiveVideos: 0,
+					bulkVideos: 0,
+					bulkVideosNote: ""
+				  }
+
 			};
 		});
 

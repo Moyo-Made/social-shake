@@ -29,6 +29,13 @@ interface CreatorProfileData {
 	};
 	country: string;
 	contentLinks: string[];
+	pricing: {
+		oneVideo: number;
+		threeVideos: number;
+		fiveVideos: number;
+		bulkVideos: number;
+		bulkVideosNote?: string;
+	}
 }
 
 interface FieldErrors {
@@ -74,6 +81,12 @@ const defaultProfileData: CreatorProfileData = {
 	},
 	country: "",
 	contentLinks: [""],
+	pricing: {
+		oneVideo: 0,
+		threeVideos: 0,
+		fiveVideos: 0,
+		bulkVideos: 0,
+	}
 };
 
 const CreatorVerificationContext = createContext<
@@ -468,6 +481,8 @@ export const CreatorVerificationProvider = ({
 			{ key: "dateOfBirth", label: "Date of Birth" },
 			{ key: "gender", label: "Gender" },
 			{ key: "country", label: "Country" },
+			{ key: "contentTypes", label: "Content Types" },
+			{ key: "pricing", label: "Pricing" },
 		];
 
 		const missingFields: string[] = [];
@@ -564,6 +579,7 @@ export const CreatorVerificationProvider = ({
 				contentTypes: updatedData.contentTypes,
 				contentLinks: updatedData.contentLinks,
 				socialMedia: updatedData.socialMedia,
+				pricing: updatedData.pricing,
 			};
 
 			// Save to local storage
@@ -686,6 +702,7 @@ export const CreatorVerificationProvider = ({
 					socialMedia: profileData.socialMedia,
 					country: profileData.country,
 					contentLinks: profileData.contentLinks,
+					pricing: profileData.pricing,
 				}),
 			};
 
