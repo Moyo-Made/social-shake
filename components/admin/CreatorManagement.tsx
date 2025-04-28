@@ -569,7 +569,7 @@ const CreatorManagement: React.FC = () => {
 								className={`px-3 py-1 rounded-l border ${
 									pagination.page === 1
 										? "bg-gray-100 text-gray-400 cursor-not-allowed"
-										: "bg-white text-blue-600 hover:bg-blue-50"
+										: "bg-white text-orange-600 hover:bg-orange-50"
 								}`}
 							>
 								Previous
@@ -598,8 +598,8 @@ const CreatorManagement: React.FC = () => {
 												onClick={() => handlePageChange(pageNum)}
 												className={`px-3 py-1 border-t border-b ${
 													pagination.page === pageNum
-														? "bg-blue-600 text-white"
-														: "bg-white text-blue-600 hover:bg-blue-50"
+														? "bg-orange-600 text-white"
+														: "bg-white text-orange-600 hover:bg-orange-50"
 												}`}
 											>
 												{pageNum}
@@ -615,7 +615,7 @@ const CreatorManagement: React.FC = () => {
 								className={`px-3 py-1 rounded-r border ${
 									pagination.page === pagination.pages
 										? "bg-gray-100 text-gray-400 cursor-not-allowed"
-										: "bg-white text-blue-600 hover:bg-blue-50"
+										: "bg-white text-orange-600 hover:bg-orange-50"
 								}`}
 							>
 								Next

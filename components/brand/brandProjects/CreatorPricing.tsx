@@ -29,8 +29,8 @@ export default function CreatorPricingTab() {
 	const [budgetError, setBudgetError] = useState("");
 	const [extras, setExtras] = useState({
 		captions: creatorPricing.extras.captions || false,
-		music: creatorPricing.extras.music || true,
-		rawFiles: creatorPricing.extras.rawFiles || true,
+		music: creatorPricing.extras.music || false,
+		rawFiles: creatorPricing.extras.rawFiles || false,
 	});
 	const [invitedCreatorsCount] = useState(2); // Fixed at 2 for invited creators
 	const [publicCreatorsCount, setPublicCreatorsCount] = useState(
@@ -97,8 +97,9 @@ export default function CreatorPricingTab() {
 			: publicCreatorsCount) * videosPerCreator;
 	const musicTotal = extras.music ? 50 * totalVideos : 0;
 	const rawFilesTotal = extras.rawFiles ? 100 * totalVideos : 0;
+	const captionsTotal = extras.captions ? 120 * totalVideos : 0;
 	const totalBudget = budget * totalVideos;
-	const totalAmount = totalBudget + (musicTotal + rawFilesTotal);
+	const totalAmount = totalBudget + (musicTotal + rawFilesTotal + captionsTotal);
 	const services = 0.1 * totalAmount;
 
 	// Update context when values change
@@ -629,7 +630,7 @@ export default function CreatorPricingTab() {
 									<div
 										className={`mt-1 h-4 w-4 rounded-full border border-black flex items-center justify-center cursor-pointer ${extras.music ? "bg-orange-500 border-orange-500" : "bg-white"}`}
 										onClick={() =>
-											setExtras({ ...extras, music: extras.music })
+											setExtras({ ...extras, music: !extras.music })
 										}
 									>
 										{extras.music && (
@@ -650,7 +651,7 @@ export default function CreatorPricingTab() {
 									<div
 										className={`mt-1 h-4 w-4 rounded-full border border-black flex items-center justify-center cursor-pointer ${extras.rawFiles ? "bg-orange-500 border-orange-500" : "bg-white"}`}
 										onClick={() =>
-											setExtras({ ...extras, rawFiles: extras.rawFiles })
+											setExtras({ ...extras, rawFiles: !extras.rawFiles })
 										}
 									>
 										{extras.rawFiles && (
@@ -814,9 +815,13 @@ export default function CreatorPricingTab() {
 								Music - ${extras.music ? 50 : 0} × {totalVideos} Videos = $
 								{musicTotal}
 							</div>
-							<div className="text-sm text-gray-500 mb-4">
+							<div className="text-sm text-gray-500 mb-1">
 								Raw Files - ${extras.rawFiles ? 100 : 0} × {totalVideos} Videos
 								= ${rawFilesTotal}
+							</div>
+							<div className="text-sm text-gray-500 mb-4">
+								Captions - ${extras.captions ? 120 : 0} × {totalVideos} Videos
+								= ${captionsTotal}
 							</div>
 
 							<div className="flex gap-1 mb-1">

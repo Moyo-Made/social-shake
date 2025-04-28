@@ -64,6 +64,13 @@ const CreatorProjectReview = () => {
 					</div>
 
 					<div className="grid grid-cols-3 gap-4">
+						<div className="font-medium text-gray-600">Product Type</div>
+						<div className="col-span-2">
+							{formData.projectDetails.productType || "Not specified"}
+						</div>
+					</div>
+
+					<div className="grid grid-cols-3 gap-4">
 						<div className="font-medium text-gray-600">Project Thumbnail</div>
 						<div className="col-span-2">
 							<div className="relative w-full h-48 rounded-lg overflow-hidden">

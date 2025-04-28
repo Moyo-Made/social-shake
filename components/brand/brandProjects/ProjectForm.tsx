@@ -85,25 +85,33 @@ const ProjectFormContent = () => {
 		validateStep("contentRequirements", () => {
 			const { contentType, platform, aspectRatio, duration, script } =
 				formData.projectRequirements;
+			const { projectType } = formData.projectDetails;
 
 			if (!contentType || contentType.trim() === "") {
 				setValidationError("Content type is required");
 				return false;
 			}
 
+			// Only validate platforms and aspect ratio for specific project types
 			if (
-				!platform ||
-				platform.length === 0 ||
-				!platform[0] ||
-				platform[0].trim() === ""
+				["UGC Content Only"].includes(
+					projectType
+				)
 			) {
-				setValidationError("At least one platform is required");
-				return false;
-			}
+				if (
+					!platform ||
+					platform.length === 0 ||
+					!platform[0] ||
+					platform[0].trim() === ""
+				) {
+					setValidationError("At least one platform is required");
+					return false;
+				}
 
-			if (!aspectRatio || aspectRatio.trim() === "") {
-				setValidationError("Aspect ratio is required");
-				return false;
+				if (!aspectRatio || aspectRatio.trim() === "") {
+					setValidationError("Aspect ratio is required");
+					return false;
+				}
 			}
 
 			if (!duration || duration.trim() === "") {
@@ -222,23 +230,41 @@ const ProjectFormContent = () => {
 
 	// Validate Step 2: Content Requirements
 	const validateStepTwo = () => {
-		const { platform, aspectRatio, duration } = formData.projectRequirements;
+		const { contentType, platform, aspectRatio, duration, script } =
+			formData.projectRequirements;
 		const { projectType } = formData.projectDetails;
 
-		// Only validate platforms for project types that have this field
-		if (projectType === "UGC Content Only") {
+		// Common validation for all project types
+		if (!contentType || contentType.trim() === "") {
+			setValidationError("Content type is required");
+			return false;
+		}
+
+		if (!duration || duration.trim() === "") {
+			setValidationError("Video duration is required");
+			return false;
+		}
+
+		// Validation for UGC Content Only, Creator-Posted UGC, and Spark Ads
+		if (
+			["UGC Content Only"].includes(
+				projectType
+			)
+		) {
 			if (!platform || platform.length === 0) {
 				setValidationError("At least one platform is required");
 				return false;
 			}
+
 			if (!aspectRatio || aspectRatio.trim() === "") {
 				setValidationError("Aspect ratio is required");
 				return false;
 			}
 		}
 
-		if (!duration || duration.trim() === "") {
-			setValidationError("Video duration is required");
+		// Validate script for all project types
+		if (!script || script.trim() === "") {
+			setValidationError("Project script is required");
 			return false;
 		}
 
@@ -293,6 +319,7 @@ const ProjectFormContent = () => {
 	}, [draftSuccess]);
 
 	const handleSubmit = async () => {
+		console.log("Submit button clicked");
 		try {
 			setSubmissionError(null);
 			setValidationError(null);

@@ -433,6 +433,15 @@ const ProjectDetailsPage: React.FC = () => {
 							</div>
 						</div>
 
+						<div className="grid grid-cols-1 md:grid-cols-3 mb-4 pb-2">
+							<div className="font-medium text-gray-500">
+								Product Type
+							</div>
+							<div className="md:col-span-2">
+								{project.projectDetails.productType || "Not specified"}
+							</div>
+						</div>
+
 						<div className="grid grid-cols-1 md:grid-cols-3 mb-4 pb-2 ">
 							<div className="font-medium text-gray-500">Video Type</div>
 							<div className="md:col-span-2">
@@ -576,7 +585,7 @@ const ProjectDetailsPage: React.FC = () => {
 					<div className="rounded-xl border border-[#FFBF9B] p-6 mb-6">
 						<div className="flex items-center mb-4">
 							<Image
-								src={brandProfiles?.logoUrl || ""}
+								src={brandProfiles?.logoUrl || "/projects/brand-logo.png"}
 								alt="Brand Logo"
 								width={32}
 								height={32}

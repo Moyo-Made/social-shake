@@ -34,7 +34,7 @@ const defaultFormData: ProjectFormData = {
 		projectName: "",
 		projectType: "UGC Content Only",
 		productLink: "",
-		productType: "",
+		productType: "Physical",
 		projectDescription: [""],
 		projectThumbnail: null,
 	},
@@ -108,7 +108,9 @@ const defaultFormData: ProjectFormData = {
 	},
 	userId: "",
 	status: ProjectStatus.PENDING,
-	createdAt: ""
+	createdAt: "",
+	participantsCount: 0,
+	projectId: ""
 };
 
 interface ProjectFormContextType {

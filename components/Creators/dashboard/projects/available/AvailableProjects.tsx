@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { ContestCard } from "./ContestCard";
+import { ProjectCard } from "./ProjectCard";
 import { Button } from "@/components/ui/button";
 import {
 	Select,
@@ -13,12 +13,12 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
-import { ContestFormData } from "@/types/contestFormData";
+import { ProjectFormData } from "@/types/contestFormData";
 
-const CreatorContestDashboard: React.FC = () => {
+const CreatorProjectDashboard: React.FC = () => {
 	const { currentUser } = useAuth();
-	const [contests, setContests] = useState<ContestFormData[]>([]);
-	const [filteredContests, setFilteredContests] = useState<ContestFormData[]>(
+	const [projects, setProjects] = useState<ProjectFormData[]>([]);
+	const [filteredProjects, setFilteredProjects] = useState<ProjectFormData[]>(
 		[]
 	);
 	const [loading, setLoading] = useState(true);
@@ -28,18 +28,18 @@ const CreatorContestDashboard: React.FC = () => {
 
 	// Search and filter states
 	const [searchQuery, setSearchQuery] = useState("");
-	const [industryType, setIndustryType] = useState("all");
-	const [participationType, setParticipationType] = useState("all");
+	const [projectType, setProjectType] = useState("all");
+	const [productType, setProductType] = useState("all");
 	const [sortBy, setSortBy] = useState("newest");
 	const [budgetRange, setBudgetRange] = useState("all");
 
-	const fetchContests = async (reset = true) => {
+	const fetchProjects = async (reset = true) => {
 		if (!currentUser?.uid) return;
 
 		try {
 			setLoading(true);
 
-			let url = `/api/contests`;
+			let url = `/api/projects`;
 
 			if (!reset && lastDocId) {
 				url += `&startAfter=${lastDocId}`;
@@ -48,22 +48,22 @@ const CreatorContestDashboard: React.FC = () => {
 			const response = await fetch(url);
 
 			if (!response.ok) {
-				throw new Error("Failed to fetch contests");
+				throw new Error("Failed to fetch projects");
 			}
 
 			const data = await response.json();
 
 			if (reset) {
-				setContests(data.data);
+				setProjects(data.data);
 			} else {
-				setContests((prev) => [...prev, ...data.data]);
+				setProjects((prev) => [...prev, ...data.data]);
 			}
 
 			setHasMore(data.pagination.hasMore);
 			setLastDocId(data.pagination.lastDocId);
 			setError(null);
 		} catch (err) {
-			setError("Error loading contests. Please try again.");
+			setError("Error loading projects. Please try again.");
 			console.error(err);
 		} finally {
 			setLoading(false);
@@ -72,48 +72,45 @@ const CreatorContestDashboard: React.FC = () => {
 
 	// Apply filters whenever filter values change
 	useEffect(() => {
-		if (contests.length > 0) {
+		if (projects.length > 0) {
 			applyFilters();
 		}
-	}, [
-		searchQuery,
-		industryType,
-		participationType,
-		sortBy,
-		budgetRange,
-		contests,
-	]);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [searchQuery, projectType, productType, sortBy, budgetRange, projects]);
 
 	useEffect(() => {
 		if (currentUser?.uid) {
-			fetchContests();
+			fetchProjects();
 		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [currentUser?.uid]);
 
 	const applyFilters = () => {
-		let result = [...contests];
+		let result = [...projects];
 
 		// Apply search query filter
 		if (searchQuery) {
 			const query = searchQuery.toLowerCase();
 			result = result.filter(
-				(contest) =>
-					contest.basic.contestName?.toLowerCase().includes(query) ||
-					contest.basic.description?.toLowerCase().includes(query)
+				(project) =>
+					project.projectDetails.projectName?.toLowerCase().includes(query) ||
+					project.projectDetails.projectDescription?.some((desc) =>
+						desc.toLowerCase().includes(query)
+					)
 			);
 		}
 
-		// Apply industry filter
-		if (industryType !== "all") {
+		// Apply project type filter
+		if (projectType !== "all") {
 			result = result.filter(
-				(contest) => contest.basic.industry === industryType
+				(project) => project.projectDetails.projectType === projectType
 			);
 		}
 
-		// Apply participation type filter
-		if (participationType !== "all") {
+		// Apply product type filter
+		if (productType !== "all") {
 			result = result.filter(
-				(contest) => contest.requirements.videoType === participationType
+				(project) => project.projectDetails.productType === productType
 			);
 		}
 
@@ -122,18 +119,18 @@ const CreatorContestDashboard: React.FC = () => {
 			switch (budgetRange) {
 				case "under1000":
 					result = result.filter(
-						(contest) => (contest.prizeTimeline.totalBudget || 0) < 1000
+						(project) => (project.creatorPricing?.totalBudget || 0) < 1000
 					);
 					break;
 				case "1000to5000":
-					result = result.filter((contest) => {
-						const budget = contest.prizeTimeline.totalBudget || 0;
+					result = result.filter((project) => {
+						const budget = project.creatorPricing?.totalBudget || 0;
 						return budget >= 1000 && budget <= 5000;
 					});
 					break;
 				case "over5000":
 					result = result.filter(
-						(contest) => (contest.prizeTimeline.totalBudget || 0) > 5000
+						(project) => (project.creatorPricing?.totalBudget || 0) > 5000
 					);
 					break;
 			}
@@ -156,25 +153,20 @@ const CreatorContestDashboard: React.FC = () => {
 			case "budget-high":
 				result.sort(
 					(a, b) =>
-						(b.prizeTimeline.totalBudget || 0) -
-						(a.prizeTimeline.totalBudget || 0)
+						(b.creatorPricing?.totalBudget || 0) -
+						(a.creatorPricing?.totalBudget || 0)
 				);
 				break;
 			case "budget-low":
 				result.sort(
 					(a, b) =>
-						(a.prizeTimeline.totalBudget || 0) -
-						(b.prizeTimeline.totalBudget || 0)
-				);
-				break;
-			case "participants":
-				result.sort(
-					(a, b) => (b.participantsCount || 0) - (a.participantsCount || 0)
+						(a.creatorPricing?.totalBudget || 0) -
+						(b.creatorPricing?.totalBudget || 0)
 				);
 				break;
 		}
 
-		setFilteredContests(result);
+		setFilteredProjects(result);
 	};
 
 	const handleSearch = (e: React.FormEvent) => {
@@ -183,18 +175,18 @@ const CreatorContestDashboard: React.FC = () => {
 	};
 
 	const loadMore = () => {
-		fetchContests(false);
+		fetchProjects(false);
 	};
 
 	return (
 		<div className="container mx-auto px-4 py-8">
 			<div className="flex flex-col space-y-6">
-				{/* Search and filter section */}
-				<div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+				{/* Search and filter section - Matches the layout shown in the image */}
+				<div className="grid grid-cols-1 md:grid-cols-5 gap-4">
 					{/* Search input */}
-					<form onSubmit={handleSearch} className="relative lg:col-span-1">
+					<form onSubmit={handleSearch} className="relative md:col-span-1">
 						<Input
-							placeholder="Search Contest"
+							placeholder="Search Projects"
 							value={searchQuery}
 							onChange={(e) => setSearchQuery(e.target.value)}
 							className="pl-10 pr-4 py-2 w-full"
@@ -203,41 +195,43 @@ const CreatorContestDashboard: React.FC = () => {
 					</form>
 
 					{/* Filters */}
-					<div className="lg:col-span-1">
-						<Select value={industryType} onValueChange={setIndustryType}>
+					<div className="md:col-span-1">
+						<Select value={projectType} onValueChange={setProjectType}>
 							<SelectTrigger>
-								<SelectValue placeholder="Industry Type" />
-							</SelectTrigger>
-							<SelectContent className="bg-[#f7f7f7]">
-								<SelectItem value="all">All Industries</SelectItem>
-								<SelectItem value="technology">Technology</SelectItem>
-								<SelectItem value="healthcare">Healthcare</SelectItem>
-								<SelectItem value="finance">Finance</SelectItem>
-								<SelectItem value="retail">Retail</SelectItem>
-								<SelectItem value="education">Education</SelectItem>
-								<SelectItem value="entertainment">Entertainment</SelectItem>
-							</SelectContent>
-						</Select>
-					</div>
-
-					<div className="lg:col-span-1">
-						<Select
-							value={participationType}
-							onValueChange={setParticipationType}
-						>
-							<SelectTrigger>
-								<SelectValue placeholder="Participation Type" />
+								<SelectValue placeholder="Project Type" />
 							</SelectTrigger>
 							<SelectContent className="bg-[#f7f7f7]">
 								<SelectItem value="all">All Types</SelectItem>
-								<SelectItem value="individual">Individual</SelectItem>
-								<SelectItem value="team">Team</SelectItem>
-								<SelectItem value="both">Both</SelectItem>
+								<SelectItem value="UGC Content Only">
+									UGC Content Only
+								</SelectItem>
+
+								<SelectItem value="Creator-Posted UGC">
+									Creator-Posted UGC
+								</SelectItem>
+								<SelectItem value="TikTok Shop">TikTok Shop</SelectItem>
+								<SelectItem value="Spark Ads">Spark Ads</SelectItem>
 							</SelectContent>
 						</Select>
 					</div>
 
-					<div className="lg:col-span-1">
+					<div className="md:col-span-1">
+						<Select value={productType} onValueChange={setProductType}>
+							<SelectTrigger>
+								<SelectValue placeholder="Product Type" />
+							</SelectTrigger>
+							<SelectContent className="bg-[#f7f7f7]">
+								<SelectItem value="all">All Products</SelectItem>
+								<SelectItem value="Virtual">Virtual Product</SelectItem>
+								<SelectItem value="Physical">
+									Physical Product
+								</SelectItem>
+							
+							</SelectContent>
+						</Select>
+					</div>
+
+					<div className="md:col-span-1">
 						<Select value={sortBy} onValueChange={setSortBy}>
 							<SelectTrigger>
 								<SelectValue placeholder="Sort By" />
@@ -247,12 +241,11 @@ const CreatorContestDashboard: React.FC = () => {
 								<SelectItem value="oldest">Oldest First</SelectItem>
 								<SelectItem value="budget-high">Budget: High to Low</SelectItem>
 								<SelectItem value="budget-low">Budget: Low to High</SelectItem>
-								<SelectItem value="participants">Most Participants</SelectItem>
 							</SelectContent>
 						</Select>
 					</div>
 
-					<div className="lg:col-span-1">
+					<div className="md:col-span-1">
 						<Select value={budgetRange} onValueChange={setBudgetRange}>
 							<SelectTrigger>
 								<SelectValue placeholder="Budget Range" />
@@ -267,14 +260,14 @@ const CreatorContestDashboard: React.FC = () => {
 					</div>
 				</div>
 
-				{/* Contest listings */}
-				{renderContestList()}
+				{/* Project listings */}
+				{renderProjectList()}
 			</div>
 		</div>
 	);
 
-	function renderContestList() {
-		if (loading && contests.length === 0) {
+	function renderProjectList() {
+		if (loading && projects.length === 0) {
 			return (
 				<div className="flex justify-center py-12">
 					<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500" />
@@ -286,29 +279,29 @@ const CreatorContestDashboard: React.FC = () => {
 			return (
 				<div className="text-center py-12">
 					<p className="text-red-500">{error}</p>
-					<Button className="mt-4" onClick={() => fetchContests()}>
+					<Button className="mt-4" onClick={() => fetchProjects()}>
 						Try Again
 					</Button>
 				</div>
 			);
 		}
 
-		if (filteredContests.length === 0) {
+		if (filteredProjects.length === 0) {
 			return (
 				<div className="text-center py-12">
 					<p className="text-gray-500">
-						{contests.length === 0
-							? "No contests found."
-							: "No contests match your filters."}
-					</p>				
-					{contests.length > 0 && (
+						{projects.length === 0
+							? "No projects found."
+							: "No projects match your filters."}
+					</p>
+					{projects.length > 0 && (
 						<Button
 							variant="outline"
 							className="mt-4"
 							onClick={() => {
 								setSearchQuery("");
-								setIndustryType("all");
-								setParticipationType("all");
+								setProjectType("all");
+								setProductType("all");
 								setSortBy("newest");
 								setBudgetRange("all");
 							}}
@@ -322,13 +315,13 @@ const CreatorContestDashboard: React.FC = () => {
 
 		return (
 			<>
-				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-					{filteredContests.map((contest) => (
-						<ContestCard key={contest.contestId} contest={contest} />
+				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mt-6">
+					{filteredProjects.map((project) => (
+						<ProjectCard key={project.userId} project={project} />
 					))}
 				</div>
 
-				{hasMore && contests.length > filteredContests.length && (
+				{hasMore && (
 					<div className="flex justify-center mt-8">
 						<Button variant="outline" onClick={loadMore} disabled={loading}>
 							{loading ? (
@@ -344,4 +337,4 @@ const CreatorContestDashboard: React.FC = () => {
 	}
 };
 
-export default CreatorContestDashboard;
+export default CreatorProjectDashboard;

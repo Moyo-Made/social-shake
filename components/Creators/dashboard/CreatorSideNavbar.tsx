@@ -251,6 +251,7 @@ const getPageTitle = (pathname: string): string => {
 	const routeTitles: Record<string, string> = {
 		"/creator/dashboard": "Dashboard",
 		"/creator/dashboard/project/all": "Available Projects",
+		"/creator/dashboard/project": "Available Projects",
 		"/creator/dashboard/project/applied": "My Projects",
 		"/creator/dashboard/contest/all": "Available Contests",
 		"/creator/dashboard/contest": "Available Contests",
@@ -278,6 +279,10 @@ const getPageTitle = (pathname: string): string => {
 		return "My Contests";
 	}
 
+	if (pathname.startsWith("/creator/dashboard/project")) {
+		return "Available Projects";
+	}
+	
 	if (pathname.startsWith("/creator/dashboard/project/all")) {
 		return "Available Projects";
 	}
@@ -327,10 +332,10 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 							/>
 						</Link>
 						{creatorProfile && (
-							<CreatorProfileDropdown 
-							creatorProfile={creatorProfile}
-							dropdownPosition="header"
-						  />
+							<CreatorProfileDropdown
+								creatorProfile={creatorProfile}
+								dropdownPosition="header"
+							/>
 						)}
 					</div>
 				</header>

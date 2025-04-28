@@ -58,11 +58,15 @@ export type ProjectType =
 	| "Spark Ads"
 	| "TikTok Shop";
 
+export type ProductType =
+	| "Physical"
+	| "Virtual";
+
 export interface ProjectDetails {
 	projectName: string;
 	projectType: ProjectType;
 	productLink: string;
-	productType: string;
+	productType: ProductType;
 	projectDescription: string[];
 	projectThumbnail: File | null;
 }
@@ -146,7 +150,9 @@ interface CostBreakdown {
 }
 
 export interface ProjectFormData {
+	participantsCount: number;
 	userId: string;
+	projectId: string;
 	status: ProjectStatus;
 	projectDetails: ProjectDetails;
 	projectRequirements: ProjectRequirements;

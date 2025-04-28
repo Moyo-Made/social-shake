@@ -9,12 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Incentive } from "@/components/brand/brandProfile/dashboard/newContest/ContestFormContext";
 
 interface ApplicationModalProps {
 	isOpen: boolean;
 	onClose: () => void;
 	contestId: string;
 	onSubmitSuccess?: () => void;
+	incentives?: Incentive[];
 }
 
 const ApplicationModal: React.FC<ApplicationModalProps> = ({

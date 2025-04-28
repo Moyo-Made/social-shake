@@ -72,7 +72,7 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 	const { projectDetails, projectRequirements, creatorPricing } = project;
 
 	// Check if the product type is physical to determine whether to show the delivery tab
-	const isPhysicalProduct = projectDetails.productType === "physical";
+	const isPhysicalProduct = projectDetails.productType === "Physical";
 
 	const tabTriggerStyles =
 		"w-40 data-[state=active]:bg-[#FFF4EE] data-[state=active]:border-b-2 data-[state=active]:border-[#FC52E4] data-[state=active]:text-[#FD5C02] data-[state=inactive]:text-[#667085] rounded-none py-3";
@@ -137,7 +137,7 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 						</div>
 						<div>
 							<span className="text-[#FD5C02]">Product Type:</span>{" "}
-							{projectDetails.productType === "physical"
+							{projectDetails.productType === "Physical"
 								? "Physical Product"
 								: "Virtual Product"}
 						</div>
@@ -200,7 +200,7 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 					<div className="flex gap-28">
 						<h3 className="text-[#667085] font-normal w-40">Product Type:</h3>
 						<p>
-							{projectDetails.productType === "physical"
+							{projectDetails.productType === "Physical"
 								? "Physical Product - A tangible item that will be shipped to creators"
 								: "Virtual Product – A digital or online service that does not require shipping"}
 						</p>
