@@ -93,7 +93,6 @@ const Applications: React.FC<ApplicationsProps> = ({ contestData }) => {
 
 	// Approve Confirmation Modal
 	const ApproveModal = () => {
-
 		if (!showApproveModal) {
 			return null;
 		}
@@ -399,8 +398,7 @@ const Applications: React.FC<ApplicationsProps> = ({ contestData }) => {
 		setPendingActionId(null);
 	};
 
-	useEffect(() => {
-	}, [pendingActionId]);
+	useEffect(() => {}, [pendingActionId]);
 
 	// Handle approving an application
 	const handleApproveApplication = async () => {
@@ -529,8 +527,7 @@ const Applications: React.FC<ApplicationsProps> = ({ contestData }) => {
 	];
 
 	// Debug logs for modal state
-	useEffect(() => {
-	}, [showApproveModal, showRejectModal]);
+	useEffect(() => {}, [showApproveModal, showRejectModal]);
 
 	// Open to all creators message
 	const OpenToAllCreatorsMessage = () => {
@@ -641,7 +638,9 @@ const Applications: React.FC<ApplicationsProps> = ({ contestData }) => {
 						<div className="space-y-4">
 							<div>
 								<p className="text-sm text-[#667085]">Creator Full Name</p>
-								<p className="font-normal text-[#101828]"></p>
+								<p className="font-normal text-[#101828]">
+									{creator.firstName} {creator.lastName}
+								</p>
 							</div>
 
 							<div>
@@ -823,7 +822,7 @@ const Applications: React.FC<ApplicationsProps> = ({ contestData }) => {
 			<div className="w-full mx-auto">
 				{/* Filters and search */}
 				<div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 mb-6">
-					<div className="flex-1 relative">
+					<div className="flex relative">
 						<div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
 							<Search className="h-4 w-4 text-gray-400" />
 						</div>

@@ -19,6 +19,7 @@ import { useProjectForm } from "../ProjectFormContext";
 import { useRouter } from "next/navigation";
 import { ProjectStatus } from "@/types/projects";
 import { getStatusStyle } from "@/utils/statusUtils";
+import { ProjectFormData } from "@/types/contestFormData";
 
 interface Project {
 	id: string;
@@ -34,22 +35,7 @@ interface Project {
 		videos: number;
 		pending: number;
 	};
-	rawData: {
-		projectDetails?: {
-			projectName?: string;
-			projectType?: string;
-			projectDescription?: string | string[];
-			projectThumbnail?: string;
-		};
-		creatorPricing?: {
-			budgetPerVideo?: number;
-			creatorCount?: number;
-		};
-		creatorApplications?: unknown[];
-		submissions?: unknown[];
-		pendingSubmissions?: unknown[];
-		[key: string]: unknown;
-	};
+	rawData: ProjectFormData;
 }
 
 const ProjectDashboard = () => {
@@ -151,7 +137,7 @@ const ProjectDashboard = () => {
 						projectType: data.projectDetails?.projectType || "UGC Content Only",
 						budget: data.creatorPricing?.budgetPerVideo || 0,
 						creatorsRequired: data.creatorPricing?.creatorCount || 0,
-						creatorsApplied: data.creatorApplications?.length || 0,
+						creatorsApplied: data.applicantsCount || 0,
 						description: description,
 						thumbnailUrl: thumbnailUrl,
 						submissions: {
@@ -159,7 +145,7 @@ const ProjectDashboard = () => {
 							pending: data.pendingSubmissions?.length || 0,
 						},
 						// Store the raw data for any additional needs
-						rawData: data,
+						rawData: data as ProjectFormData,
 					};
 				});
 
@@ -510,7 +496,7 @@ const ProjectDashboard = () => {
 												Creators Required
 											</p>
 											<p className="text-sm font-normal">
-												{project.creatorsRequired} Creators
+												{project.creatorsRequired} {project.creatorsRequired > 1 ? "Creators" : "Creator"}
 											</p>
 										</div>
 

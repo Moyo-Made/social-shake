@@ -38,7 +38,7 @@ export default function ProjectDetails({
 	const [hasApplied, setHasApplied] = useState<boolean>(false);
 	const [, setApplicationCheckComplete] =
 		useState<boolean>(false);
-	const [, setApplicationStatus] = useState<string>("pending");
+	const [applicationStatus, setApplicationStatus] = useState<string>("pending");
 	const [, setCurrentParticipantCount] = useState<number>(0);
 
 	// Function to check if user has applied for the project and get application status
@@ -475,18 +475,27 @@ export default function ProjectDetails({
 							</div>
 
 							<div className="px-4 w-full">
-								<button
-									onClick={hasApplied ? undefined : openApplyModal}
-									disabled={hasApplied}
-									className={`block w-full text-center py-2 ${
-										hasApplied
-											? "bg-gray-400 cursor-not-allowed"
-											: "bg-orange-500 hover:bg-orange-600"
-									} text-white rounded-md transition-colors`}
-								>
-									{hasApplied ? "Application Pending" : "Apply Now"}
-								</button>
-
+							<button
+  onClick={hasApplied ? undefined : openApplyModal}
+  disabled={hasApplied}
+  className={`block w-full text-center py-2 ${
+    hasApplied
+      ? applicationStatus === "approved"
+        ? "bg-green-500 cursor-not-allowed"
+        : applicationStatus === "rejected"
+        ? "bg-red-500 cursor-not-allowed"
+        : "bg-gray-400 cursor-not-allowed"
+      : "bg-orange-500 hover:bg-orange-600"
+  } text-white rounded-md transition-colors`}
+>
+  {hasApplied
+    ? applicationStatus === "approved"
+      ? "Application Approved"
+      : applicationStatus === "rejected"
+        ? "Application Rejected"
+        : "Application Pending"
+    : "Apply Now"}
+</button>
 								<ApplyModal
 									isOpen={isApplyModalOpen}
 									onClose={closeApplyModal}
@@ -660,7 +669,7 @@ export default function ProjectDetails({
 							<div className="flex flex-col">
 								<p className="text-[#667085]">Number of Videos</p>
 								<span className="text-black font-normal">
-									{numberOfVideos} {numberOfVideos === 1 ? "Video" : "Videos"}
+									{numberOfVideos} {numberOfVideos > 1 ? "Videos" : "Video"}
 								</span>
 							</div>
 						</div>
@@ -682,16 +691,26 @@ export default function ProjectDetails({
 						</div>
 
 						<button
-							onClick={hasApplied ? undefined : openApplyModal}
-							disabled={hasApplied}
-							className={`w-full text-center py-2 ${
-								hasApplied
-									? "bg-gray-400 cursor-not-allowed"
-									: "bg-orange-500 hover:bg-orange-600"
-							} text-white rounded-md transition-colors`}
-						>
-							{hasApplied ? "Application Pending" : "Apply Now"}
-						</button>
+  onClick={hasApplied ? undefined : openApplyModal}
+  disabled={hasApplied}
+  className={`block w-full text-center py-2 ${
+    hasApplied
+      ? applicationStatus === "approved"
+        ? "bg-green-500 cursor-not-allowed"
+        : applicationStatus === "rejected"
+        ? "bg-red-500 cursor-not-allowed"
+        : "bg-gray-400 cursor-not-allowed"
+      : "bg-orange-500 hover:bg-orange-600"
+  } text-white rounded-md transition-colors`}
+>
+  {hasApplied
+    ? applicationStatus === "approved"
+      ? "Application Approved"
+      : applicationStatus === "rejected"
+        ? "Application Rejected"
+        : "Application Pending"
+    : "Apply Now"}
+</button>
 
 						<ApplyModal
 							isOpen={isApplyModalOpen}

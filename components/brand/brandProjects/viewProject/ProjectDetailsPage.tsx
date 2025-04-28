@@ -9,12 +9,12 @@ import { db } from "@/config/firebase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectFormData } from "@/types/contestFormData";
 import { getStatusStyle } from "@/utils/statusUtils";
-import ProjectApplications from "./ProjectApplications";
 import ProjectSubmissions from "./ProjectSubmissions";
 import ProductDelivery from "./ProductDelivery";
 import Image from "next/image";
 import ProjectAnalytics from "./ProjectAnalytics";
 import AffiliatePayout from "./AffiliatePayout";
+import ProjectApplications from "./ProjectApplications";
 
 interface ProjectDetailPageProps {
 	projectId: string;
@@ -129,7 +129,7 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 						</div>
 						<div>
 							<span className="text-[#FD5C02]">Creators Required:</span>{" "}
-							{creatorPricing.creatorCount} Creators
+							{creatorPricing.creatorCount} {creatorPricing.creatorCount > 1 ? "Creators" : "Creator"}
 						</div>
 						<div>
 							<span className="text-[#FD5C02]">Project Type:</span>{" "}
@@ -350,7 +350,7 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 
 						<div className="flex gap-28">
 							<h3 className="text-[#667085] font-normal w-40">Gender:</h3>
-							
+
 							{(() => {
 								const genderType = creatorPricing.gender;
 
@@ -480,7 +480,11 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 				{/* Applications Tab */}
 				<TabsContent value="applications">
 					<div className="p-8 text-center text-gray-500">
-						<ProjectApplications />
+						<ProjectApplications
+							projectData={{
+								id: projectId,
+							}}
+						/>
 					</div>
 				</TabsContent>
 
