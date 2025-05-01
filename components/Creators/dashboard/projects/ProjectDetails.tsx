@@ -36,8 +36,7 @@ export default function ProjectDetails({
 	const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
 	const [brandLoading, setBrandLoading] = useState<boolean>(true);
 	const [hasApplied, setHasApplied] = useState<boolean>(false);
-	const [, setApplicationCheckComplete] =
-		useState<boolean>(false);
+	const [, setApplicationCheckComplete] = useState<boolean>(false);
 	const [applicationStatus, setApplicationStatus] = useState<string>("pending");
 	const [, setCurrentParticipantCount] = useState<number>(0);
 
@@ -189,9 +188,18 @@ export default function ProjectDetails({
 	};
 
 	// Format date for display
-	const formatDate = (dateInput?: string | Date): string => {
+	const formatDate = (
+		dateInput?: string | { _seconds: number } | Date
+	): string => {
 		if (!dateInput) return "Not Set";
-		const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+		let date: Date;
+		if (dateInput instanceof Date) {
+			date = dateInput;
+		} else if (typeof dateInput === "object" && "_seconds" in dateInput) {
+			date = new Date(dateInput._seconds * 1000);
+		} else {
+			date = new Date(dateInput);
+		}
 		return date instanceof Date && !isNaN(date.getTime())
 			? date.toLocaleDateString("en-US", {
 					year: "numeric",
@@ -378,7 +386,7 @@ export default function ProjectDetails({
 			</div>
 
 			<div className="flex flex-col lg:flex-row gap-6 mb-6">
-				<div className="flex flex-col w-full lg:w-3/4">
+				<div className="flex flex-col w-full lg:w-2/3 xl:w-3/4">
 					{/* Prize Breakdown Card for Mobile */}
 					<div className="lg:hidden mb-6">
 						<Card className="bg-[#fff] border border-[#FFBF9B] shadow-none py-3 w-full h-auto min-h-36 flex flex-col items-center justify-start">
@@ -475,27 +483,27 @@ export default function ProjectDetails({
 							</div>
 
 							<div className="px-4 w-full">
-							<button
-  onClick={hasApplied ? undefined : openApplyModal}
-  disabled={hasApplied}
-  className={`block w-full text-center py-2 ${
-    hasApplied
-      ? applicationStatus === "approved"
-        ? "bg-green-500 cursor-not-allowed"
-        : applicationStatus === "rejected"
-        ? "bg-red-500 cursor-not-allowed"
-        : "bg-gray-400 cursor-not-allowed"
-      : "bg-orange-500 hover:bg-orange-600"
-  } text-white rounded-md transition-colors`}
->
-  {hasApplied
-    ? applicationStatus === "approved"
-      ? "Application Approved"
-      : applicationStatus === "rejected"
-        ? "Application Rejected"
-        : "Application Pending"
-    : "Apply Now"}
-</button>
+								<button
+									onClick={hasApplied ? undefined : openApplyModal}
+									disabled={hasApplied}
+									className={`block w-full text-center py-2 ${
+										hasApplied
+											? applicationStatus === "approved"
+												? "bg-green-500 cursor-not-allowed"
+												: applicationStatus === "rejected"
+													? "bg-red-500 cursor-not-allowed"
+													: "bg-gray-400 cursor-not-allowed"
+											: "bg-orange-500 hover:bg-orange-600"
+									} text-white rounded-md transition-colors`}
+								>
+									{hasApplied
+										? applicationStatus === "approved"
+											? "Application Approved"
+											: applicationStatus === "rejected"
+												? "Application Rejected"
+												: "Application Pending"
+										: "Apply Now"}
+								</button>
 								<ApplyModal
 									isOpen={isApplyModalOpen}
 									onClose={closeApplyModal}
@@ -599,7 +607,7 @@ export default function ProjectDetails({
 				</div>
 
 				{/* Right column with fixed width - desktop only */}
-				<div className="hidden lg:block w-1/4 mt-14">
+				<div className="hidden lg:block lg:w-1/3 xl:w-1/4 mt-14">
 					<Card className="bg-[#fff] border border-[#FFBF9B] shadow-none w-full h-auto min-h-36 flex flex-col justify-start p-4">
 						<div className="flex items-center gap-2 w-full mb-4">
 							{brandLoading ? (
@@ -691,26 +699,26 @@ export default function ProjectDetails({
 						</div>
 
 						<button
-  onClick={hasApplied ? undefined : openApplyModal}
-  disabled={hasApplied}
-  className={`block w-full text-center py-2 ${
-    hasApplied
-      ? applicationStatus === "approved"
-        ? "bg-green-500 cursor-not-allowed"
-        : applicationStatus === "rejected"
-        ? "bg-red-500 cursor-not-allowed"
-        : "bg-gray-400 cursor-not-allowed"
-      : "bg-orange-500 hover:bg-orange-600"
-  } text-white rounded-md transition-colors`}
->
-  {hasApplied
-    ? applicationStatus === "approved"
-      ? "Application Approved"
-      : applicationStatus === "rejected"
-        ? "Application Rejected"
-        : "Application Pending"
-    : "Apply Now"}
-</button>
+							onClick={hasApplied ? undefined : openApplyModal}
+							disabled={hasApplied}
+							className={`block w-full text-center py-2 ${
+								hasApplied
+									? applicationStatus === "approved"
+										? "bg-green-500 cursor-not-allowed"
+										: applicationStatus === "rejected"
+											? "bg-red-500 cursor-not-allowed"
+											: "bg-gray-400 cursor-not-allowed"
+									: "bg-orange-500 hover:bg-orange-600"
+							} text-white rounded-md transition-colors`}
+						>
+							{hasApplied
+								? applicationStatus === "approved"
+									? "Application Approved"
+									: applicationStatus === "rejected"
+										? "Application Rejected"
+										: "Application Pending"
+								: "Apply Now"}
+						</button>
 
 						<ApplyModal
 							isOpen={isApplyModalOpen}

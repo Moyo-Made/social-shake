@@ -1,5 +1,7 @@
 "use client";
-import { useState } from "react";
+
+import { getAuth } from "firebase/auth";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,89 +17,23 @@ import Image from "next/image";
 import ReviewVideoModal from "./VideoReviewModal";
 import ProjectApprovalModal from "./ProjectApprovalModal";
 import VerifySparkCodeModal from "./VerifySparkCodeModal";
-import { Submission } from "@/types/submission";
+import { CreatorSubmission } from "@/types/submission";
 import { ProjectFormData } from "@/types/contestFormData";
 import VerifyTikTokLinkModal from "./VerifyTikTokLinkModal";
-
-// Mock data with enhanced status options
-export const submissions: Submission[] = [
-	{
-		id: "1",
-		creatorName: "Melinda Roshovelle",
-		creatorIcon: "/icons/creator-icon.svg",
-		videoNumber: "#3",
-		revisionNumber: "#2",
-		status: "submitted",
-		submittedAt: "Mar 28, 11:29pm",
-		thumbnail: "/images/submission1.svg",
-		product: "skincare",
-	},
-	{
-		id: "2",
-		creatorName: "Colina Smith",
-		creatorIcon: "/icons/creator-icon.svg",
-		videoNumber: "#2",
-		revisionNumber: "#2",
-		status: "submitted",
-		submittedAt: "Mar 28, 11:29pm",
-		thumbnail: "/images/submission2.svg",
-		product: "supplement",
-	},
-	{
-		id: "3",
-		creatorName: "Melinda Roshovelle",
-		creatorIcon: "/icons/creator-icon.svg",
-		videoNumber: "#2",
-		revisionNumber: "",
-		status: "approved",
-		submittedAt: "Mar 28, 11:29pm",
-		thumbnail: "/images/submission3.svg",
-		product: "skincare",
-	},
-	{
-		id: "4",
-		creatorName: "Melinda Roshovelle",
-		creatorIcon: "/icons/creator-icon.svg",
-		videoNumber: "#1",
-		revisionNumber: "",
-		status: "approved",
-		submittedAt: "Mar 28, 11:29pm",
-		thumbnail: "/images/submission3.svg",
-		product: "skincare",
-	},
-	{
-		id: "5",
-		creatorName: "Colina Smith",
-		creatorIcon: "/icons/creator-icon.svg",
-		videoNumber: "#2",
-		revisionNumber: "#2",
-		status: "submitted",
-		submittedAt: "Mar 28, 11:29pm",
-		thumbnail: "/images/submission2.svg",
-		product: "supplement",
-	},
-	{
-		id: "6",
-		creatorName: "Melinda Roshovelle",
-		creatorIcon: "/icons/creator-icon.svg",
-		videoNumber: "#1",
-		revisionNumber: "",
-		status: "new",
-		submittedAt: "Mar 28, 11:29pm",
-		thumbnail: "/images/submission1.svg",
-		product: "skincare",
-	},
-];
+import toast from "react-hot-toast";
 
 interface ProjectSubmissionsProps {
 	projectFormData: ProjectFormData;
+	userId?: string;
+	projectId: string;
 }
 
 export default function ProjectSubmissions({
 	projectFormData,
+	userId,
+	projectId,
 }: ProjectSubmissionsProps) {
-	const projectType =
-		projectFormData?.projectDetails?.projectType;
+	const projectType = projectFormData?.projectDetails?.projectType;
 
 	const [activeView, setActiveView] = useState<"project" | "creator">(
 		"project"
@@ -107,246 +43,416 @@ export default function ProjectSubmissions({
 	const [openVerifySparkDialog, setOpenVerifySparkDialog] = useState(false);
 	const [openVerifyTiktokLinkDialog, setOpenVerifyTiktokLinkDialog] =
 		useState(false);
-	const [currentSubmission, setCurrentSubmission] = useState<Submission | null>(
-		null
-	);
+	const [currentSubmission, setCurrentSubmission] =
+		useState<CreatorSubmission | null>(null);
 	const [revisionUsed, setRevisionUsed] = useState<number>(1);
 	const [maxRevisions] = useState<number>(3);
-	const [submissionsList, setSubmissionsList] =
-		useState<Submission[]>(submissions);
+	const [submissionsList, setSubmissionsList] = useState<CreatorSubmission[]>(
+		[]
+	);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
 	const [expandedCreators, setExpandedCreators] = useState<
 		Record<string, boolean>
-	>({
-		"Melinda Roshovelle": true,
-		"Colina Smith": false,
-	});
-	const [sparkCode] = useState<string>("SPRK-9X2L4M7QF5");
-	// const [tiktokLink, setTikTokLink] = useState<string>("https://tiktok.com/@creator");
+	>({});
+	const [statusFilter, setStatusFilter] = useState<string>("all");
+	const [sortBy, setSortBy] = useState<string>("newest");
 
-	// Group submissions by creator
-	const groupedSubmissions = submissionsList.reduce(
-		(groups, submission) => {
-			if (!groups[submission.creatorName]) {
-				groups[submission.creatorName] = [];
+	// Fetch submissions data
+	useEffect(() => {
+		const fetchSubmissions = async () => {
+			try {
+				setLoading(true);
+
+				const response = await fetch(
+					`/api/project-submissions?projectId=${projectId}`
+				);
+
+				if (!response.ok) {
+					throw new Error(`Error fetching submissions: ${response.statusText}`);
+				}
+
+				const data = await response.json();
+
+				if (data.success && data.submissions) {
+					// First set basic submissions data
+					const basicSubmissions = data.submissions;
+
+					// Fetch all creator data in parallel
+					const userIds = [
+						...new Set(
+							basicSubmissions.map((sub: CreatorSubmission) => sub.userId)
+						),
+					];
+					const creatorDataMap = new Map();
+
+					await Promise.all(
+						userIds.map(async (userId) => {
+							try {
+								const creatorRes = await fetch(
+									`/api/admin/creator-approval?userId=${userId}`
+								);
+
+								if (creatorRes.ok) {
+									const response = await creatorRes.json();
+
+									// Store the first creator from the response
+									if (response.creators && response.creators.length > 0) {
+										creatorDataMap.set(userId, response.creators[0]);
+									}
+								}
+							} catch (err) {
+								console.error(
+									`Error fetching creator data for user ID ${userId}:`,
+									err
+								);
+							}
+						})
+					);
+
+					// Transform the API response to match our Submission interface with creator data
+					const transformedSubmissions = basicSubmissions.map(
+						// eslint-disable-next-line @typescript-eslint/no-explicit-any
+						(submission: any, index: number) => {
+							const creatorData = creatorDataMap.get(submission.userId);
+
+							return {
+								id: submission.id,
+								userId: submission.userId,
+								projectId: submission.projectId,
+								creatorName:
+									creatorData?.username || submission.creatorName || "Creator",
+								creatorIcon:
+									creatorData?.logoUrl ||
+									submission.creatorIcon ||
+									"/placeholder-profile.jpg",
+								videoUrl: submission.videoUrl || "/placeholder-video.jpg",
+								videoNumber: submission.videoNumber || `#${index + 1}`,
+								revisionNumber: submission.revisionNumber
+									? `#${submission.revisionNumber}`
+									: "",
+								status: submission.status || "new",
+								createdAt: new Date(submission.createdAt).toLocaleDateString(),
+								sparkCode: submission.sparkCode || "",
+								tiktokLink: submission.tiktokLink || "",
+								creator: creatorData || null,
+							};
+						}
+					);
+
+					setSubmissionsList(transformedSubmissions);
+
+					// Initialize expanded state for creators
+					const creatorExpandState: Record<string, boolean> = {};
+					transformedSubmissions.forEach((submission: CreatorSubmission) => {
+						if (
+							submission.creatorName &&
+							!creatorExpandState[submission.creatorName]
+						) {
+							creatorExpandState[submission.creatorName] = true; // Default to expanded
+						}
+					});
+					setExpandedCreators(creatorExpandState);
+				} else {
+					throw new Error(data.error || "Failed to fetch submissions");
+				}
+			} catch (err) {
+				console.error("Error fetching submissions:", err);
+				setError(
+					err instanceof Error ? err.message : "An unknown error occurred"
+				);
+				if (toast) {
+					toast.error("Failed to fetch submissions");
+				}
+			} finally {
+				setLoading(false);
 			}
-			groups[submission.creatorName].push(submission);
-			return groups;
-		},
-		{} as Record<string, Submission[]>
-	);
+		};
 
-	const totalVideos = 15;
-	const completedVideos = 10;
-	const completionPercentage = (completedVideos / totalVideos) * 100;
+		fetchSubmissions();
+	}, [userId, projectId]);
 
-	const toggleCreatorExpand = (creatorName: string) => {
-		setExpandedCreators({
-			...expandedCreators,
-			[creatorName]: !expandedCreators[creatorName],
-		});
+	// Function to update submission status
+	const updateSubmissionStatus = async (
+		submissionId: string,
+		newStatus: string,
+		additionalData: Record<string, unknown> = {}
+	) => {
+		try {
+			// Get current user token from Firebase Auth
+			const auth = getAuth();
+			const currentUser = auth.currentUser;
+
+			if (!currentUser) {
+				toast.error("You must be logged in to update submissions");
+				return false;
+			}
+
+			// Get the authentication token
+			const token = await currentUser.getIdToken();
+
+			// Ensure statuses match between frontend and backend
+			const apiStatus = newStatus;
+			// Both backend and frontend use the same status values now
+
+			const response = await fetch("/api/project-submissions/update-status", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`, // Add the auth token
+				},
+				body: JSON.stringify({
+					submissionId,
+					status: apiStatus,
+					...additionalData,
+				}),
+			});
+
+			if (!response.ok) {
+				// Log more detailed error info
+				const errorData = await response.json();
+				console.error("API Response Error:", {
+					status: response.status,
+					statusText: response.statusText,
+					data: errorData,
+				});
+				throw new Error(`Failed to update status: ${response.statusText}`);
+			}
+
+			const data = await response.json();
+
+			if (data.success) {
+				// Update local state with new status
+				setSubmissionsList((prevList) =>
+					prevList.map((sub) =>
+						sub.id === submissionId
+							? {
+									...sub,
+									status: newStatus as CreatorSubmission["status"],
+									...additionalData,
+								}
+							: sub
+					)
+				);
+
+				toast.success(`Status updated to ${newStatus}`);
+				return true;
+			} else {
+				throw new Error(data.error || "Failed to update status");
+			}
+		} catch (err) {
+			console.error("Error updating submission status:", err);
+			toast.error("Failed to update submission status");
+			return false;
+		}
 	};
 
-	const handleReview = (submission: Submission) => {
+	const handleReview = (submission: CreatorSubmission) => {
 		setCurrentSubmission(submission);
 		setOpenReviewDialog(true);
-		setRevisionUsed(submission.id === "1" ? 1 : 2);
+		// Determine revision number based on submission data
+		setRevisionUsed(
+			parseInt(String(submission.revisionNumber)?.replace("#", "") || "1")
+		);
 	};
 
-	const handleApproveClick = (submission: Submission) => {
+	const handleApproveClick = (submission: CreatorSubmission) => {
 		setCurrentSubmission(submission);
 		setOpenApproveDialog(true);
 	};
 
-	const handleApprove = () => {
+	const handleApprove = async () => {
 		if (currentSubmission) {
-			const updatedSubmissions = submissionsList.map((sub) =>
-				sub.id === currentSubmission.id ? { ...sub, status: "approved" } : sub
+			const success = await updateSubmissionStatus(
+				currentSubmission.id,
+				"approved"
 			);
 
-			setSubmissionsList(updatedSubmissions as Submission[]);
-			setOpenApproveDialog(false);
-			console.log(`Submission ${currentSubmission.id} approved`);
+			if (success) {
+				setOpenApproveDialog(false);
+			}
 		}
 	};
 
-	// In the handleRequestSparkCode function
-	const handleRequestSparkCode = (submission: Submission) => {
-		const updatedSubmissions = submissionsList.map((sub) =>
-			sub.id === submission.id ? { ...sub, status: "spark_requested" } : sub
+	const handleRequestSparkCode = async (submission: CreatorSubmission) => {
+		// First update the status to spark_requested and don't change it automatically
+		const success = await updateSubmissionStatus(
+			submission.id,
+			"spark_requested"
 		);
-		setSubmissionsList(updatedSubmissions as Submission[]);
 
-		// Simulate receiving a spark code after a delay (in a real app, this would be an API call)
-		setTimeout(() => {
-			const sparkUpdatedSubmissions = updatedSubmissions.map((sub) =>
-				sub.id === submission.id
-					? {
-							...sub,
-							status: "spark_received",
-							sparkCode:
-								"SPRK-" +
-								Math.random().toString(36).substring(2, 10).toUpperCase(),
-						}
-					: sub
-			);
-			setSubmissionsList(sparkUpdatedSubmissions as Submission[]);
-		}, 3000); // 3 second delay to simulate server response
+		if (success) {
+			try {
+				// When fetching the spark code, don't automatically update the status
+				const response = await fetch(
+					"/api/project-submissions/get-spark-code",
+					{
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+						},
+						body: JSON.stringify({
+							submissionId: submission.id,
+						}),
+					}
+				);
 
-		console.log(`Spark code requested for submission ${submission.id}`);
+				if (!response.ok) {
+					const errorData = await response.json();
+					console.error("Failed to fetch spark code:", errorData);
+					// Don't change the status here, leave it as spark_requested
+					return;
+				}
+
+				const data = await response.json();
+
+				if (data.success && data.data.sparkCode) {
+					// Only if we successfully got a spark code, update the status
+					await updateSubmissionStatus(submission.id, "spark_received", {
+						sparkCode: data.data.sparkCode,
+					});
+				}
+				// If no spark code was found, the status remains as spark_requested
+			} catch (error) {
+				console.error("Error fetching spark code:", error);
+				// Don't change the status on error
+			}
+		}
 	};
 
-	// Create a new function for requesting TikTok link
-	const handleRequestTiktokLink = (submission: Submission) => {
-
-		const updatedSubmissions = submissionsList.map((sub) =>
-			sub.id === submission.id ? { ...sub, status: "spark_requested" } : sub
+	const handleRequestTiktokLink = async (submission: CreatorSubmission) => {
+		// Updated to use tiktokLink_requested status
+		const success = await updateSubmissionStatus(
+			submission.id,
+			"tiktokLink_requested"
 		);
-		setSubmissionsList(updatedSubmissions as Submission[]);
 
-		// Simulate receiving a TikTok link after a delay (in a real app, this would be an API call)
-		setTimeout(() => {
-			const tiktokUpdatedSubmissions = updatedSubmissions.map((sub) =>
-				sub.id === submission.id
-					? {
-							...sub,
-							status: "spark_received",
-							sparkCode: `https://tiktok.com/@creator_${Math.random().toString(36).substring(2, 8)}`,
-						}
-					: sub
-			);
-			setSubmissionsList(tiktokUpdatedSubmissions as Submission[]);
-		}, 3000); // 3 second delay to simulate server response
-
-		console.log(`TikTok link requested for submission ${submission.id}`);
+		if (success) {
+			// Simulate receiving a TikTok link after a delay
+			setTimeout(async () => {
+				const tiktokLink = `https://tiktok.com/@creator_${Math.random().toString(36).substring(2, 8)}`;
+				await updateSubmissionStatus(submission.id, "tiktokLink_requested", {
+					tiktokLink, // Using tiktokLink field instead of sparkCode
+				});
+			}, 3000);
+		}
 	};
 
-	const handleVerifySparkCode = (submission: Submission) => {
+	const handleVerifySparkCode = (submission: CreatorSubmission) => {
 		setCurrentSubmission(submission);
 		setOpenVerifySparkDialog(true);
 	};
 
-	const handleVerifyTiktokLink = (submission: Submission) => {
+	const handleVerifyTiktokLink = (submission: CreatorSubmission) => {
 		setCurrentSubmission(submission);
 		setOpenVerifyTiktokLinkDialog(true);
 	};
 
-	// Function to handle payment confirmation with status update after delay
-	const handleConfirmPayment = (submission: Submission) => {
-		// First update status to awaiting_payment
-		const updatedSubmissions = submissionsList.map((sub) =>
-			sub.id === submission.id ? { ...sub, status: "awaiting_payment" } : sub
+	const handleConfirmPayment = async (submission: CreatorSubmission) => {
+		const success = await updateSubmissionStatus(
+			submission.id,
+			"awaiting_payment"
 		);
-		setSubmissionsList(updatedSubmissions as Submission[]);
-		console.log(`Payment initiated for submission ${submission.id}`);
 
-		// After 5 seconds, update status to payment_confirmed
-		setTimeout(() => {
-			const confirmedSubmissions = submissionsList.map((sub) =>
-				sub.id === submission.id ? { ...sub, status: "payment_confirmed" } : sub
-			);
-			setSubmissionsList(confirmedSubmissions as Submission[]);
-			console.log(
-				`Payment confirmed for submission ${submission.id} after 5 seconds`
-			);
-		}, 3000); // 3 second delay to simulate payment confirmation
-	};
-
-	const confirmSparkCodeVerification = () => {
-		if (currentSubmission) {
-			const updatedSubmissions = submissionsList.map((sub) =>
-				sub.id === currentSubmission.id
-					? { ...sub, status: "spark_verified", sparkCode: sparkCode }
-					: sub
-			);
-			setSubmissionsList(updatedSubmissions as Submission[]);
-			setOpenVerifySparkDialog(false);
-			console.log(`Spark code verified for submission ${currentSubmission.id}`);
+		if (success) {
+			// Simulate payment confirmation after delay
+			setTimeout(async () => {
+				await updateSubmissionStatus(submission.id, "payment_confirmed");
+			}, 3000);
 		}
 	};
 
-	const confirmTiktokLinkVerification = () => {
+	const confirmSparkCodeVerification = async () => {
 		if (currentSubmission) {
-			const updatedSubmissions = submissionsList.map((sub) =>
-				sub.id === currentSubmission.id
-					? { ...sub, status: "spark_verified", sparkCode: sparkCode }
-					: sub
+			const success = await updateSubmissionStatus(
+				currentSubmission.id,
+				"spark_verified"
 			);
-			setSubmissionsList(updatedSubmissions as Submission[]);
-			setOpenVerifyTiktokLinkDialog(false);
-			console.log(`Spark code verified for submission ${currentSubmission.id}`);
+
+			if (success) {
+				setOpenVerifySparkDialog(false);
+			}
 		}
 	};
 
-	const handleRequestNewCode = (submission: Submission, setIsModalOpen: React.Dispatch<React.SetStateAction<boolean>>) => {
-		// First close the modal
-		setIsModalOpen(false);
-		
-		// Update the submission status to indicate a new code is being requested
-		const updatedSubmissions = submissionsList.map((sub) =>
-		  sub.id === submission.id ? { ...sub, status: "spark_requested" } : sub
-		);
-		setSubmissionsList(updatedSubmissions as Submission[]);
-		
-		// Simulate receiving a new TikTok link after a delay (in a real app, this would be an API call)
-		setTimeout(() => {
-		  const newTiktokUpdatedSubmissions = updatedSubmissions.map((sub) =>
-			sub.id === submission.id
-			  ? {
-				  ...sub,
-				  status: "spark_received",
-				  sparkCode: "SPRK-" +
-								Math.random().toString(36).substring(2, 10).toUpperCase(),
-				}
-			  : sub
-		  );
-		  setSubmissionsList(newTiktokUpdatedSubmissions as Submission[]);
-		}, 3000); // 3 second delay to simulate server response
-		
-		console.log(`New TikTok link requested for submission ${submission.id}`);
-	  };
+	const confirmTiktokLinkVerification = async () => {
+		if (currentSubmission) {
+			const success = await updateSubmissionStatus(
+				currentSubmission.id,
+				"tiktokLink_verified" // Changed to tiktokLink_verified
+			);
 
-	  const handleRequestNewLink = (submission: Submission, setIsModalOpen: React.Dispatch<React.SetStateAction<boolean>>) => {
-		// First close the modal
-		setIsModalOpen(false);
-		
-		// Update the submission status to indicate a new code is being requested
-		const updatedSubmissions = submissionsList.map((sub) =>
-		  sub.id === submission.id ? { ...sub, status: "spark_requested" } : sub
-		);
-		setSubmissionsList(updatedSubmissions as Submission[]);
-		
-		// Simulate receiving a new TikTok link after a delay (in a real app, this would be an API call)
-		setTimeout(() => {
-		  const newTiktokUpdatedSubmissions = updatedSubmissions.map((sub) =>
-			sub.id === submission.id
-			  ? {
-				  ...sub,
-				  status: "spark_received",
-				  sparkCode: `https://tiktok.com/@creator_${Math.random().toString(36).substring(2, 8)}`,
-				}
-			  : sub
-		  );
-		  setSubmissionsList(newTiktokUpdatedSubmissions as Submission[]);
-		}, 3000); // 3 second delay to simulate server response
-		
-		console.log(`New TikTok link requested for submission ${submission.id}`);
-	  };
+			if (success) {
+				setOpenVerifyTiktokLinkDialog(false);
+			}
+		}
+	};
 
-	const handleSubmit = (
+	const handleRequestNewCode = async (
+		submission: CreatorSubmission,
+		setIsModalOpen: React.Dispatch<React.SetStateAction<boolean>>
+	) => {
+		setIsModalOpen(false);
+
+		// Set status to spark_requested
+		const success = await updateSubmissionStatus(
+			submission.id,
+			"spark_requested"
+		);
+
+		// Don't do anything else automatically - leave it in the requested state
+		if (success) {
+			toast.success("New spark code requested successfully");
+		}
+	};
+
+	const handleRequestNewLink = async (
+		submission: CreatorSubmission,
+		setIsModalOpen: React.Dispatch<React.SetStateAction<boolean>>
+	) => {
+		setIsModalOpen(false);
+
+		const success = await updateSubmissionStatus(
+			submission.id,
+			"tiktokLink_requested" // Changed to tiktokLink_requested
+		);
+
+		if (success) {
+			// Simulate receiving a new TikTok link after a delay
+			setTimeout(async () => {
+				const newTiktokLink = `https://tiktok.com/@creator_${Math.random().toString(36).substring(2, 8)}`;
+				await updateSubmissionStatus(submission.id, "tiktokLink_received", {
+					// Changed to tiktokLink_received
+					tiktokLink: newTiktokLink, // Using tiktokLink instead of sparkCode
+				});
+			}, 3000);
+		}
+	};
+
+	const handleSubmit = async (
 		approved: boolean,
 		feedback?: string,
-		issues?: string[]
+		issues?: string[],
+		videoTimestamps?: { time: number; note: string }[]
 	) => {
-		console.log("Approved:", approved);
-		console.log("Feedback:", feedback);
-		console.log("Issues:", issues);
-
-		if (approved && currentSubmission) {
-			const updatedSubmissions = submissionsList.map((sub) =>
-				sub.id === currentSubmission.id ? { ...sub, status: "approved" } : sub
-			);
-
-			setSubmissionsList(updatedSubmissions as Submission[]);
+		if (currentSubmission) {
+			if (approved) {
+				await updateSubmissionStatus(currentSubmission.id, "approved", {
+					feedback,
+					issues,
+					videoTimestamps,
+				});
+			} else {
+				await updateSubmissionStatus(
+					currentSubmission.id,
+					"revision_requested",
+					{
+						feedback,
+						issues,
+						videoTimestamps, // Include timestamps in the update
+					}
+				);
+			}
 		}
 		setOpenReviewDialog(false);
 	};
@@ -355,14 +461,76 @@ export default function ProjectSubmissions({
 		setOpenReviewDialog(false);
 		setOpenApproveDialog(false);
 		setOpenVerifySparkDialog(false);
-		console.log("Modal closed");
+		setOpenVerifyTiktokLinkDialog(false);
 	};
 
+	const toggleCreatorExpand = (creatorName: string) => {
+		setExpandedCreators({
+			...expandedCreators,
+			[creatorName]: !expandedCreators[creatorName],
+		});
+	};
+
+	// Filter and sort submissions
+	const filteredSubmissions = submissionsList.filter((submission) => {
+		if (statusFilter === "all") return true;
+		return submission.status === statusFilter;
+	});
+
+	const sortedSubmissions = [...filteredSubmissions].sort((a, b) => {
+		switch (sortBy) {
+			case "newest":
+				return (
+					new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+				);
+			case "oldest":
+				return (
+					new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+				);
+			case "creator":
+				return a.createdAt.localeCompare(b.createdAt);
+			default:
+				return 0;
+		}
+	});
+
+	// Group submissions by creator for creator view
+	const groupedSubmissions = sortedSubmissions.reduce(
+		(groups, submission) => {
+			if (!groups[submission.creatorName]) {
+				groups[submission.creatorName] = [];
+			}
+			groups[submission.creatorName].push(submission);
+			return groups;
+		},
+		{} as Record<string, CreatorSubmission[]>
+	);
+
+	// Calculate progress metrics
+	const totalVideos = submissionsList.length;
+	const completedVideos = submissionsList.filter(
+		(sub) =>
+			sub.status === "pending" ||
+			sub.status === "approved" ||
+			sub.status === "spark_requested" ||
+			sub.status === "spark_received" ||
+			sub.status === "spark_verified" ||
+			sub.status === "tiktokLink_requested" ||
+			sub.status === "tiktokLink_received" ||
+			sub.status === "tiktokLink_verified" ||
+			sub.status === "awaiting_payment" ||
+			sub.status === "payment_confirmed"
+	).length;
+
+	const completionPercentage =
+		totalVideos > 0 ? (completedVideos / totalVideos) * 100 : 0;
+
 	// Render buttons based on submission status
-	const renderSubmissionButtons = (submission: Submission) => {
+	const renderSubmissionButtons = (submission: CreatorSubmission) => {
 		switch (submission.status) {
 			case "submitted":
 			case "new":
+			case "pending":
 				return (
 					<>
 						<Button
@@ -382,13 +550,27 @@ export default function ProjectSubmissions({
 						</Button>
 					</>
 				);
+			case "revision_requested":
+				return (
+					<Button
+						variant="secondary"
+						className="flex-grow bg-[#FD5C02] text-white flex items-center justify-center"
+						onClick={() => handleReview(submission)}
+					>
+						Review
+					</Button>
+				);
 			case "approved":
 				// For UGC, show download directly after approval
-				if (projectType === "UGC Content Only" || projectType === "TikTok Shop") {
-					return ( 
+				if (
+					projectType === "UGC Content Only" ||
+					projectType === "TikTok Shop"
+				) {
+					return (
 						<Button
 							variant="secondary"
 							className="flex-grow bg-[#FD5C02] text-white flex items-center justify-center"
+							onClick={() => window.open(submission.videoUrl, "_blank")}
 						>
 							Download Video
 							<Download className="h-4 w-4 ml-2" />
@@ -415,7 +597,7 @@ export default function ProjectSubmissions({
 							className="flex-grow bg-[#FD5C02] text-white flex items-center justify-center"
 							onClick={() => handleRequestTiktokLink(submission)}
 						>
-							Request Tiktok Link
+							Request TikTok Link
 						</Button>
 					);
 				}
@@ -428,21 +610,23 @@ export default function ProjectSubmissions({
 						className="flex-grow bg-[#FD5C02] text-white opacity-70 flex items-center justify-center"
 						disabled
 					>
-						{projectType === "Creator-Posted UGC"
-							? "Tiktok Link Requested"
-							: "Request Sent"}
+						Spark Code Requested
 					</Button>
 				);
-			case "spark_received":
-				return projectType === "Creator-Posted UGC" ? (
+
+			case "tiktokLink_requested":
+				return (
 					<Button
 						variant="secondary"
-						className="flex-grow bg-[#FD5C02] text-white flex items-center justify-center"
-						onClick={() => handleVerifyTiktokLink(submission)}
+						className="flex-grow bg-[#FD5C02] text-white opacity-70 flex items-center justify-center"
+						disabled
 					>
-						Verify Tiktok Link
+						TikTok Link Requested
 					</Button>
-				) : (
+				);
+
+			case "spark_received":
+				return (
 					<Button
 						variant="secondary"
 						className="flex-grow bg-[#FD5C02] text-white flex items-center justify-center"
@@ -451,13 +635,26 @@ export default function ProjectSubmissions({
 						Verify Spark Code
 					</Button>
 				);
+
+			case "tiktokLink_received":
+				return (
+					<Button
+						variant="secondary"
+						className="flex-grow bg-[#FD5C02] text-white flex items-center justify-center"
+						onClick={() => handleVerifyTiktokLink(submission)}
+					>
+						Verify TikTok Link
+					</Button>
+				);
+
 			case "spark_verified":
-				// NEW: Show first image with Review/Approve buttons
+			case "tiktokLink_verified":
 				return (
 					<div className="flex flex-col w-full gap-2">
 						<Button
 							variant="secondary"
 							className="bg-[#FD5C02] text-white flex items-center justify-center w-full"
+							onClick={() => window.open(submission.videoUrl, "_blank")}
 						>
 							Download Video
 							<Download className="h-4 w-4 ml-2" />
@@ -473,12 +670,12 @@ export default function ProjectSubmissions({
 					</div>
 				);
 			case "awaiting_payment":
-				// NEW: Show "Awaiting Admin Payment" status
 				return (
 					<div className="flex flex-col w-full gap-2">
 						<Button
 							variant="secondary"
 							className="bg-[#FD5C02] text-white flex items-center justify-center w-full"
+							onClick={() => window.open(submission.videoUrl, "_blank")}
 						>
 							Download Video
 							<Download className="h-4 w-4 ml-2" />
@@ -486,17 +683,18 @@ export default function ProjectSubmissions({
 						<Button
 							variant="secondary"
 							className="w-full bg-[#F0F7F4] text-center text-[#067647] py-2"
+							disabled
 						>
 							Awaiting Admin Payment
 						</Button>
 					</div>
 				);
 			case "payment_confirmed":
-				// NEW: Show only Download Video button
 				return (
 					<Button
 						variant="secondary"
 						className="flex-grow bg-[#FD5C02] text-white flex items-center justify-center"
+						onClick={() => window.open(submission.videoUrl, "_blank")}
 					>
 						Download Video
 						<Download className="h-4 w-4 ml-2" />
@@ -507,6 +705,7 @@ export default function ProjectSubmissions({
 					<Button
 						variant="secondary"
 						className="flex-grow bg-[#FD5C02] text-white flex items-center justify-center"
+						onClick={() => window.open(submission.videoUrl, "_blank")}
 					>
 						Download Video
 						<Download className="h-4 w-4 ml-2" />
@@ -515,10 +714,46 @@ export default function ProjectSubmissions({
 		}
 	};
 
+	// Loading state
+	if (loading) {
+		return (
+			<div className="flex flex-col items-center justify-center mt-10">
+				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+				<div className="text-center">Loading project submissions...</div>
+			</div>
+		);
+	}
+
+	// Error state
+	if (error) {
+		return (
+			<div className="container mx-auto p-6">
+				<div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+					<strong className="font-bold">Error: </strong>
+					<span className="block sm:inline">{error}</span>
+				</div>
+			</div>
+		);
+	}
+
+	// Empty state
+	if (submissionsList.length === 0) {
+		return (
+			<div className="container mx-auto p-6">
+				<div className="text-center p-10 border border-dashed border-gray-300 rounded-lg">
+					<h2 className="text-2xl font-medium mb-2">No submissions yet</h2>
+					<p className="text-gray-500 mb-4">
+						There are no submissions for this project currently.
+					</p>
+				</div>
+			</div>
+		);
+	}
+
 	// Render Project View (original grid layout)
 	const renderProjectView = () => (
 		<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-			{submissionsList.map((submission) => (
+			{sortedSubmissions.map((submission) => (
 				<Card
 					key={submission.id}
 					className="overflow-hidden border border-[#FFBF9BBA]"
@@ -573,25 +808,26 @@ export default function ProjectSubmissions({
 											submission.status === "spark_requested" ||
 											submission.status === "spark_received" ||
 											submission.status === "spark_verified" ||
+											submission.status === "tiktokLink_requested" ||
+											submission.status === "tiktokLink_received" ||
+											submission.status === "tiktokLink_verified" ||
 											submission.status === "awaiting_payment" ||
 											submission.status === "payment_confirmed"
 												? "Approved:"
 												: "Submitted:"}
 											<p className="text-black text-xs">
-												{submission.submittedAt}
+												{submission.createdAt}
 											</p>
 										</div>
 									</div>
 								</div>
 							</div>
 
-							<div className="relative">
-								<Image
-									src={submission.thumbnail}
-									alt={`${submission.creatorName}'s video thumbnail`}
-									width={500}
-									height={192}
-									className="w-full object-fit rounded-md pt-2"
+							<div className="w-full h-64 relative">
+								<video
+									src={submission.videoUrl}
+									className="absolute inset-0 w-full h-full object-cover rounded-md"
+									controls
 								/>
 							</div>
 
@@ -605,24 +841,50 @@ export default function ProjectSubmissions({
 								submission.sparkCode && (
 									<div className="mt-1 flex items-center gap-1 justify-center">
 										<span className="text-sm">
-											{projectType === "Creator-Posted UGC"
-												? ""
-												: "Spark Code: "}
-											<span className="text-black">
-												{projectType === "Creator-Posted UGC" ? (
-													<a
-														href={submission.sparkCode}
-														target="_blank"
-														className="text-black text-center underline"
-													>
-														Tiktok Link
-													</a>
-												) : (
-													submission.sparkCode
-												)}
-											</span>
+											Spark Code:{" "}
+											<span className="text-black">{submission.sparkCode}</span>
 										</span>
-										<Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+										<Button
+											variant="ghost"
+											size="sm"
+											className="h-8 w-8 p-0"
+											onClick={() => {
+												navigator.clipboard.writeText(
+													submission.sparkCode || ""
+												);
+												toast.success("Spark code copied to clipboard");
+											}}
+										>
+											<Copy className="h-4 w-4" />
+										</Button>
+									</div>
+								)}
+
+							{(submission.status === "tiktokLink_received" ||
+								submission.status === "tiktokLink_verified" ||
+								submission.status === "awaiting_payment") &&
+								submission.tiktokLink && (
+									<div className="mt-1 flex items-center gap-1 justify-center">
+										<span className="text-sm">
+											<a
+												href={submission.tiktokLink}
+												target="_blank"
+												className="text-black text-center underline"
+											>
+												TikTok Link
+											</a>
+										</span>
+										<Button
+											variant="ghost"
+											size="sm"
+											className="h-8 w-8 p-0"
+											onClick={() => {
+												navigator.clipboard.writeText(
+													submission.tiktokLink || ""
+												);
+												toast.success("TikTok link copied to clipboard");
+											}}
+										>
 											<Copy className="h-4 w-4" />
 										</Button>
 									</div>
@@ -639,11 +901,10 @@ export default function ProjectSubmissions({
 		<div className="space-y-6">
 			{Object.entries(groupedSubmissions).map(
 				([creatorName, creatorSubmissions]) => {
-					const creatorSubmissionsTyped = creatorSubmissions as Submission[];
 					// Count total and completed videos for each creator
-					const totalCreatorVideos = creatorSubmissionsTyped.length;
-					const completedCreatorVideos = creatorSubmissionsTyped.filter(
-						(sub: { status: string }) =>
+					const totalCreatorVideos = creatorSubmissions.length;
+					const completedCreatorVideos = creatorSubmissions.filter(
+						(sub) =>
 							sub.status === "approved" ||
 							sub.status === "spark_requested" ||
 							sub.status === "spark_received" ||
@@ -652,14 +913,12 @@ export default function ProjectSubmissions({
 							sub.status === "payment_confirmed"
 					).length;
 
-					const sortedSubmissions = [...creatorSubmissionsTyped].sort(
-						(a, b) => {
-							// Sort by video number
-							const aVideoNum = parseInt(a.videoNumber.replace("#", ""));
-							const bVideoNum = parseInt(b.videoNumber.replace("#", ""));
-							return aVideoNum - bVideoNum;
-						}
-					);
+					const sortedSubmissions = [...creatorSubmissions].sort((a, b) => {
+						// Sort by video number
+						const aVideoNum = parseInt(String(a.videoNumber).replace("#", ""));
+						const bVideoNum = parseInt(String(b.videoNumber).replace("#", ""));
+						return aVideoNum - bVideoNum;
+					});
 
 					return (
 						<div
@@ -673,7 +932,7 @@ export default function ProjectSubmissions({
 								<div className="flex items-center gap-3">
 									<div className="w-12 h-12 bg-gray-200 rounded-full overflow-hidden">
 										<Image
-											src={creatorSubmissionsTyped[0].creatorIcon}
+											src={creatorSubmissions[0].creatorIcon}
 											alt={creatorName}
 											width={48}
 											height={48}
@@ -682,7 +941,9 @@ export default function ProjectSubmissions({
 										/>
 									</div>
 									<div>
-										<h3 className="text-lg font-medium">{creatorName}</h3>
+										<h3 className="text-base text-start text-black">
+											{creatorName}
+										</h3>
 										<p className="text-sm text-start text-gray-600">
 											Total Videos: {completedCreatorVideos}/
 											{totalCreatorVideos}
@@ -691,7 +952,7 @@ export default function ProjectSubmissions({
 								</div>
 								<div className="flex items-center">
 									<p className="text-sm text-gray-600 mr-4">
-										Latest Update: {creatorSubmissionsTyped[0].submittedAt}
+										Latest Update: {creatorSubmissions[0].createdAt}
 									</p>
 									{expandedCreators[creatorName] ? (
 										<ChevronUp className="h-5 w-5 text-gray-600" />
@@ -712,18 +973,24 @@ export default function ProjectSubmissions({
 											submission.status === "spark_verified" ||
 											submission.status === "awaiting_payment" ||
 											submission.status === "payment_confirmed";
-										const hasRevision = submission.revisionNumber !== "";
+										const hasRevision =
+											submission.revisionNumber !== undefined &&
+											submission.revisionNumber !== null;
 
 										return (
 											<div
 												key={submission.id}
 												className={`border rounded-lg overflow-hidden ${isNew ? "border-orange-500" : "border-[#FFBF9BBA]"}`}
 											>
-												<div className="p-4">
+												<div className=" p-4">
 													<div className="flex justify-between mb-1">
 														<div className="flex items-center">
 															<div className="text-orange-500 font-medium">
-																Video #{submission.videoNumber.replace("#", "")}
+																Video #
+																{String(submission.videoNumber).replace(
+																	"#",
+																	""
+																)}
 															</div>
 														</div>
 													</div>
@@ -732,7 +999,10 @@ export default function ProjectSubmissions({
 														{hasRevision && (
 															<div className="text-orange-500 text-sm">
 																Revision #
-																{submission.revisionNumber.replace("#", "")}
+																{String(submission.revisionNumber).replace(
+																	"#",
+																	""
+																)}
 															</div>
 														)}
 														{isNew && (
@@ -752,25 +1022,22 @@ export default function ProjectSubmissions({
 															</Badge>
 														)}
 														{isApproved ? (
-															<div>Approved: {submission.submittedAt}</div>
+															<div>Approved: {submission.createdAt}</div>
 														) : (
-															<div>Submitted: {submission.submittedAt}</div>
+															<div>Submitted: {submission.createdAt}</div>
 														)}
 													</div>
 
-													<div className="relative rounded-lg overflow-hidden mb-4">
-														<Image
-															src={submission.thumbnail}
-															alt={`Video ${submission.videoNumber} thumbnail`}
-															width={400}
-															height={225}
-															className="w-full object-cover"
-														/>
-														<div className="absolute inset-0 flex items-center justify-center">
-															<div className="bg-white bg-opacity-80 rounded-full w-16 h-16 flex items-center justify-center">
-																<div className="h-0 w-0 border-y-8 border-y-transparent border-l-12 border-l-orange-500 ml-1"></div>
+													<div className=" relative p-4">
+														{submission.videoUrl && (
+															<div className="w-full h-64 relative">
+																<video
+																	src={submission.videoUrl}
+																	className="absolute inset-0 w-full h-full object-cover rounded-md"
+																	controls
+																/>
 															</div>
-														</div>
+														)}
 													</div>
 
 													<div className="flex">
@@ -792,6 +1059,14 @@ export default function ProjectSubmissions({
 																	variant="ghost"
 																	size="sm"
 																	className="h-8 w-8 p-0"
+																	onClick={() => {
+																		navigator.clipboard.writeText(
+																			submission.sparkCode || ""
+																		);
+																		toast.success(
+																			"Spark code copied to clipboard"
+																		);
+																	}}
 																>
 																	<Copy className="h-4 w-4" />
 																</Button>
@@ -814,7 +1089,7 @@ export default function ProjectSubmissions({
 		<div className="container mx-auto p-6">
 			<div className="flex justify-between items-center mb-6">
 				<h1 className="text-2xl text-black font-bold">
-					Project Submissions ({completedVideos})
+					Project Submissions ({totalVideos})
 				</h1>
 				<div className="inline-flex rounded-full border border-orange-500 overflow-hidden">
 					<Button
@@ -897,12 +1172,11 @@ export default function ProjectSubmissions({
 
 			{/* Review Modal */}
 			<ReviewVideoModal
-				submission={currentSubmission}
-				revisionsUsed={revisionUsed}
-				maxRevisions={maxRevisions}
-				onSubmit={handleSubmit}
-				onClose={handleCloseModals}
 				isOpen={openReviewDialog}
+				onClose={handleCloseModals}
+				onSubmit={handleSubmit}
+				submission={currentSubmission}
+				revisionUsed={revisionUsed}
 			/>
 
 			{/* Approval Modal */}
@@ -917,7 +1191,9 @@ export default function ProjectSubmissions({
 				isOpen={openVerifySparkDialog}
 				onClose={handleCloseModals}
 				onVerify={confirmSparkCodeVerification}
-				onRequestNewCode={() => handleRequestNewCode(currentSubmission!, setOpenVerifySparkDialog)}
+				onRequestNewCode={() =>
+					handleRequestNewCode(currentSubmission!, setOpenVerifySparkDialog)
+				}
 			/>
 
 			{/* Spark Code Modal */}
@@ -925,7 +1201,12 @@ export default function ProjectSubmissions({
 				isOpen={openVerifyTiktokLinkDialog}
 				onClose={handleCloseModals}
 				onVerify={confirmTiktokLinkVerification}
-				onRequestNewLink={() => handleRequestNewLink(currentSubmission!, setOpenVerifyTiktokLinkDialog)}
+				onRequestNewLink={() =>
+					handleRequestNewLink(
+						currentSubmission!,
+						setOpenVerifyTiktokLinkDialog
+					)
+				}
 			/>
 		</div>
 	);

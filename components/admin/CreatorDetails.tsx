@@ -553,7 +553,7 @@ const CreatorDetailsPage: React.FC = () => {
 							{creator.verificationVideoUrl && (
 								<video
 									controls
-									className="w-full max-w-lg "
+									className="w-full h-48 max-w-lg "
 									src={creator.verificationVideoUrl}
 									preload="metadata"
 								>

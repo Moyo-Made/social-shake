@@ -173,7 +173,7 @@ const Login = () => {
 				if (hasProfile) {
 					router.push("/brand/dashboard");
 				} else {
-					router.push("/brand/create-profile");
+					router.push("/brand/signup");
 				}
 			}
 		} catch (err: unknown) {

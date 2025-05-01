@@ -67,8 +67,8 @@ export interface ProjectDetails {
 	projectType: ProjectType;
 	productLink: string;
 	productType: ProductType;
-	projectDescription: string[];
-	projectThumbnail: File | null;
+	projectDescription: string;
+	projectThumbnail: string | null;
 }
 
 export interface ProjectRequirements {
@@ -150,12 +150,18 @@ interface CostBreakdown {
 }
 
 export interface ProjectFormData {
+	views: number;
 	participantsCount: number;
+	applicantsCount: number;
 	userId: string;
 	projectId: string;
+	interestId: string;
 	status: ProjectStatus;
+	applicationCreatedAt?: { _seconds: number; _nanoseconds: number } | string;
+	interestCreatedAt?: { _seconds: number; _nanoseconds: number } | string;
 	projectDetails: ProjectDetails;
 	projectRequirements: ProjectRequirements;
 	creatorPricing: CreatorPricing;
-	createdAt: string;
+	createdAt?: string | { _seconds: number };
+	updatedAt?: string | { _seconds: number };
 }

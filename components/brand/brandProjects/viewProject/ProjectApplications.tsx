@@ -162,17 +162,9 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 	useEffect(() => {
 		const fetchData = async () => {
 			if (!projectData?.id) return;
-			console.log(
-				"Starting to fetch applications for project ID:",
-				projectData?.id
-			);
 
 			try {
 				setLoading(true);
-				console.log(
-					"About to fetch from:",
-					`/api/project-applications?projectId=${projectData.id}`
-				);
 
 				const response = await fetch(
 					`/api/project-applications?projectId=${projectData.id}`
@@ -181,8 +173,6 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 				if (!response.ok) {
 					throw new Error("Failed to fetch applications");
 				}
-
-				console.log("Response received:", response.status);
 
 				const data = await response.json();
 

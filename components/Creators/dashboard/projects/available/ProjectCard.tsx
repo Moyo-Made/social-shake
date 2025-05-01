@@ -3,6 +3,7 @@ import Image from "next/image";
 import { ProjectFormData } from "@/types/contestFormData";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { getProjectTypeIcon } from "@/types/projects";
 
 interface BrandProfile {
 	id?: string;
@@ -86,24 +87,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
 				);
 			default:
 				return null;
-		}
-	};
-
-	// Function to get the right icon for project type
-	const getProjectTypeIcon = (projectType: string) => {
-		switch (projectType) {
-			case "UGC Videos Only":
-				return "/icons/ugc.svg";
-			case "Creator-Posted UGC":
-				return "/icons/creator-posted.svg";
-			case "UGC Content Only":
-				return "/icons/ugc.svg";
-			case "Spark Ads":
-				return "/icons/ad.svg";
-			case "TikTok Shop":
-				return "/icons/tiktok-shop.svg";
-			default:
-				return "/icons/default.svg";
 		}
 	};
 
@@ -204,11 +187,17 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
 						<div className="flex flex-col">
 							<p className="text-orange-500">Published</p>
 							<p className="font-normal">
-								{new Date(project.createdAt).toLocaleDateString("en-US", {
-									year: "numeric",
-									month: "long",
-									day: "numeric",
-								})}
+								{(() => {
+									const createdAt =
+										typeof project.createdAt === "object" && "_seconds" in project.createdAt
+											? new Date(project.createdAt._seconds * 1000)
+											: new Date(project.createdAt ?? "");
+									return createdAt.toLocaleDateString("en-US", {
+										year: "numeric",
+										month: "long",
+										day: "numeric",
+									});
+								})()}
 							</p>
 						</div>
 					</div>

@@ -1,103 +1,54 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-// import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectFormData } from "@/types/contestFormData";
-import { getStatusStyle } from "@/utils/statusUtils";
-import ProjectSubmissions from "./ProjectSubmissions";
-import ProductDelivery from "./ProductDelivery";
 import Image from "next/image";
-import ProjectAnalytics from "./ProjectAnalytics";
-import AffiliatePayout from "./AffiliatePayout";
-import ProjectApplications from "./ProjectApplications";
-import { CreatorSubmission } from "@/types/submission";
+import ProductDelivery from "@/components/brand/brandProjects/viewProject/ProductDelivery";
+import { getProjectStatusInfo } from "@/types/projects";
+import CreatorSubmissionTab from "./CreatorSubmissionTab";
+
 
 interface ProjectDetailPageProps {
 	projectId: string;
 }
-const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
+const ManageProjects = ({ projectId }: ProjectDetailPageProps) => {
 	//   const router = useRouter();
 	const [project, setProject] = useState<ProjectFormData | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+
 	// const [applications] = useState<unknown[]>([]);
-	const [submissionsList, setSubmissionsList] = useState<CreatorSubmission[]>(
-			[]
-		);
+	// const [submissions] = useState<unknown[]>([]);
 
-		useEffect(() => {
-			const fetchProjectData = async () => {
-				try {
-					setLoading(true);
-					const projectRef = doc(db, "projects", projectId.toString());
-					const projectSnap = await getDoc(projectRef);
-	
-					if (projectSnap.exists()) {
-						setProject(projectSnap.data() as ProjectFormData);
-					} else {
-						setError("Project not found");
-					}
-				} catch (err) {
-					console.error("Error fetching project:", err);
-					setError("Failed to load project details");
-				} finally {
-					setLoading(false);
+	useEffect(() => {
+		const fetchProjectData = async () => {
+			try {
+				setLoading(true);
+				const projectRef = doc(db, "projects", projectId.toString());
+				const projectSnap = await getDoc(projectRef);
+
+				if (projectSnap.exists()) {
+					setProject(projectSnap.data() as ProjectFormData);
+				} else {
+					setError("Project not found");
 				}
-			};
-	
-			const fetchSubmissions = async () => {
-				try {
-					const response = await fetch(
-						`/api/project-submissions?projectId=${projectId}`
-					);
-	
-					if (!response.ok) {
-						throw new Error(`Error fetching submissions: ${response.statusText}`);
-					}
-	
-					const data = await response.json();
-	
-					if (data.success && data.submissions) {
-						const basicSubmissions = data.submissions;
-						
-						// Transform the API response to match our Submission interface
-						const transformedSubmissions = basicSubmissions.map(
-							// eslint-disable-next-line @typescript-eslint/no-explicit-any
-							(submission: any, index: number) => ({
-								id: submission.id,
-								userId: submission.userId,
-								projectId: submission.projectId,
-								creatorName: submission.creatorName || "Creator",
-								creatorIcon: submission.creatorIcon || "/placeholder-profile.jpg",
-								videoUrl: submission.videoUrl || "/placeholder-video.jpg",
-								videoNumber: submission.videoNumber || `#${index + 1}`,
-								revisionNumber: submission.revisionNumber
-									? `#${submission.revisionNumber}`
-									: "",
-								status: submission.status || "new",
-								createdAt: new Date(submission.createdAt).toLocaleDateString(),
-								sparkCode: submission.sparkCode || "",
-							})
-						);
-	
-						setSubmissionsList(transformedSubmissions);
-					}
-				} catch (err) {
-					console.error("Error fetching submissions:", err);
-				}
-			};
-	
-			if (projectId) {
-				fetchProjectData();
-				fetchSubmissions();
+			} catch (err) {
+				console.error("Error fetching project:", err);
+				setError("Failed to load project details");
+			} finally {
+				setLoading(false);
 			}
-		}, [projectId]);
+		};
 
+		if (projectId) {
+			fetchProjectData();
+		}
+	}, [projectId]);
 
 	if (loading) {
 		return (
@@ -115,6 +66,8 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 			</div>
 		);
 	}
+
+	const { label, color, bgColor, borderColor } = getProjectStatusInfo(project.status);
 
 	const { projectDetails, projectRequirements, creatorPricing } = project;
 
@@ -162,9 +115,9 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 							{projectDetails.projectName}
 						</h1>
 						<div
-							className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${getStatusStyle(project.status).color}`}
+							className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${color} ${bgColor} ${borderColor}`}
 						>
-							{getStatusStyle(project.status).text}
+							{label}
 						</div>
 					</div>
 
@@ -174,10 +127,7 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 							<span className="text-[#FD5C02]">Project Budget:</span> $
 							{creatorPricing.totalBudget || 0}
 						</div>
-						<div>
-							<span className="text-[#FD5C02]">Creators Required:</span>{" "}
-							{creatorPricing.creatorCount} {creatorPricing.creatorCount > 1 ? "Creators" : "Creator"}
-						</div>
+
 						<div>
 							<span className="text-[#FD5C02]">Project Type:</span>{" "}
 							{projectDetails.projectType}
@@ -188,31 +138,26 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 								? "Physical Product"
 								: "Virtual Product"}
 						</div>
-						<div>
-							<span className="text-[#FD5C02]">Submissions:</span> {submissionsList.length} {submissionsList.length !== 1 ? "Videos" : "Video"} • 
-							{" "}{submissionsList.filter(sub => sub.status === "pending").length} Pending
-						</div>
 					</div>
 				</div>
 			</div>
 
 			{/* Tabs Navigation */}
-			<Tabs defaultValue="overview" className="w-full">
+			<Tabs defaultValue="submissions" className="w-full">
 				<TabsList className="flex gap-6 mb-3 p-3 mt-6">
-					<TabsTrigger value="overview" className={tabTriggerStyles}>
-						Project Overview
-					</TabsTrigger>
-					<TabsTrigger value="applications" className={tabTriggerStyles}>
-						Applications
-					</TabsTrigger>
 					<TabsTrigger value="submissions" className={tabTriggerStyles}>
 						Submissions
 					</TabsTrigger>
+
 					{isPhysicalProduct && (
 						<TabsTrigger value="product-delivery" className={tabTriggerStyles}>
-							Product Delivery
+							Product Delivery Tracking
 						</TabsTrigger>
 					)}
+
+					<TabsTrigger value="overview" className={tabTriggerStyles}>
+						Project Overview
+					</TabsTrigger>
 
 					{projectDetails.projectType === "TikTok Shop" && (
 						<>
@@ -524,21 +469,10 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 					</div>
 				</TabsContent>
 
-				{/* Applications Tab */}
-				<TabsContent value="applications">
-					<div className="p-8 text-center text-gray-500">
-						<ProjectApplications
-							projectData={{
-								id: projectId,
-							}}
-						/>
-					</div>
-				</TabsContent>
-
 				{/* Submissions Tab */}
 				<TabsContent value="submissions">
 					<div className="p-8 text-center text-gray-500">
-						<ProjectSubmissions projectFormData={project} projectId={projectId} />
+						<CreatorSubmissionTab projectFormData={project} projectId={projectId} />
 					</div>
 				</TabsContent>
 
@@ -550,25 +484,9 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 						</div>
 					</TabsContent>
 				)}
-
-				{/* Analytics and Affiliate tab for Tiktok shop  */}
-				{projectDetails.projectType === "TikTok Shop" && (
-					<>
-						<TabsContent value="analytics">
-							<div className="p-8 text-gray-500">
-								<ProjectAnalytics />
-							</div>
-						</TabsContent>
-						<TabsContent value="affiliate-payout">
-							<div className="p-8 text-gray-500">
-								<AffiliatePayout />
-							</div>
-						</TabsContent>
-					</>
-				)}
 			</Tabs>
 		</div>
 	);
 };
 
-export default ProjectDetailPage;
+export default ManageProjects;

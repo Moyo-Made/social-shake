@@ -1,17 +1,20 @@
 import React from "react";
 import ProjectDetails from "@/components/Creators/dashboard/projects/ProjectDetails";
 import { ProjectFormProvider } from "@/components/brand/brandProjects/ProjectFormContext";
+import { ProjectFormData } from "@/types/contestFormData";
 
 interface PageParams {
   projectId: string;
+  project: ProjectFormData;
 }
 
-const ContestDetailsPage = ({ params }: { params: PageParams }) => {
-  console.log("Page component received params:", params); 
-  
+const ContestDetailsPage = ({ params }: { params: PageParams }) => { 
+
+  const { projectId, project } = params;
+
   return (
     <ProjectFormProvider>
-      <ProjectDetails projectId={params.projectId} />
+      <ProjectDetails projectId={projectId} project={project} />
     </ProjectFormProvider>
   );
 };

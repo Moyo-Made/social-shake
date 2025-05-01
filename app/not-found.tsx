@@ -1,11 +1,15 @@
 "use client";
 
+import Footer from "@/components/Footer";
+import Navbar from "@/components/Navbar";
 import Link from "next/link";
 
 export default function NotFound() {
 
 
 	return (
+		<>
+		<Navbar />
 		<div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 font-satoshi">
 			<div className="max-w-md w-full space-y-8 text-center">
 				<div>
@@ -49,5 +53,7 @@ export default function NotFound() {
 				</div>
 			</div>
 		</div>
+		<Footer />
+		</>
 	);
 }

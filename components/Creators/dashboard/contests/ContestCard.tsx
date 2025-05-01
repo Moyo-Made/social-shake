@@ -217,7 +217,7 @@ export default function ContestCard({ contest }: ContestCardProps) {
 					label: "√ Joined",
 					color: "text-[#067647]",
 					bgColor: "bg-[#ECFDF3]",
-					borderColor: "border-[#ABEFC6]",
+					borderColor: "border border-[#ABEFC6]",
 				};
 			case "pending":
 				return {
@@ -225,7 +225,7 @@ export default function ContestCard({ contest }: ContestCardProps) {
 					label: "• Pending Approval",
 					color: "text-[#1A1A1A]",
 					bgColor: "bg-[#FFF0C3]",
-					borderColor: "border-[#FDD849]",
+					borderColor: "border border-[#FDD849]",
 				};
 			case "interested":
 				return {
@@ -233,7 +233,7 @@ export default function ContestCard({ contest }: ContestCardProps) {
 					label: "• Interested",
 					color: "text-[#FC52E4]",
 					bgColor: "bg-[#FFE5FB]",
-					borderColor: "border-[#FC52E4]",
+					borderColor: "border border-[#FC52E4]",
 				};
 			case "rejected":
 				return {
@@ -241,7 +241,7 @@ export default function ContestCard({ contest }: ContestCardProps) {
 					label: "• Rejected",
 					color: "text-[#F04438]",
 					bgColor: "bg-[#FFE9E7]",
-					borderColor: "border-[#F04438]",
+					borderColor: "border border-[#F04438]",
 				};
 			case "completed":
 				return {
@@ -249,7 +249,7 @@ export default function ContestCard({ contest }: ContestCardProps) {
 					label: "• Completed",
 					color: "text-gray-600",
 					bgColor: "bg-gray-100",
-					borderColor: "border-gray-600",
+					borderColor: "border border-gray-600",
 				};
 			case "approved":
 				return {
@@ -257,7 +257,7 @@ export default function ContestCard({ contest }: ContestCardProps) {
 					label: "√ Approved",
 					color: "text-blue-600",
 					bgColor: "bg-blue-100",
-					borderColor: "border-blue-600",
+					borderColor: "border border-blue-600",
 				};
 			default:
 				return {
@@ -265,7 +265,7 @@ export default function ContestCard({ contest }: ContestCardProps) {
 					label: status.charAt(0).toUpperCase() + status.slice(1),
 					color: "text-gray-600",
 					bgColor: "bg-gray-100",
-					borderColor: "border-gray-600",
+					borderColor: "border border-gray-600",
 				};
 		}
 	};

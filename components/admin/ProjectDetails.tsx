@@ -13,9 +13,9 @@ import Image from "next/image";
 const ProjectDetailsPage: React.FC = () => {
 	const params = useParams();
 	const projectId = params?.projectId as string;
-	const userId = params?.userId as string;
 
-	const [brandProfiles, setBrandProfiles] = useState<BrandProfile | null>(null);
+		const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
+			const [brandEmail, setBrandEmail] = useState<string>("");
 
 	const [project, setProject] = useState<ProjectFormData | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -45,7 +45,7 @@ const ProjectDetailsPage: React.FC = () => {
 				} else {
 					// If not in localStorage, fetch from API
 					const response = await fetch(
-						`/api/admin/project/projectId?=${projectId}`
+						`/api/admin/project-approval/${projectId}`
 					);
 
 					if (!response.ok) {
@@ -74,24 +74,32 @@ const ProjectDetailsPage: React.FC = () => {
 			}
 
 			try {
-				setLoading(true);
-
-				// First try to get brand from localStorage (similar to BrandDetailsPage approach)
-				const storedBrand = localStorage.getItem("viewingBrand");
-
-				if (storedBrand) {
-					setBrandProfiles(JSON.parse(storedBrand));
-				} else {
-					// If not in localStorage, fetch from API using the userId
-					const response = await fetch(`/api/admin/brand/${userId}`);
-
-					if (!response.ok) {
-						throw new Error("Failed to fetch brand details");
-					}
-
-					const data = await response.json();
-					setBrandProfiles(data.brandProfiles);
+				// Skip if we already have this brand profile
+				if (brandProfile && brandProfile.userId === project.userId) {
+					return;
 				}
+
+				const response = await fetch(
+					`/api/admin/brand-approval?userId=${project.userId}`
+				);
+
+				if (response.ok) {
+					const data = await response.json();
+					setBrandProfile(data);
+					if (data.email) {
+						setBrandEmail(data.email);
+					}
+				} else {
+					// Handle 404 or other errors by setting a placeholder
+					setBrandProfile({
+						id: project.userId,
+						userId: project.userId,
+						email: "Unknown",
+						brandName: "Unknown Brand",
+						logoUrl: "",
+					});
+				}
+
 			} catch (err) {
 				console.error("Error fetching brand profile:", err);
 				setError(
@@ -107,7 +115,7 @@ const ProjectDetailsPage: React.FC = () => {
 		if (project) {
 			fetchBrandProfile();
 		}
-	}, [project]);
+	}, [project, brandProfile]);
 
 	// Handle project action (approve, cancel, etc.)
 	const handleProjectAction = async () => {
@@ -123,7 +131,7 @@ const ProjectDetailsPage: React.FC = () => {
 					projectId: projectId,
 					action: actionType,
 					message: actionMessage,
-					brandEmail: brandProfiles?.email || "",
+					brandEmail: brandEmail || brandProfile?.email || "",
 				}),
 			});
 
@@ -585,20 +593,26 @@ const ProjectDetailsPage: React.FC = () => {
 					<div className="rounded-xl border border-[#FFBF9B] p-6 mb-6">
 						<div className="flex items-center mb-4">
 							<Image
-								src={brandProfiles?.logoUrl || "/projects/brand-logo.png"}
+								src={brandProfile?.logoUrl || "/projects/brand-logo.png"}
 								alt="Brand Logo"
 								width={32}
 								height={32}
 								className="w-8 h-8 rounded-full mr-2"
 							/>
-							<p className="font-semibold">{brandProfiles?.brandName || ""}</p>
+							<p className="font-semibold">{brandProfile?.brandName || ""}</p>
 						</div>
 
 						<div className="space-y-4">
 							<div>
 								<p className="text-gray-500 mb-1">Published On</p>
 								<p className="text-black">
-									{new Date(project.createdAt).toLocaleDateString()}
+									{project.createdAt
+										? new Date(
+												typeof project.createdAt === "object" && "_seconds" in project.createdAt
+													? project.createdAt._seconds * 1000
+													: project.createdAt
+										  ).toLocaleDateString()
+										: "Unknown Date"}
 								</p>
 							</div>
 

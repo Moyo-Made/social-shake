@@ -1,34 +1,78 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { CheckIcon, ChevronDown, ChevronLeft, X } from "lucide-react";
 import Image from "next/image";
-import { Submission } from "@/types/submission";
-
-
+import { CreatorSubmission } from "@/types/submission";
+import { toast } from "react-hot-toast";
 
 interface ReviewVideoModalProps {
-	submission: Submission | null;
-	revisionsUsed: number;
-	maxRevisions?: number;
-	onSubmit: (approved: boolean, feedback?: string, issues?: string[]) => void;
+	submission: CreatorSubmission | null;
 	onClose: () => void;
 	isOpen: boolean;
+	onSubmit: (
+        approved: boolean,
+        feedback?: string,
+        issues?: string[],
+        videoTimestamps?: { time: number; note: string }[]
+    ) => Promise<void>;
+	revisionUsed: number;
+	onReviewComplete?: (approved: boolean, revisionsUsed: number) => void;
 }
 
 const ReviewVideoModal: React.FC<ReviewVideoModalProps> = ({
 	submission,
-	revisionsUsed = 1,
-	maxRevisions = 3,
-	onSubmit,
 	onClose,
 	isOpen,
+	onReviewComplete,
 }) => {
 	const [feedback, setFeedback] = useState<string>("");
 	const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
 	const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
+	const [revisionsUsed, setRevisionsUsed] = useState<number>(0);
+	const [maxRevisions, setMaxRevisions] = useState<number>(3);
+	const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+	// Fetch current revision data when submission changes
+	useEffect(() => {
+		if (submission?.id) {
+			fetchRevisionsData(submission.id);
+		}
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [submission]);
+
+	// Fetch revision data
+	const fetchRevisionsData = async (submissionId: string) => {
+		try {
+			const response = await fetch(`/api/reviews?submissionId=${submissionId}`);
+			
+			if (!response.ok) {
+				const errorData = await response.json();
+				console.error("Error fetching revision data:", errorData);
+				return;
+			}
+			
+			const data = await response.json();
+			
+			// If we have a submission with revisionsUsed field, use that
+			if (submission?.revisionsUsed !== undefined) {
+				setRevisionsUsed(submission.revisionsUsed);
+			} 
+			// Otherwise calculate from reviews data
+			else if (data.reviews && Array.isArray(data.reviews)) {
+				// Count reviews that were not approvals
+				const revisionRequests = data.reviews.filter(
+					(review: { approved: boolean }) => !review.approved
+				).length;
+				setRevisionsUsed(revisionRequests);
+			}
+			
+		} catch (error) {
+			console.error("Failed to fetch revisions data:", error);
+		}
+	};
 
 	const issuesList = [
 		"Wrong aspect ratio",
@@ -69,14 +113,71 @@ const ReviewVideoModal: React.FC<ReviewVideoModalProps> = ({
 		setSelectedIssues(selectedIssues.filter((item) => item !== issue));
 	};
 
-	const handleApprove = () => {
-		onSubmit(true, feedback, selectedIssues);
-		onClose();
-	};
+	const handleSubmitReview = async (approved: boolean) => {
+		if (!submission?.id) {
+			toast.error("No submission selected");
+			return;
+		}
 
-	const handleSendReview = () => {
-		onSubmit(false, feedback, selectedIssues);
-		onClose();
+		if (!approved && revisionsUsed >= maxRevisions) {
+			toast.error(`Maximum revisions (${maxRevisions}) already used`);
+			return;
+		}
+
+		setIsSubmitting(true);
+
+		try {
+			const response = await fetch("/api/reviews", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					submissionId: submission.id,
+					approved,
+					feedback,
+					issues: selectedIssues,
+				}),
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Failed to submit review");
+			}
+
+			// Update local revision count
+			const newRevisionsUsed = approved 
+				? revisionsUsed  // No change if approved
+				: revisionsUsed + 1;
+			
+			setRevisionsUsed(newRevisionsUsed);
+			
+			// Show success message
+			toast.success(
+				approved 
+					? "Video approved successfully!" 
+					: `Revision request sent (${newRevisionsUsed}/${maxRevisions} revisions used)`
+			);
+			
+			// Trigger callback if provided
+			if (onReviewComplete) {
+				onReviewComplete(approved, newRevisionsUsed);
+			}
+			
+			// Reset form
+			setFeedback("");
+			setSelectedIssues([]);
+			
+			// Close modal
+			onClose();
+			
+		} catch (error) {
+			console.error("Error submitting review:", error);
+			toast.error(error instanceof Error ? error.message : "Failed to submit review");
+		} finally {
+			setIsSubmitting(false);
+		}
 	};
 
 	// Don't render if not open or no submission
@@ -91,6 +192,7 @@ const ReviewVideoModal: React.FC<ReviewVideoModalProps> = ({
 				<button
 					onClick={onClose}
 					className="absolute top-4 left-4 inline-flex items-center text-gray-600 hover:text-black z-10"
+					disabled={isSubmitting}
 				>
 					<ChevronLeft className="h-5 w-5 mr-1" />
 					<span>Back</span>
@@ -128,7 +230,7 @@ const ReviewVideoModal: React.FC<ReviewVideoModalProps> = ({
 									</div>
 									<div className="text-[#667085]">
 										Submitted:{" "}
-										<span className="text-black">{submission.submittedAt}</span>
+										<span className="text-black">{submission.createdAt}</span>
 									</div>
 									<div className="text-orange-500 font-medium">
 										Video {submission.videoNumber}
@@ -137,13 +239,13 @@ const ReviewVideoModal: React.FC<ReviewVideoModalProps> = ({
 							</div>
 
 							<div className="relative rounded-lg overflow-hidden h-[350px] mb-6">
-								<Image
-									src={submission.thumbnail}
-									alt="Video thumbnail"
-									className="w-full h-full"
-									width={200}
-									height={400}
-								/>
+								<div className="w-full h-64 relative">
+									<video
+										src={submission.videoUrl}
+										className="absolute inset-0 w-full h-full object-cover rounded-md"
+										controls
+									/>
+								</div>
 							</div>
 						</div>
 
@@ -179,6 +281,7 @@ const ReviewVideoModal: React.FC<ReviewVideoModalProps> = ({
 												<button
 													onClick={() => removeIssue(issue)}
 													className="ml-1 text-gray-500 hover:text-gray-700"
+													disabled={isSubmitting}
 												>
 													<X className="h-3 w-3" />
 												</button>
@@ -193,6 +296,7 @@ const ReviewVideoModal: React.FC<ReviewVideoModalProps> = ({
 										type="button"
 										className="flex items-center justify-between w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-left focus:outline-none focus:ring-2 focus:ring-orange-500"
 										onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+										disabled={isSubmitting}
 									>
 										<span className="text-gray-500">
 											{selectedIssues.length > 0
@@ -225,13 +329,14 @@ const ReviewVideoModal: React.FC<ReviewVideoModalProps> = ({
 
 							<div className="mb-2">
 								<p className="text-base text-black text-start font-medium mb-2">
-									Provide Detailed Feedback (Optional)
+									Provide Detailed Feedback {!selectedIssues.length && "(Required)"}
 								</p>
 								<Textarea
-									placeholder="Enter your text..."
+									placeholder="Enter your feedback..."
 									className="resize-none min-h-[120px]"
 									value={feedback}
 									onChange={(e) => setFeedback(e.target.value)}
+									disabled={isSubmitting}
 								/>
 								<p className="text-sm text-start text-gray-500 mt-2">
 									(Max: 2000 characters)
@@ -241,17 +346,35 @@ const ReviewVideoModal: React.FC<ReviewVideoModalProps> = ({
 							<div className="flex gap-4 mt-6">
 								<Button
 									className="flex-1 bg-[#067647] hover:bg-green-700 text-white py-3 text-base"
-									onClick={handleApprove}
+									onClick={() => handleSubmitReview(true)}
+									disabled={isSubmitting}
 								>
-									Approve <CheckIcon className="h-5 w-5" />
+									Approve <CheckIcon className="h-5 w-5 ml-1" />
 								</Button>
 								<Button
 									className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-3 text-base"
-									onClick={handleSendReview}
+									onClick={() => handleSubmitReview(false)}
+									disabled={
+										isSubmitting || 
+										revisionsUsed >= maxRevisions || 
+										(!selectedIssues.length && !feedback.trim())
+									}
 								>
-									Send Review
+									{isSubmitting ? "Sending..." : "Send Review"}
 								</Button>
 							</div>
+							
+							{revisionsUsed >= maxRevisions && (
+								<p className="text-red-500 text-sm mt-2 text-center">
+									Maximum revisions reached. Only approval is possible.
+								</p>
+							)}
+							
+							{!selectedIssues.length && !feedback.trim() && (
+								<p className="text-orange-500 text-sm mt-2 text-center">
+									Please select issues or provide feedback to send a review.
+								</p>
+							)}
 						</div>
 					</div>
 				</CardContent>

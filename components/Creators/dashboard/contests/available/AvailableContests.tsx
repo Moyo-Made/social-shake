@@ -75,6 +75,7 @@ const CreatorContestDashboard: React.FC = () => {
 		if (contests.length > 0) {
 			applyFilters();
 		}
+	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [
 		searchQuery,
 		industryType,
@@ -88,6 +89,7 @@ const CreatorContestDashboard: React.FC = () => {
 		if (currentUser?.uid) {
 			fetchContests();
 		}
+	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [currentUser?.uid]);
 
 	const applyFilters = () => {

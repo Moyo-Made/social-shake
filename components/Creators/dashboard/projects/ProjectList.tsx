@@ -1,11 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import ContestCard from "./ContestCard";
 import StatusTabs from "./StatusTabs";
-import SearchBar from "./SearchBar";
 import { useAuth } from "@/context/AuthContext";
-import { Contest } from "@/types/contests";
 import {
 	Select,
 	SelectContent,
@@ -13,31 +10,36 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import SearchBar from "../contests/SearchBar";
+import ProjectCard from "./ProjectCard";
+import { ProjectFormData } from "@/types/contestFormData";
 
-export default function ContestList() {
+export default function ProjectList() {
 	const { currentUser } = useAuth();
-	const [contests, setContests] = useState<Contest[]>([]);
-	const [filteredContests, setFilteredContests] = useState<Contest[]>([]);
+	const [projects, setProjects] = useState<ProjectFormData[]>([]);
+	const [filteredProjects, setFilteredProjects] = useState<ProjectFormData[]>(
+		[]
+	);
 	const [searchQuery, setSearchQuery] = useState("");
-	const [activeTab, setActiveTab] = useState("All Contests");
+	const [activeTab, setActiveTab] = useState("All Projects");
 	const [isLoading, setIsLoading] = useState(true);
 	const [sortOption, setSortOption] = useState("latest");
 
 	// Counts for each tab
 	const counts = {
-		"All Contests": contests.length,
-		Applied: contests.filter((contest) => contest.status === "pending").length,
-		Joined: contests.filter((contest) => contest.status === "joined").length,
-		Interested: contests.filter((contest) => contest.status === "interested")
+		"All Projects": projects.length,
+		Applied: projects.filter((project) => project.status === "pending").length,
+		"In Progress": projects.filter(p => p.status === "approved").length,
+		Interested: projects.filter((project) => project.status === "interested")
 			.length,
-		Rejected: contests.filter((contest) => contest.status === "rejected")
+		Rejected: projects.filter((project) => project.status === "rejected")
 			.length,
-		Completed: contests.filter((contest) => contest.status === "completed")
+		Completed: projects.filter((project) => project.status === "completed")
 			.length,
 	};
 
 	useEffect(() => {
-		const fetchContests = async () => {
+		const fetchProjects = async () => {
 			// Only fetch if we have a user
 			if (!currentUser) {
 				setIsLoading(false); // Stop loading if no user
@@ -47,76 +49,89 @@ export default function ContestList() {
 			setIsLoading(true);
 			try {
 				const userId = currentUser.uid;
-				console.log("Fetching contests for user ID:", userId);
-				const response = await fetch(`/api/user-contests?userId=${userId}`);
+				console.log("Fetching projects for user ID:", userId);
+				const response = await fetch(`/api/user-projects?userId=${userId}`);
 				console.log("Response status:", response);
 				if (!response.ok) {
-					throw new Error("Failed to fetch contests");
+					throw new Error("Failed to fetch projects");
 				}
 				const data = await response.json();
 				console.log("API response:", data);
-				setContests(data.contests);
+				setProjects(data.projects);
 			} catch (error) {
-				console.error("Error fetching contests:", error);
+				console.error("Error fetching projects:", error);
 			} finally {
 				setIsLoading(false);
 			}
 		};
 
-		fetchContests();
+		fetchProjects();
 	}, [currentUser]);
 
 	useEffect(() => {
-		let filtered = [...contests];
+		let filtered = [...projects];
 
 		// Filter by status based on active tab
-		if (activeTab !== "All Contests") {
+		if (activeTab !== "All Projects") {
 			const statusMap: Record<string, string> = {
 				Applied: "pending",
+				"In Progress": "approved",
 				Joined: "joined",
 				Interested: "interested",
 				Rejected: "rejected",
 				Completed: "completed",
 			};
 			filtered = filtered.filter(
-				(contest) => contest.status === statusMap[activeTab]
+				(project) => project.status === statusMap[activeTab]
 			);
 		}
 
 		// Filter by search query
 		if (searchQuery) {
 			filtered = filtered.filter(
-				(contest) =>
-					contest.basic?.contestName
+				(project) =>
+					project.projectDetails.projectName
 						.toLowerCase()
 						.includes(searchQuery.toLowerCase()) ||
-					contest.basic?.description
+					project.projectDetails.projectDescription
 						?.toLowerCase()
 						.includes(searchQuery.toLowerCase())
 			);
 		}
 
-		// Sort the contests based on the selected option
+		// Sort the projects based on the selected option
 		switch (sortOption) {
 			case "latest":
 				filtered.sort((a, b) => {
-					const dateA = a.createdAt && typeof a.createdAt === "object" && "_seconds" in a.createdAt
-						? new Date(a.createdAt._seconds * 1000)
-						: new Date(a.createdAt || 0);
-					const dateB = b.createdAt && typeof b.createdAt === "object" && "_seconds" in b.createdAt
-						? new Date(b.createdAt._seconds * 1000)
-						: new Date(b.createdAt || 0);
+					const dateA =
+						a.createdAt &&
+						typeof a.createdAt === "object" &&
+						"_seconds" in a.createdAt
+							? new Date(a.createdAt._seconds * 1000)
+							: new Date(a.createdAt || 0);
+					const dateB =
+						b.createdAt &&
+						typeof b.createdAt === "object" &&
+						"_seconds" in b.createdAt
+							? new Date(b.createdAt._seconds * 1000)
+							: new Date(b.createdAt || 0);
 					return dateB.getTime() - dateA.getTime(); // Newest first
 				});
 				break;
 			case "oldest":
 				filtered.sort((a, b) => {
-					const dateA = a.createdAt && typeof a.createdAt === "object" && "_seconds" in a.createdAt
-						? new Date(a.createdAt._seconds * 1000)
-						: new Date(a.createdAt || 0);
-					const dateB = b.createdAt && typeof b.createdAt === "object" && "_seconds" in b.createdAt
-						? new Date(b.createdAt._seconds * 1000)
-						: new Date(b.createdAt || 0);
+					const dateA =
+						a.createdAt &&
+						typeof a.createdAt === "object" &&
+						"_seconds" in a.createdAt
+							? new Date(a.createdAt._seconds * 1000)
+							: new Date(a.createdAt || 0);
+					const dateB =
+						b.createdAt &&
+						typeof b.createdAt === "object" &&
+						"_seconds" in b.createdAt
+							? new Date(b.createdAt._seconds * 1000)
+							: new Date(b.createdAt || 0);
 					return dateA.getTime() - dateB.getTime(); // Oldest first
 				});
 				break;
@@ -128,30 +143,27 @@ export default function ContestList() {
 					return popularityB - popularityA; // Higher count first
 				});
 				break;
-			// case "relevant":
-			// 	filtered.sort((a, b) => {
-			// 		// Calculate relevance score based on multiple factors
-			// 		// This is a simple example - you can customize this based on your needs
-			// 		const scoreA = currentUser ? calculateRelevanceScore(a, currentUser) : 0;
-			// 		const scoreB = currentUser ? calculateRelevanceScore(b, currentUser) : 0;
-			// 		return scoreB - scoreA; // Higher score first
-			// 	});
-			// 	break;
 			default:
 				// Default to latest if no valid option is selected
 				filtered.sort((a, b) => {
-					const dateA = a.createdAt && typeof a.createdAt === "object" && "_seconds" in a.createdAt
-						? new Date(a.createdAt._seconds * 1000)
-						: new Date(a.createdAt || 0);
-					const dateB = b.createdAt && typeof b.createdAt === "object" && "_seconds" in b.createdAt
-						? new Date(b.createdAt._seconds * 1000)
-						: new Date(b.createdAt || 0);
+					const dateA =
+						a.createdAt &&
+						typeof a.createdAt === "object" &&
+						"_seconds" in a.createdAt
+							? new Date(a.createdAt._seconds * 1000)
+							: new Date(a.createdAt || 0);
+					const dateB =
+						b.createdAt &&
+						typeof b.createdAt === "object" &&
+						"_seconds" in b.createdAt
+							? new Date(b.createdAt._seconds * 1000)
+							: new Date(b.createdAt || 0);
 					return dateB.getTime() - dateA.getTime();
 				});
 		}
 
-		setFilteredContests(filtered);
-	}, [contests, activeTab, searchQuery, sortOption, currentUser]);
+		setFilteredProjects(filtered);
+	}, [projects, activeTab, searchQuery, sortOption, currentUser]);
 
 	return (
 		<div className="max-w-6xl mx-auto p-4">
@@ -183,13 +195,13 @@ export default function ContestList() {
 				{isLoading ? (
 					<div className="flex flex-col justify-center items-center">
 						<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
-						<div className="text-center">Loading contests...</div>
+						<div className="text-center">Loading projects...</div>
 					</div>
-				) : filteredContests.length === 0 ? (
-					<div className="text-center py-8">No contests found</div>
+				) : filteredProjects.length === 0 ? (
+					<div className="text-center py-8">No projects found</div>
 				) : (
-					filteredContests.map((contest) => (
-						<ContestCard key={contest.id} contest={contest} />
+					filteredProjects.map((project) => (
+						<ProjectCard key={project.projectId} project={project} />
 					))
 				)}
 			</div>
