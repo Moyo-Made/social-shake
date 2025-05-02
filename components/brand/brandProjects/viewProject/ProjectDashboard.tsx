@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { ProjectStatus } from "@/types/projects";
 import { getStatusStyle } from "@/utils/statusUtils";
 import { ProjectFormData } from "@/types/contestFormData";
+import { CreatorSubmission } from "@/types/submission";
 
 interface Project {
 	id: string;
@@ -35,6 +36,7 @@ interface Project {
 		videos: number;
 		pending: number;
 	};
+	submissionsList: CreatorSubmission[];
 	rawData: ProjectFormData;
 }
 
@@ -144,13 +146,76 @@ const ProjectDashboard = () => {
 							videos: data.submissions?.length || 0,
 							pending: data.pendingSubmissions?.length || 0,
 						},
+						submissionsList: [], // Initialize with empty array, will be populated later
 						// Store the raw data for any additional needs
 						rawData: data as ProjectFormData,
 					};
 				});
 
+				// First set projects without submissions to show something to user quickly
 				setProjects(projectsData);
 				setFilteredProjects(projectsData);
+				
+				// Then fetch submissions for each project
+				const projectsWithSubmissions = await Promise.all(
+					projectsData.map(async (project) => {
+						// Only fetch submissions for projects that should show them
+						if (shouldShowSubmissions(project.status)) {
+							try {
+								const response = await fetch(
+									`/api/project-submissions?projectId=${project.id}`
+								);
+
+								if (response.ok) {
+									const data = await response.json();
+									
+									if (data.success && data.submissions) {
+										const basicSubmissions = data.submissions;
+										
+										// Transform the API response to match our Submission interface
+										const transformedSubmissions = basicSubmissions.map(
+											// eslint-disable-next-line @typescript-eslint/no-explicit-any
+											(submission: any, index: number) => ({
+												id: submission.id,
+												userId: submission.userId,
+												projectId: submission.projectId,
+												creatorName: submission.creatorName || "Creator",
+												creatorIcon: submission.creatorIcon || "/placeholder-profile.jpg",
+												videoUrl: submission.videoUrl || "/placeholder-video.jpg",
+												videoNumber: submission.videoNumber || `#${index + 1}`,
+												revisionNumber: submission.revisionNumber
+													? `#${submission.revisionNumber}`
+													: "",
+												status: submission.status || "new",
+												createdAt: new Date(submission.createdAt).toLocaleDateString(),
+												sparkCode: submission.sparkCode || "",
+											})
+										);
+
+										// Return project with submissions data
+										return {
+											...project,
+											submissionsList: transformedSubmissions,
+											submissions: {
+												videos: transformedSubmissions.length,
+												pending: transformedSubmissions.filter((sub: { status: string; }) => sub.status === "pending").length
+											}
+										};
+									}
+								}
+							} catch (err) {
+								console.error(`Error fetching submissions for project ${project.id}:`, err);
+							}
+						}
+						
+						// If fetch failed or wasn't attempted, return project as is
+						return project;
+					})
+				);
+
+				// Update state with the projects that now include submissions data
+				setProjects(projectsWithSubmissions);
+				setFilteredProjects(projectsWithSubmissions);
 				setLoading(false);
 			} catch (err: unknown) {
 				console.error("Error fetching projects:", err);
@@ -268,6 +333,7 @@ const ProjectDashboard = () => {
 			status.toLowerCase()
 		);
 	};
+	
 	return (
 		<div className="bg-gray-50 p-6 min-h-screen w-full">
 			{/* Header with search and filters */}
@@ -496,7 +562,8 @@ const ProjectDashboard = () => {
 												Creators Required
 											</p>
 											<p className="text-sm font-normal">
-												{project.creatorsRequired} {project.creatorsRequired > 1 ? "Creators" : "Creator"}
+												{project.creatorsRequired}{" "}
+												{project.creatorsRequired > 1 ? "Creators" : "Creator"}
 											</p>
 										</div>
 
@@ -531,13 +598,18 @@ const ProjectDashboard = () => {
 												height={25}
 											/>
 											<div>
-												<p className="text-sm text-orange-500 font-medium">
+												<span className="text-sm text-orange-500 font-medium">
 													Submissions
-												</p>
-
+												</span>{" "}
 												<p className="text-sm font-normal">
-													{project.submissions.videos} Videos •{" "}
-													{project.submissions.pending} Pending
+													{project.submissionsList.length}{" "}
+													{project.submissionsList.length !== 1 ? "Videos" : "Video"} •{" "}
+													{
+														project.submissionsList.filter(
+															(sub) => sub.status === "pending"
+														).length
+													}{" "}
+													Pending
 												</p>
 											</div>
 										</div>
@@ -720,12 +792,216 @@ const ProjectDashboard = () => {
 													height={25}
 												/>
 												<div>
-													<p className="text-sm text-orange-500 font-medium">
+													<span className="text-sm text-orange-500 font-medium">
 														Submissions
+													</span>{" "}
+													<p className="text-sm font-normal">
+														{project.submissionsList.length}{" "}
+														{project.submissionsList.length !== 1 ? "Videos" : "Video"}{" "}
+														 •{" "}
+														{
+															project.submissionsList.filter(
+																(sub) => sub.status === "pending"
+															).length
+														}{" "}
+														Pending
+													</p>
+												</div>
+											</div>
+										)}
+									</div>
+
+									{/* Action Button */}
+									{shouldShowEditButton(project.status) ? (
+										<Link
+											href={`/brand/dashboard/projects/edit/${project.id}`}
+											className="w-full flex py-2 px-4 bg-orange-500 text-white font-medium rounded-md items-center justify-center gap-2"
+										>
+											Edit Project
+											<svg
+												width="16"
+												height="16"
+												viewBox="0 0 24 24"
+												fill="none"
+												xmlns="http://www.w3.org/2000/svg"
+												className="inline ml-2"
+											>
+												<path
+													d="M5 12H19M19 12L12 5M19 12L12 19"
+													stroke="currentColor"
+													strokeWidth="2"
+													strokeLinecap="round"
+													strokeLinejoin="round"
+												/>
+											</svg>
+										</Link>
+									) : (
+										<Link
+											href={`/brand/dashboard/projects/${project.id}`}
+											className="w-full flex py-2 px-4 bg-orange-500 text-white font-medium rounded-md items-center justify-center gap-2"
+										>
+											View Project
+											<svg
+												width="16"
+												height="16"
+												viewBox="0 0 24 24"
+												fill="none"
+												xmlns="http://www.w3.org/2000/svg"
+											>
+												<path
+													d="M5 12H19M19 12L12 5M19 12L12 19"
+													stroke="currentColor"
+													strokeWidth="2"
+													strokeLinecap="round"
+													strokeLinejoin="round"
+												/>
+											</svg>
+										</Link>
+									)}
+								</div>
+							</div>
+						))}
+					</div>
+				)}
+
+			{/* Projects display - List View */}
+			{!loading &&
+				!error &&
+				filteredProjects.length > 0 &&
+				viewType === "list" && (
+					<div className="space-y-4">
+						{filteredProjects.map((project) => (
+							<div
+								key={project.id}
+								className="bg-white border border-[#D2D2D2] rounded-xl shadow-sm overflow-hidden flex flex-col md:flex-row p-3"
+							>
+								<div className="relative w-full md:w-72 h-48 md:h-auto flex-shrink-0">
+									{project.thumbnailUrl ? (
+										// eslint-disable-next-line @next/next/no-img-element
+										<img
+											src={project.thumbnailUrl}
+											alt={`${project.title} thumbnail`}
+											className="w-full h-48 object-cover"
+											onError={handleImageError}
+											loading="lazy"
+										/>
+									) : (
+										<div className="w-full h-48 bg-gray-100 flex items-center justify-center rounded-xl">
+											<p className="text-gray-400">No thumbnail available</p>
+										</div>
+									)}
+								</div>
+
+								<div className="py-3 px-6 flex-1">
+									<div className="flex flex-col md:flex-row justify-between items-start mb-3">
+										<div>
+											<h3 className="text-lg font-semibold mb-2">
+												{project.title || "Untitled Project"}
+											</h3>
+											{/* Project Type Badge */}
+											<div className="flex items-center gap-2 mb-2 bg-[#FFF4EE] rounded-full py-2 px-4 w-fit">
+												<div className="w-6 h-6 rounded-full flex items-center justify-center">
+													<Image
+														src={getProjectTypeIcon(project.projectType)}
+														alt={project.projectType}
+														width={20}
+														height={20}
+													/>
+												</div>
+												<span className="text-sm font-normal">
+													{project.projectType}
+												</span>
+											</div>
+										</div>
+
+										{/* Status Badge */}
+										<div className="flex gap-1 items-center mb-4">
+											<div className="text-[#667085] text-base">Status:</div>
+											<div
+												className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${getStatusStyle(project.status).color}`}
+											>
+												{getStatusStyle(project.status).text}
+											</div>
+										</div>
+									</div>
+
+									<p className="ext-base text-[#667085] mb-4 line-clamp-3">
+										{project.description}
+									</p>
+
+									{/* Project Details Section - LIST VIEW - UPDATED TO 4 COLUMNS */}
+									<div className="border-t border-gray-200 pt-4 grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+										{/* Project Budget */}
+										<div className="flex items-center gap-2">
+											<Image
+												src="/icons/dollar.svg"
+												alt="Dollar icon"
+												width={25}
+												height={25}
+											/>
+											<div>
+												<p className="text-sm text-orange-500 font-medium">
+													Project Budget
+												</p>
+												<p className="text-sm font-normal">
+													${project.budget}/Creator
+												</p>
+											</div>
+										</div>
+
+										{/* Creators Required */}
+										<div>
+											<p className="text-sm text-orange-500 font-medium">
+												Creators Required
+											</p>
+											<p className="text-sm font-normal">
+												{project.creatorsRequired} Creators
+											</p>
+										</div>
+
+										{/* Show Creators Applied conditionally */}
+										{shouldShowSubmissions(project.status) && (
+											<div className="flex items-center gap-2">
+												<Image
+													src="/icons/applied.svg"
+													alt="Creator applied icon"
+													width={25}
+													height={25}
+												/>
+												<div>
+													<p className="text-sm text-orange-500 font-medium">
+														Creators Applied
 													</p>
 													<p className="text-sm font-normal">
-														{project.submissions.videos} Videos •{" "}
-														{project.submissions.pending} Pending
+														{project.creatorsApplied} Applied
+													</p>
+												</div>
+											</div>
+										)}
+
+										{/* Show Submissions directly in the grid for list view */}
+										{shouldShowSubmissions(project.status) && (
+											<div className="flex items-center gap-2">
+												<Image
+													src="/icons/applied.svg"
+													alt="Submissions icon"
+													width={25}
+													height={25}
+												/>
+												<div>
+													<span className="text-sm text-orange-500 font-medium">
+														Submissions
+													</span>{" "}
+													<p className="text-sm font-normal">
+														{project.submissionsList.length}{" "}
+														{project.submissionsList.length !== 1 ? "Videos" : "Video"}{" "}
+														 •{" "}
+														{
+															project.submissionsList.filter(
+																(sub) => sub.status === "pending"
+															).length
+														}{" "}
+														Pending
 													</p>
 												</div>
 											</div>
@@ -788,5 +1064,4 @@ const ProjectDashboard = () => {
 		</div>
 	);
 };
-
 export default ProjectDashboard;

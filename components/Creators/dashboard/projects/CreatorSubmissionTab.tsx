@@ -9,6 +9,8 @@ import ProjectSubmissionModal from "./ProjectSubmissionModal";
 import { useAuth } from "@/context/AuthContext";
 import RevisionModal from "./RevisionModal";
 import SparkCodeModal from "@/components/Creators/dashboard/projects/SparkCodeModal";
+import Link from "next/link";
+import TikTokLinkModal from "./TikTokLinkModal";
 
 interface ProjectSubmissionsProps {
 	projectFormData: ProjectFormData;
@@ -37,6 +39,10 @@ export default function CreatorSubmissionTab({
 	const [sparkCodeSubmissionId, setSparkCodeSubmissionId] =
 		useState<string>("");
 	const [fetchingSparkCodes, setFetchingSparkCodes] = useState(false);
+	const [isTiktokLinkModalOpen, setIsTiktokLinkModalOpen] = useState(false);
+	const [tiktokLinkSubmissionId, setTiktokLinkSubmissionId] =
+		useState<string>("");
+	const [fetchingTiktokLink, setFetchingTiktokLink] = useState(false);
 
 	const totalVideos = projectFormData?.creatorPricing?.videosPerCreator || 0;
 	const completedVideos = submissionsList.length || 0;
@@ -49,6 +55,86 @@ export default function CreatorSubmissionTab({
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [currentUser, projectId]);
+
+	// Fetch tiktok links for submissions that need them
+	useEffect(() => {
+		const fetchTiktokLink = async () => {
+			if (submissionsList.length > 0 && !fetchingTiktokLink) {
+				setFetchingTiktokLink(true);
+
+				const tiktokNeedSubmissions = submissionsList.filter(
+					(sub) =>
+						(sub.status === "tiktokLink_verified" ||
+							sub.status === "tiktokLink_received") &&
+						!sub.sparkCode
+				);
+
+				if (tiktokNeedSubmissions.length > 0) {
+					try {
+						// Create an array of promises for each submission that needs a spark code
+						const tiktokLinkPromises = tiktokNeedSubmissions.map(
+							async (submission) => {
+								const response = await fetch(
+									`/api/project-submissions/get-tiktok-link`,
+									{
+										method: "POST",
+										headers: {
+											"Content-Type": "application/json",
+										},
+										body: JSON.stringify({
+											submissionId: submission.id,
+										}),
+									}
+								);
+
+								if (!response.ok) {
+									console.warn(
+										`Failed to fetch spark code for submission ${submission.id}`
+									);
+									return null;
+								}
+
+								const data = await response.json();
+								return {
+									submissionId: submission.id,
+									sparkCode: data.data.sparkCode,
+								};
+							}
+						);
+
+						// Wait for all promises to resolve
+						const results = await Promise.all(tiktokLinkPromises);
+
+						// Update submissions with spark codes
+						const updatedSubmissions = [...submissionsList];
+
+						results.forEach((result) => {
+							if (result) {
+								const index = updatedSubmissions.findIndex(
+									(sub) => sub.id === result.submissionId
+								);
+
+								if (index !== -1) {
+									updatedSubmissions[index] = {
+										...updatedSubmissions[index],
+										sparkCode: result.sparkCode,
+									};
+								}
+							}
+						});
+
+						setSubmissionsList(updatedSubmissions);
+					} catch (error) {
+						console.error("Error fetching spark codes:", error);
+					}
+				}
+
+				setFetchingSparkCodes(false);
+			}
+		};
+
+		fetchTiktokLink();
+	}, [submissionsList, fetchingTiktokLink]);
 
 	// Fetch spark codes for submissions that need them
 	useEffect(() => {
@@ -69,7 +155,7 @@ export default function CreatorSubmissionTab({
 						const sparkCodePromises = sparkNeededSubmissions.map(
 							async (submission) => {
 								const response = await fetch(
-									`/api/project-submissions/spark-code/get`,
+									`/api/project-submissions/get-spark-code`,
 									{
 										method: "POST",
 										headers: {
@@ -257,6 +343,12 @@ export default function CreatorSubmissionTab({
 		setIsSparkCodeModalOpen(true);
 	};
 
+	const openTiktokLinkModal = (submission: CreatorSubmission) => {
+		setCurrentSubmission(submission);
+		setTiktokLinkSubmissionId(submission.id);
+		setIsTiktokLinkModalOpen(true);
+	};
+
 	// Render buttons based on submission status
 	const renderSubmissionButtons = (submission: CreatorSubmission) => {
 		switch (submission.status) {
@@ -297,6 +389,7 @@ export default function CreatorSubmissionTab({
 			case "tiktokLink_requested":
 				return (
 					<Button
+						onClick={() => openTiktokLinkModal(submission)}
 						variant="secondary"
 						className="flex-grow bg-[#FD5C02] text-white flex items-center justify-center"
 					>
@@ -390,7 +483,7 @@ export default function CreatorSubmissionTab({
 					<div className="grid grid-cols-1 md:grid-cols-2  gap-6">
 						{submissionsList.map((submission) => (
 							<Card
-								key={submission.id}
+								key={`submission-${submission.id}`}
 								className="overflow-hidden border border-[#FFBF9BBA]"
 							>
 								<CardContent className="">
@@ -467,6 +560,20 @@ export default function CreatorSubmissionTab({
 															</p>
 														</div>
 													)}
+
+												{/* Display Spark Code if present */}
+												{(submission.status === "tiktokLink_verified" ||
+													submission.status === "tiktokLink_received") &&
+													submission.sparkCode && (
+														<Link
+															href={submission.tiktokLink}
+															className="mt-4 -mb-4"
+														>
+															<p className="text-start text-xs text-black hover:underline">
+																View TikTok
+															</p>
+														</Link>
+													)}
 											</div>
 										</div>
 										<div className="flex mt-4">
@@ -484,6 +591,41 @@ export default function CreatorSubmissionTab({
 						onClose={handleCloseModals}
 						onApprove={handleApprove}
 					/>
+
+					{/* Tiktok Link Modal */}
+					{isTiktokLinkModalOpen && (
+						<TikTokLinkModal
+							isSubmitting={false} // You'll need to track this state
+							onClose={() => setIsTiktokLinkModalOpen(false)}
+							onSubmit={async (tiktokLink) => {
+								try {
+									// Submit the tiktok link using fetch or your API method
+									const response = await fetch(
+										`/api/project-submissions/submit-tiktok-link`,
+										{
+											method: "POST",
+											headers: {
+												"Content-Type": "application/json",
+											},
+											body: JSON.stringify({
+												tiktokLink,
+												submissionId: tiktokLinkSubmissionId,
+											}),
+										}
+									);
+									if (!response.ok) {
+										throw new Error("Failed to submit tiktok link");
+									}
+									// Refresh submissions after successful submission
+									await fetchSubmissions();
+									setIsTiktokLinkModalOpen(false);
+								} catch (error) {
+									console.error("Error submitting tiktok link:", error);
+									throw error;
+								}
+							}}
+						/>
+					)}
 
 					{/* SparkCode Modal */}
 					{isSparkCodeModalOpen && (

@@ -8,8 +8,6 @@ export default function ProjectPage() {
 	const params = useParams();
 	const projectId = params.projectId as string;
 
-	// Add some validation or logging here
-	console.log("Project ID from URL params:", projectId);
 
 	if (!projectId) {
 		return (
