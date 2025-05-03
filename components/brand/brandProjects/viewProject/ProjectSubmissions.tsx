@@ -47,7 +47,6 @@ export default function ProjectSubmissions({
 	const [currentSubmission, setCurrentSubmission] =
 		useState<CreatorSubmission | null>(null);
 	const [revisionUsed, setRevisionUsed] = useState<number>(1);
-	const [maxRevisions] = useState<number>(3);
 	const [submissionsList, setSubmissionsList] = useState<CreatorSubmission[]>(
 		[]
 	);
@@ -1168,11 +1167,11 @@ export default function ProjectSubmissions({
 						</div>
 					</div>
 					<div className="flex justify-end mb-4 space-x-2">
-						<Select>
+					<Select onValueChange={(value) => setStatusFilter(value)}>
 							<SelectTrigger className="w-32">
 								<SelectValue placeholder="All Statuses" />
 							</SelectTrigger>
-							<SelectContent>
+							<SelectContent className="bg-[#f7f7f7]">
 								<SelectItem value="all">All Statuses</SelectItem>
 								<SelectItem value="submitted">Submitted</SelectItem>
 								<SelectItem value="approved">Approved</SelectItem>
@@ -1189,11 +1188,11 @@ export default function ProjectSubmissions({
 							</SelectContent>
 						</Select>
 
-						<Select>
+						<Select onValueChange={(value) => setSortBy(value)}>
 							<SelectTrigger className="w-32">
 								<SelectValue placeholder="Sort By" />
 							</SelectTrigger>
-							<SelectContent>
+							<SelectContent className="bg-[#f7f7f7]">
 								<SelectItem value="newest">Newest</SelectItem>
 								<SelectItem value="oldest">Oldest</SelectItem>
 								<SelectItem value="creator">Creator Name</SelectItem>
