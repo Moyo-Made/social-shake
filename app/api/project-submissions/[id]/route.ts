@@ -3,12 +3,10 @@ import { adminAuth, adminDb } from "@/config/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 
 // PATCH endpoint to update a submission status
-export async function PATCH(
-  request: NextRequest,
-  context: { params: { id: string } }
-) {  
-try {
-    const submissionId = context.params.id;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function PATCH(request: NextRequest, { params }: any) {
+  try {
+    const submissionId = params.id;
     
     if (!submissionId) {
       return NextResponse.json({ error: "Submission ID is required" }, { status: 400 });
