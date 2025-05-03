@@ -33,7 +33,7 @@ const ProjectDetails: React.FC = () => {
 		// If there's a string URL in the context
 		if (typeof projectDetails.projectThumbnail === "string") {
 			setPreviewUrl(projectDetails.projectThumbnail as string);
-		} else if (typeof projectDetails.projectThumbnail === "string" && projectDetails.projectThumbnail instanceof File) {
+		} else if (projectDetails.projectThumbnail instanceof File) {
 			// If there's a File object
 			setSelectedFile(projectDetails.projectThumbnail);
 			const objectUrl = URL.createObjectURL(projectDetails.projectThumbnail);

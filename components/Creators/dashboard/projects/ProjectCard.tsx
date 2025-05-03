@@ -218,8 +218,9 @@ export default function ProjectCard({ project }: ProjectCardProps) {
 				<div className="w-1/3">
 					<Image
 						src={
-							project.projectDetails.projectThumbnail ||
-							"/api/placeholder/300/200"
+							typeof project.projectDetails.projectThumbnail === "string"
+								? project.projectDetails.projectThumbnail
+								: ""
 						}
 						alt={project.projectDetails.projectName}
 						className="w-full h-[20rem] object-cover rounded-xl p-2"

@@ -68,7 +68,7 @@ export interface ProjectDetails {
 	productLink: string;
 	productType: ProductType;
 	projectDescription: string;
-	projectThumbnail: string | null;
+	projectThumbnail: string | File | null;
 }
 
 export interface ProjectRequirements {
