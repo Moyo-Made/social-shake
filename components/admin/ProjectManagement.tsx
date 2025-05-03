@@ -495,7 +495,7 @@ const ProjectManagement: React.FC = () => {
 			},
 		};
 
-		const config = statusConfig[status] || statusConfig.pending;
+		const config = statusConfig[status as keyof typeof statusConfig] || statusConfig["pending"];
 
 		return (
 			<span
