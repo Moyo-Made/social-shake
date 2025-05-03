@@ -50,9 +50,13 @@ export interface CreatorSubmission {
 		| "awaiting_payment"
 		| "tiktokLink_requested"
 		| "tiktokLink_received"
-		| "tiktokLink_verified";
+		| "tiktokLink_verified"
+		| "affiliateLink_requested"
+		| "affiliateLink_received"
+		| "affiliateLink_verified";
 	sparkCode?: string;
 	revisionsUsed?: number;
+	affiliateLink?: string;
 }
 
 export interface SubmissionReview {

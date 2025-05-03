@@ -24,7 +24,9 @@ export default function TikTokShopCreatorPricingTab() {
     CreatorPricing["selectionMethod"]
   >(creatorPricing.selectionMethod || "Invite Specific Creators");
   const [creatorPayment, setCreatorPayment] = useState(creatorPricing.budgetPerVideo || 1500);
-  const [affiliateCommission, setAffiliateCommission] = useState("10");
+  const [affiliateCommission, setAffiliateCommission] = useState(
+    creatorPricing.cost.commissionPerSale || ""
+  );
   const [extras, setExtras] = useState<{
     captions: boolean;
     music: boolean;
@@ -88,7 +90,7 @@ export default function TikTokShopCreatorPricingTab() {
       : [];
       
     updateCreatorPricing({
-      selectionMethod: selectionMethod === "Invite Specific Creators" ? "Invite Specific Creators" : "Post Public Brief",
+      selectionMethod,
       selectedCreators: creatorsForContext,
       ageGroup,
       gender,
@@ -137,7 +139,8 @@ export default function TikTokShopCreatorPricingTab() {
         },
         extrasTotal,
         totalAmount,
-        commissionPerSale: serviceFee,
+        commissionPerSale: affiliateCommission,
+        serviceFee: 0
       },
     });
   };
@@ -158,6 +161,7 @@ export default function TikTokShopCreatorPricingTab() {
     language,
     countries,
     creators,
+    affiliateCommission, 
   ]);
 
   return (
@@ -179,10 +183,10 @@ export default function TikTokShopCreatorPricingTab() {
                   <SelectValue placeholder="Select method" />
                 </SelectTrigger>
                 <SelectContent className="bg-white">
-                  <SelectItem value="invite">
+                  <SelectItem value="Invite Specific Creators">
                     Invite Specific Creators
                   </SelectItem>
-                  <SelectItem value="public">Post Public Brief</SelectItem>
+                  <SelectItem value="Post Public Brief">Post Public Brief</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -579,7 +583,7 @@ export default function TikTokShopCreatorPricingTab() {
                 <Input
                   type="text"
                   value={affiliateCommission}
-                  onChange={(e) => setAffiliateCommission(e.target.value)}
+                  onChange={(e) => setAffiliateCommission((e.target.value))}
                   className="pl-3 border rounded-md"
                   placeholder="10%"
                 />
@@ -785,7 +789,7 @@ export default function TikTokShopCreatorPricingTab() {
                   ${(musicTotal + rawFilesTotal).toLocaleString()}
                 </span>
               </div>
-              <div className="text-sm text-gray-500 mb-1">
+              <div className="text-sm text-gray-500 mb-3">
                 Music - ${extras.music ? 50 : 0} × {totalVideos} Videos = ${musicTotal}
                 {extras.rawFiles && (
                   <>

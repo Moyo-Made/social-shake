@@ -8,9 +8,11 @@ import { db } from "@/config/firebase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectFormData } from "@/types/contestFormData";
 import Image from "next/image";
-import ProductDelivery from "@/components/brand/brandProjects/viewProject/ProductDelivery";
 import { getProjectStatusInfo } from "@/types/projects";
 import CreatorSubmissionTab from "./CreatorSubmissionTab";
+import ProjectAnalytics from "./ProjectAnalytics";
+import DeliveryTracking from "./ProductDeliveryTracking";
+
 
 
 interface ProjectDetailPageProps {
@@ -75,7 +77,7 @@ const ManageProjects = ({ projectId }: ProjectDetailPageProps) => {
 	const isPhysicalProduct = projectDetails.productType === "Physical";
 
 	const tabTriggerStyles =
-		"w-40 data-[state=active]:bg-[#FFF4EE] data-[state=active]:border-b-2 data-[state=active]:border-[#FC52E4] data-[state=active]:text-[#FD5C02] data-[state=inactive]:text-[#667085] rounded-none py-3";
+		"w-48 data-[state=active]:bg-[#FFF4EE] data-[state=active]:border-b-2 data-[state=active]:border-[#FC52E4] data-[state=active]:text-[#FD5C02] data-[state=inactive]:text-[#667085] rounded-none py-3";
 
 	return (
 		<div className="flex flex-col bg-white border border-[#FFD9C3] rounded-lg py-5 px-6 mt-3">
@@ -101,11 +103,11 @@ const ManageProjects = ({ projectId }: ProjectDetailPageProps) => {
 
 				{/* Back Button */}
 				<Link
-					href="/brand/dashboard/projects"
+					href="/creator/dashboard/project/applied"
 					className="absolute top-4 left-6 flex items-center text-white hover:underline z-10"
 				>
 					<ChevronLeft size={20} />
-					<span>All Projects</span>
+					<span>My Projects</span>
 				</Link>
 
 				{/* Project Title & Stats */}
@@ -149,6 +151,15 @@ const ManageProjects = ({ projectId }: ProjectDetailPageProps) => {
 						Submissions
 					</TabsTrigger>
 
+					{projectDetails.projectType === "TikTok Shop" && (
+						<>
+							<TabsTrigger value="analytics" className={tabTriggerStyles}>
+								Analytics
+							</TabsTrigger>
+						
+						</>
+					)}
+
 					{isPhysicalProduct && (
 						<TabsTrigger value="product-delivery" className={tabTriggerStyles}>
 							Product Delivery Tracking
@@ -159,19 +170,7 @@ const ManageProjects = ({ projectId }: ProjectDetailPageProps) => {
 						Project Overview
 					</TabsTrigger>
 
-					{projectDetails.projectType === "TikTok Shop" && (
-						<>
-							<TabsTrigger value="analytics" className={tabTriggerStyles}>
-								Analytics
-							</TabsTrigger>
-							<TabsTrigger
-								value="affiliate-payout"
-								className={tabTriggerStyles}
-							>
-								Affiliates Payout
-							</TabsTrigger>
-						</>
-					)}
+					
 				</TabsList>
 
 				{/* Project Overview Tab */}
@@ -476,11 +475,18 @@ const ManageProjects = ({ projectId }: ProjectDetailPageProps) => {
 					</div>
 				</TabsContent>
 
+				<TabsContent value="analytics">
+					<div className="p-8 text-center text-gray-500">
+						<ProjectAnalytics />
+					</div>
+				</TabsContent>
+
+
 				{/* Product Delivery Tab (only shown for physical products) */}
 				{isPhysicalProduct && (
 					<TabsContent value="product-delivery">
 						<div className="p-8 text-gray-500">
-							<ProductDelivery />
+							<DeliveryTracking />
 						</div>
 					</TabsContent>
 				)}

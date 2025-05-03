@@ -314,6 +314,8 @@ export default function ProjectDetails({
 	const publishedDate = formatDate(projectData?.createdAt);
 	const projectType =
 		projectData?.projectDetails.projectType || "Not specified";
+	const productLink =
+		projectData?.projectDetails.productLink || "Not specified";
 	const description =
 		projectData?.projectDetails.projectDescription ||
 		"No description provided.";
@@ -328,6 +330,9 @@ export default function ProjectDetails({
 	const productType =
 		projectData?.projectDetails.productType || "Not specified";
 	const numberOfVideos = projectData?.creatorPricing.videosPerCreator || 0;
+	const fixedFeePerVideo = projectData?.creatorPricing.cost.budgetPerVideo;
+	const commissionSale =
+		projectData?.creatorPricing.cost.commissionPerSale || 0;
 
 	// Get the status display properties
 	const getStatusDisplay = (status: string) => {
@@ -467,20 +472,58 @@ export default function ProjectDetails({
 								</div>
 							</div>
 
-							<div className="flex gap-2 text-sm mb-2">
-								<Image
-									src="/icons/money.svg"
-									alt="Money"
-									width={20}
-									height={20}
-								/>
-								<div className="flex flex-col">
-									<p className="mb-2 text-[#667085]">Payment Per Video</p>
-									<span className="text-black font-normal">
-										${paymentPerVideo}
-									</span>
+							{projectType === "UGC Content Only" ||
+								projectType === "Creator-Posted UGC" ||
+								(projectType === "Spark Ads" && (
+									<div className="flex gap-2 text-sm mb-2">
+										<Image
+											src="/icons/money.svg"
+											alt="Money"
+											width={20}
+											height={20}
+										/>
+										<div className="flex flex-col">
+											<p className="mb-2 text-[#667085]">Payment Per Video</p>
+											<span className="text-black font-normal">
+												${paymentPerVideo}
+											</span>
+										</div>
+									</div>
+								))}
+
+							{projectType === "TikTok Shop" && (
+								<div>
+									<div className="flex gap-2 text-sm mb-2">
+										<Image
+											src="/icons/money.svg"
+											alt="Money"
+											width={20}
+											height={20}
+										/>
+										<div className="flex flex-col">
+											<p className="mb-2 text-[#667085]">Fixed Fee Per Video</p>
+											<span className="text-black font-normal">
+												${fixedFeePerVideo}
+											</span>
+										</div>
+									</div>
+
+									<div className="flex gap-2 text-sm mb-2">
+										<Image
+											src="/icons/sales.svg"
+											alt="Commission"
+											width={20}
+											height={20}
+										/>
+										<div className="flex flex-col">
+											<p className="mb-2 text-[#667085]">Commission Per Sale</p>
+											<span className="text-black font-normal">
+												${commissionSale}
+											</span>
+										</div>
+									</div>
 								</div>
-							</div>
+							)}
 
 							<div className="px-4 w-full">
 								<button
@@ -538,31 +581,40 @@ export default function ProjectDetails({
 							<h3 className="text-base text-[#667085] mb-2">Project Type</h3>
 							<p>{projectType}</p>
 						</div>
-
 						<div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
 							<h3 className="text-base text-[#667085] mb-2">
 								Project Description
 							</h3>
 							<p>{description}</p>
 						</div>
-
 						<div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
 							<h3 className="text-base text-[#667085] mb-2">Content Type</h3>
 							<p className="capitalize">{contentType.replace(/-/g, " ")}</p>
 						</div>
-
+						
+						{projectData?.projectDetails.projectType === "TikTok Shop" && (
+							<div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
+								<h3 className="text-base text-[#667085] mb-2">Product Link</h3>
+								<Link
+									href={productLink}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="text-orange-500 hover:underline"
+								>
+									{productLink}
+								</Link>
+							</div>
+						)}
 						<div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
 							<h3 className="text-base text-[#667085] mb-2">Video Type</h3>
 							<p className="capitalize">{videoType.replace(/-/g, " ")}</p>
 						</div>
-
 						{projectType === "UGC Content Only" && (
 							<div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
 								<h3 className="text-base text-[#667085] mb-2">Aspect Ratio</h3>
 								<p>{aspectRatio}</p>
 							</div>
 						)}
-
 						{/* Content Creation Guidance */}
 						<div>
 							<div className="relative border-b pb-4">
@@ -682,21 +734,58 @@ export default function ProjectDetails({
 							</div>
 						</div>
 
-						<div className="flex gap-2 text-sm mb-6">
-							<Image
-								src="/icons/money.svg"
-								alt="Money"
-								width={20}
-								height={20}
-							/>
+						{projectType === "UGC Content Only" ||
+							projectType === "Creator-Posted UGC" ||
+							(projectType === "Spark Ads" && (
+								<div className="flex gap-2 text-sm mb-2">
+									<Image
+										src="/icons/money.svg"
+										alt="Money"
+										width={20}
+										height={20}
+									/>
+									<div className="flex flex-col">
+										<p className="mb-2 text-[#667085]">Payment Per Video</p>
+										<span className="text-black font-normal">
+											${paymentPerVideo}
+										</span>
+									</div>
+								</div>
+							))}
 
-							<div className="flex flex-col ">
-								<p className="text-[#667085]">Payment Per Video</p>
-								<span className="text-black font-normal">
-									${paymentPerVideo}
-								</span>
+						{projectType === "TikTok Shop" && (
+							<div>
+								<div className="flex gap-2 text-sm mb-2">
+									<Image
+										src="/icons/money.svg"
+										alt="Money"
+										width={20}
+										height={20}
+									/>
+									<div className="flex flex-col">
+										<p className="mb-1 text-[#667085]">Fixed Fee Per Video</p>
+										<span className="text-black font-normal">
+											${fixedFeePerVideo}
+										</span>
+									</div>
+								</div>
+
+								<div className="flex gap-2 text-sm mb-2">
+									<Image
+										src="/icons/sales.svg"
+										alt="Commission"
+										width={20}
+										height={20}
+									/>
+									<div className="flex flex-col">
+										<p className="mb-1 text-[#667085]">Commission Per Sale</p>
+										<span className="text-black font-normal mb-2">
+											${commissionSale}
+										</span>
+									</div>
+								</div>
 							</div>
-						</div>
+						)}
 
 						<button
 							onClick={hasApplied ? undefined : openApplyModal}

@@ -11,6 +11,7 @@ import RevisionModal from "./RevisionModal";
 import SparkCodeModal from "@/components/Creators/dashboard/projects/SparkCodeModal";
 import Link from "next/link";
 import TikTokLinkModal from "./TikTokLinkModal";
+import AffiliateLinkModal from "./AffiliateLinkModal";
 
 interface ProjectSubmissionsProps {
 	projectFormData: ProjectFormData;
@@ -43,6 +44,11 @@ export default function CreatorSubmissionTab({
 	const [tiktokLinkSubmissionId, setTiktokLinkSubmissionId] =
 		useState<string>("");
 	const [fetchingTiktokLink, setFetchingTiktokLink] = useState(false);
+	const [isAffiliateLinkModalOpen, setIsAffiliateLinkModalOpen] =
+		useState(false);
+	const [affiliateLinkSubmissionId, setAffiliateLinkSubmissionId] =
+		useState<string>("");
+	const [fetchingAffiliateLink, setFetchingAffiliateLink] = useState(false);
 
 	const totalVideos = projectFormData?.creatorPricing?.videosPerCreator || 0;
 	const completedVideos = submissionsList.length || 0;
@@ -66,12 +72,12 @@ export default function CreatorSubmissionTab({
 					(sub) =>
 						(sub.status === "tiktokLink_verified" ||
 							sub.status === "tiktokLink_received") &&
-						!sub.sparkCode
+						!sub.tiktokLink
 				);
 
 				if (tiktokNeedSubmissions.length > 0) {
 					try {
-						// Create an array of promises for each submission that needs a spark code
+						// Create an array of promises for each submission that needs a tiktok link
 						const tiktokLinkPromises = tiktokNeedSubmissions.map(
 							async (submission) => {
 								const response = await fetch(
@@ -89,7 +95,7 @@ export default function CreatorSubmissionTab({
 
 								if (!response.ok) {
 									console.warn(
-										`Failed to fetch spark code for submission ${submission.id}`
+										`Failed to fetch tiktok link for submission ${submission.id}`
 									);
 									return null;
 								}
@@ -97,7 +103,7 @@ export default function CreatorSubmissionTab({
 								const data = await response.json();
 								return {
 									submissionId: submission.id,
-									sparkCode: data.data.sparkCode,
+									tiktokLink: data.data.tiktokLink,
 								};
 							}
 						);
@@ -105,7 +111,7 @@ export default function CreatorSubmissionTab({
 						// Wait for all promises to resolve
 						const results = await Promise.all(tiktokLinkPromises);
 
-						// Update submissions with spark codes
+						// Update submissions with tiktok link
 						const updatedSubmissions = [...submissionsList];
 
 						results.forEach((result) => {
@@ -117,7 +123,7 @@ export default function CreatorSubmissionTab({
 								if (index !== -1) {
 									updatedSubmissions[index] = {
 										...updatedSubmissions[index],
-										sparkCode: result.sparkCode,
+										tiktokLink: result.tiktokLink,
 									};
 								}
 							}
@@ -125,16 +131,95 @@ export default function CreatorSubmissionTab({
 
 						setSubmissionsList(updatedSubmissions);
 					} catch (error) {
-						console.error("Error fetching spark codes:", error);
+						console.error("Error fetching tiktok link:", error);
 					}
 				}
 
-				setFetchingSparkCodes(false);
+				setFetchingTiktokLink(false);
 			}
 		};
 
 		fetchTiktokLink();
 	}, [submissionsList, fetchingTiktokLink]);
+
+	// Fetch affiliate links for submissions that need them
+	useEffect(() => {
+		const fetchAffiliateLink = async () => {
+			if (submissionsList.length > 0 && !fetchingAffiliateLink) {
+				setFetchingAffiliateLink(true);
+
+				const affiliateLinkNeedSubmissions = submissionsList.filter(
+					(sub) =>
+						(sub.status === "approved" ||
+							sub.status === "affiliateLink_received" ||
+							sub.status === "affiliateLink_verified") &&
+						!sub.affiliateLink
+				);
+
+				if (affiliateLinkNeedSubmissions.length > 0) {
+					try {
+						// Create an array of promises for each submission that needs an affiliate link
+						const affiliateLinkPromises = affiliateLinkNeedSubmissions.map(
+							async (submission) => {
+								// Using GET to only retrieve existing links:
+								const response = await fetch(
+									`/api/project-submissions/generate-affiliate-link?submissionId=${submission.id}`,
+									{
+										method: "GET",
+										headers: {
+											"Content-Type": "application/json",
+										},
+									}
+								);
+
+								if (!response.ok) {
+									console.warn(
+										`Failed to fetch affiliate link for submission ${submission.id}`
+									);
+									return null;
+								}
+
+								const data = await response.json();
+								return {
+									submissionId: submission.id,
+									affiliateLink: data.data.affiliateLink,
+								};
+							}
+						);
+
+						// Wait for all promises to resolve
+						const results = await Promise.all(affiliateLinkPromises);
+
+						// Update submissions with affiliate link
+						const updatedSubmissions = [...submissionsList];
+
+						results.forEach((result) => {
+							if (result) {
+								const index = updatedSubmissions.findIndex(
+									(sub) => sub.id === result.submissionId
+								);
+
+								if (index !== -1) {
+									updatedSubmissions[index] = {
+										...updatedSubmissions[index],
+										affiliateLink: result.affiliateLink,
+									};
+								}
+							}
+						});
+
+						setSubmissionsList(updatedSubmissions);
+					} catch (error) {
+						console.error("Error fetching affiliate link:", error);
+					}
+				}
+
+				setFetchingAffiliateLink(false);
+			}
+		};
+
+		fetchAffiliateLink();
+	}, [submissionsList, fetchingAffiliateLink]);
 
 	// Fetch spark codes for submissions that need them
 	useEffect(() => {
@@ -254,6 +339,7 @@ export default function CreatorSubmissionTab({
 						createdAt: formattedDate,
 						updatedAt: submission.updatedAt || formattedDate,
 						sparkCode: submission.sparkCode || "",
+						tiktokLink: submission.tiktokLink || "",
 					};
 				}
 			);
@@ -349,6 +435,12 @@ export default function CreatorSubmissionTab({
 		setIsTiktokLinkModalOpen(true);
 	};
 
+	const openAffiliateLinkModal = (submission: CreatorSubmission) => {
+		setCurrentSubmission(submission);
+		setAffiliateLinkSubmissionId(submission.id);
+		setIsAffiliateLinkModalOpen(true);
+	};
+
 	// Render buttons based on submission status
 	const renderSubmissionButtons = (submission: CreatorSubmission) => {
 		switch (submission.status) {
@@ -364,15 +456,23 @@ export default function CreatorSubmissionTab({
 					</>
 				);
 			case "approved":
-				return (
-					<Button
-						variant="secondary"
-						className="flex-grow bg-[#067411] text-white flex items-center justify-center"
-						disabled
-					>
-						Approved
-					</Button>
-				);
+			case "approved":
+				// For approved submissions and TikTok Shop projects, show Generate Affiliate Link button
+				if (projectFormData?.projectDetails.projectType === "TikTok Shop") {
+					return (
+						<Button
+							variant="secondary"
+							className="flex-grow bg-[#FD5C02] text-white flex items-center justify-center"
+							onClick={() => openAffiliateLinkModal(submission)}
+						>
+							Generate Affiliate Link
+						</Button>
+					);
+				}
+				return;
+				case "affiliateLink_received":
+					case "affiliateLink_verified":
+						return;
 			case "spark_requested":
 				return (
 					<Button
@@ -396,6 +496,9 @@ export default function CreatorSubmissionTab({
 						Submit Tiktok Link
 					</Button>
 				);
+			case "tiktokLink_received":
+			case "tiktokLink_verified":
+				return;
 
 			case "revision_requested":
 				return (
@@ -480,58 +583,59 @@ export default function CreatorSubmissionTab({
 						</div>
 					</div>
 
-					<div className="grid grid-cols-1 md:grid-cols-2  gap-6">
+					<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 						{submissionsList.map((submission) => (
 							<Card
 								key={`submission-${submission.id}`}
-								className="overflow-hidden border border-[#FFBF9BBA]"
+								className="w-96 overflow-hidden border shadow-md"
 							>
-								<CardContent className="">
-									<div className="pt-4">
-										<div className=" relative">
-											{/* If we have a videoUrl, create a video thumbnail */}
-											{submission.videoUrl && (
-												<div className="w-full h-64 relative">
-													<video
-														src={submission.videoUrl}
-														className="absolute inset-0 w-full h-full object-cover rounded-md"
-														controls
-													/>
-												</div>
-											)}
-										</div>
-										<div className="flex items-center mt-4 gap-4">
-											<div className="flex flex-col">
-												<div className="flex gap-3 items-center mb-1">
-													<div className="text-sm font-medium text-black">
-														Video #{submission.videoNumber}
-													</div>
+								<CardContent className="p-0">
+									<div>
+										{/* Video container */}
+										{submission.videoUrl && (
+											<div className="w-full aspect-square relative">
+												<video
+													src={submission.videoUrl}
+													className="absolute inset-0 w-full h-full object-cover"
+													controls
+												/>
+											</div>
+										)}
 
-													<div className="">
-														<p>
-															{submission.status === "pending" ? (
-																<span className="bg-[#FFF0C3] border border-[#FDD849] text-[#1A1A1A] text-xs py-0.5 px-1 rounded-full">
-																	• Pending
-																</span>
-															) : submission.status === "approved" ? (
-																<span className="text-[#067647] text-xs bg-[#ECFDF3] border border-[#ABEFC6] py-0.5 px-1 rounded-full">
-																	√ Approved
-																</span>
-															) : submission.status === "spark_received" ||
-															  submission.status === "spark_verified" ? (
-																<span className="text-[#067647] text-xs bg-[#ECFDF3] border border-[#ABEFC6] py-0.5 px-1 rounded-full">
-																	√ Spark Code Verified
-																</span>
-															) : submission.status === "revision_requested" ? (
-																<span className="bg-[#FFE5FB] border border-[#FC52E4] text-[#F04438] text-xs py-0.5 px-1 rounded-full">
-																	• Requested Revision
-																</span>
-															) : null}{" "}
-														</p>
-													</div>
+										{/* Card content area */}
+										<div className="p-4">
+											{/* Header with title and status badge */}
+											<div className="flex justify-between items-center mb-1">
+												<div className="text-sm font-medium text-black">
+													Video #{submission.videoNumber}
 												</div>
-												<div className="flex justify-between text-xs text-black">
-													<div className="flex gap-1 text-gray-500 text-xs items-center">
+
+												<div>
+													{submission.status === "pending" ? (
+														<span className="bg-[#FFF0C3] border border-[#FDD849] text-[#1A1A1A] text-xs py-0.5 px-2 rounded-full">
+															• Pending
+														</span>
+													) : submission.status === "approved" ? (
+														<span className="text-[#067647] text-xs bg-[#ECFDF3] border border-[#ABEFC6] py-0.5 px-2 rounded-full">
+															√ Approved
+														</span>
+													) : submission.status === "spark_received" ||
+													  submission.status === "spark_verified" ? (
+														<span className="text-[#067647] text-xs bg-[#ECFDF3] border border-[#ABEFC6] py-0.5 px-2 rounded-full">
+															√ Spark Code Verified
+														</span>
+													) : submission.status === "revision_requested" ? (
+														<span className="bg-[#FFE5FB] border border-[#FC52E4] text-[#F04438] text-xs py-0.5 px-2 rounded-full">
+															• Requested Revision
+														</span>
+													) : null}
+												</div>
+											</div>
+
+											{/* Submission information */}
+											<div className="flex items-center justify-between text-xs mb-3">
+												<div className="flex items-center gap-1 text-gray-500">
+													<span>
 														{submission.status === "approved"
 															? "Approved:"
 															: submission.status === "pending"
@@ -542,42 +646,52 @@ export default function CreatorSubmissionTab({
 																		  submission.status === "spark_verified"
 																		? "Spark Verified:"
 																		: "Submitted:"}
-
-														<p className="text-black text-xs">
-															{submission.createdAt}
-														</p>
-													</div>
+													</span>
+													<span className="text-black">
+														{submission.createdAt}
+													</span>
 												</div>
 
-												{/* Display Spark Code if present */}
-												{(submission.status === "spark_verified" ||
-													submission.status === "spark_received") &&
-													submission.sparkCode && (
-														<div className="mt-4 -mb-4">
-															<p className="text-start text-xs text-black">
-																<span className="font-medium">Spark Code:</span>{" "}
-																{submission.sparkCode}
-															</p>
-														</div>
-													)}
-
-												{/* Display Spark Code if present */}
+												{/* TikTok Link */}
 												{(submission.status === "tiktokLink_verified" ||
 													submission.status === "tiktokLink_received") &&
-													submission.sparkCode && (
+													submission.tiktokLink && (
 														<Link
 															href={submission.tiktokLink}
-															className="mt-4 -mb-4"
+															className="text-sm text-black hover:underline"
 														>
-															<p className="text-start text-xs text-black hover:underline">
-																View TikTok
-															</p>
+															View TikTok
+														</Link>
+													)}
+
+												{(submission.status === "affiliateLink_received" ||
+													submission.status === "affiliateLink_verified") &&
+													submission.affiliateLink && (
+														<Link
+															href={submission.affiliateLink}
+															className="text-sm text-black hover:underline"
+														>
+															View Affiliate Link
 														</Link>
 													)}
 											</div>
-										</div>
-										<div className="flex mt-4">
-											{renderSubmissionButtons(submission)}
+
+											{/* Spark Code if present */}
+											{(submission.status === "spark_verified" ||
+												submission.status === "spark_received") &&
+												submission.sparkCode && (
+													<div className="mb-3 text-start">
+														<p className="text-xs text-black">
+															<span className="font-medium">Spark Code:</span>{" "}
+															{submission.sparkCode}
+														</p>
+													</div>
+												)}
+
+											{/* Action buttons */}
+											<div className="flex justify-center mt-2">
+												{renderSubmissionButtons(submission)}
+											</div>
 										</div>
 									</div>
 								</CardContent>
@@ -624,6 +738,14 @@ export default function CreatorSubmissionTab({
 									throw error;
 								}
 							}}
+						/>
+					)}
+
+					{isAffiliateLinkModalOpen && (
+						<AffiliateLinkModal
+							isOpen={isAffiliateLinkModalOpen}
+							onClose={() => setIsAffiliateLinkModalOpen(false)}
+							submissionId={affiliateLinkSubmissionId}
 						/>
 					)}
 

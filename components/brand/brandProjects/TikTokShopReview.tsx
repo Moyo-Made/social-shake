@@ -112,7 +112,25 @@ const TikTokShopProjectReview = () => {
 					<div className="grid grid-cols-3 gap-4">
 						<div className="font-medium text-gray-600">Content Type</div>
 						<div className="col-span-2">
-							{formData.projectRequirements.contentType || "Not specified"}
+							{(() => {
+								// Make sure we're accessing the correct property path
+								const contentType = formData.projectRequirements.contentType;
+
+								// Map technical values to display-friendly names
+								const contentTypeMap = {
+									"product-showcase": "Product Showcase",
+									testimonials: "Testimonials",
+									tutorials: "Tutorials",
+									"trend-participation": "Trend Participation",
+								};
+
+								// Return the mapped name if it exists, otherwise use the original value
+								return (
+									contentTypeMap[contentType as keyof typeof contentTypeMap] ||
+									contentType ||
+									"Not specified"
+								);
+							})()}
 						</div>
 					</div>
 
@@ -126,7 +144,21 @@ const TikTokShopProjectReview = () => {
 					<div className="grid grid-cols-3 gap-4">
 						<div className="font-medium text-gray-600">Video Type</div>
 						<div className="col-span-2">
-							{formData.projectRequirements.videoType || "Not specified"}
+							{(() => {
+								const videoType = formData.projectRequirements.videoType;
+
+								const videoTypeMap = {
+									"client-script": "Client's Script",
+									"creator-script": "Creator's Script",
+								};
+
+								// Return the mapped name if it exists, otherwise use the original value
+								return (
+									videoTypeMap[videoType as keyof typeof videoTypeMap] ||
+									videoType ||
+									"Not specified"
+								);
+							})()}
 						</div>
 					</div>
 
@@ -251,7 +283,7 @@ const TikTokShopProjectReview = () => {
 
 							<div className="grid grid-cols-3 gap-4">
 								<div className="font-medium text-gray-600">Gender</div>
-								<div className="col-span-2">
+								<div className="col-span-2 capitalize">
 									{formData.creatorPricing.creator.gender || "Not specified"}
 								</div>
 							</div>
@@ -260,14 +292,14 @@ const TikTokShopProjectReview = () => {
 								<div className="font-medium text-gray-600">
 									Type of Industry
 								</div>
-								<div className="col-span-2">
+								<div className="col-span-2 capitalize">
 									{formData.creatorPricing.creator.industry || "Not specified"}
 								</div>
 							</div>
 
 							<div className="grid grid-cols-3 gap-4">
 								<div className="font-medium text-gray-600">Language</div>
-								<div className="col-span-2">
+								<div className="col-span-2 capitalize">
 									{formData.creatorPricing.creator.language || "Not specified"}
 								</div>
 							</div>
@@ -277,7 +309,7 @@ const TikTokShopProjectReview = () => {
 					<div className="grid grid-cols-3 gap-4">
 						<div className="font-medium text-gray-600">No of Creators</div>
 						<div className="col-span-2">
-							{formData.creatorPricing.creator.creatorCount} Creators
+							{formData.creatorPricing.creator.creatorCount} {formData.creatorPricing.creator.creatorCount <= 1 ? "Creator" : "Creators"}
 						</div>
 					</div>
 
@@ -296,7 +328,7 @@ const TikTokShopProjectReview = () => {
 							Total Number of Videos
 						</div>
 						<div className="col-span-2">
-							{formData.creatorPricing.creator.totalVideos} Videos
+							{formData.creatorPricing.creator.totalVideos} {formData.creatorPricing.creator.totalVideos <= 1 ? "Video" : "Videos"} 
 						</div>
 					</div>
 				</div>

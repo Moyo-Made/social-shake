@@ -146,7 +146,8 @@ interface CostBreakdown {
 	extras: Extras;
 	extrasTotal: number;
 	totalAmount: number;
-	commissionPerSale: number;
+	commissionPerSale: string;
+	serviceFee: number;
 }
 
 export interface ProjectFormData {

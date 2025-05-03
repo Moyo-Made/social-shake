@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { CheckIcon, ChevronDown, ChevronLeft, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, X } from "lucide-react";
 import Image from "next/image";
 import { CreatorSubmission } from "@/types/submission";
 import { toast } from "react-hot-toast";
@@ -32,7 +32,7 @@ const ReviewVideoModal: React.FC<ReviewVideoModalProps> = ({
 	const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
 	const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
 	const [revisionsUsed, setRevisionsUsed] = useState<number>(0);
-	const [maxRevisions, setMaxRevisions] = useState<number>(3);
+	const [maxRevisions, ] = useState<number>(3);
 	const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
 	// Fetch current revision data when submission changes
@@ -112,6 +112,7 @@ const ReviewVideoModal: React.FC<ReviewVideoModalProps> = ({
 	const removeIssue = (issue: string) => {
 		setSelectedIssues(selectedIssues.filter((item) => item !== issue));
 	};
+
 
 	const handleSubmitReview = async (approved: boolean) => {
 		if (!submission?.id) {
@@ -344,13 +345,7 @@ const ReviewVideoModal: React.FC<ReviewVideoModalProps> = ({
 							</div>
 
 							<div className="flex gap-4 mt-6">
-								<Button
-									className="flex-1 bg-[#067647] hover:bg-green-700 text-white py-3 text-base"
-									onClick={() => handleSubmitReview(true)}
-									disabled={isSubmitting}
-								>
-									Approve <CheckIcon className="h-5 w-5 ml-1" />
-								</Button>
+								
 								<Button
 									className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-3 text-base"
 									onClick={() => handleSubmitReview(false)}

@@ -156,7 +156,8 @@ export default function CreatorPricingTab() {
 				},
 				extrasTotal: musicTotal + rawFilesTotal,
 				totalAmount,
-				commissionPerSale: services,
+				serviceFee: services,
+				commissionPerSale: ""
 			},
 		});
 	};

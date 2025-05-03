@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 import React, { useState, useEffect } from "react";
 import { useProjectForm } from "./ProjectFormContext";
-import { ProjectType } from "@/types/contestFormData";
+import { ProductType, ProjectType } from "@/types/contestFormData";
 
 const ProjectDetails: React.FC = () => {
 	// Use the contest form context instead of local state
@@ -33,7 +33,7 @@ const ProjectDetails: React.FC = () => {
 		// If there's a string URL in the context
 		if (typeof projectDetails.projectThumbnail === "string") {
 			setPreviewUrl(projectDetails.projectThumbnail as string);
-		} else if (projectDetails.projectThumbnail instanceof File) {
+		} else if (typeof projectDetails.projectThumbnail !== "string" && projectDetails.projectThumbnail instanceof File) {
 			// If there's a File object
 			setSelectedFile(projectDetails.projectThumbnail);
 			const objectUrl = URL.createObjectURL(projectDetails.projectThumbnail);
@@ -110,7 +110,7 @@ const ProjectDetails: React.FC = () => {
 	};
 
 	const handleProductTypeChange = (value: string) => {
-		updateProjectDetails({ productType: value });
+		updateProjectDetails({ productType: value as ProductType });
 		setTouched(prev => ({ ...prev, productType: true }));
 		validateFields();
 	};
@@ -125,7 +125,7 @@ const ProjectDetails: React.FC = () => {
 	const handleProjectDescriptionChange = (
 		e: React.ChangeEvent<HTMLTextAreaElement>
 	) => {
-		updateProjectDetails({ projectDescription: [e.target.value] });
+		updateProjectDetails({ projectDescription: e.target.value });
 		if (touched.projectDescription) validateFields();
 	};
 
@@ -150,7 +150,11 @@ const ProjectDetails: React.FC = () => {
 		if (e.dataTransfer.files && e.dataTransfer.files[0]) {
 			const file = e.dataTransfer.files[0];
 			setSelectedFile(file);
-			updateProjectDetails({ projectThumbnail: file });
+			const reader = new FileReader();
+			reader.onload = () => {
+				updateProjectDetails({ projectThumbnail: reader.result as string });
+			};
+			reader.readAsDataURL(file);
 			setTouched(prev => ({ ...prev, projectThumbnail: true }));
 			validateFields();
 		}
@@ -160,7 +164,11 @@ const ProjectDetails: React.FC = () => {
 		if (e.target.files && e.target.files[0]) {
 			const file = e.target.files[0];
 			setSelectedFile(file);
-			updateProjectDetails({ projectThumbnail: file });
+			const reader = new FileReader();
+			reader.onload = () => {
+				updateProjectDetails({ projectThumbnail: reader.result as string });
+			};
+			reader.readAsDataURL(file);
 			setTouched(prev => ({ ...prev, projectThumbnail: true }));
 			validateFields();
 		}

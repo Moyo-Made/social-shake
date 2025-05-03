@@ -35,7 +35,7 @@ const defaultFormData: ProjectFormData = {
 		projectType: "UGC Content Only",
 		productLink: "",
 		productType: "Physical",
-		projectDescription: [""],
+		projectDescription: "",
 		projectThumbnail: null,
 	},
 
@@ -103,14 +103,18 @@ const defaultFormData: ProjectFormData = {
 			},
 			extrasTotal: 0,
 			totalAmount: 0,
-			commissionPerSale: 0,
+			commissionPerSale: "",
+			serviceFee: 0
 		},
 	},
 	userId: "",
 	status: ProjectStatus.PENDING,
 	createdAt: "",
 	participantsCount: 0,
-	projectId: ""
+	projectId: "",
+	views: 0,
+	applicantsCount: 0,
+	interestId: ""
 };
 
 interface ProjectFormContextType {
@@ -392,7 +396,7 @@ export const ProjectFormProvider: React.FC<{
 			);
 
 			// Add the thumbnail file if it exists
-			if (formData.projectDetails.projectThumbnail instanceof File) {
+			if (formData.projectDetails.projectThumbnail !== null && formData.projectDetails.projectThumbnail instanceof File) {
 				formDataForSubmission.append(
 					"projectThumbnail",
 					formData.projectDetails.projectThumbnail

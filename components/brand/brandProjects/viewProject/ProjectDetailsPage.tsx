@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-// import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
@@ -21,83 +20,80 @@ interface ProjectDetailPageProps {
 	projectId: string;
 }
 const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
-	//   const router = useRouter();
 	const [project, setProject] = useState<ProjectFormData | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	// const [applications] = useState<unknown[]>([]);
 	const [submissionsList, setSubmissionsList] = useState<CreatorSubmission[]>(
-			[]
-		);
+		[]
+	);
 
-		useEffect(() => {
-			const fetchProjectData = async () => {
-				try {
-					setLoading(true);
-					const projectRef = doc(db, "projects", projectId.toString());
-					const projectSnap = await getDoc(projectRef);
-	
-					if (projectSnap.exists()) {
-						setProject(projectSnap.data() as ProjectFormData);
-					} else {
-						setError("Project not found");
-					}
-				} catch (err) {
-					console.error("Error fetching project:", err);
-					setError("Failed to load project details");
-				} finally {
-					setLoading(false);
+	useEffect(() => {
+		const fetchProjectData = async () => {
+			try {
+				setLoading(true);
+				const projectRef = doc(db, "projects", projectId.toString());
+				const projectSnap = await getDoc(projectRef);
+
+				if (projectSnap.exists()) {
+					setProject(projectSnap.data() as ProjectFormData);
+				} else {
+					setError("Project not found");
 				}
-			};
-	
-			const fetchSubmissions = async () => {
-				try {
-					const response = await fetch(
-						`/api/project-submissions?projectId=${projectId}`
-					);
-	
-					if (!response.ok) {
-						throw new Error(`Error fetching submissions: ${response.statusText}`);
-					}
-	
-					const data = await response.json();
-	
-					if (data.success && data.submissions) {
-						const basicSubmissions = data.submissions;
-						
-						// Transform the API response to match our Submission interface
-						const transformedSubmissions = basicSubmissions.map(
-							// eslint-disable-next-line @typescript-eslint/no-explicit-any
-							(submission: any, index: number) => ({
-								id: submission.id,
-								userId: submission.userId,
-								projectId: submission.projectId,
-								creatorName: submission.creatorName || "Creator",
-								creatorIcon: submission.creatorIcon || "/placeholder-profile.jpg",
-								videoUrl: submission.videoUrl || "/placeholder-video.jpg",
-								videoNumber: submission.videoNumber || `#${index + 1}`,
-								revisionNumber: submission.revisionNumber
-									? `#${submission.revisionNumber}`
-									: "",
-								status: submission.status || "new",
-								createdAt: new Date(submission.createdAt).toLocaleDateString(),
-								sparkCode: submission.sparkCode || "",
-							})
-						);
-	
-						setSubmissionsList(transformedSubmissions);
-					}
-				} catch (err) {
-					console.error("Error fetching submissions:", err);
-				}
-			};
-	
-			if (projectId) {
-				fetchProjectData();
-				fetchSubmissions();
+			} catch (err) {
+				console.error("Error fetching project:", err);
+				setError("Failed to load project details");
+			} finally {
+				setLoading(false);
 			}
-		}, [projectId]);
+		};
 
+		const fetchSubmissions = async () => {
+			try {
+				const response = await fetch(
+					`/api/project-submissions?projectId=${projectId}`
+				);
+
+				if (!response.ok) {
+					throw new Error(`Error fetching submissions: ${response.statusText}`);
+				}
+
+				const data = await response.json();
+
+				if (data.success && data.submissions) {
+					const basicSubmissions = data.submissions;
+
+					// Transform the API response to match our Submission interface
+					const transformedSubmissions = basicSubmissions.map(
+						// eslint-disable-next-line @typescript-eslint/no-explicit-any
+						(submission: any, index: number) => ({
+							id: submission.id,
+							userId: submission.userId,
+							projectId: submission.projectId,
+							creatorName: submission.creatorName || "Creator",
+							creatorIcon: submission.creatorIcon || "/placeholder-profile.jpg",
+							videoUrl: submission.videoUrl || "/placeholder-video.jpg",
+							videoNumber: submission.videoNumber || `#${index + 1}`,
+							revisionNumber: submission.revisionNumber
+								? `#${submission.revisionNumber}`
+								: "",
+							status: submission.status || "new",
+							createdAt: new Date(submission.createdAt).toLocaleDateString(),
+							sparkCode: submission.sparkCode || "",
+						})
+					);
+
+					setSubmissionsList(transformedSubmissions);
+				}
+			} catch (err) {
+				console.error("Error fetching submissions:", err);
+			}
+		};
+
+		if (projectId) {
+			fetchProjectData();
+			fetchSubmissions();
+		}
+	}, [projectId]);
 
 	if (loading) {
 		return (
@@ -176,7 +172,8 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 						</div>
 						<div>
 							<span className="text-[#FD5C02]">Creators Required:</span>{" "}
-							{creatorPricing.creatorCount} {creatorPricing.creatorCount > 1 ? "Creators" : "Creator"}
+							{creatorPricing.creatorCount}{" "}
+							{creatorPricing.creatorCount > 1 ? "Creators" : "Creator"}
 						</div>
 						<div>
 							<span className="text-[#FD5C02]">Project Type:</span>{" "}
@@ -189,8 +186,11 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 								: "Virtual Product"}
 						</div>
 						<div>
-							<span className="text-[#FD5C02]">Submissions:</span> {submissionsList.length} {submissionsList.length !== 1 ? "Videos" : "Video"} • 
-							{" "}{submissionsList.filter(sub => sub.status === "pending").length} Pending
+							<span className="text-[#FD5C02]">Submissions:</span>{" "}
+							{submissionsList.length}{" "}
+							{submissionsList.length !== 1 ? "Videos" : "Video"} •{" "}
+							{submissionsList.filter((sub) => sub.status === "pending").length}{" "}
+							Pending
 						</div>
 					</div>
 				</div>
@@ -287,6 +287,19 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 								);
 							})()}
 						</p>
+					</div>
+
+					{/* Product Link */}
+					<div className="flex gap-28">
+						<h3 className="text-[#667085] font-normal w-40">Product Link:</h3>
+						<Link
+							href={projectDetails.productLink}
+							target="_blank"
+							rel="noopener noreferrer"
+							className="text-orange-500 hover:underline"
+						>
+							{projectDetails.productLink}
+						</Link>
 					</div>
 
 					{/* Duration */}
@@ -419,19 +432,26 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 							<h3 className="text-[#667085] font-normal w-40">
 								Type of Industry:
 							</h3>
-							<p>{creatorPricing.industry || "Beauty & Wellness"}</p>
+							<p className="capitalize">
+								{creatorPricing.industry || "Beauty & Wellness"}
+							</p>
 						</div>
 
 						<div className="flex gap-28">
 							<h3 className="text-[#667085] font-normal w-40">Language:</h3>
-							<p>{creatorPricing.language || "English"}</p>
+							<p className="capitalize">
+								{creatorPricing.language || "English"}
+							</p>
 						</div>
 
 						<div className="flex gap-28">
 							<h3 className="text-[#667085] font-normal w-40">
 								No of Creators:
 							</h3>
-							<p>{creatorPricing.creatorCount || 4} Creators</p>
+							<p>
+								{creatorPricing.creatorCount || 4}{" "}
+								{creatorPricing.creatorCount <= 1 ? "Creator" : "Creators"}
+							</p>
 						</div>
 
 						<div className="flex gap-28">
@@ -448,7 +468,11 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 									creatorPricing.creatorCount *
 										creatorPricing.videosPerCreator ||
 									4}{" "}
-								Videos
+								{creatorPricing.totalVideos ||
+								creatorPricing.creatorCount * creatorPricing.videosPerCreator <=
+									1
+									? "Video"
+									: "Videos"}
 							</p>
 						</div>
 
@@ -538,7 +562,10 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 				{/* Submissions Tab */}
 				<TabsContent value="submissions">
 					<div className="p-8 text-center text-gray-500">
-						<ProjectSubmissions projectFormData={project} projectId={projectId} />
+						<ProjectSubmissions
+							projectFormData={project}
+							projectId={projectId}
+						/>
 					</div>
 				</TabsContent>
 

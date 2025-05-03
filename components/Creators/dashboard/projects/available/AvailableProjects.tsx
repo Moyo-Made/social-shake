@@ -94,7 +94,8 @@ const CreatorProjectDashboard: React.FC = () => {
 			result = result.filter(
 				(project) =>
 					project.projectDetails.projectName?.toLowerCase().includes(query) ||
-					project.projectDetails.projectDescription?.some((desc) =>
+					Array.isArray(project.projectDetails.projectDescription) &&
+					project.projectDetails.projectDescription.some((desc) =>
 						desc.toLowerCase().includes(query)
 					)
 			);
@@ -141,13 +142,31 @@ const CreatorProjectDashboard: React.FC = () => {
 			case "newest":
 				result.sort(
 					(a, b) =>
-						new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+						new Date(
+							typeof b.createdAt === "object" && "_seconds" in b.createdAt
+								? b.createdAt._seconds * 1000
+								: (b.createdAt as string | number) || 0
+						).getTime() -
+						new Date(
+							typeof a.createdAt === "object" && "_seconds" in a.createdAt
+								? a.createdAt._seconds * 1000
+								: new Date(a.createdAt || 0).getTime()
+						).getTime()
 				);
 				break;
 			case "oldest":
 				result.sort(
 					(a, b) =>
-						new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+						new Date(
+							typeof a.createdAt === "object" && "_seconds" in a.createdAt
+								? a.createdAt._seconds * 1000
+								: a.createdAt || 0
+						).getTime() -
+						new Date(
+							typeof b.createdAt === "object" && "_seconds" in b.createdAt
+								? b.createdAt._seconds * 1000
+								: b.createdAt || 0
+						).getTime()
 				);
 				break;
 			case "budget-high":

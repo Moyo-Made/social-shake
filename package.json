@@ -37,6 +37,7 @@
     "date-fns": "^3.6.0",
     "firebase": "^10.14.1",
     "firebase-admin": "^11.11.1",
+    "firebase-functions": "^6.3.2",
     "firebaseui": "^6.1.0",
     "formidable": "^3.5.3",
     "lucide-react": "^0.475.0",

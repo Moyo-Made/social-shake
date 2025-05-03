@@ -21,6 +21,7 @@ import { CreatorSubmission } from "@/types/submission";
 import { ProjectFormData } from "@/types/contestFormData";
 import VerifyTikTokLinkModal from "./VerifyTikTokLinkModal";
 import toast from "react-hot-toast";
+import Link from "next/link";
 
 interface ProjectSubmissionsProps {
 	projectFormData: ProjectFormData;
@@ -135,6 +136,7 @@ export default function ProjectSubmissions({
 								createdAt: new Date(submission.createdAt).toLocaleDateString(),
 								sparkCode: submission.sparkCode || "",
 								tiktokLink: submission.tiktokLink || "",
+								affiliate: submission.affiliateLink || "",
 								creator: creatorData || null,
 							};
 						}
@@ -892,13 +894,13 @@ export default function ProjectSubmissions({
 									submission.tiktokLink && (
 										<div className="mt-1 flex items-center gap-1 justify-center">
 											<span className="text-sm">
-												<a
+												<Link
 													href={submission.tiktokLink}
 													target="_blank"
 													className="text-black text-center underline"
 												>
 													TikTok Link
-												</a>
+												</Link>
 											</span>
 											<Button
 												variant="ghost"
