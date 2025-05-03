@@ -1,5 +1,6 @@
 "use client";
 
+import { CreatorProfileData } from "@/types/creators";
 import React, {
 	createContext,
 	useContext,
@@ -13,30 +14,7 @@ interface VerificationData {
 	verifiableID: File | null;
 }
 
-interface CreatorProfileData {
-	picture: File | null;
-	bio: string;
-	tiktokUrl: string;
-	ethnicity: string;
-	dateOfBirth: string;
-	gender: string;
-	contentTypes: string[];
-	socialMedia: {
-		instagram: string;
-		twitter: string;
-		facebook: string;
-		youtube: string;
-	};
-	country: string;
-	contentLinks: string[];
-	pricing: {
-		oneVideo: number;
-		threeVideos: number;
-		fiveVideos: number;
-		bulkVideos: number;
-		bulkVideosNote?: string;
-	}
-}
+
 
 interface FieldErrors {
 	[key: string]: string;
@@ -78,6 +56,7 @@ const defaultProfileData: CreatorProfileData = {
 		twitter: "",
 		facebook: "",
 		youtube: "",
+		tiktok: ""
 	},
 	country: "",
 	contentLinks: [""],
@@ -86,7 +65,21 @@ const defaultProfileData: CreatorProfileData = {
 		threeVideos: 0,
 		fiveVideos: 0,
 		bulkVideos: 0,
-	}
+	},
+	id: "",
+	verificationId: "",
+	userId: "",
+	creator: "",
+	status: "",
+	createdAt: "",
+	logoUrl: null,
+	firstName: "",
+	lastName: "",
+	email: "",
+	username: "",
+	verifiableIDUrl: null,
+	verificationVideoUrl: null,
+	profilePictureUrl: null
 };
 
 const CreatorVerificationContext = createContext<

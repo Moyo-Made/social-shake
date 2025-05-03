@@ -62,6 +62,7 @@ const CompleteCreatorProfile = () => {
 		twitter: "",
 		facebook: "",
 		youtube: "",
+		tiktok: "",
 	});
 
 	const [pricing, setPricing] = useState({
@@ -117,6 +118,7 @@ const CompleteCreatorProfile = () => {
 				twitter: profileData.socialMedia?.twitter || "",
 				facebook: profileData.socialMedia?.facebook || "",
 				youtube: profileData.socialMedia?.youtube || "",
+				tiktok: profileData.socialMedia?.tiktok || "",
 			});
 
 			setPricing({
