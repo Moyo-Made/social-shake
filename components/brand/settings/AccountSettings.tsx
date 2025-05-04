@@ -320,7 +320,7 @@ const AccountSettings: React.FC = () => {
 			<div className="flex-1 p-6 ">
 				{/* Account Settings Tab */}
 				{activeTab === "account" && (
-					<div className="bg-white border border-[#FFD9C3] rounded-lg p-6">
+					<div className="bg-white border border-[#FFD9C3] rounded-lg p-6 md:w-[50rem] max-w-4xl mx-auto">
 						<h2 className="text-2xl font-medium mb-2">Account Settings</h2>
 						<p className="text-gray-500 mb-2">
 							Manage your brand details and contact information
@@ -554,27 +554,31 @@ const AccountSettings: React.FC = () => {
 
 				{/* Billing & Payments Tab */}
 				{activeTab === "billing" && (
-					<div>
+					<div className="md:w-[50rem] max-w-4xl mx-auto">
 						<BillingPage />
 					</div>
 				)}
 
 				{/* Project Preference Tab */}
 				{activeTab === "project" && (
-					<div>
+					<div className="md:w-[50rem] max-w-4xl mx-auto">
 						<ProjectPreference />
 					</div>
 				)}
 
 				{/* Notifications & Alerts Tab */}
 				{activeTab === "notifications" && (
-					<div>
+					<div className="md:w-[50rem] max-w-4xl mx-auto">
 						<NotificationPreferences />
 					</div>
 				)}
 
 				{/* Security & Privacy Tab */}
-				{activeTab === "security" && <SecurityPage />}
+				{activeTab === "security" && (
+					<div className="md:w-[50rem] max-w-4xl mx-auto">
+						<SecurityPage />
+					</div>
+				)}
 			</div>
 		</div>
 	);

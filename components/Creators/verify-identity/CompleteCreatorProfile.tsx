@@ -107,7 +107,9 @@ const CompleteCreatorProfile = () => {
 
 			// Handle arrays and objects
 			setContentTypes(
-				profileData.contentTypes?.length > 0 ? profileData.contentTypes : []
+				Array.isArray(profileData?.contentTypes) && profileData.contentTypes.length > 0
+					? profileData.contentTypes
+					: []
 			);
 			setContentLinks(
 				profileData.contentLinks?.length > 0 ? profileData.contentLinks : [""]

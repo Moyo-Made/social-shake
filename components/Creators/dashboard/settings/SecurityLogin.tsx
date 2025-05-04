@@ -14,7 +14,7 @@ interface SecuritySettingsProps {
 	userEmail: string;
 }
 
-export default function SecurityPrivacySettings({
+export default function SecurityLoginSettings({
 	userEmail,
 }: SecuritySettingsProps) {
 	// Form states
@@ -182,7 +182,8 @@ export default function SecurityPrivacySettings({
 	return (
 		<div className="bg-white border border-[#FFD9C3] rounded-lg p-6 space-y-8">
 			<div>
-				<h1 className="text-xl font-semibold mb-3">Security & Privacy</h1>
+				<h1 className="text-xl font-semibold mb-1">Security & Login</h1>
+				<p className="text-[#667085] mb-3">Manage your account security and authentication methods</p>
 				<div className="w-full border border-[#6670854D] mb-4" />
 			</div>
 

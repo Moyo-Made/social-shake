@@ -36,7 +36,7 @@ export interface CreatorProfileData {
 	ethnicity: string;
 	dateOfBirth: string;
 	gender: string;
-	contentTypes: string[];
+	contentTypes?: string[];
 	socialMedia: {
 		instagram: string;
 		twitter: string;
