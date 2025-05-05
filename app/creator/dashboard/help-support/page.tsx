@@ -1,8 +1,10 @@
+import Tabs from "@/components/brand/help-and-support/Tabs";
 import React from "react";
 
 const page = () => {
 	return (
-		<div>Help & Support</div>
+
+			<Tabs />
 	);
 };
 
