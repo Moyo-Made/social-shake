@@ -229,7 +229,7 @@ export default function SupportTicketHistory() {
 						{getStatusBadge(ticket.status)}
 					  </td>
 					  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-						<Link href={`/brand/dashboard/help-support/tickets/${ticket.id}`} className="text-orange-500 hover:underline">
+						<Link href={`/creator/dashboard/help-support/tickets/${ticket.id}`} className="text-orange-500 hover:underline">
 						  View Ticket
 						</Link>
 					  </td>

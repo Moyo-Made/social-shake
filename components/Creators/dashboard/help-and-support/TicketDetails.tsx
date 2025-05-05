@@ -70,11 +70,11 @@ interface TicketDetailProps {
 						});
 					} else {
 						alert("You don't have permission to view this ticket");
-						router.push("/brand/dashboard/help-support/history");
+						router.push("/creator/dashboard/help-support/history");
 					}
 				} else {
 					alert("Ticket not found");
-					router.push("/brand/dashboard/help-support/history");
+					router.push("/creator/dashboard/help-support/history");
 				}
 			} catch (error) {
 				console.error("Error fetching ticket:", error);
@@ -360,7 +360,7 @@ interface TicketDetailProps {
 					) : (
 						<div className="flex justify-end mt-3 border-t border-[#6670854D] pt-6">
 							<Link
-								href="/brand/dashboard/help-support"
+								href="/creator/dashboard/help-support"
 								className="text-center text-[#667085] px-4 py-2 rounded-md border border-[#6670854D] hover:bg-gray-200"
 							>
 								Go to Contact Support

@@ -44,7 +44,7 @@ export default function TicketConfirmation({
 
 				<Button
 					className="bg-orange-500 hover:bg-orange-600 text-white shadow-none"
-					onClick={() => router.push("/brand/dashboard/help-support/history")}
+					onClick={() => router.push("/creator/dashboard/help-support/history")}
 				>
 					View My Tickets
 				</Button>
