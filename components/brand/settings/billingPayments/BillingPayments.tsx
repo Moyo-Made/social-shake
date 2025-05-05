@@ -1,13 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-	collection,
-	addDoc,
-	getDocs,
-	doc,
-	updateDoc,
-	deleteDoc,
-} from "firebase/firestore";
-import { auth, db } from "@/config/firebase";
+import { auth } from "@/config/firebase";
 import { PlusIcon, TrashIcon, PencilIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +12,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+	fetchPaymentMethods,
+	addPaymentMethod,
+	updatePaymentMethod,
+	deletePaymentMethod,
+	setDefaultPaymentMethod,
+} from "@/services/paymentMethodService";
+import Image from "next/image";
 
 // Types for our payment methods
 type PaymentMethod = {
@@ -71,27 +71,30 @@ const BillingPayments = () => {
 
 	// Fetch payment methods on component mount
 	useEffect(() => {
-		fetchPaymentMethods();
+		getPaymentMethods();
 	}, []);
 
-	const fetchPaymentMethods = async () => {
+	// Handle any alert messages
+	useEffect(() => {
+		if (success || error) {
+			const timer = setTimeout(() => {
+				setSuccess("");
+				setError("");
+			}, 5000);
+			return () => clearTimeout(timer);
+		}
+	}, [success, error]);
+
+	const getPaymentMethods = async () => {
 		try {
 			setIsLoading(true);
 			setError("");
 
-			const querySnapshot = await getDocs(collection(db, "paymentMethods"));
-			const methods: PaymentMethod[] = [];
-
-			querySnapshot.forEach((doc) => {
-				methods.push({ id: doc.id, ...doc.data() } as PaymentMethod);
-			});
-
+			const methods = await fetchPaymentMethods();
 			setPaymentMethods(methods);
 		} catch (err) {
 			console.error("Error fetching payment methods:", err);
-
-			// Fallback to mock data if fetching fails
-			setPaymentMethods(mockPaymentMethods);
+			setError("Failed to load payment methods. Please try again later.");
 		} finally {
 			setIsLoading(false);
 		}
@@ -145,20 +148,7 @@ const BillingPayments = () => {
 					break;
 			}
 
-			// If setting as default, update all other payment methods to not be default
-			if (setAsDefault) {
-				const defaultMethods = paymentMethods.filter(
-					(method) => method.isDefault
-				);
-				for (const method of defaultMethods) {
-					await updateDoc(doc(db, "paymentMethods", method.id), {
-						isDefault: false,
-					});
-				}
-			}
-
-			// Add the new payment method to Firestore
-			await addDoc(collection(db, "paymentMethods"), paymentMethodData);
+			await addPaymentMethod(paymentMethodData);
 
 			// Clear form and close modal
 			resetForm();
@@ -166,9 +156,9 @@ const BillingPayments = () => {
 			setSuccess("Payment method added successfully");
 
 			// Refresh payment methods list
-			fetchPaymentMethods();
+			getPaymentMethods();
 		} catch (err) {
-			setError("Failed to add payment method");
+			setError("Failed to add payment method. Please try again.");
 			console.error("Error adding payment method:", err);
 		} finally {
 			setIsLoading(false);
@@ -223,23 +213,7 @@ const BillingPayments = () => {
 					break;
 			}
 
-			// If setting as default, update all other payment methods
-			if (setAsDefault && !editingPaymentMethod.isDefault) {
-				const defaultMethods = paymentMethods.filter(
-					(method) => method.isDefault
-				);
-				for (const method of defaultMethods) {
-					await updateDoc(doc(db, "paymentMethods", method.id), {
-						isDefault: false,
-					});
-				}
-			}
-
-			// Update the payment method
-			await updateDoc(
-				doc(db, "paymentMethods", editingPaymentMethod.id),
-				updatedPaymentData
-			);
+			await updatePaymentMethod(editingPaymentMethod.id, updatedPaymentData);
 
 			resetForm();
 			setIsEditModalOpen(false);
@@ -247,9 +221,9 @@ const BillingPayments = () => {
 			setSuccess("Payment method updated successfully");
 
 			// Refresh payment methods
-			fetchPaymentMethods();
+			getPaymentMethods();
 		} catch (err) {
-			setError("Failed to update payment method");
+			setError("Failed to update payment method. Please try again.");
 			console.error("Error updating payment method:", err);
 		} finally {
 			setIsLoading(false);
@@ -261,37 +235,24 @@ const BillingPayments = () => {
 			setIsLoading(true);
 			setError("");
 
-			// Get current payment methods
-			const currentMethods = [...paymentMethods];
-
 			// Check if the method is already default
-			const method = currentMethods.find((m) => m.id === id);
+			const method = paymentMethods.find((m) => m.id === id);
 			if (method && method.isDefault) {
 				setIsLoading(false);
 				return; // Already default, do nothing
 			}
 
-			// Update Firestore: first set all to false, then set the selected one to true
-			const batch = [];
+			await setDefaultPaymentMethod(id);
 
-			for (const method of currentMethods) {
-				batch.push(
-					updateDoc(doc(db, "paymentMethods", method.id), {
-						isDefault: method.id === id,
-					})
-				);
-			}
-
-			await Promise.all(batch);
+			setSuccess("Default payment method updated");
 
 			// Update local state
-			const updatedMethods = currentMethods.map((method) => ({
+			const updatedMethods = paymentMethods.map((method) => ({
 				...method,
 				isDefault: method.id === id,
 			}));
 
 			setPaymentMethods(updatedMethods);
-			setSuccess("Default payment method updated");
 		} catch (err) {
 			setError("Failed to update default payment method");
 			console.error("Error setting default payment method:", err);
@@ -305,27 +266,11 @@ const BillingPayments = () => {
 			setIsLoading(true);
 			setError("");
 
-			// Check if we're deleting a default payment method
-			const methodToDelete = paymentMethods.find((method) => method.id === id);
+			await deletePaymentMethod(id);
 
-			if (methodToDelete) {
-				await deleteDoc(doc(db, "paymentMethods", id));
-
-				// If we deleted the default method and there are other methods,
-				// set another one as default
-				if (methodToDelete.isDefault && paymentMethods.length > 1) {
-					const newDefault = paymentMethods.find((method) => method.id !== id);
-					if (newDefault) {
-						await updateDoc(doc(db, "paymentMethods", newDefault.id), {
-							isDefault: true,
-						});
-					}
-				}
-
-				setSuccess("Payment method deleted successfully");
-				// Update local state
-				setPaymentMethods((prev) => prev.filter((method) => method.id !== id));
-			}
+			setSuccess("Payment method deleted successfully");
+			// Update local state
+			setPaymentMethods((prev) => prev.filter((method) => method.id !== id));
 		} catch (err) {
 			setError("Failed to delete payment method");
 			console.error("Error deleting payment method:", err);
@@ -372,43 +317,14 @@ const BillingPayments = () => {
 		setSetAsDefault(false);
 	};
 
-	// Mock data for demonstration (these would usually come from the database)
-	const mockPaymentMethods: PaymentMethod[] = [
-		{
-			id: "1",
-			type: "bank",
-			bankName: "Bank of America",
-			accountEnding: "6789",
-			isDefault: true,
-			lastUpdated: new Date(),
-		},
-		{
-			id: "2",
-			type: "paypal",
-			paypalEmail: "user@example.com",
-			isDefault: false,
-			lastUpdated: new Date(),
-		},
-		{
-			id: "3",
-			type: "card",
-			cardType: "Visa",
-			cardEnding: "4242",
-			expiryDate: "05/26",
-			isDefault: false,
-			lastUpdated: new Date(),
-		},
-	];
-
 	// Use fetched data, fallback to mock data if empty
-	const displayPaymentMethods =
-		paymentMethods.length > 0 ? paymentMethods : mockPaymentMethods;
+	const displayPaymentMethods = paymentMethods.length > 0 && paymentMethods;
 
 	return (
-		<div className="bg-white border border-[#FFD9C3] rounded-lg p-6">
-			<h2 className="text-2xl font-medium mb-6">Billing & Payments</h2>
-			<p className="text-gray-500">
-				Manage your subscription and payment methods.
+		<div className="border border-[#FFD9C3] rounded-lg p-6">
+			<h2 className="text-2xl font-medium mb-1">Payments & Payouts</h2>
+			<p className="text-gray-500 mb-2">
+				Manage how you receive earnings from campaigns & contests
 			</p>
 			<hr className="my-4" />
 
@@ -425,104 +341,107 @@ const BillingPayments = () => {
 			)}
 
 			<div className="space-y-4">
-				{displayPaymentMethods.map((method) => (
-					<div
-						key={method.id}
-						className="border rounded-lg p-4 flex items-center justify-between"
-					>
-						<div className="flex items-center space-x-4">
-							{method.type === "bank" && (
-								<div className="w-10 h-10 bg-gray-100 flex items-center justify-center rounded">
-									<span className="text-xl">🏦</span>
-								</div>
-							)}
-							{method.type === "paypal" && (
-								<div className="w-10 h-10 bg-blue-100 flex items-center justify-center rounded">
-									<span className="text-xl">P</span>
-								</div>
-							)}
-							{method.type === "card" && (
-								<div className="w-10 h-10 bg-yellow-100 flex items-center justify-center rounded">
-									<span className="text-xl">💳</span>
-								</div>
-							)}
-
-							<div>
+				{Array.isArray(displayPaymentMethods) &&
+					displayPaymentMethods.map((method) => (
+						<div
+							key={method.id}
+							className="border rounded-lg p-4 flex items-center justify-between"
+						>
+							<div className="flex items-center space-x-4">
 								{method.type === "bank" && (
-									<>
-										<div className="font-medium">{method.bankName}</div>
-										<div className="text-sm text-gray-500">
-											Account ending in {method.accountEnding}
-										</div>
-									</>
+									<div className="w-10 h-10 bg-gray-100 flex items-center justify-center rounded">
+										<span className="text-xl">🏦</span>
+									</div>
 								)}
 								{method.type === "paypal" && (
-									<>
-										<div className="font-medium">Paypal</div>
-										{method.paypalEmail && (
-											<div className="text-sm text-gray-500">
-												{method.paypalEmail}
-											</div>
-										)}
-									</>
+									<Image
+										src="/icons/paypal.svg"
+										alt="Paypal"
+										width={30}
+										height={30}
+									/>
 								)}
 								{method.type === "card" && (
-									<>
-										<div className="font-medium">{method.cardType}</div>
-										<div className="text-sm text-gray-500">
-											Card ending in {method.cardEnding} (Expires:{" "}
-											{method.expiryDate})
-										</div>
-									</>
+									<div className="w-10 h-10 bg-yellow-100 flex items-center justify-center rounded">
+										<span className="text-xl">💳</span>
+									</div>
 								)}
-							</div>
-						</div>
 
-						<div className="flex items-center space-x-2">
-							{method.isDefault ? (
-								<span className="text-sm text-blue-500 bg-blue-50 px-3 py-1 rounded-full">
-									Default
-								</span>
-							) : (
+								<div>
+									{method.type === "bank" && (
+										<>
+											<div className="font-medium">{method.bankName}</div>
+											<div className="text-sm text-gray-500">
+												Account ending in {method.accountEnding}
+											</div>
+										</>
+									)}
+									{method.type === "paypal" && (
+										<>
+											<div className="font-medium">Paypal</div>
+											{method.paypalEmail && (
+												<div className="text-sm text-gray-500">
+													{method.paypalEmail}
+												</div>
+											)}
+										</>
+									)}
+									{method.type === "card" && (
+										<>
+											<div className="font-medium">{method.cardType}</div>
+											<div className="text-sm text-gray-500">
+												Card ending in {method.cardEnding} (Expires:{" "}
+												{method.expiryDate})
+											</div>
+										</>
+									)}
+								</div>
+							</div>
+
+							<div className="flex items-center space-x-2">
+								{method.isDefault ? (
+									<span className="text-sm text-[#20D5EC] bg-[#F1FEFB] px-3 py-1 rounded-full">
+										Default
+									</span>
+								) : (
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => handleSetDefault(method.id)}
+										disabled={isLoading}
+										className="bg-[#6670854D] rounded-full font-light"
+									>
+										Make Default
+									</Button>
+								)}
 								<Button
 									variant="outline"
-									size="sm"
-									onClick={() => handleSetDefault(method.id)}
+									size="icon"
+									onClick={() => handleEditClick(method)}
+								>
+									<PencilIcon className="h-4 w-4" />
+								</Button>
+								<Button
+									variant="outline"
+									size="icon"
+									onClick={() => handleDeletePaymentMethod(method.id)}
 									disabled={isLoading}
 								>
-									Make Default
+									<TrashIcon className="h-4 w-4" />
 								</Button>
-							)}
-							<Button
-								variant="outline"
-								size="icon"
-								onClick={() => handleEditClick(method)}
-							>
-								<PencilIcon className="h-4 w-4" />
-							</Button>
-							<Button
-								variant="outline"
-								size="icon"
-								onClick={() => handleDeletePaymentMethod(method.id)}
-								disabled={isLoading}
-							>
-								<TrashIcon className="h-4 w-4" />
-							</Button>
+							</div>
 						</div>
-					</div>
-				))}
+					))}
 
-				<Button
-					onClick={() => setIsAddModalOpen(true)}
-					className="w-full flex items-center justify-center py-6"
-					variant="outline"
-				>
-					<PlusIcon className="mr-2 h-5 w-5" /> Add Payment Method
-				</Button>
-			</div>
-
-			<div className="mt-6 flex justify-end">
-				<Button>Save Changes</Button>
+				<div className="flex justify-end mt-3">
+					<Button
+						onClick={() => setIsAddModalOpen(true)}
+						className="flex items-center py-5 bg-black text-white"
+						variant="outline"
+					>
+						<PlusIcon className="mr-1 h-5 w-5" /> Add Payment Method
+					</Button>
+				</div>
 			</div>
 
 			{/* Add New Payment Method Modal (using divs instead of Dialog) */}
@@ -554,7 +473,7 @@ const BillingPayments = () => {
 									<SelectTrigger>
 										<SelectValue placeholder="Select payment method" />
 									</SelectTrigger>
-									<SelectContent>
+									<SelectContent className="bg-[#f7f7f7]">
 										<SelectItem value="bank">Bank</SelectItem>
 										<SelectItem value="paypal">Paypal</SelectItem>
 										<SelectItem value="card">Credit/Debit Card</SelectItem>
@@ -692,7 +611,11 @@ const BillingPayments = () => {
 							>
 								Cancel
 							</Button>
-							<Button onClick={handleAddPaymentMethod} disabled={isLoading}>
+							<Button
+								onClick={handleAddPaymentMethod}
+								disabled={isLoading}
+								className="text-white bg-black"
+							>
 								{isLoading
 									? "Adding..."
 									: `Add ${
@@ -875,7 +798,11 @@ const BillingPayments = () => {
 							>
 								Cancel
 							</Button>
-							<Button onClick={handleEditPaymentMethod} disabled={isLoading}>
+							<Button
+								onClick={handleEditPaymentMethod}
+								disabled={isLoading}
+								className="bg-orange-500 text-white"
+							>
 								{isLoading ? "Saving..." : "Save Changes"}
 							</Button>
 						</div>

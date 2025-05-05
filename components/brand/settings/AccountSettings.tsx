@@ -453,11 +453,11 @@ const AccountSettings: React.FC = () => {
 									<SelectValue placeholder="Select a country" />
 								</SelectTrigger>
 								<SelectContent className="bg-[#f7f7f7]">
-									<SelectItem value="Australia">Australia</SelectItem>
-									<SelectItem value="United States">United States</SelectItem>
-									<SelectItem value="United Kingdom">United Kingdom</SelectItem>
-									<SelectItem value="Canada">Canada</SelectItem>
-									<SelectItem value="New Zealand">New Zealand</SelectItem>
+									{countries.map((country) => (
+										<SelectItem key={country.code} value={country.name}>
+											{country.name}
+										</SelectItem>
+									))}
 								</SelectContent>
 							</Select>
 						</div>
