@@ -183,7 +183,7 @@ export default function SecurityPrivacySettings({
 		<div className="bg-white border border-[#FFD9C3] rounded-lg p-6 space-y-8">
 			<div>
 				<h1 className="text-xl font-semibold mb-3">Security & Privacy</h1>
-				<div className="w-full border border-[#6670854D] mb-4" />
+				<hr className="my-4" />
 			</div>
 
 			{/* Password Change Section */}

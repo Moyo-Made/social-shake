@@ -184,7 +184,7 @@ export default function SecurityLoginSettings({
 			<div>
 				<h1 className="text-xl font-semibold mb-1">Security & Login</h1>
 				<p className="text-[#667085] mb-3">Manage your account security and authentication methods</p>
-				<div className="w-full border border-[#6670854D] mb-4" />
+				<hr className="my-4" />
 			</div>
 
 			{/* Password Change Section */}

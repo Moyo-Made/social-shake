@@ -17,7 +17,7 @@ interface ProjectCardProps {
 	project: ProjectFormData;
 }
 
-export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
+ const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
 	const { projectId, projectDetails, status } = project;
 	const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
 	const [, setBrandEmail] = useState<string>("");
@@ -97,13 +97,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
 			: text;
 	};
 
-	// Get first description item or return empty string
-	const getDescription = () => {
-		return projectDetails.projectDescription &&
-			projectDetails.projectDescription.length > 0
-			? projectDetails.projectDescription[0]
-			: "";
-	};
+
 
 	return (
 		<div className="rounded-lg overflow-hidden border border-gray-200 bg-white hover:shadow-md transition-shadow">
@@ -172,7 +166,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
 
 				<div className="border-b border-gray-200">
 					<p className="text-sm text-gray-600 mb-4">
-						{truncateText(getDescription(), 250)}
+						{truncateText(projectDetails.projectDescription, 250)}
 					</p>
 				</div>
 
@@ -245,3 +239,5 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
 		</div>
 	);
 };
+
+export default ProjectCard;

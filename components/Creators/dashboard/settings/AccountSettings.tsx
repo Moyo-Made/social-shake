@@ -17,6 +17,9 @@ import { CreatorProfileData } from "@/types/creators";
 import { Textarea } from "@/components/ui/textarea";
 import { countries } from "@/types/countries";
 import SecurityPage from "./SecurityPage";
+import PayoutPage from "./payouts/PayoutPage";
+import NotificationPreferences from "./notification/NotificationPreferences";
+import ShippingAddressPage from "./shippingDetails/ShippingDetails";
 
 // Tabs interface
 interface TabItem {
@@ -210,185 +213,194 @@ const AccountSettings: React.FC = () => {
 
 	const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
 		if (!e.target.files || !e.target.files[0]) return;
-		
+
 		setError(null);
 		const file = e.target.files[0];
-		
+
 		// Create a preview URL for immediate visual feedback
 		const previewUrl = URL.createObjectURL(file);
 		setImagePreview(previewUrl);
-		
+
 		// Show loading state
 		setIsLoading(true);
-		
+
 		// Verify we have the necessary data
 		if (!currentUser?.email || !formData?.verificationId) {
-		  setError("User email and verification ID are required for uploading a logo");
-		  setIsLoading(false);
-		  return;
+			setError(
+				"User email and verification ID are required for uploading a logo"
+			);
+			setIsLoading(false);
+			return;
 		}
-		
+
 		// Create FormData object with required fields
 		const uploadData = new FormData();
 		uploadData.append("logo", file);
 		uploadData.append("email", currentUser.email);
 		uploadData.append("verificationId", formData.verificationId);
-		
+
 		try {
-		  const response = await fetch(`/api/admin/creator-approval`, {
-			method: "POST",
-			body: uploadData,
-		  });
-		  
-		  if (!response.ok) {
-			const errorText = await response.text();
-			console.error("Error response:", errorText);
-			
-			try {
-			  // Try to parse as JSON if possible
-			  const errorData = JSON.parse(errorText);
-			  throw new Error(errorData.error || "Failed to upload logo");
-			} catch {
-			  // If not JSON, use the raw text
-			  throw new Error(`Upload failed: ${errorText}`);
+			const response = await fetch(`/api/admin/creator-approval`, {
+				method: "POST",
+				body: uploadData,
+			});
+
+			if (!response.ok) {
+				const errorText = await response.text();
+				console.error("Error response:", errorText);
+
+				try {
+					// Try to parse as JSON if possible
+					const errorData = JSON.parse(errorText);
+					throw new Error(errorData.error || "Failed to upload logo");
+				} catch {
+					// If not JSON, use the raw text
+					throw new Error(`Upload failed: ${errorText}`);
+				}
 			}
-		  }
-		  
-		  // Get the response data
-		  const responseData = await response.json();
-		  console.log("Logo upload response:", responseData);
-		  
-		  // Extract the logoUrl from the response
-		  const logoUrl = responseData.logoUrl;
-		  
-		  if (logoUrl) {
-			// Update formData with the new logoUrl - this is crucial
-			setFormData((prevFormData) => {
-			  if (!prevFormData) return null;
-			  return {
-				...prevFormData,
-				logoUrl: logoUrl,
-			  };
-			});
-			
-			// Also update profileData to ensure it's reflected in the UI
-			setProfileData((prevProfileData) => {
-			  if (!prevProfileData) return null;
-			  return {
-				...prevProfileData,
-				logoUrl: logoUrl,
-			  };
-			});
-			
-			setSuccessMessage("Profile picture uploaded successfully");
-		  } else {
-			throw new Error("Logo URL not found in response");
-		  }
+
+			// Get the response data
+			const responseData = await response.json();
+			console.log("Logo upload response:", responseData);
+
+			// Extract the logoUrl from the response
+			const logoUrl = responseData.logoUrl;
+
+			if (logoUrl) {
+				// Update formData with the new logoUrl - this is crucial
+				setFormData((prevFormData) => {
+					if (!prevFormData) return null;
+					return {
+						...prevFormData,
+						logoUrl: logoUrl,
+					};
+				});
+
+				// Also update profileData to ensure it's reflected in the UI
+				setProfileData((prevProfileData) => {
+					if (!prevProfileData) return null;
+					return {
+						...prevProfileData,
+						logoUrl: logoUrl,
+					};
+				});
+
+				setSuccessMessage("Profile picture uploaded successfully");
+			} else {
+				throw new Error("Logo URL not found in response");
+			}
 		} catch (error) {
-		  setError(
-			error instanceof Error
-			  ? error.message
-			  : "Failed to upload profile picture. Please try again."
-		  );
-		  console.error("Error uploading logo:", error);
+			setError(
+				error instanceof Error
+					? error.message
+					: "Failed to upload profile picture. Please try again."
+			);
+			console.error("Error uploading logo:", error);
 		} finally {
-		  setIsLoading(false);
+			setIsLoading(false);
 		}
-	  };
-  
-  // Updated handleSaveChanges function to include logoUrl when updating verification data
-  const handleSaveChanges = async () => {
-	if (!formData || !currentUser?.email) return;
-  
-	setError(null);
-	setSuccessMessage(null);
-  
-	// Make sure socialMedia is properly structured as an object
-	const dataToSend = {
-	  ...formData,
-	  email: currentUser.email,
-	  // Ensure socialMedia is an object, not individual dot-notation fields
-	  socialMedia: {
-		facebook: formData.socialMedia?.facebook || "",
-		instagram: formData.socialMedia?.instagram || "",
-		twitter: formData.socialMedia?.twitter || "",
-		youtube: formData.socialMedia?.youtube || "",
-	  },
-	  // Include content links
-	  contentLinks: contentLinks.filter((link) => link.trim().length > 0),
 	};
-  
-	try {
-	  setIsSaving(true);
-	  // Use both endpoints to update data
-	  const response = await fetch("/api/creator-profile", {
-		method: "PUT",
-		headers: {
-		  "Content-Type": "application/json",
-		},
-		body: JSON.stringify(dataToSend),
-	  });
-  
-	  if (!response.ok) {
-		const errorData = await response.json();
-		throw new Error(errorData.error || "Failed to update profile");
-	  }
-  
-	  // If we have a verification ID, update that data too
-	  if (formData.verificationId) {
-		// Ensure contentTypes is always an array
-		const contentTypesArray = Array.isArray(formData.contentTypes) 
-		  && formData?.contentTypes.filter((item: string) => item).join(', ') || [];
-		
-		const verificationUpdate = await fetch("/api/admin/creator-approval", {
-		  method: "PUT",
-		  headers: {
-			"Content-Type": "application/json",
-		  },
-		  body: JSON.stringify({
-			verificationId: formData.verificationId,
-			// Send profile data in 'updates' field as expected by the API
-			updates: {
-			  profileData: {
-				bio: formData.bio || "",
-				contentTypes: contentTypesArray,
-				contentLinks: dataToSend.contentLinks || [],
-				pricing: formData.pricing || {},
-				socialMedia: dataToSend.socialMedia || {},
-				tiktokUrl: formData.tiktokUrl || formData.socialMedia?.tiktok || "",
-				logoUrl: formData.logoUrl || "", 
-				email: currentUser.email,
-				country: formData.country || "",
-				username: formData.username || "",
-				firstName: formData.firstName || "",
-				lastName: formData.lastName || "",
-				gender: formData.gender || "",
-			  }
-			}
-		  }),
-		});
-  
-		if (!verificationUpdate.ok) {
-		  const errorData = await verificationUpdate.json().catch(() => ({error: "Unknown error"}));
-		  console.error("Failed to update verification data:", errorData);
-		  throw new Error(errorData.error || "Failed to update verification data");
-		}
-	  }
-  
-	  setSuccessMessage("Profile updated successfully");
-	  // Update the profile data with the new form data
-	  setProfileData({ ...formData });
-  
-	  // Clear success message after 3 seconds
-	  setTimeout(() => {
+
+	// Updated handleSaveChanges function to include logoUrl when updating verification data
+	const handleSaveChanges = async () => {
+		if (!formData || !currentUser?.email) return;
+
+		setError(null);
 		setSuccessMessage(null);
-	  }, 3000);
-	} catch (err) {
-	  setError(err instanceof Error ? err.message : "Failed to update profile");
-	} finally {
-	  setIsSaving(false);
-	}
-  };
+
+		// Make sure socialMedia is properly structured as an object
+		const dataToSend = {
+			...formData,
+			email: currentUser.email,
+			// Ensure socialMedia is an object, not individual dot-notation fields
+			socialMedia: {
+				facebook: formData.socialMedia?.facebook || "",
+				instagram: formData.socialMedia?.instagram || "",
+				twitter: formData.socialMedia?.twitter || "",
+				youtube: formData.socialMedia?.youtube || "",
+			},
+			// Include content links
+			contentLinks: contentLinks.filter((link) => link.trim().length > 0),
+		};
+
+		try {
+			setIsSaving(true);
+			// Use both endpoints to update data
+			const response = await fetch("/api/creator-profile", {
+				method: "PUT",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify(dataToSend),
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || "Failed to update profile");
+			}
+
+			// If we have a verification ID, update that data too
+			if (formData.verificationId) {
+				// Ensure contentTypes is always an array
+				const contentTypesArray =
+					(Array.isArray(formData.contentTypes) &&
+						formData?.contentTypes.filter((item: string) => item).join(", ")) ||
+					[];
+
+				const verificationUpdate = await fetch("/api/admin/creator-approval", {
+					method: "PUT",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({
+						verificationId: formData.verificationId,
+						// Send profile data in 'updates' field as expected by the API
+						updates: {
+							profileData: {
+								bio: formData.bio || "",
+								contentTypes: contentTypesArray,
+								contentLinks: dataToSend.contentLinks || [],
+								pricing: formData.pricing || {},
+								socialMedia: dataToSend.socialMedia || {},
+								tiktokUrl:
+									formData.tiktokUrl || formData.socialMedia?.tiktok || "",
+								logoUrl: formData.logoUrl || "",
+								email: currentUser.email,
+								country: formData.country || "",
+								username: formData.username || "",
+								firstName: formData.firstName || "",
+								lastName: formData.lastName || "",
+								gender: formData.gender || "",
+							},
+						},
+					}),
+				});
+
+				if (!verificationUpdate.ok) {
+					const errorData = await verificationUpdate
+						.json()
+						.catch(() => ({ error: "Unknown error" }));
+					console.error("Failed to update verification data:", errorData);
+					throw new Error(
+						errorData.error || "Failed to update verification data"
+					);
+				}
+			}
+
+			setSuccessMessage("Profile updated successfully");
+			// Update the profile data with the new form data
+			setProfileData({ ...formData });
+
+			// Clear success message after 3 seconds
+			setTimeout(() => {
+				setSuccessMessage(null);
+			}, 3000);
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to update profile");
+		} finally {
+			setIsSaving(false);
+		}
+	};
 
 	// Clean up object URLs when component unmounts
 	useEffect(() => {
@@ -438,7 +450,7 @@ const AccountSettings: React.FC = () => {
 						<p className="text-gray-500 mb-2">
 							Update your profile information and preferences
 						</p>
-						<div className="border border-[#6670854D] mb-6" />
+						<hr className="my-4" />
 
 						{error && (
 							<div className="bg-red-50 text-red-600 p-3 rounded-md mb-4">
@@ -457,7 +469,6 @@ const AccountSettings: React.FC = () => {
 							<div className="flex items-center space-x-4">
 								<div className="w-24 h-24 bg-gray-100 border border-gray-200 flex items-center justify-center rounded-full overflow-hidden">
 									{formData?.logoUrl || imagePreview ? (
-									
 										<Image
 											src={imagePreview || formData?.logoUrl || ""}
 											alt="Creator Profile Picture"
@@ -623,7 +634,6 @@ const AccountSettings: React.FC = () => {
 							<Input
 								id="dateOfBirth"
 								name="dateOfBirth"
-								
 								value={formData?.dateOfBirth || ""}
 								onChange={handleInputChange}
 								className="w-full"
@@ -877,16 +887,30 @@ const AccountSettings: React.FC = () => {
 				)}
 
 				{/* Billing & Payments Tab */}
-				{activeTab === "shipping-details" && <div className="md:w-[50rem] max-w-4xl mx-auto"></div>}
+				{activeTab === "shipping-details" && (
+					<div className="md:w-[50rem] max-w-4xl mx-auto"><ShippingAddressPage /></div>
+				)}
 
 				{/* Project Preference Tab */}
-				{activeTab === "security" && <div className="md:w-[50rem] max-w-4xl mx-auto"><SecurityPage /></div>}
+				{activeTab === "security" && (
+					<div className="md:w-[50rem] max-w-4xl mx-auto">
+						<SecurityPage />
+					</div>
+				)}
 
 				{/* Notifications & Alerts Tab */}
-				{activeTab === "payments" && <div className="md:w-[50rem] max-w-4xl mx-auto"></div>}
+				{activeTab === "payments" && (
+					<div className="md:w-[50rem] max-w-4xl mx-auto">
+						<PayoutPage />
+					</div>
+				)}
 
 				{/* Security & Privacy Tab */}
-				{activeTab === "notifications" && <div className="md:w-[50rem] max-w-4xl mx-auto"></div>}
+				{activeTab === "notifications" && (
+					<div className="md:w-[50rem] max-w-4xl mx-auto">
+						<NotificationPreferences />
+					</div>
+				)}
 			</div>
 		</div>
 	);

@@ -11,6 +11,8 @@ import {
 import { Check, ChevronLeft, Mail, Search, X } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { useAuthApi } from "@/hooks/useAuthApi";
+import { ShippingAddress } from "@/components/Creators/dashboard/projects/available/ProjectApplyModal";
 
 interface ApplicationsProps {
 	projectData: {
@@ -90,6 +92,8 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 	const [showApproveModal, setShowApproveModal] = useState(false);
 	const [showRejectModal, setShowRejectModal] = useState(false);
 	const [pendingActionId, setPendingActionId] = useState<string | null>(null);
+	const [applicationAddresses, setApplicationAddresses] = useState<Record<string, ShippingAddress>>({});
+	const api = useAuthApi(); 
 
 	// Approve Confirmation Modal
 	const ApproveModal = () => {
@@ -157,6 +161,34 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 			</div>
 		);
 	};
+
+	const fetchApplicationAddress = async (applicationId: string) => {
+		try {
+		  const { data, error } = await api.get(`/api/project-application-address?applicationId=${applicationId}`);
+		  
+		  if (error) {
+			console.error(`Failed to load shipping address for application ${applicationId}:`, error);
+			return null;
+		  }
+		  
+		  if (data) {
+			// Store the address in our applicationAddresses state
+			setApplicationAddresses((prev) => ({
+			  ...prev,
+			  [applicationId]: data as ShippingAddress,
+			}));
+			
+			return data;
+		  }
+		  
+		  return null;
+		} catch (err) {
+		  console.error(`Error fetching address for application ${applicationId}:`, err);
+		  return null;
+		}
+	  }
+
+	
 
 	// Fetch applications data
 	useEffect(() => {
@@ -372,9 +404,14 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 	const handleViewApplication = async (id: string) => {
 		const application = applications.find((app) => app.id === id);
 		if (application) {
-			setSelectedApplication(application);
+		  setSelectedApplication(application);
+		  
+		  // Only fetch address if the user needs the product
+		  if (application.productOwnership === "need" && !applicationAddresses[id]) {
+			await fetchApplicationAddress(id);
+		  }
 		}
-	};
+	  };
 
 	// Go back to application list
 	const handleBackToList = () => {
@@ -639,25 +676,46 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 							</div>
 
 							{selectedApplication.productOwnership === "need" && (
-								<div className="flex flex-col space-y-1">
-								<p className="text-sm text-[#667085]">Shipping Address</p>
-								<p className="font-normal text-[#101828]">
-								  {selectedApplication.shippingAddress.addressLine1}
-								</p>
-								<p className="font-normal text-[#101828]">
-								  {selectedApplication.shippingAddress.addressLine2}
-								</p>
-								<p className="font-normal text-[#101828]">
-								  {selectedApplication.shippingAddress.city},{" "}
-								  {selectedApplication.shippingAddress.state}{" "}
-								  {selectedApplication.shippingAddress.zipCode}
-								</p>
-								<p className="font-normal text-[#101828]">
-								  {selectedApplication.shippingAddress.country}
-								</p>
-							  </div>
-							  
-							)}
+  <div className="flex flex-col space-y-1">
+    <p className="text-sm text-[#667085]">Shipping Address</p>
+    {!applicationAddresses[selectedApplication.id] ? (
+      <div>
+        <p className="font-normal text-[#101828]">Loading shipping address...</p>
+        <button 
+          onClick={() => fetchApplicationAddress(selectedApplication.id)}
+          className="text-sm text-orange-500 hover:underline mt-2"
+        >
+          Retry loading address
+        </button>
+      </div>
+    ) : (
+      <>
+        <p className="font-normal text-[#101828]">
+          {applicationAddresses[selectedApplication.id]?.name}
+        </p>
+        <p className="font-normal text-[#101828]">
+          {applicationAddresses[selectedApplication.id]?.addressLine1}
+        </p>
+        {applicationAddresses[selectedApplication.id]?.addressLine2 && (
+          <p className="font-normal text-[#101828]">
+            {applicationAddresses[selectedApplication.id]?.addressLine2}
+          </p>
+        )}
+        <p className="font-normal text-[#101828]">
+          {applicationAddresses[selectedApplication.id]?.city},{" "}
+          {applicationAddresses[selectedApplication.id]?.state}{" "}
+          {applicationAddresses[selectedApplication.id]?.zipCode}
+        </p>
+        <p className="font-normal text-[#101828]">
+          {applicationAddresses[selectedApplication.id]?.country}
+        </p>
+        <p className="font-normal text-[#101828]">
+          Phone: {applicationAddresses[selectedApplication.id]?.phoneNumber}
+        </p>
+      </>
+    )}
+  </div>
+)}
 						</div>
 					</div>
 

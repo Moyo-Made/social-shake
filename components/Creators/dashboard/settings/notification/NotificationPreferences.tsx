@@ -14,34 +14,75 @@ export default function NotificationPreferences() {
 	const { currentUser } = useAuth();
 	const [settings, setSettings] = useState<NotificationSetting[]>([
 		{
-			id: "creator_applications",
-			title: "New creator applications",
-			description: "Receive emails when creators apply to your projects",
+			id: "project_invites",
+			title: "New Project Invites",
+			description: "When brands invites you to their campaign",
 			enabled: true,
 		},
 		{
-			id: "submission_approvals",
-			title: "Project Submission approval requests",
-			description: "Get notified when submissions needs your approval",
+			id: "payment_received",
+			title: "Payment Received",
+			description: "When you receive a payment from a brand",
 			enabled: true,
 		},
 		{
-			id: "payment_receipts",
-			title: "Payment receipts",
-			description: "Receive email confirmations for all payments",
+			id: "content_approval",
+			title: "Content Approval",
+			description: "When brands approves your submitted content",
 			enabled: true,
 		},
 		{
-			id: "milestone_updates",
-			title: "Creator milestone updates",
-			description: "Get notified about project progress and milestones",
+			id: "content_review",
+			title: "Content Review",
+			description: "When brands request changes to your content",
 			enabled: true,
 		},
 		{
-			id: "deadline_reminders",
-			title: "Contest deadline reminders",
-			description: "Receive reminders about upcoming project deadlines",
+			id: "content_results",
+			title: "Content Results",
+			description: "When results are announced for contests you've entered",
+			enabled: true,
+		},
+		{
+			id: "platform_updates",
+			title: "Platform Updates",
+			description: "News and updates about Social Shake",
 			enabled: false,
+		},
+		{
+			id: "weekly_digest",
+			title: "Weekly Digest",
+			description: "Weekly summary of your activity and opportunities",
+			enabled: false,
+		},
+	]);
+
+	const [dashboardSettings, setDashboardSettings] = useState<
+		NotificationSetting[]
+	>([
+		{
+			id: "brand_messages",
+			title: "Brand Messages",
+			description: "When brands send you messages",
+			enabled: true,
+		},
+		{
+			id: "payout_status",
+			title: "Payout Status Updates",
+			description: "When your payment status changes",
+			enabled: true,
+		},
+		{
+			id: "campaign_milestone_reminders",
+			title: "Campaign Milestone Reminders",
+			description: "Reminders about upcoming deadlines",
+			enabled: true,
+		},
+		{
+			id: "content_feedback",
+			title: "Content Feedback",
+			description: "When brands leave feedback on your content",
+			enabled: true,
 		},
 	]);
 	const [isSaving, setIsSaving] = useState(false);
@@ -61,6 +102,15 @@ export default function NotificationPreferences() {
 
 					// Update local state with user's saved preferences
 					setSettings((prev) =>
+						prev.map((setting) => ({
+							...setting,
+							enabled:
+								userSettings[setting.id] !== undefined
+									? userSettings[setting.id]
+									: setting.enabled,
+						}))
+					);
+					setDashboardSettings((prev) =>
 						prev.map((setting) => ({
 							...setting,
 							enabled:
@@ -119,7 +169,7 @@ export default function NotificationPreferences() {
 
 	if (isLoading) {
 		return (
-			<div className="flex flex-col justify-center items-center">
+			<div className="flex flex-col justify-center items-center h-screen">
 				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
 				Loading notification preferences...
 			</div>
@@ -128,16 +178,18 @@ export default function NotificationPreferences() {
 
 	return (
 		<div className="bg-white border border-[#FFD9C3] rounded-lg shadow-md p-6  max-w-3xl mx-auto">
-			<h2 className="text-2xl font-medium mb-1">Notifications & Alerts</h2>
+			<h2 className="text-xl font-medium mb-1">Notifications Settings</h2>
 			<p className="text-gray-500 mb-2">
-				Manage your notification preferences.
+				Control which alerts you receive via email and in your dashboard
 			</p>
-			<div className="w-full border border-[#6670854D] mb-6" />
+			<hr className="my-4" />
+			<h2 className="text-lg font-medium ">Email Notifications</h2>
+			<p className="text-gray-500 mb-6">Manage emails from Social Shake</p>
 			<div className="space-y-6">
 				{settings.map((setting) => (
 					<div key={setting.id} className="flex items-center justify-between">
 						<div>
-							<h3 className="font-medium text-lg">{setting.title}</h3>
+							<h3 className="font-medium text-base">{setting.title}</h3>
 							<p className="text-gray-500">{setting.description}</p>
 						</div>
 						<label className="relative inline-flex items-center cursor-pointer">
@@ -148,11 +200,48 @@ export default function NotificationPreferences() {
 								onChange={() => toggleSetting(setting.id)}
 							/>
 							<div
-								className={`w-14 h-7 rounded-full transition-colors duration-200 ease-in-out
-				${setting.enabled ? "bg-orange-500" : "bg-gray-200"}
-				after:content-[''] after:absolute after:top-[2px] after:left-[2px]
-				after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all
-				peer-checked:after:translate-x-7`}
+								className={`w-10 h-5 rounded-full relative transition-colors duration-200 ease-in-out
+    ${setting.enabled ? "bg-orange-500" : "bg-gray-200"}
+    after:content-[''] after:absolute after:top-0.5 after:left-0.5
+    after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all
+    ${setting.enabled ? "after:translate-x-5" : ""}`}
+							></div>
+						</label>
+					</div>
+				))}
+			</div>
+
+			{/* Dashboard Settings */}
+			<hr className="my-4" />
+			<h2 className="text-lg font-medium ">Dashboard Alerts</h2>
+			<p className="text-gray-500 mb-6">
+				Notifications displayed in your dashboard
+			</p>
+			<div className="space-y-6">
+				{dashboardSettings.map((dashboardSetting) => (
+					<div
+						key={dashboardSetting.id}
+						className="flex items-center justify-between"
+					>
+						<div>
+							<h3 className="font-medium text-base">
+								{dashboardSetting.title}
+							</h3>
+							<p className="text-gray-500">{dashboardSetting.description}</p>
+						</div>
+						<label className="relative inline-flex items-center cursor-pointer">
+							<input
+								type="checkbox"
+								className="sr-only peer"
+								checked={dashboardSetting.enabled}
+								onChange={() => toggleSetting(dashboardSetting.id)}
+							/>
+							<div
+								className={`w-10 h-5 rounded-full relative transition-colors duration-200 ease-in-out
+    ${dashboardSetting.enabled ? "bg-orange-500" : "bg-gray-200"}
+    after:content-[''] after:absolute after:top-0.5 after:left-0.5
+    after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all
+    ${dashboardSetting.enabled ? "after:translate-x-5" : ""}`}
 							></div>
 						</label>
 					</div>

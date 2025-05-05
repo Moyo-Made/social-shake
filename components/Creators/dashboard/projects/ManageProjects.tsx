@@ -13,12 +13,14 @@ import CreatorSubmissionTab from "./CreatorSubmissionTab";
 import ProjectAnalytics from "./ProjectAnalytics";
 import DeliveryTracking from "./ProductDeliveryTracking";
 
-
-
 interface ProjectDetailPageProps {
 	projectId: string;
+	applicationId: string;
 }
-const ManageProjects = ({ projectId }: ProjectDetailPageProps) => {
+const ManageProjects = ({
+	projectId,
+	applicationId,
+}: ProjectDetailPageProps) => {
 	//   const router = useRouter();
 	const [project, setProject] = useState<ProjectFormData | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -69,7 +71,9 @@ const ManageProjects = ({ projectId }: ProjectDetailPageProps) => {
 		);
 	}
 
-	const { label, color, bgColor, borderColor } = getProjectStatusInfo(project.status);
+	const { label, color, bgColor, borderColor } = getProjectStatusInfo(
+		project.status
+	);
 
 	const { projectDetails, projectRequirements, creatorPricing } = project;
 
@@ -156,7 +160,6 @@ const ManageProjects = ({ projectId }: ProjectDetailPageProps) => {
 							<TabsTrigger value="analytics" className={tabTriggerStyles}>
 								Analytics
 							</TabsTrigger>
-						
 						</>
 					)}
 
@@ -169,8 +172,6 @@ const ManageProjects = ({ projectId }: ProjectDetailPageProps) => {
 					<TabsTrigger value="overview" className={tabTriggerStyles}>
 						Project Overview
 					</TabsTrigger>
-
-					
 				</TabsList>
 
 				{/* Project Overview Tab */}
@@ -471,7 +472,10 @@ const ManageProjects = ({ projectId }: ProjectDetailPageProps) => {
 				{/* Submissions Tab */}
 				<TabsContent value="submissions">
 					<div className="p-8 text-center text-gray-500">
-						<CreatorSubmissionTab projectFormData={project} projectId={projectId} />
+						<CreatorSubmissionTab
+							projectFormData={project}
+							projectId={projectId}
+						/>
 					</div>
 				</TabsContent>
 
@@ -481,12 +485,11 @@ const ManageProjects = ({ projectId }: ProjectDetailPageProps) => {
 					</div>
 				</TabsContent>
 
-
 				{/* Product Delivery Tab (only shown for physical products) */}
 				{isPhysicalProduct && (
 					<TabsContent value="product-delivery">
 						<div className="p-8 text-gray-500">
-							<DeliveryTracking />
+							<DeliveryTracking applicationId={applicationId} />
 						</div>
 					</TabsContent>
 				)}

@@ -325,7 +325,7 @@ const AccountSettings: React.FC = () => {
 						<p className="text-gray-500 mb-2">
 							Manage your brand details and contact information
 						</p>
-						<div className="border border-[#6670854D] mb-6" />
+						<hr className="my-4" />
 
 						{error && (
 							<div className="bg-red-50 text-red-600 p-3 rounded-md mb-4">

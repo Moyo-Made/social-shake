@@ -1,13 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/config/firebase-admin";
+import { adminDb } from "@/config/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { getAuth } from 'firebase-admin/auth';
+
+// Helper function to get the current user ID from the request
+async function getCurrentUserId(request: NextRequest): Promise<string> {
+  const auth = getAuth();
+  try {
+    // Get the authorization token from the request headers
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new Error('Missing or invalid authorization token');
+    }
+
+    const token = authHeader.split('Bearer ')[1];
+    const decodedToken = await auth.verifyIdToken(token);
+    return decodedToken.uid;
+  } catch {
+    throw new Error('Unauthorized access');
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
+    // Get the authenticated user ID from the token
+    const userId = await getCurrentUserId(request);
+    
     // Parse the request body
     const body = await request.json();
     const {
-      userId,
       projectId,
       reason,
       productOwnership,
@@ -22,36 +43,11 @@ export async function POST(request: NextRequest) {
       hasData: !!body,
     });
 
-    // Validate userId
-    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
-      return NextResponse.json(
-        { 
-          error: "Missing or invalid userId",
-          details: "User ID must be a non-empty string"
-        },
-        { status: 400 }
-      );
-    }
-
     // Validate other required fields
     if (!projectId || !reason) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
-      );
-    }
-
-    // Verify the user exists in Auth system
-    try {
-      await adminAuth.getUser(userId);
-    } catch (error) {
-      console.error("Error verifying user:", error);
-      return NextResponse.json(
-        {
-          error: "Invalid user ID. Please sign in again.",
-          details: error instanceof Error ? error.message : String(error)
-        },
-        { status: 401 }
       );
     }
 
@@ -99,13 +95,13 @@ export async function POST(request: NextRequest) {
 
     // Create the application document
     const applicationData = {
-      userId: userId.trim(),
+      userId,
       projectId,
       reason,
       productOwnership,
       deliveryTime,
-      shippingAddress: productOwnership === "need" ? shippingAddress : null,
-      canShip: productOwnership === "need" ? canShip : true,
+      ...(productOwnership === "need" && shippingAddress ? { shippingAddress } : {}),
+      canShip: productOwnership === "need" ? !!canShip : true,
       status: "pending",
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
@@ -122,7 +118,7 @@ export async function POST(request: NextRequest) {
 
     // Create notification for the applicant
     await adminDb.collection("notifications").add({
-      userId: userId.trim(),
+      userId,
       message: "Your application has been submitted for review. We'll notify you once it's approved.",
       status: "unread",
       type: "project_application",
@@ -152,6 +148,14 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error submitting project application:", error);
+    
+    if (error instanceof Error && error.message === 'Unauthorized access') {
+      return NextResponse.json(
+        { error: "Unauthorized access" },
+        { status: 401 }
+      );
+    }
+    
     return NextResponse.json(
       {
         error: "Failed to submit application",

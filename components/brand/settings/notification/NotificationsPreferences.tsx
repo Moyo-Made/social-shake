@@ -128,16 +128,16 @@ export default function NotificationPreferences() {
 
 	return (
 		<div className="bg-white border border-[#FFD9C3] rounded-lg shadow-md p-6  max-w-3xl mx-auto">
-			<h2 className="text-2xl font-medium mb-1">Notifications & Alerts</h2>
+			<h2 className="text-xl font-medium mb-1">Notifications & Alerts</h2>
 			<p className="text-gray-500 mb-2">
 				Manage your notification preferences.
 			</p>
-			<div className="w-full border border-[#6670854D] mb-6" />
+			<hr className="my-4" />
 			<div className="space-y-6">
 				{settings.map((setting) => (
 					<div key={setting.id} className="flex items-center justify-between">
 						<div>
-							<h3 className="font-medium text-lg">{setting.title}</h3>
+							<h3 className="font-medium text-base">{setting.title}</h3>
 							<p className="text-gray-500">{setting.description}</p>
 						</div>
 						<label className="relative inline-flex items-center cursor-pointer">
@@ -148,11 +148,11 @@ export default function NotificationPreferences() {
 								onChange={() => toggleSetting(setting.id)}
 							/>
 							<div
-								className={`w-14 h-7 rounded-full transition-colors duration-200 ease-in-out
-                ${setting.enabled ? "bg-orange-500" : "bg-gray-200"}
-                after:content-[''] after:absolute after:top-[2px] after:left-[2px]
-                after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all
-                peer-checked:after:translate-x-7`}
+								className={`w-10 h-5 rounded-full relative transition-colors duration-200 ease-in-out
+    ${setting.enabled ? "bg-orange-500" : "bg-gray-200"}
+    after:content-[''] after:absolute after:top-0.5 after:left-0.5
+    after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all
+    ${setting.enabled ? "after:translate-x-5" : ""}`}
 							></div>
 						</label>
 					</div>

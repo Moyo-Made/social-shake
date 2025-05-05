@@ -44,7 +44,7 @@ type PaymentMethod = {
 	expiryDate?: string;
 };
 
-const BillingPayments = () => {
+const Payout = () => {
 	const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
 	const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 	const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -405,10 +405,10 @@ const BillingPayments = () => {
 		paymentMethods.length > 0 ? paymentMethods : mockPaymentMethods;
 
 	return (
-		<div className="bg-white border border-[#FFD9C3] rounded-lg p-6">
-			<h2 className="text-2xl font-medium mb-6">Billing & Payments</h2>
-			<p className="text-gray-500">
-				Manage your subscription and payment methods.
+		<div className="border border-[#FFD9C3] rounded-lg p-6">
+			<h2 className="text-2xl font-medium mb-1">Payments & Payouts</h2>
+			<p className="text-gray-500 mb-2">
+			Manage how you receive earnings from campaigns & contests
 			</p>
 			<hr className="my-4" />
 
@@ -886,4 +886,4 @@ const BillingPayments = () => {
 	);
 };
 
-export default BillingPayments;
+export default Payout;

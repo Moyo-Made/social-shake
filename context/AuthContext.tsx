@@ -30,6 +30,7 @@ interface AuthContextType {
 	logout: () => Promise<void>;
 	resetPassword: (email: string) => Promise<void>;
 	clearError: () => void;
+	getIdToken?: () => Promise<string>; 
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -338,7 +339,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 		loginWithFacebook,
 		logout,
 		resetPassword,
-		clearError
+		clearError,
+		getIdToken: async () => {
+			if (auth.currentUser) {
+			  return await auth.currentUser.getIdToken(true);
+			}
+			return '';
+		  }
 	};
 
 	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

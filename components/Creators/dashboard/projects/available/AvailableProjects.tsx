@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { ProjectCard } from "./ProjectCard";
+import  ProjectCard  from "./ProjectCard";
 import { Button } from "@/components/ui/button";
 import {
 	Select,
@@ -89,17 +89,30 @@ const CreatorProjectDashboard: React.FC = () => {
 		let result = [...projects];
 
 		// Apply search query filter
-		if (searchQuery) {
-			const query = searchQuery.toLowerCase();
-			result = result.filter(
-				(project) =>
-					project.projectDetails.projectName?.toLowerCase().includes(query) ||
-					Array.isArray(project.projectDetails.projectDescription) &&
-					project.projectDetails.projectDescription.some((desc) =>
-						desc.toLowerCase().includes(query)
-					)
-			);
+if (searchQuery) {
+	const query = searchQuery.toLowerCase();
+	result = result.filter(
+	  (project) => {
+		const nameMatch = project.projectDetails.projectName?.toLowerCase().includes(query);
+		
+		// Handle project description correctly whether it's a string or an array
+		let descriptionMatch = false;
+		const description = project.projectDetails.projectDescription;
+		
+		if (Array.isArray(description)) {
+		  // If it's an array, check if any element includes the query
+		  descriptionMatch = description.some(desc => 
+			typeof desc === 'string' && desc.toLowerCase().includes(query)
+		  );
+		} else if (typeof description === 'string') {
+		  // If it's a string, check if it includes the query
+		  descriptionMatch = description.toLowerCase().includes(query);
 		}
+		
+		return nameMatch || descriptionMatch;
+	  }
+	);
+  }
 
 		// Apply project type filter
 		if (projectType !== "all") {

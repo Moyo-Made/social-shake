@@ -780,7 +780,7 @@ export default function ProjectDetails({
 									<div className="flex flex-col">
 										<p className="mb-1 text-[#667085]">Commission Per Sale</p>
 										<span className="text-black font-normal mb-2">
-											${commissionSale}
+											{commissionSale}%
 										</span>
 									</div>
 								</div>

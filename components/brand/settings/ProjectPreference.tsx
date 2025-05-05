@@ -188,7 +188,7 @@ const ProjectPreference = () => {
 			<p className="text-gray-500 mb-3">
 				Set default preferences for all your UGC projects
 			</p>
-			<div className="w-full border border-[#6670854D] mb-6" />
+			<hr className="my-4" />
 
 			{/* Display error and success messages */}
 			{error && (
