@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import UserDashboard from "@/components/brand/brandProfile/dashboard/DashboardOverview";
 import { useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/brand/brandProfile/ProtectedRoute";
 import CreatorContentWrapper from "@/components/Creators/dashboard/CreatorContentWrapper";
+import CreatorDashboard from "@/components/Creators/dashboard/CreatorDashboard";
 
 export default function DashboardPage() {
 	const [isLoading, setIsLoading] = useState(true);
@@ -36,7 +36,7 @@ export default function DashboardPage() {
 		<CreatorContentWrapper userId={currentUser.uid} pageType="dashboard">
 			<div className="p-6">
 				<ProtectedRoute>
-					<UserDashboard userId={currentUser.uid} />
+					<CreatorDashboard userId={currentUser.uid} />
 				</ProtectedRoute>
 			</div>
 		</CreatorContentWrapper>

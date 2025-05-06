@@ -238,12 +238,12 @@ export default function UserDashboard({ userId }: UserDashboardProps) {
 											</div>
 										</td>
 										<td className="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
-											<a
+											<Link
 												href={`/brand/dashboard/projects/${project.projectId}`}
 												className="text-orange-500 hover:underline"
 											>
 												View Project
-											</a>
+											</Link>
 										</td>
 									</tr>
 								))}

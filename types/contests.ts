@@ -48,6 +48,10 @@ export interface ContestData {
   }
 
   export interface Contest {
+	likes: string;
+	comments: string;
+	
+	gmvSales: string;
 	views: number | undefined;
 	id: string;
 	userId: string;
@@ -85,6 +89,8 @@ export interface ContestData {
 	  endDate: string;
 	  applicationDeadline?: string;
 	};
+	hasWinningEntry?: boolean;
+	prizeAmount?: number;
 	contestType: ContestType | undefined;
 	incentives: {
 	  type: string;
