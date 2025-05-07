@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/config/firebase-admin";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
@@ -44,7 +45,7 @@ async function getCurrentUserId(request: NextRequest): Promise<string> {
 // GET endpoint for fetching a specific shipping address
 export async function GET(
 	request: NextRequest,
-	{ params }: { params: { id: string } }
+	{ params }: any
 ) {
 	try {
 		const addressId = params.id;
@@ -101,7 +102,7 @@ export async function GET(
 // PUT endpoint for updating a shipping address
 export async function PUT(
 	request: NextRequest,
-	{ params }: { params: { id: string } }
+	{ params }: any
 ) {
 	try {
 		const addressId = params.id;
@@ -189,7 +190,7 @@ export async function PUT(
 // DELETE endpoint for removing a shipping address
 export async function DELETE(
 	request: NextRequest,
-	{ params }: { params: { id: string } }
+	{ params }: any
 ) {
 	try {
 		const addressId = params.id;
