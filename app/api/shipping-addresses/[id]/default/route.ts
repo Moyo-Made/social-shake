@@ -23,7 +23,8 @@ async function getCurrentUserId(request: NextRequest): Promise<string> {
 // PUT endpoint for setting an address as default
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  { params }: any
 ) {
   try {
     const addressId = params.id;
