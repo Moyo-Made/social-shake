@@ -210,6 +210,7 @@ const ProductDelivery: React.FC = () => {
       
       // Fetch creator profiles for all applicants
       const creatorProfiles = await Promise.all(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         applications.map(async (app: any) => {
           try {
             const creatorResponse = await fetch(
@@ -264,7 +265,7 @@ const ProductDelivery: React.FC = () => {
   
   // Function to handle creator selection
   const handleCreatorChange = (creatorId: string) => {
-    const selectedCreator = projectCreators.find(c => c.userId === creatorId);
+    // const selectedCreator = projectCreators.find(c => c.userId === creatorId);
     
     setNewProduct(prev => ({
       ...prev,
@@ -706,7 +707,7 @@ const ProductDelivery: React.FC = () => {
         return;
       }
 
-      const token = await currentUser.getIdToken();
+      // const token = await currentUser.getIdToken();
       
       const delivery = deliveries.find((d) => d.id === deliveryId);
       if (!delivery) {
