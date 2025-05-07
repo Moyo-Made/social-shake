@@ -1,4 +1,3 @@
-// services/paymentMethodService.js
 import { auth } from "@/config/firebase";
 
 // Helper function to get auth token

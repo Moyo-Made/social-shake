@@ -1,6 +1,17 @@
 "use client";
 
 import React from "react";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+
+// Extend jsPDF to include autoTable
+declare module "jspdf" {
+	interface jsPDF {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		autoTable: (options: any) => void;
+		lastAutoTable?: { finalY: number };
+	}
+}
 
 // Transaction Details Modal Component
 interface Transaction {
@@ -26,31 +37,102 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 }) => {
 	if (!isOpen) return null;
 
-	// Function to generate and download PDF
-	const handleDownloadPDF = () => {
-		// In a real implementation, you would generate a PDF with the transaction details
-		// For now, we'll just create a text file with the transaction info
-		const content = `
-Transaction Details
-Transaction ID: ${transaction.id}
-Description: ${transaction.description}
-Type: ${transaction.type}
-Amount: $${transaction.amount}
-Status: ${transaction.status}
-Payment Date: ${transaction.paymentDate}
-Project Completed: ${transaction.projectCompleted}
-    `;
-
-		const blob = new Blob([content], { type: "text/plain" });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement("a");
-		a.href = url;
-		a.download = `Transaction_${transaction.id}.txt`;
-		document.body.appendChild(a);
-		a.click();
-		document.body.removeChild(a);
-		URL.revokeObjectURL(url);
-	};
+	// Function to generate and download PDF 
+const handleDownloadPDF = () => {
+	// Import jsPDF and autoTable (assuming they are already imported at the top of your file)
+	// If not imported elsewhere, you'll need to add:
+	// import { jsPDF } from "jspdf";
+	// import autoTable from "jspdf-autotable";
+	
+	const doc = new jsPDF();
+	
+	// Add title
+	doc.setFontSize(20);
+	doc.text("Transaction Receipt", 105, 20, { align: 'center' });
+	
+	// Add logo/branding
+	doc.setFontSize(12);
+	doc.text("Social Shake", 105, 30, { align: 'center' });
+	
+	// Add status badge
+	if (transaction.status === "Processed" || transaction.status === "Completed") {
+	  doc.setFillColor(39, 174, 96); // Green color for completed/processed
+	  doc.roundedRect(75, 35, 60, 10, 5, 5, 'F');
+	  doc.setTextColor(255, 255, 255);
+	  doc.text(transaction.status, 105, 42, { align: 'center' });
+	} else if (transaction.status === "Processing") {
+	  doc.setFillColor(255, 193, 7); // Yellow color for processing
+	  doc.roundedRect(75, 35, 60, 10, 5, 5, 'F');
+	  doc.setTextColor(0, 0, 0);
+	  doc.text(transaction.status, 105, 42, { align: 'center' });
+	} else {
+	  doc.setFillColor(220, 220, 220); // Gray for other statuses
+	  doc.roundedRect(75, 35, 60, 10, 5, 5, 'F');
+	  doc.setTextColor(0, 0, 0);
+	  doc.text(transaction.status, 105, 42, { align: 'center' });
+	}
+	doc.setTextColor(0, 0, 0);
+	
+	// Add transaction details
+	doc.setFontSize(12);
+	doc.text("Transaction Details", 20, 60);
+	
+	// Create a table for transaction details
+	const tableData = [
+	  ['Transaction ID', transaction.id],
+	  ['Description', transaction.description],
+	  ['Type', transaction.type],
+	  ['Amount', `$${transaction.amount}`],
+	  ['Status', transaction.status],
+	  ['Payment Date', transaction.paymentDate || 'N/A'],
+	  ['Project Completed', transaction.projectCompleted || 'N/A']
+	];
+	
+	// Generate the auto table
+	autoTable(doc, {
+	  startY: 65,
+	  head: [['Item', 'Details']],
+	  body: tableData,
+	  theme: 'striped',
+	  headStyles: { fillColor: [255, 165, 0] }
+	});
+	
+	// Add timeline if applicable
+	if (transaction.projectCompleted) {
+	  doc.text("Payment Timeline", 20, (doc.lastAutoTable?.finalY || 150) + 10);
+	  
+	  const timelineData = [
+		['Project Completed', transaction.projectCompleted, '✓'],
+		['Processing Started', transaction.paymentDate || 'N/A', transaction.paymentDate ? '✓' : 'Pending'],
+		['Payment Processed', transaction.status === "Processed" ? transaction.paymentDate : 'Pending...', 
+		  transaction.status === "Processed" ? '✓' : '']
+	  ];
+  
+	  autoTable(doc, {
+		startY: (doc.lastAutoTable?.finalY || 150) + 15,
+		head: [['Stage', 'Time', 'Status']],
+		body: timelineData,
+		theme: 'grid',
+		headStyles: { fillColor: [255, 165, 0] }
+	  });
+	}
+	
+	// Add footer
+	const pageCount = doc.getNumberOfPages();
+	for (let i = 1; i <= pageCount; i++) {
+	  doc.setPage(i);
+	  doc.setFontSize(10);
+	  doc.text(
+		`Generated on ${new Date().toLocaleString()} - Page ${i} of ${pageCount}`,
+		doc.internal.pageSize.getWidth() / 2,
+		doc.internal.pageSize.getHeight() - 10,
+		{ align: 'center' }
+	  );
+	}
+	
+	// Save the PDF
+	doc.save(`transaction-receipt-${transaction.id}.pdf`);
+  };
 
 	// Helper function to get status badge styling
 	const getStatusStyle = (status: string) => {
