@@ -23,7 +23,8 @@ type ApiResponse = ErrorResponse | SuccessResponse;
 // In App Router, we use named exports for HTTP methods
 export async function GET(
 	request: NextRequest,
-	{ params }: { params: { contestId: string } }
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	{ params }: any
 ): Promise<NextResponse<ApiResponse | { message: string }>> {
 	const { contestId } = params;
 
