@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/config/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { getAuth } from 'firebase-admin/auth';
 
 // Helper function to get the current user ID from the request
-async function getCurrentUserId(request: { headers: Headers; }) {
+async function getCurrentUserId(request: NextRequest) {
   const auth = getAuth();
   try {
     // Get the authorization token from the request headers
@@ -38,7 +38,7 @@ async function verifyOwnership(paymentMethodId: string, userId: string) {
 }
 
 // PATCH endpoint for setting a payment method as default
-export async function PATCH(request: { json: () => Promise<{ paymentMethodId: string }>; headers: Headers; }) {
+export async function PATCH(request: NextRequest) {
   try {
     // Get the current user ID
     const userId = await getCurrentUserId(request);
