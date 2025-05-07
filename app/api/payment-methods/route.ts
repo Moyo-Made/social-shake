@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/config/firebase-admin";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { getAuth } from 'firebase-admin/auth';
@@ -23,11 +23,11 @@ function convertTimestampsToISO(data: Record<string, unknown> | null) {
 }
 
 // Helper function to get the current user ID from the request
-async function getCurrentUserId(request: { url?: string | URL; json?: () => Promise<{ routingNumber?: string; cardNumber?: string; [key: string]: unknown; }>; headers?: Headers; }) {
+async function getCurrentUserId(request: NextRequest) {
   const auth = getAuth();
   try {
     // Get the authorization token from the request headers
-    const authHeader = request.headers?.get('authorization') ?? '';
+    const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new Error('Missing or invalid authorization token');
     }
@@ -55,7 +55,7 @@ async function isUserAdmin(userId: string) {
 }
 
 // GET endpoint for fetching payment methods
-export async function GET(request: { url: string | URL; }) {
+export async function GET(request: NextRequest) {
   try {
     // Get URL parameters
     const url = new URL(request.url);
@@ -123,7 +123,7 @@ export async function GET(request: { url: string | URL; }) {
 }
 
 // POST endpoint for creating a new payment method
-export async function POST(request: { json: () => Promise<{ routingNumber?: string; cardNumber?: string; [key: string]: unknown }>; }) {
+export async function POST(request: NextRequest) {
   try {
     // Get the current user ID
     const userId = await getCurrentUserId(request);
