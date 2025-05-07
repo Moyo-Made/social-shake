@@ -13,7 +13,7 @@ import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 
 // Define types
-interface Creator {
+export interface Creators {
 	id: string;
 	name: string;
 	username: string;
@@ -55,11 +55,11 @@ const CreatorMarketplace = () => {
 
 	const isSavedCreatorsPage = pathname === "/brand/dashboard/creators/saved";
 
-	const [selectedCreator, setSelectedCreator] = useState<Creator | null>(null);
+	const [selectedCreator, setSelectedCreator] = useState<Creators | null>(null);
 	const [showAlert, setShowAlert] = useState<boolean>(false);
-	const [savedCreators, setSavedCreators] = useState<Creator[]>([]);
+	const [savedCreators, setSavedCreators] = useState<Creators[]>([]);
 	const [alertMessage, setAlertMessage] = useState<string>("");
-	const [creators, setCreators] = useState<Creator[]>([]);
+	const [creators, setCreators] = useState<Creators[]>([]);
 	const [isClient, setIsClient] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -190,7 +190,7 @@ const CreatorMarketplace = () => {
 		}
 	}, [savedCreators, isClient]);
 
-	const handleViewProfile = (creator: Creator): void => {
+	const handleViewProfile = (creator: Creators): void => {
 		setSelectedCreator(creator);
 	};
 
@@ -202,7 +202,7 @@ const CreatorMarketplace = () => {
 		return savedCreators.some((creator) => creator.id === creatorId);
 	};
 
-	const handleSaveCreator = (creator: Creator): void => {
+	const handleSaveCreator = (creator: Creators): void => {
 		if (!isCreatorSaved(creator.id)) {
 			const newSavedCreators = [...savedCreators, creator];
 			setSavedCreators(newSavedCreators);
@@ -250,7 +250,7 @@ const CreatorMarketplace = () => {
 				{isLoading
 					? ""
 					: isSavedCreatorsPage
-						? "You haven't saved any creators to your favorites yet. Browse the marketplace and click the heart icon to save creators."
+						? "You haven't saved any creators to your favorites yet. Browse creators and click the heart icon to save creators."
 						: "No creators found. Please check back later or try different search criteria."}
 			</p>
 			{!isLoading && isSavedCreatorsPage && (
@@ -258,7 +258,7 @@ const CreatorMarketplace = () => {
 					onClick={handleNavigateToMarketplace}
 					className="px-4 py-2 bg-orange-500 text-white rounded-md font-medium text-sm md:text-base"
 				>
-					Browse Marketplace
+					Browse Creators
 				</button>
 			)}
 		</div>
@@ -304,7 +304,7 @@ const CreatorMarketplace = () => {
 							<div className="flex flex-col md:flex-row md:items-center gap-4">
 								<div className="h-24 w-24 md:h-32 md:w-32 lg:h-40 lg:w-40 rounded-full overflow-hidden border-4 border-orange-100 mx-auto md:mx-0">
 									<Image
-										src={selectedCreator.profilePictureUrl || defaultProfileImg}
+										src={selectedCreator.profilePictureUrl}
 										alt={selectedCreator.name}
 										className="h-full w-full object-cover"
 										width={160}
@@ -316,7 +316,7 @@ const CreatorMarketplace = () => {
 										{selectedCreator.name}
 									</h2>
 									<p className="text-gray-600 text-sm md:text-base">
-										{selectedCreator.contentTypes.join(" | ")}
+										{selectedCreator.contentTypes}
 									</p>
 									<p className="text-gray-500 text-sm md:text-base">
 										@{selectedCreator.username}
@@ -517,7 +517,7 @@ const CreatorMarketplace = () => {
 										<div className="flex items-center">
 											<div className="w-12 h-12 md:w-16 md:h-16 rounded-full overflow-hidden mr-3 md:mr-4">
 												<Image
-													src={creator.profilePictureUrl || defaultProfileImg}
+													src={creator.profilePictureUrl}
 													alt={creator.name}
 													className="w-full h-full object-cover"
 													width={64}
@@ -743,7 +743,7 @@ const CreatorMarketplace = () => {
 									<div className="flex items-center">
 										<div className="w-12 h-12 md:w-16 md:h-16 rounded-full overflow-hidden mr-3 md:mr-4">
 											<Image
-												src={creator.profilePictureUrl || defaultProfileImg}
+												src={creator.profilePictureUrl}
 												alt={creator.name}
 												className="w-full h-full object-cover"
 												width={64}

@@ -114,6 +114,8 @@ export interface CreatorPricing {
 }
 
 export interface Creator {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	id: any;
 	name: string;
 	avatar: string;
 }

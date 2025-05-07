@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
 	Select,
@@ -15,24 +15,32 @@ import { X } from "lucide-react";
 import Image from "next/image";
 import { useProjectForm } from "./ProjectFormContext";
 import { Creator, CreatorPricing } from "@/types/contestFormData";
+import { useSavedCreators } from "@/hooks/useSavedCreators";
 
 export default function CreatorPricingTab() {
 	const { formData, updateCreatorPricing } = useProjectForm();
 	const { creatorPricing } = formData;
+	const {
+		savedCreators,
+		allCreators,
+		isLoading,
+		error,
+		searchCreators,
+	} = useSavedCreators();
 
 	// Initialize state from context or use default values
 	const [selectionMethod, setSelectionMethod] = useState<
 		CreatorPricing["selectionMethod"]
 	>(creatorPricing.selectionMethod || "Invite Specific Creators");
-	const [budget, setBudget] = useState(creatorPricing.budgetPerVideo || 1500);
-	const [budgetValue, setBudgetValue] = useState(budget.toString());
-	const [budgetError, setBudgetError] = useState("");
+	const [budget, setBudget] = useState(creatorPricing.budgetPerVideo || 0);
+	const [budgetValue, setBudgetValue] = useState(budget ? budget.toString() : "");
+	const [, setBudgetError] = useState("");
 	const [extras, setExtras] = useState({
 		captions: creatorPricing.extras.captions || false,
 		music: creatorPricing.extras.music || false,
 		rawFiles: creatorPricing.extras.rawFiles || false,
 	});
-	const [invitedCreatorsCount] = useState(2); // Fixed at 2 for invited creators
+	
 	const [publicCreatorsCount, setPublicCreatorsCount] = useState(
 		creatorPricing.selectionMethod === "Post Public Brief"
 			? creatorPricing.creatorCount || 1
@@ -59,18 +67,109 @@ export default function CreatorPricingTab() {
 	);
 	const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
 
-	// Predefined mock creators
-	const [selectedCreators] = useState<Creator[]>([
-		{ name: "Colina Demirdjian", avatar: "/icons/colina.svg" },
-		{ name: "Tolulope Olu", avatar: "/icons/colina.svg" },
-	]);
+	const [selectedCreators, setSelectedCreators] = useState<Creator[]>(
+		creatorPricing.selectedCreators || []
+	);
+	const [selectedCreatorIds, setSelectedCreatorIds] = useState<string[]>(
+		(creatorPricing.selectedCreators || []).map((creator) => creator.id)
+	);
+	const [invitedCreatorsCount, setInvitedCreatorsCount] = useState(selectedCreators.length || 2);
+	const [searchQuery, setSearchQuery] = useState("");
+
+	useEffect(() => {
+		if (savedCreators && savedCreators.length > 0) {
+			if (creatorSelectionMode === "all") {
+				// Select all saved creators when "all" mode is selected
+				const allCreatorIds = savedCreators.map((creator) => creator.id);
+				setSelectedCreatorIds(allCreatorIds);
+
+				// Map savedCreators to selectedCreators format
+				const mappedCreators = savedCreators.map((creator) => ({
+					name: creator.name,
+					avatar: creator.profilePictureUrl,
+					id: creator.id,
+					price: creator.pricing?.oneVideo || 0, // Use oneVideo price if available
+				}));
+				setSelectedCreators(mappedCreators);
+			} else if (creatorSelectionMode === "search") {
+				// In search mode, only include creators that are actually selected
+				const filteredCreators = savedCreators
+					.filter((creator) => selectedCreatorIds.includes(creator.id))
+					.map((creator) => ({
+						name: creator.name,
+						avatar: creator.profilePictureUrl,
+						id: creator.id,
+						price: creator.pricing?.oneVideo || "",
+					}));
+				setSelectedCreators(filteredCreators);
+			}
+		}
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
+	useEffect(() => {
+		if (creatorSelectionMode === "all") {
+			// In "all" mode, select all saved creators
+			const allCreatorIds = savedCreators.map((creator) => creator.id);
+			setSelectedCreatorIds(allCreatorIds);
+
+			// Map savedCreators to selectedCreators format
+			const mappedCreators = savedCreators.map((creator) => ({
+				name: creator.name,
+				avatar: creator.profilePictureUrl,
+				id: creator.id,
+				price: creator.pricing?.oneVideo || "", // Use oneVideo price if available
+			}));
+
+			setSelectedCreators(mappedCreators);
+		}
+		// When switching to search mode, maintain current selections
+	}, [creatorSelectionMode, savedCreators]);
+
+	// Function to toggle selection of a creator
+	const toggleCreatorSelection = (creatorId: string) => {
+		if (selectedCreatorIds.includes(creatorId)) {
+			// Remove creator if already selected
+			setSelectedCreatorIds((prevIds) =>
+				prevIds.filter((id) => id !== creatorId)
+			);
+			setSelectedCreators((prevCreators) =>
+				prevCreators.filter((creator) => creator.id !== creatorId)
+			);
+		} else {
+			// Add creator if not already selected
+			setSelectedCreatorIds((prevIds) => [...prevIds, creatorId]);
+
+			// Find the creator from either allCreators or savedCreators
+			const creatorsList =
+				creatorSelectionMode === "search" ? allCreators : savedCreators;
+			const creator = creatorsList.find((c) => c.id === creatorId);
+
+			if (creator) {
+				const newCreator = {
+					name: creator.name,
+					avatar: creator.profilePictureUrl,
+					id: creator.id,
+					price: creator.pricing?.oneVideo || "",
+				};
+
+				setSelectedCreators((prevCreators) => [...prevCreators, newCreator]);
+			}
+		}
+	};
+	// Function to filter creators based on search query
+	// Function to get filtered creators based on search
+	const getFilteredCreators = () => {
+		// When in "all" mode, only show saved creators
+		// When in "search" mode, search all creators
+		return searchCreators(searchQuery, creatorSelectionMode === "search");
+	};
 
 	// Handle budget value change
 	const handleBudgetChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		// Allow empty string for clearing the input field
 		if (e.target.value === "") {
 			setBudgetValue("");
-			setBudgetError("Minimum budget per video is $1,500");
 			return;
 		}
 
@@ -80,10 +179,9 @@ export default function CreatorPricingTab() {
 
 		const numValue = Number(inputValue);
 
-		// Validate the value
-		if (numValue < 1500) {
-			setBudgetError("Minimum budget per video is $1,500");
-			setBudget(numValue); // Still update the budget for calculations
+		// Validate only that it's a positive number
+		if (numValue < 0) {
+			setBudgetError("Price per video must be a positive number");
 		} else {
 			setBudgetError("");
 			setBudget(numValue);
@@ -98,18 +196,20 @@ export default function CreatorPricingTab() {
 	const musicTotal = extras.music ? 50 * totalVideos : 0;
 	const rawFilesTotal = extras.rawFiles ? 100 * totalVideos : 0;
 	const captionsTotal = extras.captions ? 120 * totalVideos : 0;
-	const totalBudget = budget * totalVideos;
-	const totalAmount = totalBudget + (musicTotal + rawFilesTotal + captionsTotal);
+	const totalBudget = budget ;
+	const totalAmount =
+		totalBudget + (musicTotal + rawFilesTotal + captionsTotal);
 	const services = 0.1 * totalAmount;
 
 	// Update context when values change
 	const updateContextValues = () => {
 		const currentCreatorCount =
 			selectionMethod === "Invite Specific Creators"
-				? invitedCreatorsCount
+				? selectedCreators.length || invitedCreatorsCount
 				: publicCreatorsCount;
 		updateCreatorPricing({
 			selectionMethod,
+
 			selectedCreators,
 			ageGroup,
 			gender,
@@ -157,13 +257,13 @@ export default function CreatorPricingTab() {
 				extrasTotal: musicTotal + rawFilesTotal,
 				totalAmount,
 				serviceFee: services,
-				commissionPerSale: ""
+				commissionPerSale: "",
 			},
 		});
 	};
 
 	// Trigger context update when relevant values change
-	React.useEffect(() => {
+	useEffect(() => {
 		updateContextValues();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [
@@ -177,7 +277,12 @@ export default function CreatorPricingTab() {
 		industry,
 		language,
 		countries,
+		selectedCreators,
 	]);
+
+	useEffect(() => {
+		setInvitedCreatorsCount(selectedCreators.length);
+	}, [selectedCreators]);
 
 	return (
 		<div className="flex flex-col lg:flex-row gap-4 p-4 max-w-6xl mx-auto">
@@ -265,6 +370,8 @@ export default function CreatorPricingTab() {
 												type="text"
 												placeholder="Search Creators"
 												className="pl-8 border rounded-full"
+												value={searchQuery}
+												onChange={(e) => setSearchQuery(e.target.value)}
 											/>
 											<svg
 												className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
@@ -290,36 +397,50 @@ export default function CreatorPricingTab() {
 										</div>
 									)}
 
-									<div>
-										<h3 className="text-base font-medium mb-4">
-											Saved Creators
-										</h3>
-										<div className="border rounded-lg p-4">
-											<div className="flex flex-wrap gap-2">
-												{selectedCreators.map((creator, index) => (
-													<div
-														key={index}
-														className="flex items-center border border-[#D0D5DD] gap-1 bg-white rounded-lg px-2 py-1"
+									{isLoading ? (
+										<p className="text-gray-500">Loading creators...</p>
+									) : error ? (
+										<p className="text-red-500">{error}</p>
+									) : getFilteredCreators().length > 0 ? (
+										<div className="flex flex-wrap gap-2">
+											{getFilteredCreators().map((creator) => (
+												<div
+													key={creator.id}
+													className={`flex items-center border gap-1 bg-white rounded-lg cursor-pointer px-2 py-1 ${
+														selectedCreatorIds.includes(creator.id)
+															? "border-orange-500"
+															: "border-[#D0D5DD]"
+													}`}
+													onClick={() => toggleCreatorSelection(creator.id)}
+												>
+													<Image
+														src={creator.profilePictureUrl}
+														alt={creator.name}
+														width={24}
+														height={24}
+														className="w-6 h-6 rounded-full object-fill"
+													
+													/>
+													<span className="text-sm">{creator.name}</span>
+													<button
+														className="ml-1 text-gray-500 hover:text-gray-700 cursor-pointer"
+														onClick={(e) => {
+															e.stopPropagation();
+															toggleCreatorSelection(creator.id);
+														}}
 													>
-														<Image
-															src={creator.avatar}
-															alt={creator.name}
-															width={6}
-															height={6}
-															className="w-6 h-6 rounded-full"
-															onError={(e) => {
-																e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(creator.name)}&background=random`;
-															}}
-														/>
-														<span className="text-sm">{creator.name}</span>
-														<button className="ml-1 text-gray-500 hover:text-gray-700">
-															<X size={14} />
-														</button>
-													</div>
-												))}
-											</div>
+													
+													</button>
+												</div>
+											))}
 										</div>
-									</div>
+									) : (
+										<p className="text-gray-500">
+											{creatorSelectionMode === "search"
+												? "No creators found."
+												: "No saved creators found."}
+										</p>
+									)}
 								</div>
 							) : (
 								<div className="space-y-4">
@@ -579,9 +700,7 @@ export default function CreatorPricingTab() {
 				<CardContent className="pt-6">
 					<div className="space-y-6">
 						<div>
-							<h2 className="text-base font-medium mb-2">
-								Total Budget per Video
-							</h2>
+							<h2 className="text-base font-medium mb-2">Price per Video</h2>
 							<div className="relative">
 								<span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
 									$
@@ -590,17 +709,12 @@ export default function CreatorPricingTab() {
 									type="text"
 									value={budgetValue}
 									onChange={handleBudgetChange}
-									className={`pl-8 border rounded-md ${budgetError ? "border-red-500" : ""}`}
-									min={1500}
+									className="pl-8 border rounded-md"
 								/>
 							</div>
-							{budgetError ? (
-								<p className="text-sm text-red-500 mt-1">{budgetError}</p>
-							) : (
-								<p className="text-sm text-gray-500 mt-1">
-									This is the total amount you intend to spend (Min. $1,500)
-								</p>
-							)}
+							<p className="text-sm text-gray-500 mt-1">
+								This is the price per video for the selected creator(s)
+							</p>
 						</div>
 
 						<div className="border-t pt-4">
@@ -675,7 +789,7 @@ export default function CreatorPricingTab() {
 							{selectionMethod === "Invite Specific Creators" ? (
 								<div className="flex justify-between mb-2">
 									<span>No of Creators:</span>
-									<span>{Math.max(2, invitedCreatorsCount)} Creators</span>
+									<span>{invitedCreatorsCount} Creators</span>
 								</div>
 							) : (
 								<div className="flex justify-between items-center mb-2">
@@ -821,8 +935,8 @@ export default function CreatorPricingTab() {
 								= ${rawFilesTotal}
 							</div>
 							<div className="text-sm text-gray-500 mb-4">
-								Captions - ${extras.captions ? 120 : 0} × {totalVideos} Videos
-								= ${captionsTotal}
+								Captions - ${extras.captions ? 120 : 0} × {totalVideos} Videos =
+								${captionsTotal}
 							</div>
 
 							<div className="flex gap-1 mb-1">
