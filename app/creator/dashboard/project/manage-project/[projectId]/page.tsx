@@ -10,7 +10,7 @@ interface PageProps {
 const Page: React.FC<PageProps> = ({ params }) => {
 	return (
 		<div>
-			<ManageProjects projectId={params.projectId} />
+			<ManageProjects projectId={params.projectId} applicationId={params.applicationId} />
 		</div>
 	);
 };
