@@ -17,6 +17,7 @@ import BillingPage from "./billingPayments/Billing";
 import ProjectPreference from "./ProjectPreference";
 import NotificationPreferences from "./notification/NotificationsPreferences";
 import SecurityPage from "./SecurityPage";
+import { countries } from "@/types/countries";
 
 // Interface for social media data
 interface SocialMedia {
