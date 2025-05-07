@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/config/firebase-admin";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { getAuth } from 'firebase-admin/auth';
@@ -23,7 +23,7 @@ function convertTimestampsToISO(data: Record<string, unknown> | null) {
 }
 
 // Helper function to get the current user ID from the request
-async function getCurrentUserId(request: { headers: Headers }) {
+async function getCurrentUserId(request: NextRequest) {
   const auth = getAuth();
   try {
     // Get the authorization token from the request headers
@@ -57,18 +57,15 @@ async function verifyOwnership(paymentMethodId: string, userId: string) {
 }
 
 // PUT endpoint for updating an existing payment method
-export async function PUT(request: { json?: () => Record<string, unknown>; headers?: Headers; }, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const paymentMethodId = params.id;
     
     // Get the current user ID
-    if (!request.headers) {
-      throw new Error('Missing headers in the request');
-    }
-    const userId = await getCurrentUserId({ headers: request.headers });
+    const userId = await getCurrentUserId(request);
     
     // Parse the request body
-    const updateData: { accountNumber?: string; routingNumber?: string; isDefault?: boolean; cardNumber?: string; cvv?: string; [key: string]: unknown } = request.json ? await request.json() : {};
+    const updateData: { accountNumber?: string; routingNumber?: string; isDefault?: boolean; cardNumber?: string; cvv?: string; [key: string]: unknown } = await request.json();
     
     // Verify that the user owns this payment method
     const methodDoc = await verifyOwnership(paymentMethodId, userId);
@@ -175,7 +172,7 @@ export async function PUT(request: { json?: () => Record<string, unknown>; heade
 }
 
 // DELETE endpoint for removing a payment method
-export async function DELETE(request: { headers: Headers; }, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const paymentMethodId = params.id;
     
