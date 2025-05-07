@@ -145,6 +145,22 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 		}
 	}, [currentUser, mode]);
 
+	useEffect(() => {
+		// Function to handle global profile update events
+		const handleProfileUpdate = () => {
+		  console.log("Profile update event detected in hook, refreshing data");
+		  fetchCreatorProfile();
+		};
+	  
+		// Add event listener
+		window.addEventListener("creator-profile-updated", handleProfileUpdate);
+		
+		// Clean up
+		return () => {
+		  window.removeEventListener("creator-profile-updated", handleProfileUpdate);
+		};
+	  }, []);  
+
 	const updateCreatorProfile = async (formData: FormData) => {
 		try {
 			setLoading(true);

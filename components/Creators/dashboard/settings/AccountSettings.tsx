@@ -398,6 +398,17 @@ const AccountSettings: React.FC = () => {
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to update profile");
 		} finally {
+			setSuccessMessage("Profile updated successfully");
+			// Update the profile data with the new form data
+			setProfileData({ ...formData });
+
+			// Dispatch custom event to notify other components of the profile update
+			window.dispatchEvent(new Event("creator-profile-updated"));
+
+			// Clear success message after 3 seconds
+			setTimeout(() => {
+				setSuccessMessage(null);
+			}, 3000);
 			setIsSaving(false);
 		}
 	};
@@ -888,7 +899,9 @@ const AccountSettings: React.FC = () => {
 
 				{/* Billing & Payments Tab */}
 				{activeTab === "shipping-details" && (
-					<div className="md:w-[50rem] max-w-4xl mx-auto"><ShippingAddressPage /></div>
+					<div className="md:w-[50rem] max-w-4xl mx-auto">
+						<ShippingAddressPage />
+					</div>
 				)}
 
 				{/* Project Preference Tab */}
