@@ -1,5 +1,6 @@
 import { db } from '@/config/firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { NextRequest, NextResponse } from 'next/server';
 
 interface ContestData {
 	contestId: string;
@@ -19,22 +20,18 @@ interface SuccessResponse {
 
 type ApiResponse = ErrorResponse | SuccessResponse;
 
-export default async function handler(
-	req: { method: string; query: { contestId?: string } },
-	res: {
-		status: (code: number) => {
-			json: (body: ApiResponse | { message: string }) => void;
-		};
-	}
-): Promise<void> {
-	if (req.method !== 'GET') {
-		return res.status(405).json({ message: 'Method not allowed' });
-	}
-
-	const { contestId } = req.query;
+// In App Router, we use named exports for HTTP methods
+export async function GET(
+	request: NextRequest,
+	{ params }: { params: { contestId: string } }
+): Promise<NextResponse<ApiResponse | { message: string }>> {
+	const { contestId } = params;
 
 	if (!contestId) {
-		return res.status(400).json({ message: 'Contest ID is required' });
+		return NextResponse.json(
+			{ success: false, message: 'Contest ID is required' },
+			{ status: 400 }
+		);
 	}
 
 	try {
@@ -43,10 +40,13 @@ export default async function handler(
 		const contestDoc = await getDoc(contestRef);
 
 		if (!contestDoc.exists()) {
-			return res.status(404).json({
-				success: false,
-				message: 'Contest not found'
-			});
+			return NextResponse.json(
+				{
+					success: false,
+					message: 'Contest not found'
+				},
+				{ status: 404 }
+			);
 		}
 
 		const contestData: ContestData = {
@@ -54,16 +54,22 @@ export default async function handler(
 			...contestDoc.data()
 		};
 
-		return res.status(200).json({
-			success: true,
-			data: contestData
-		});
+		return NextResponse.json(
+			{
+				success: true,
+				data: contestData
+			},
+			{ status: 200 }
+		);
 	} catch (error) {
 		console.error('Error fetching contest details:', error);
-		return res.status(500).json({ 
-			success: false,
-			message: 'Failed to fetch contest details',
-			error: (error as Error).message 
-		});
+		return NextResponse.json(
+			{ 
+				success: false,
+				message: 'Failed to fetch contest details',
+				error: (error as Error).message 
+			},
+			{ status: 500 }
+		);
 	}
 }
