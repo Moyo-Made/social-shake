@@ -57,7 +57,8 @@ async function verifyOwnership(paymentMethodId: string, userId: string) {
 }
 
 // PUT endpoint for updating an existing payment method
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function PUT(request: NextRequest, { params }: any) {
   try {
     const paymentMethodId = params.id;
     
@@ -172,7 +173,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 }
 
 // DELETE endpoint for removing a payment method
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function DELETE(request: NextRequest, { params }: any) {
   try {
     const paymentMethodId = params.id;
     
