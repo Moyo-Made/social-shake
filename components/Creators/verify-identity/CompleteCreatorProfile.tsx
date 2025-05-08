@@ -24,6 +24,7 @@ import {
 	useCreatorVerification,
 } from "@/components/Creators/verify-identity/CreatorVerificationContext";
 import { useAuth } from "@/context/AuthContext";
+import UploadProgress from "./UploadProgress";
 
 const CompleteCreatorProfile = () => {
 	const router = useRouter();
@@ -37,6 +38,11 @@ const CompleteCreatorProfile = () => {
 		submitVerification,
 		loading,
 		isFormValid,
+		isUploading,
+		currentUploadingFile,
+		uploadProgress,
+		totalFilesToUpload,
+		completedUploads,
 	} = useCreatorVerification();
 
 	// State for form fields
@@ -107,7 +113,8 @@ const CompleteCreatorProfile = () => {
 
 			// Handle arrays and objects
 			setContentTypes(
-				Array.isArray(profileData?.contentTypes) && profileData.contentTypes.length > 0
+				Array.isArray(profileData?.contentTypes) &&
+					profileData.contentTypes.length > 0
 					? profileData.contentTypes
 					: []
 			);
@@ -855,7 +862,13 @@ const CompleteCreatorProfile = () => {
 					</div>
 				</Card>
 			</div>
-
+			<UploadProgress
+				isUploading={isUploading}
+				currentFile={currentUploadingFile}
+				progress={uploadProgress}
+				totalFiles={totalFilesToUpload}
+				completedFiles={completedUploads}
+			/>
 			{/* Submit Button - Fixed with proper event parameter and loading state */}
 			<div className="mt-8 flex justify-end mb-10">
 				<Button

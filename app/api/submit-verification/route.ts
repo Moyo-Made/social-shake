@@ -1,6 +1,3 @@
-// Update the API route to handle chunked uploads for large files
-// api/submit-verification/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/config/firebase-admin";
 import { adminStorage } from "@/config/firebase-admin";
@@ -32,6 +29,12 @@ export async function POST(request: NextRequest) {
       profilePicture,
     } = body;
 
+    console.log("Received submission with files:", {
+      hasVideo: !!verificationVideo,
+      hasID: !!verifiableID,
+      hasProfilePic: !!profilePicture
+    });
+
     if (!userId) {
       return NextResponse.json(
         { error: "User ID is required" },
@@ -55,18 +58,44 @@ export async function POST(request: NextRequest) {
     const fileUrls: Record<string, string> = {};
     const bucket = adminStorage.bucket();
 
-    // Function to handle file uploads with better error handling
+    // Function to handle file uploads with better error handling and logging
     const uploadFile = async (
-      fileData: { data: string; name: string; type: string },
+      fileData: { data: string; name: string; type: string } | null | undefined,
       folder: string
     ): Promise<string | null> => {
-      if (!fileData || !fileData.data) return null;
+      if (!fileData || !fileData.data) {
+        console.log(`No file data provided for ${folder}`);
+        return null;
+      }
 
       try {
+        console.log(`Processing ${folder} file: ${fileData.name}, type: ${fileData.type}`);
+        
+        // Verify the base64 string is valid
+        if (!fileData.data.match(/^data:.*;base64,/)) {
+          // If it's not a data URL, assume it's already base64
+          if (!fileData.data.match(/^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?$/)) {
+            console.error(`Invalid base64 data for ${folder}`);
+            return null;
+          }
+        } else {
+          // Extract the base64 data from a data URL
+          fileData.data = fileData.data.split(',')[1];
+        }
+
         const fileBuffer = Buffer.from(fileData.data, "base64");
+        
+        // Validate the buffer has actual content
+        if (fileBuffer.length === 0) {
+          console.error(`Empty file buffer for ${folder}`);
+          return null;
+        }
+        
         const fileName = `${userId}/${folder}/${Date.now()}-${fileData.name}`;
         const fileRef = bucket.file(fileName);
 
+        console.log(`Uploading ${folder} file to path: ${fileName}`);
+        
         await fileRef.save(fileBuffer, {
           metadata: {
             contentType: fileData.type,
@@ -77,7 +106,9 @@ export async function POST(request: NextRequest) {
         await fileRef.makePublic();
 
         // Get the public URL
-        return `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+        const url = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+        console.log(`Successfully uploaded ${folder} file: ${url}`);
+        return url;
       } catch (error) {
         console.error(`Error uploading ${folder} file:`, error);
         return null;
@@ -105,6 +136,8 @@ export async function POST(request: NextRequest) {
       if (pictureUrl) fileUrls.profilePictureUrl = pictureUrl;
     }
 
+    console.log("File URLs after upload:", fileUrls);
+
     // Create verification document in Firestore
     await verificationRef.set({
       createdAt: FieldValue.serverTimestamp(),
@@ -126,6 +159,7 @@ export async function POST(request: NextRequest) {
         success: true,
         message: "Verification submitted successfully",
         verificationId,
+        fileUrls, // Return the file URLs for confirmation
       },
       { status: 200 }
     );

@@ -36,9 +36,14 @@ export async function GET(request: NextRequest) {
       const doc = verificationSnapshot.docs[0];
       console.log(`Found verification by userId: ${doc.id}`);
       
+      const data = doc.data();
+      // Make sure we extract all URL fields explicitly to include in response
       return NextResponse.json({
         id: doc.id,
-        ...doc.data()
+        ...data,
+        profilePictureUrl: data.profilePictureUrl || null,
+        verificationVideoUrl: data.verificationVideoUrl || null,
+        verifiableIDUrl: data.verifiableIDUrl || null
       });
     }
     
@@ -46,7 +51,7 @@ export async function GET(request: NextRequest) {
     console.log(`Fetching verification with ID: ${id}`);
     const verificationRef = adminDb.collection("creator_verifications").doc(id);
     const docSnap = await verificationRef.get();
-
+    
     if (!docSnap.exists) {
       console.log(`Verification with ID ${id} not found`);
       return NextResponse.json(
@@ -54,7 +59,7 @@ export async function GET(request: NextRequest) {
         { status: 404 }
       );
     }
-
+    
     const verificationData = docSnap.data();
     
     // Security check: Make sure the user can only access their own verification data
@@ -66,15 +71,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Make sure we extract all URL fields explicitly to include in response
     return NextResponse.json({
       id: docSnap.id,
-      ...verificationData
+      ...verificationData,
     });
   } catch (error) {
     console.error("Error fetching verification:", error);
     return NextResponse.json(
       { 
-        error: "Failed to fetch verification", 
+        error: "Failed to fetch verification",
         details: error instanceof Error ? error.message : String(error)
       },
       { status: 500 }
@@ -82,5 +88,5 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic"; 
 export const runtime = "nodejs";

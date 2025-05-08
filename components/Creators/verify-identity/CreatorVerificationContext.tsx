@@ -42,6 +42,11 @@ interface CreatorVerificationContextType {
 	resetForm: () => Promise<void>;
 	isCompressing: boolean;
 	compressionProgress: number;
+	isUploading: boolean;
+	currentUploadingFile: string | null;
+	uploadProgress: number;
+	totalFilesToUpload: number;
+	completedUploads: number;
 }
 
 const defaultVerificationData: VerificationData = {
@@ -264,6 +269,13 @@ export const CreatorVerificationProvider = ({
 	const [isProfileComplete, setIsProfileComplete] = useState(false);
 	const [isFormValid, setIsFormValid] = useState(false); // Added isFormValid state
 	const [touched, setTouched] = useState<Record<string, boolean>>({});
+	const [isUploading, setIsUploading] = useState(false);
+	const [currentUploadingFile, setCurrentUploadingFile] = useState<
+		string | null
+	>(null);
+	const [uploadProgress, setUploadProgress] = useState(0);
+	const [totalFilesToUpload, setTotalFilesToUpload] = useState(0);
+	const [completedUploads, setCompletedUploads] = useState(0);
 
 	// Initialize database
 	useEffect(() => {
@@ -710,130 +722,286 @@ export const CreatorVerificationProvider = ({
 	// Submit all data to the API
 	const submitVerification = async () => {
 		if (!userId) {
-			return { success: false, message: "User ID is required" };
+		  return { success: false, message: "User ID is required" };
 		}
-
+	  
 		// Force validation before submission
 		const profileValidation = validateProfileData(true);
-
+	  
 		if (!isVerificationComplete) {
-			setFieldErrors((prev) => ({
-				...prev,
-				verificationVideo: !verificationData.verificationVideo
-					? "Verification video is required"
-					: "",
-				verifiableID: !verificationData.verifiableID
-					? "ID verification is required"
-					: "",
-			}));
-			return {
-				success: false,
-				message: "Please complete all required verification fields",
-			};
+		  setFieldErrors((prev) => ({
+			...prev,
+			verificationVideo: !verificationData.verificationVideo
+			  ? "Verification video is required"
+			  : "",
+			verifiableID: !verificationData.verifiableID
+			  ? "ID verification is required"
+			  : "",
+		  }));
+		  return {
+			success: false,
+			message: "Please complete all required verification fields",
+		  };
 		}
-
+	  
 		if (!profileValidation.isValid) {
-			return {
-				success: false,
-				message: `Please complete all required profile fields: ${profileValidation.missingFields.join(", ")}`,
-			};
+		  return {
+			success: false,
+			message: `Please complete all required profile fields: ${profileValidation.missingFields.join(", ")}`,
+		  };
 		}
-
+	  
+		setIsUploading(true);
 		setLoading(true);
+	  
 		try {
-			// Prepare files for API upload
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const apiPayload: any = {
-				userId,
-				profileData: JSON.stringify({
-					bio: profileData.bio,
-					tiktokUrl: profileData.tiktokUrl,
-					ethnicity: profileData.ethnicity,
-					dateOfBirth: profileData.dateOfBirth,
-					gender: profileData.gender,
-					contentTypes: profileData.contentTypes,
-					socialMedia: profileData.socialMedia,
-					country: profileData.country,
-					contentLinks: profileData.contentLinks,
-					pricing: profileData.pricing,
-				}),
-			};
-
-			// Add verification video if exists
-			if (verificationData.verificationVideo) {
-				const videoBase64 = await fileToBase64(
-					verificationData.verificationVideo
-				);
-				apiPayload.verificationVideo = {
-					name: verificationData.verificationVideo.name,
-					type: verificationData.verificationVideo.type,
-					size: verificationData.verificationVideo.size,
-					data: videoBase64.split(",")[1], // Remove the data:mime/type;base64, prefix
-				};
-			}
-
-			// Add verifiable ID if exists
-			if (verificationData.verifiableID) {
-				const idBase64 = await fileToBase64(verificationData.verifiableID);
-				apiPayload.verifiableID = {
-					name: verificationData.verifiableID.name,
-					type: verificationData.verifiableID.type,
-					size: verificationData.verifiableID.size,
-					data: idBase64.split(",")[1], // Remove the data:mime/type;base64, prefix
-				};
-			}
-
-			// Add profile picture if exists
-			if (profileData.picture) {
-				const pictureBase64 = await fileToBase64(profileData.picture);
-				apiPayload.profilePicture = {
-					name: profileData.picture.name,
-					type: profileData.picture.type,
-					size: profileData.picture.size,
-					data: pictureBase64.split(",")[1], // Remove the data:mime/type;base64, prefix
-				};
-			}
-
-			// Log the payload size to identify any issues with large uploads
-			console.log(
-				"API Payload size:",
-				JSON.stringify(apiPayload).length,
-				"bytes"
+		  // Count total files to upload
+		  let filesToUpload = 0;
+		  if (verificationData.verificationVideo) filesToUpload++;
+		  if (verificationData.verifiableID) filesToUpload++;
+		  if (profileData.picture) filesToUpload++;
+	  
+		  setTotalFilesToUpload(filesToUpload);
+		  setCompletedUploads(0);
+	  
+		  // Upload files one by one and keep track of the verificationId
+		  let verificationId = "";
+		  
+		  // Create an updated copy of profileData to track file URLs
+		  const updatedProfileData = { ...profileData };
+	  
+		  // Upload verification video if exists
+		  if (verificationData.verificationVideo) {
+			setCurrentUploadingFile("verificationVideo");
+			setUploadProgress(0);
+	  
+			const videoBase64 = await fileToBase64(
+			  verificationData.verificationVideo
 			);
+	  
+			// Upload with progress tracking
+			const videoResponse = await uploadFileWithProgress(
+			  userId,
+			  "verificationVideo",
+			  {
+				name: verificationData.verificationVideo.name,
+				type: verificationData.verificationVideo.type,
+				size: verificationData.verificationVideo.size,
+				data: videoBase64.split(",")[1],
+			  },
+			  verificationId,
+			  (progress) => setUploadProgress(progress)
+			);
+	  
+			if (!videoResponse.success) {
+			  throw new Error(
+				videoResponse.message || "Failed to upload verification video"
+			  );
+			}
+	  
+			// Store the URL in the profile data
+			updatedProfileData.verificationVideoUrl = videoResponse.fileUrl;
+			verificationId = videoResponse.verificationId;
+			setCompletedUploads((prev) => prev + 1);
+		  }
+	  
+		  // Upload verifiable ID if exists
+		  if (verificationData.verifiableID) {
+			setCurrentUploadingFile("verifiableID");
+			setUploadProgress(0);
+	  
+			const idBase64 = await fileToBase64(verificationData.verifiableID);
+	  
+			const idResponse = await uploadFileWithProgress(
+			  userId,
+			  "verifiableID",
+			  {
+				name: verificationData.verifiableID.name,
+				type: verificationData.verifiableID.type,
+				size: verificationData.verifiableID.size,
+				data: idBase64.split(",")[1],
+			  },
+			  verificationId,
+			  (progress) => setUploadProgress(progress)
+			);
+	  
+			if (!idResponse.success) {
+			  throw new Error(idResponse.message || "Failed to upload ID document");
+			}
+	  
+			// Store the URL in the profile data
+			updatedProfileData.verifiableIDUrl = idResponse.fileUrl;
+			verificationId = idResponse.verificationId;
+			setCompletedUploads((prev) => prev + 1);
+		  }
+	  
+		  // Upload profile picture if exists
+		  if (profileData.picture) {
+			setCurrentUploadingFile("profilePicture");
+			setUploadProgress(0);
+	  
+			const pictureBase64 = await fileToBase64(profileData.picture);
+	  
+			const pictureResponse = await uploadFileWithProgress(
+			  userId,
+			  "profilePicture",
+			  {
+				name: profileData.picture.name,
+				type: profileData.picture.type,
+				size: profileData.picture.size,
+				data: pictureBase64.split(",")[1],
+			  },
+			  verificationId,
+			  (progress) => setUploadProgress(progress)
+			);
+	  
+			if (!pictureResponse.success) {
+			  throw new Error(
+				pictureResponse.message || "Failed to upload profile picture"
+			  );
+			}
+	  
+			// Store the URL in the profile data
+			updatedProfileData.profilePictureUrl = pictureResponse.fileUrl;
+			verificationId = pictureResponse.verificationId;
+			setCompletedUploads((prev) => prev + 1);
+		  }
+	  
+		  // Complete the verification process by sending profile data WITH the file URLs
+		  const completeResponse = await fetch("/api/submit-verification", {
+			method: "POST",
+			headers: {
+			  "Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+			  userId,
+			  verificationId,
+			  profileData: {
+				bio: updatedProfileData.bio,
+				tiktokUrl: updatedProfileData.tiktokUrl,
+				ethnicity: updatedProfileData.ethnicity,
+				dateOfBirth: updatedProfileData.dateOfBirth,
+				gender: updatedProfileData.gender,
+				contentTypes: updatedProfileData.contentTypes,
+				socialMedia: updatedProfileData.socialMedia,
+				country: updatedProfileData.country,
+				contentLinks: updatedProfileData.contentLinks,
+				pricing: updatedProfileData.pricing,
+				// Add the file URLs to the submitted data
+				verificationVideoUrl: updatedProfileData.verificationVideoUrl,
+				verifiableIDUrl: updatedProfileData.verifiableIDUrl,
+				profilePictureUrl: updatedProfileData.profilePictureUrl,
+			  },
+			}),
+		  });
+	  
+		  if (!completeResponse.ok) {
+			const errorData = await completeResponse.json();
+			throw new Error(errorData.error || "Failed to complete verification");
+		  }
+	  
+		  const result = await completeResponse.json();
+	  
+		  // Update state with URLs before clearing
+		  setProfileData(updatedProfileData);
+	  
+		  // Clear data after successful submission
+		  await resetForm();
+	  
+		  return {
+			success: true,
+			message: result.message || "Verification submitted successfully",
+		  };
+		} catch (error) {
+		  console.error("Error submitting verification:", error);
+		  return {
+			success: false,
+			message:
+			  error instanceof Error
+				? error.message
+				: "Failed to submit verification",
+		  };
+		} finally {
+		  setIsUploading(false);
+		  setCurrentUploadingFile(null);
+		  setUploadProgress(0);
+		  setLoading(false);
+		}
+	  };
 
-			const response = await fetch("/api/submit-verification", {
+	// Add this helper function for uploading files with progress
+	const uploadFileWithProgress = async (
+		userId: string,
+		fileType: string,
+		fileData: {
+			name: string;
+			type: string;
+			size: number;
+			data: string;
+		},
+		existingVerificationId: string = "",
+		onProgress: (progress: number) => void
+	) => {
+		// Simulate progress for the API call
+		const startTime = Date.now();
+		const simulateProgress = () => {
+			const elapsedMs = Date.now() - startTime;
+			const estimatedTotalTime = fileData.size / 10000; // Rough estimate based on file size
+			const progress = Math.min((elapsedMs / estimatedTotalTime) * 100, 95);
+
+			// Cap at 95% until we get confirmation from the server
+			onProgress(progress);
+
+			if (progress < 95) {
+				setTimeout(simulateProgress, 200);
+			}
+		};
+
+		// Start progress simulation
+		simulateProgress();
+
+		// Actual upload
+		try {
+			const response = await fetch("/api/upload-file", {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
 				},
-				body: JSON.stringify(apiPayload),
+				body: JSON.stringify({
+					userId,
+					fileType,
+					fileData,
+					verificationId: existingVerificationId,
+				}),
 			});
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || "Failed to submit verification");
-			}
 
 			const result = await response.json();
 
-			// Clear data after successful submission
-			await resetForm();
+			// Complete progress to 100%
+			onProgress(100);
+
+			if (!response.ok) {
+				return {
+					success: false,
+					message: result.error || `Failed to upload ${fileType}`,
+				};
+			}
 
 			return {
 				success: true,
-				message: result.message || "Verification submitted successfully",
+				message: result.message || `${fileType} uploaded successfully`,
+				verificationId: result.verificationId,
+				fileUrl: result.fileUrl,
 			};
 		} catch (error) {
-			console.error("Error submitting verification:", error);
+			console.error(`Error uploading ${fileType}:`, error);
 			return {
 				success: false,
 				message:
 					error instanceof Error
 						? error.message
-						: "Failed to submit verification",
+						: `Failed to upload ${fileType}`,
 			};
-		} finally {
-			setLoading(false);
 		}
 	};
 
@@ -857,6 +1025,11 @@ export const CreatorVerificationProvider = ({
 				resetForm,
 				isCompressing: verificationData.isCompressing,
 				compressionProgress: verificationData.compressionProgress,
+				isUploading,
+				currentUploadingFile,
+				uploadProgress,
+				totalFilesToUpload,
+				completedUploads,
 			}}
 		>
 			{children}
