@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import ContestGridCard from "./CreatorContestGridCard";
 import { useAuth } from "@/context/AuthContext";
 import { Contest } from "@/types/contests";
+import Link from "next/link";
 
 
 export default function CreatorContestsGrid() {
@@ -69,9 +70,9 @@ export default function CreatorContestsGrid() {
     <div className="mt-6 mb-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-xl font-semibold">My Contests</h1>
-        <button className="bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 text-sm rounded-lg transition-colors">
+        <Link href="/creator/dashboard/contest/all" className="bg-orange-500 hover:bg-orange-600 text-white text-sm py-2 px-4 rounded-lg transition-colors">
           Explore New Contests
-        </button>
+        </Link>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -84,10 +85,10 @@ export default function CreatorContestsGrid() {
           ))
         ) : (
           <div className="col-span-2 text-center py-12 text-gray-500">
-            <p className="mb-4">You haven&apos;t applied to any contests yet.</p>
-            <button className="bg-orange-500 hover:bg-orange-600 text-white font-medium text-sm py-2 px-4 rounded-lg transition-colors">
+            <p className="mb-6">You haven&apos;t applied to any contests yet.</p>
+            <Link href="/creator/dashboard/contest/all" className="bg-orange-500 hover:bg-orange-600 text-white py-3 px-4 rounded-lg transition-colors">
               Browse Available Contests
-            </button>
+            </Link>
           </div>
         )}
       </div>

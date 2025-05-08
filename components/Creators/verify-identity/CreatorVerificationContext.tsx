@@ -8,13 +8,14 @@ import React, {
 	useEffect,
 	ReactNode,
 } from "react";
+import { compressVideo, needsCompression } from "@/utils/videoCompression";
 
 interface VerificationData {
 	verificationVideo: File | null;
 	verifiableID: File | null;
+	isCompressing: boolean;
+	compressionProgress: number;
 }
-
-
 
 interface FieldErrors {
 	[key: string]: string;
@@ -31,16 +32,23 @@ interface CreatorVerificationContextType {
 	submitVerification: () => Promise<{ success: boolean; message: string }>;
 	loading: boolean;
 	fieldErrors: FieldErrors;
-	validateProfileData: (updateErrorState?: boolean) => { isValid: boolean; missingFields: string[] };
+	validateProfileData: (updateErrorState?: boolean) => {
+		isValid: boolean;
+		missingFields: string[];
+	};
 	clearFieldError: (field: string) => void;
 	touched: Record<string, boolean>;
 	setTouched: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 	resetForm: () => Promise<void>;
+	isCompressing: boolean;
+	compressionProgress: number;
 }
 
 const defaultVerificationData: VerificationData = {
 	verificationVideo: null,
 	verifiableID: null,
+	isCompressing: false,
+	compressionProgress: 0,
 };
 
 const defaultProfileData: CreatorProfileData = {
@@ -56,7 +64,7 @@ const defaultProfileData: CreatorProfileData = {
 		twitter: "",
 		facebook: "",
 		youtube: "",
-		tiktok: ""
+		tiktok: "",
 	},
 	country: "",
 	contentLinks: [""],
@@ -79,7 +87,7 @@ const defaultProfileData: CreatorProfileData = {
 	username: "",
 	verifiableIDUrl: null,
 	verificationVideoUrl: null,
-	profilePictureUrl: null
+	profilePictureUrl: null,
 };
 
 const CreatorVerificationContext = createContext<
@@ -99,7 +107,7 @@ const TOUCHED_FIELDS_KEY = "creatorTouchedFields";
 // IndexedDB utility functions
 const openDatabase = (): Promise<IDBDatabase> => {
 	return new Promise((resolve, reject) => {
-		if (typeof indexedDB === 'undefined') {
+		if (typeof indexedDB === "undefined") {
 			reject(new Error("IndexedDB is not available"));
 			return;
 		}
@@ -301,6 +309,8 @@ export const CreatorVerificationProvider = ({
 					const restoredVerificationData: VerificationData = {
 						verificationVideo: null,
 						verifiableID: null,
+						isCompressing: false,
+						compressionProgress: 0,
 					};
 
 					// Restore verification video if it exists
@@ -408,7 +418,49 @@ export const CreatorVerificationProvider = ({
 			// Process any file data to convert to base64 for storage
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const storageData: any = { ...existingFiles }; // Start with existing files
-			
+
+			// Check if we need to compress the video
+			let processedVerificationVideo = data.verificationVideo;
+
+			// If there's a new video file and it needs compression
+			if (data.verificationVideo && needsCompression(data.verificationVideo)) {
+				try {
+					// Update compression status
+					setVerificationData((prev) => ({
+						...prev,
+						isCompressing: true,
+						compressionProgress: 0,
+					}));
+
+					// Compress the video
+					processedVerificationVideo = await compressVideo(
+						data.verificationVideo,
+						{
+							onProgress: (progress) => {
+								setVerificationData((prev) => ({
+									...prev,
+									compressionProgress: progress,
+								}));
+							},
+						}
+					);
+
+					console.log(
+						`Video compressed: ${(data.verificationVideo.size / (1024 * 1024)).toFixed(2)}MB → ${(processedVerificationVideo.size / (1024 * 1024)).toFixed(2)}MB`
+					);
+				} catch (error) {
+					console.error("Error compressing video:", error);
+					// Continue with the original file but log the error
+				} finally {
+					// Reset compression status
+					setVerificationData((prev) => ({
+						...prev,
+						isCompressing: false,
+						compressionProgress: 1,
+					}));
+				}
+			}
+
 			// Update state first
 			const updatedVerificationData = {
 				verificationVideo:
@@ -420,7 +472,7 @@ export const CreatorVerificationProvider = ({
 						? data.verifiableID
 						: verificationData.verifiableID,
 			};
-			
+
 			// Set flags based on updated data
 			const storageFlags = {
 				verificationVideoExists: !!updatedVerificationData.verificationVideo,
@@ -448,16 +500,19 @@ export const CreatorVerificationProvider = ({
 			await putIntoDB(VERIFICATION_STORE, "files", storageData);
 
 			// Update state after successful storage
-			setVerificationData(updatedVerificationData);
-			
+			setVerificationData((prev) => ({
+				...prev,
+				...updatedVerificationData,
+			}));
+
 			// Mark fields as touched
 			if (data.verificationVideo !== undefined) {
-				setTouched(prev => ({...prev, verificationVideo: true}));
+				setTouched((prev) => ({ ...prev, verificationVideo: true }));
 			}
 			if (data.verifiableID !== undefined) {
-				setTouched(prev => ({...prev, verifiableID: true}));
+				setTouched((prev) => ({ ...prev, verifiableID: true }));
 			}
-			
+
 			return;
 		} catch (error) {
 			console.error("Error updating verification data in IndexedDB:", error);
@@ -490,8 +545,11 @@ export const CreatorVerificationProvider = ({
 				}
 			} else if (
 				!profileData[field.key as keyof CreatorProfileData] ||
-				(typeof profileData[field.key as keyof CreatorProfileData] === "string" &&
-				(profileData[field.key as keyof CreatorProfileData] as string).trim() === "")
+				(typeof profileData[field.key as keyof CreatorProfileData] ===
+					"string" &&
+					(
+						profileData[field.key as keyof CreatorProfileData] as string
+					).trim() === "")
 			) {
 				missingFields.push(field.label);
 				errors[field.key] = `${field.label} is required`;
@@ -510,9 +568,9 @@ export const CreatorVerificationProvider = ({
 
 		// URL format validation
 		if (
-			profileData.tiktokUrl && 
-			profileData.tiktokUrl.trim() !== "" && 
-			!profileData.tiktokUrl.includes('tiktok.com')
+			profileData.tiktokUrl &&
+			profileData.tiktokUrl.trim() !== "" &&
+			!profileData.tiktokUrl.includes("tiktok.com")
 		) {
 			missingFields.push("TikTok URL");
 			errors.tiktokUrl = "Please enter a valid TikTok URL";
@@ -524,7 +582,7 @@ export const CreatorVerificationProvider = ({
 		}
 
 		const isValid = missingFields.length === 0;
-		
+
 		// Always update form validity state
 		setIsFormValid(isValid);
 		setIsProfileComplete(isValid);
@@ -558,7 +616,8 @@ export const CreatorVerificationProvider = ({
 			const updatedData = {
 				...profileData,
 				...data,
-				picture: data.picture !== undefined ? data.picture : profileData.picture,
+				picture:
+					data.picture !== undefined ? data.picture : profileData.picture,
 			};
 
 			// Prepare data for storage (without the File object)
@@ -590,15 +649,12 @@ export const CreatorVerificationProvider = ({
 					name: data.picture.name,
 					type: data.picture.type,
 				};
-				localStorage.setItem(
-					PROFILE_PICTURE_KEY,
-					JSON.stringify(pictureData)
-				);
+				localStorage.setItem(PROFILE_PICTURE_KEY, JSON.stringify(pictureData));
 			}
 
 			// Update touched state for all fields in data
 			const newTouched = { ...touched };
-			Object.keys(data).forEach(key => {
+			Object.keys(data).forEach((key) => {
 				newTouched[key] = true;
 			});
 			setTouched(newTouched);
@@ -611,10 +667,10 @@ export const CreatorVerificationProvider = ({
 
 			// Update state after storage is complete
 			setProfileData(updatedData);
-			
-			// The validateProfileData will be called automatically 
+
+			// The validateProfileData will be called automatically
 			// via the useEffect when profileData changes
-			
+
 			return;
 		} catch (error) {
 			console.error("Error updating profile data in local storage:", error);
@@ -628,12 +684,12 @@ export const CreatorVerificationProvider = ({
 			// Clear IndexedDB
 			await deleteFromDB(VERIFICATION_STORE, "flags");
 			await deleteFromDB(VERIFICATION_STORE, "files");
-			
+
 			// Clear localStorage
 			localStorage.removeItem(PROFILE_DATA_KEY);
 			localStorage.removeItem(PROFILE_PICTURE_KEY);
 			localStorage.removeItem(TOUCHED_FIELDS_KEY);
-			
+
 			// Reset state
 			setVerificationData(defaultVerificationData);
 			setProfileData(defaultProfileData);
@@ -659,12 +715,16 @@ export const CreatorVerificationProvider = ({
 
 		// Force validation before submission
 		const profileValidation = validateProfileData(true);
-		
+
 		if (!isVerificationComplete) {
-			setFieldErrors(prev => ({
+			setFieldErrors((prev) => ({
 				...prev,
-				verificationVideo: !verificationData.verificationVideo ? "Verification video is required" : "",
-				verifiableID: !verificationData.verifiableID ? "ID verification is required" : ""
+				verificationVideo: !verificationData.verificationVideo
+					? "Verification video is required"
+					: "",
+				verifiableID: !verificationData.verifiableID
+					? "ID verification is required"
+					: "",
 			}));
 			return {
 				success: false,
@@ -735,7 +795,11 @@ export const CreatorVerificationProvider = ({
 			}
 
 			// Log the payload size to identify any issues with large uploads
-			console.log("API Payload size:", JSON.stringify(apiPayload).length, "bytes");
+			console.log(
+				"API Payload size:",
+				JSON.stringify(apiPayload).length,
+				"bytes"
+			);
 
 			const response = await fetch("/api/submit-verification", {
 				method: "POST",
@@ -743,7 +807,6 @@ export const CreatorVerificationProvider = ({
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify(apiPayload),
-				
 			});
 
 			if (!response.ok) {
@@ -752,7 +815,7 @@ export const CreatorVerificationProvider = ({
 			}
 
 			const result = await response.json();
-			
+
 			// Clear data after successful submission
 			await resetForm();
 
@@ -791,7 +854,9 @@ export const CreatorVerificationProvider = ({
 				clearFieldError,
 				touched,
 				setTouched,
-				resetForm
+				resetForm,
+				isCompressing: verificationData.isCompressing,
+				compressionProgress: verificationData.compressionProgress,
 			}}
 		>
 			{children}

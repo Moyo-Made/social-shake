@@ -67,8 +67,8 @@ export function OngoingProjectsSection({ userId }: { userId: string }) {
 					Ongoing Projects
 				</h2>
 				<Link
-					href="/creator/dashboard/projects"
-					className="bg-orange-500 hover:bg-orange-600 text-white py-2 px-6 rounded-md"
+					href="/creator/dashboard/project/all"
+					className="bg-orange-500 hover:bg-orange-600 text-white text-sm py-2 px-6 rounded-md"
 				>
 					View All Projects
 				</Link>
@@ -111,7 +111,7 @@ export function OngoingProjectsSection({ userId }: { userId: string }) {
 				<div className="text-center py-8 bg-white rounded-lg shadow p-6">
 					<p>No ongoing projects found.</p>
 					<Link
-						href="/creator/explore/projects"
+						href="/creator/dashboard/project/all"
 						className="mt-4 inline-block bg-orange-500 hover:bg-orange-600 text-white py-2 px-6 rounded-md"
 					>
 						Explore Projects

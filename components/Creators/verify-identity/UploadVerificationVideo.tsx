@@ -14,7 +14,9 @@ function VerificationVideo() {
     fieldErrors,
     clearFieldError,
     touched,
-    setTouched
+    setTouched,
+    isCompressing,
+    compressionProgress
   } = useCreatorVerification();
   
   const { verificationVideo, verifiableID } = verificationData;
@@ -50,7 +52,7 @@ function VerificationVideo() {
     }
   }, [verificationVideo, verifiableID, touched, setTouched]);
 
-  // Enhanced upload handler for videos with better context integration
+  // Enhanced upload handler for videos with compression feedback
   const handleVideoUpload = async (file: File) => {
     // Clear any previous errors
     clearFieldError("verificationVideo");
@@ -65,15 +67,14 @@ function VerificationVideo() {
     try {
       // Check file size before processing (50MB limit)
       if (file.size > 50 * 1024 * 1024) {
-        toast.error("File too large. Maximum video size is 50MB.");
-        return;
+        toast.warning("Your video is large and will be automatically compressed.");
       }
       
       // Update context data with proper async handling
       await toast.promise(
         updateVerificationData({ verificationVideo: file }),
         {
-          loading: "Uploading verification video...",
+          loading: isCompressing ? "Compressing and uploading video..." : "Uploading verification video...",
           success: "Your verification video has been uploaded successfully.",
           error: "Failed to upload video. Please try again."
         }
@@ -176,17 +177,34 @@ function VerificationVideo() {
           All documents and files you upload will be kept strictly confidential
           and used only for verification purposes.
         </p>
+        
+        {/* Compression progress indicator */}
+        {isCompressing && (
+          <div className="mb-4">
+            <p className="text-sm text-blue-600 mb-2">
+              Compressing video ({Math.round(compressionProgress * 100)}%)...
+            </p>
+            <div className="w-full bg-gray-200 rounded-full h-2.5">
+              <div 
+                className="bg-blue-600 h-2.5 rounded-full" 
+                style={{ width: `${compressionProgress * 100}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
+        
         <UploadDropzone
           onFileSelect={handleVideoUpload}
           acceptedFileTypes="video/*"
           maxSize={50 * 1024 * 1024} // 50MB max size
           selectedFile={verificationVideo}
           instructionText="Click to upload or drag and drop"
-          fileTypeText="Video file (max 50MB)"
+          fileTypeText="Video file (max 50MB, large files will be compressed)"
+          disabled={isCompressing}
         />
-        {verificationVideo && (
+        {verificationVideo && !isCompressing && (
           <p className="text-sm text-green-600 mt-2">
-            Video uploaded: {verificationVideo.name}
+            Video uploaded: {verificationVideo.name} ({(verificationVideo.size / (1024 * 1024)).toFixed(2)}MB)
           </p>
         )}
         {touched.verificationVideo && fieldErrors.verificationVideo && (
@@ -211,10 +229,11 @@ function VerificationVideo() {
           selectedFile={verifiableID}
           instructionText="Click to upload or drag and drop"
           fileTypeText="PNG, or JPG (max. 5MB)"
+          disabled={isCompressing}
         />
         {verifiableID && (
           <p className="text-sm text-green-600 mt-2">
-            ID uploaded: {verifiableID.name}
+            ID uploaded: {verifiableID.name} ({(verifiableID.size / (1024 * 1024)).toFixed(2)}MB)
           </p>
         )}
         {touched.verifiableID && fieldErrors.verifiableID && (

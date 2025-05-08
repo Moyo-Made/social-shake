@@ -167,9 +167,21 @@ const CreatorProfileDropdown: React.FC<CreatorProfileDropdownProps> = ({
 	// Function to get profile picture from either source
 	const getProfilePictureUrl = () => {
 		if (!creatorProfile) return null;
+
+		// First try the standard profile picture URL - this is set from either source in the hook
+
 		// Then check for logoUrl which is used in AccountSettings
 		if (creatorProfile.logoUrl) {
 			return creatorProfile.logoUrl as string;
+		}
+
+		if (creatorProfile.profilePictureUrl) {
+			return creatorProfile.profilePictureUrl;
+		}
+
+		// Then check if it's in the profileData
+		if (creatorProfile.profileData?.profilePictureUrl) {
+			return creatorProfile.profileData.profilePictureUrl as string;
 		}
 
 		// Finally check if logoUrl is in profileData
