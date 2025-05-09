@@ -542,11 +542,11 @@ export async function GET(request: NextRequest) {
 					createdAt:
 						verificationData.createdAt?.toDate?.() ||
 						verificationData.createdAt,
-					logoUrl:
+						logoUrl:
 						profileData.logoUrl ||
 						verificationData.profileData?.logoUrl ||
 						verificationData.logoUrl ||
-						verificationData.profileData.profilePictureUrl ||
+						verificationData.profileData?.profilePictureUrl ||
 						verificationData.profilePictureUrl ||
 						creatorProfileData?.logoUrl ||
 						creatorProfileData?.profileImageUrl ||

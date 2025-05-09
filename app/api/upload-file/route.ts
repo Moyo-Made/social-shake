@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '200mb', // Reduced for individual file uploads
+      sizeLimit: '500mb',
     },
     responseLimit: false,
   },
