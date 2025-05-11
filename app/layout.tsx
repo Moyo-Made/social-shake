@@ -4,6 +4,8 @@ import "./globals.css";
 import localFont from "next/font/local";
 import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "@/components/ui/sonner";
+import { SocketProvider } from "@/context/SocketContext";
+import { NotificationsProvider } from "@/context/NotificationContext";
 
 const inter = Inter({
 	subsets: ["latin"],
@@ -48,9 +50,15 @@ export default function RootLayout({
 	return (
 		<html lang="en">
 			<body className={`${inter.variable} ${satoshi.variable}`}>
-				<AuthProvider>{children}</AuthProvider>
-				<Toaster />
-			</body>
+  <AuthProvider>
+    <SocketProvider>
+      <NotificationsProvider>
+        {children}
+      </NotificationsProvider>
+    </SocketProvider>
+  </AuthProvider>
+  <Toaster />
+</body>
 		</html>
 	);
 }

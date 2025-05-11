@@ -11,6 +11,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
 // Define types
 export interface Creators {
@@ -52,6 +53,7 @@ const defaultProfileImg = "";
 const CreatorMarketplace = () => {
 	const router = useRouter();
 	const pathname = usePathname();
+	const {currentUser} = useAuth();
 
 	const isSavedCreatorsPage = pathname === "/brand/dashboard/creators/saved";
 
@@ -198,6 +200,51 @@ const CreatorMarketplace = () => {
 		setSelectedCreator(null);
 	};
 
+	const handleSendMessage = async (creator: Creators) => {
+		if (!currentUser) {
+		  alert("You need to be logged in to send messages");
+		  return;
+		}
+		
+		try {
+		  // Show loading indicator or disable button here if needed
+		  
+		  const response = await fetch('/api/createConversation', {
+			method: 'POST',
+			headers: {
+			  'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+			  currentUserId: currentUser.uid,
+			  creatorId: creator.id,
+			  userData: {
+				name: currentUser.displayName || "User",
+				avatar: currentUser.photoURL || "/icons/default-avatar.svg",
+				username: currentUser.email?.split('@')[0] || "",
+			  },
+			  creatorData: {
+				name: creator.name,
+				avatar: creator.profilePictureUrl,
+				username: creator.username
+			  }
+			}),
+		  });
+		  
+		  const data = await response.json();
+		  
+		  if (!response.ok) {
+			throw new Error(data.error || 'Failed to create conversation');
+		  }
+		  
+		  // Navigate to chat page with this conversation
+		  router.push(`/brand/dashboard/messages?conversation=${data.conversationId}`);
+		} catch (error) {
+		  console.error("Error creating conversation:", error);
+		  alert("Failed to start conversation. Please try again.");
+		}
+	  };
+		  
+
 	const isCreatorSaved = (creatorId: string): boolean => {
 		return savedCreators.some((creator) => creator.id === creatorId);
 	};
@@ -332,7 +379,7 @@ const CreatorMarketplace = () => {
 								</div>
 								<div className="flex gap-3">
 									<button
-										onClick={() => {}}
+										onClick={() => handleSendMessage(selectedCreator)}
 										className="px-3 py-1.5 md:px-4 md:py-2 bg-orange-500 text-white rounded-md flex items-center text-sm md:text-base"
 									>
 										<Send size={16} className="mr-1 md:mr-2" />

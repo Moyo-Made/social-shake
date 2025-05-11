@@ -30,7 +30,7 @@ interface AuthContextType {
 	logout: () => Promise<void>;
 	resetPassword: (email: string) => Promise<void>;
 	clearError: () => void;
-	getIdToken?: () => Promise<string>; 
+	getIdToken?: () => Promise<string>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -93,60 +93,105 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 	// Helper function to fetch and set user data
 	const fetchUserData = async (firebaseUser: FirebaseUser): Promise<void> => {
 		try {
-			// Make sure we have a valid email before checking brandProfiles
-			if (firebaseUser.email) {
-			  // Check if user has a brand profile
-			  try {
-				const brandProfileDoc = await getDoc(doc(db, "brandProfiles", firebaseUser.email));
-				setHasProfile(brandProfileDoc.exists());
-			  } catch (profileError) {
-				console.warn("Could not check brand profile:", profileError);
-				// Continue with the rest of the function even if this fails
+			// Make sure we have a valid user before proceeding
+			if (!firebaseUser) {
+				setCurrentUser(null);
+				setIsAdmin(false);
 				setHasProfile(false);
-			  }
-			} else {
-			  setHasProfile(false);
+				return;
 			}
 
-			// Force refresh to get latest claims
-			await firebaseUser.getIdToken(true);
-			const tokenResult = await firebaseUser.getIdTokenResult();
+			// Force refresh to get latest claims - do this first to ensure we have fresh token
+			try {
+				await firebaseUser.getIdToken(true);
+			} catch (tokenError) {
+				console.error("Error refreshing token:", tokenError);
+				// Continue with possibly stale token
+			}
 
-			// Check admin claim
-			const isUserAdmin = tokenResult.claims.admin === true;
-			setIsAdmin(isUserAdmin);
-
-			// Get additional user data from Firestore
-			const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-
-			if (userDoc.exists()) {
-				const userData = userDoc.data() as Omit<User, "uid">;
-				setCurrentUser({
-					uid: firebaseUser.uid,
-					...userData,
-				});
+			// Check if user has a brand profile - in try/catch to isolate potential errors
+			if (firebaseUser.email) {
+				try {
+					const brandProfileDoc = await getDoc(
+						doc(db, "brandProfiles", firebaseUser.email)
+					);
+					setHasProfile(brandProfileDoc.exists());
+				} catch (profileError) {
+					console.warn("Could not check brand profile:", profileError);
+					setHasProfile(false);
+				}
 			} else {
-				// If user document doesn't exist, create it
-				await updateUserDocument(firebaseUser.uid, firebaseUser.email || "");
+				setHasProfile(false);
+			}
 
-				// Fetch again to ensure we have data
-				const newUserDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-				if (newUserDoc.exists()) {
-					const userData = newUserDoc.data() as Omit<User, "uid">;
+			// Get admin status
+			try {
+				const tokenResult = await firebaseUser.getIdTokenResult();
+				const isUserAdmin = tokenResult.claims.admin === true;
+				setIsAdmin(isUserAdmin);
+			} catch (adminError) {
+				console.error("Error checking admin status:", adminError);
+				setIsAdmin(false);
+			}
+
+			// Get user document from Firestore - wrap in try/catch to handle potential permission issues
+			try {
+				const userRef = doc(db, "users", firebaseUser.uid);
+				const userDoc = await getDoc(userRef);
+
+				if (userDoc.exists()) {
+					const userData = userDoc.data() as Omit<User, "uid">;
 					setCurrentUser({
 						uid: firebaseUser.uid,
 						...userData,
 					});
 				} else {
-					setCurrentUser(null);
+					// Document doesn't exist - create it
+					try {
+						await setDoc(userRef, {
+							email: firebaseUser.email || "",
+							role: UserRole.USER,
+							createdAt: new Date(),
+							updatedAt: new Date(),
+						});
+
+						// Fetch the newly created document
+						const newUserDoc = await getDoc(userRef);
+						if (newUserDoc.exists()) {
+							const userData = newUserDoc.data() as Omit<User, "uid">;
+							setCurrentUser({
+								uid: firebaseUser.uid,
+								...userData,
+							});
+						} else {
+							console.error("Failed to fetch user after creation");
+							setCurrentUser(null);
+						}
+					} catch (createError) {
+						console.error("Error creating user document:", createError);
+						// Set minimal user data from Firebase Auth
+						setCurrentUser({
+							uid: firebaseUser.uid,
+							email: firebaseUser.email || "",
+							role: UserRole.USER,
+						} as User);
+					}
 				}
+			} catch (userDocError) {
+				console.error("Error fetching user document:", userDocError);
+				// Use minimal user data from Firebase Auth
+				setCurrentUser({
+					uid: firebaseUser.uid,
+					email: firebaseUser.email || "",
+					role: UserRole.USER,
+				} as User);
 			}
 		} catch (error) {
-			console.error("Error fetching user data:", error);
+			console.error("Error in fetchUserData:", error);
 			setCurrentUser(null);
 			setIsAdmin(false);
+			setHasProfile(false);
 			setError("Error fetching user data");
-			throw error; // Re-throw to handle in caller
 		}
 	};
 
@@ -179,11 +224,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 		setIsLoading(true);
 		setError(null);
 		try {
-			const userCredential = await signInWithEmailAndPassword(auth, email, password);
-			
+			const userCredential = await signInWithEmailAndPassword(
+				auth,
+				email,
+				password
+			);
+
 			// Wait for user data to be fetched explicitly before returning
 			await fetchUserData(userCredential.user);
-			
 		} catch (err) {
 			console.error("Login error:", err);
 			if (err instanceof Error) {
@@ -197,19 +245,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 		}
 	};
 
-	const signup = async (email: string, password: string): Promise<{ user: FirebaseUser }> => {
+	const signup = async (
+		email: string,
+		password: string
+	): Promise<{ user: FirebaseUser }> => {
 		setIsLoading(true);
 		setError(null);
 		try {
 			// Create the user
-			const result = await createUserWithEmailAndPassword(auth, email, password);
-			
+			const result = await createUserWithEmailAndPassword(
+				auth,
+				email,
+				password
+			);
+
 			// Create user document in Firestore
 			await updateUserDocument(result.user.uid, email, true);
-			
+
 			// Explicitly fetch user data to ensure it's loaded
 			await fetchUserData(result.user);
-			
+
 			// Return the user information
 			return { user: result.user };
 		} catch (err) {
@@ -230,20 +285,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 		setError(null);
 		const provider = new GoogleAuthProvider();
 		let isNewUser = false;
-		
+
 		try {
 			const result = await signInWithPopup(auth, provider);
 			const additionalInfo = getAdditionalUserInfo(result);
 			isNewUser = additionalInfo?.isNewUser ?? false;
-			
+
 			// Make sure to await this operation
 			if (result.user.email) {
 				await updateUserDocument(result.user.uid, result.user.email, isNewUser);
 			}
-			
+
 			// Also await fetchUserData to ensure user data is loaded
 			await fetchUserData(result.user);
-			
+
 			return { isExistingAccount: !isNewUser };
 		} catch (err) {
 			console.error("Google login error:", err);
@@ -252,7 +307,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 			} else {
 				setError("Failed to login with Google");
 			}
-			throw err;  // Make sure to throw the error to handle it in the component
+			throw err; // Make sure to throw the error to handle it in the component
 		} finally {
 			setIsLoading(false);
 		}
@@ -271,7 +326,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 			if (result.user.email) {
 				await updateUserDocument(result.user.uid, result.user.email, isNewUser);
 			}
-			
+
 			// Wait for user data to be fetched explicitly
 			await fetchUserData(result.user);
 		} catch (err) {
@@ -342,10 +397,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 		clearError,
 		getIdToken: async () => {
 			if (auth.currentUser) {
-			  return await auth.currentUser.getIdToken(true);
+				return await auth.currentUser.getIdToken(true);
 			}
-			return '';
-		  }
+			return "";
+		},
 	};
 
 	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

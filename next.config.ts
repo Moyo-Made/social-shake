@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
     ],
   },
   env: {
-    FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY
+    FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY,
   },
 };
 

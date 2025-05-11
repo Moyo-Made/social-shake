@@ -3,7 +3,7 @@ export interface Creator {
 	verificationId: string;
 	userId: string;
 	creator: string;
-	status: string; 
+	status: string;
 	createdAt: string;
 	logoUrl: string | null;
 	bio: string;
@@ -27,6 +27,16 @@ export interface Creator {
 	dateOfBirth: string;
 	verifiableIDUrl: string | null;
 	verificationVideoUrl: string | null;
+	pricing: {
+		oneVideo: number;
+		threeVideos: number;
+		fiveVideos: number;
+		bulkVideos: number;
+		bulkVideosNote?: string;
+	};
+	totalGMV: number;
+	avgGMVPerVideo: number;
+	avgImpressions: number;
 }
 
 export interface CreatorProfileData {
@@ -52,12 +62,12 @@ export interface CreatorProfileData {
 		fiveVideos: number;
 		bulkVideos: number;
 		bulkVideosNote?: string;
-	}
+	};
 	id: string;
 	verificationId: string;
 	userId: string;
 	creator: string;
-	status: string; 
+	status: string;
 	createdAt: string;
 	logoUrl: string | null;
 	firstName: string;

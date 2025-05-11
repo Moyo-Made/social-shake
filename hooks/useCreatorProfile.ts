@@ -57,22 +57,22 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
       let verificationData: Partial<CreatorProfile> = {};
       
       // Try to fetch verification data if there's a verificationId
-      if (verificationId) {
-        try {
-          const verificationResponse = await fetch(
-            `/api/verification?id=${verificationId}`
-          );
+      // if (verificationId) {
+      //   try {
+      //     const verificationResponse = await fetch(
+      //       `/api/verification?id=${verificationId}`
+      //     );
           
-          if (verificationResponse.ok) {
-            verificationData = await verificationResponse.json();
-            console.log("Verification data fetched by ID:", verificationData);
-          } else {
-            console.warn("Failed to fetch verification by ID, status:", verificationResponse.status);
-          }
-        } catch (err) {
-          console.error("Error fetching verification data by ID:", err);
-        }
-      }
+      //     if (verificationResponse.ok) {
+      //       verificationData = await verificationResponse.json();
+      //       console.log("Verification data fetched by ID:", verificationData);
+      //     } else {
+      //       console.warn("Failed to fetch verification by ID, status:", verificationResponse.status);
+      //     }
+      //   } catch (err) {
+      //     console.error("Error fetching verification data by ID:", err);
+      //   }
+      // }
       
       // If we still don't have verification data, try by userId as fallback
       if (Object.keys(verificationData).length === 0) {

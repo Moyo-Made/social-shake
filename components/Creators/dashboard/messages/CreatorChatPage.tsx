@@ -11,7 +11,6 @@ import { useAuth } from "@/context/AuthContext";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useSocket } from "@/context/SocketContext";
 import { useNotifications } from "@/context/NotificationContext";
-
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -19,18 +18,26 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+interface BrandProfile {
+	id: string;
+	brandName: string;
+	profilePictureUrl?: string;
+	logoUrl?: string;
+	username?: string;
+}
+
 type User = {
 	timestamp: number;
-	conversationId: string | null;
 	id: string;
 	name: string;
 	avatar: string;
+	username?: string;
 	lastMessage?: string;
 	time?: string;
 	isActive?: boolean;
-	username?: string;
-	unreadCounts: number;
+	conversationId: string | null;
 	unreadCount?: number;
+	unreadCounts: number;
 };
 
 type Message = {
@@ -44,7 +51,6 @@ type Message = {
 };
 
 type Conversation = {
-	unreadCounts: Record<string, number>;
 	id: string;
 	participants: string[];
 	participantsInfo?: Record<
@@ -53,28 +59,17 @@ type Conversation = {
 	>;
 	lastMessage?: string;
 	updatedAt?: any;
+	unreadCounts: Record<string, number>;
 };
 
-const ChatPage = () => {
+const CreatorChatPage = () => {
 	const { currentUser } = useAuth();
 	const searchParams = useSearchParams();
 	const router = useRouter();
 	const conversationIdFromUrl = searchParams.get("conversation");
 	const scrollAreaRef = useRef<HTMLDivElement>(null);
-
-	// State variables
-	const [, setConversations] = useState<Conversation[]>([]);
-	const [selectedConversation, setSelectedConversation] = useState<
-		string | null
-	>(conversationIdFromUrl);
-	const [messages, setMessages] = useState<Message[]>([]);
-	const [messageInput, setMessageInput] = useState("");
-	const [users, setUsers] = useState<User[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [sendingMessage, setSendingMessage] = useState(false);
 	const { setTotalUnreadCount } = useNotifications();
 	const [sortOption, setSortOption] = useState("Newest");
-	const [searchQuery, setSearchQuery] = useState("");
 
 	const handleSortChange = (option: "Newest" | "Oldest") => {
 		setSortOption(option);
@@ -100,100 +95,55 @@ const ChatPage = () => {
 		});
 	};
 
-	const filteredUsers = users.filter((user) => {
-		// If search query is empty, show all users
-		if (!searchQuery.trim()) return true;
-		
-		// Search in name, username, and last message
-		const searchTermLower = searchQuery.toLowerCase();
-		
-		return (
-		  // Search in name
-		  user.name.toLowerCase().includes(searchTermLower) ||
-		  // Search in username (if available)
-		  (user.username && user.username.toLowerCase().includes(searchTermLower)) ||
-		  // Search in last message
-		  (user.lastMessage && user.lastMessage.toLowerCase().includes(searchTermLower))
-		);
-	  });
 
-	// Fetch all conversations for current user
-	useEffect(() => {
-		if (!currentUser) return;
+	// State variables
+	const [brandProfiles, setBrandProfiles] = useState<
+		Record<string, BrandProfile>
+	>({});
+	const [, setConversations] = useState<Conversation[]>([]);
+	const [selectedConversation, setSelectedConversation] = useState<
+		string | null
+	>(conversationIdFromUrl);
+	const [messages, setMessages] = useState<Message[]>([]);
+	const [messageInput, setMessageInput] = useState("");
+	const [users, setUsers] = useState<User[]>([]);
+	const [loading, setLoading] = useState(true);
+	const [searchQuery, setSearchQuery] = useState("");
+	const [sendingMessage, setSendingMessage] = useState(false);
 
-		const fetchConversations = async () => {
-			try {
-				setLoading(true);
-				const response = await fetch(
-					`/api/conversations?userId=${currentUser.uid}`
-				);
 
-				if (!response.ok) {
-					throw new Error("Failed to fetch conversations");
-				}
+	const {
+		joinConversation,
+		leaveConversation,
+		sendMessage: socketSendMessage,
+		socket,
+	} = useSocket();
 
+	// Fetch brand profiles for all conversations
+	const fetchBrandProfile = async (userId: string) => {
+		try {
+			const response = await fetch(
+				`/api/admin/brand-approval?userId=${userId}`
+			);
+
+			if (response.ok) {
 				const data = await response.json();
-				setConversations(data.conversations);
-
-				// In your fetchConversations function, update the processedUsers mapping:
-				const processedUsers = data.conversations.map((conv: Conversation) => {
-					const otherParticipantId = conv.participants.find(
-						(p: string) => p !== currentUser.uid
-					);
-
-					const participantInfo = otherParticipantId
-						? conv.participantsInfo?.[otherParticipantId]
-						: undefined;
-
-					// Get the unread count specifically for this conversation
-					const unreadCount = conv.unreadCounts?.[currentUser.uid] || 0;
-
-					// Store the actual timestamp for sorting purposes
-					const timestamp = conv.updatedAt
-						? new Date(conv.updatedAt).getTime()
-						: 0;
-
-					return {
-						id: otherParticipantId || "",
-						name: participantInfo?.name || "Unknown User",
-						avatar: participantInfo?.avatar || "/icons/default-avatar.svg",
-						username: participantInfo?.username || "",
-						lastMessage: conv.lastMessage || "Start a conversation",
-						time: conv.updatedAt
-							? new Date(conv.updatedAt).toLocaleTimeString([], {
-									hour: "2-digit",
-									minute: "2-digit",
-								})
-							: "",
-						timestamp: timestamp,
-						conversationId: conv.id,
-						unreadCount: unreadCount, // Use the specific unread count for this conversation
-					};
-				});
-
-				setUsers(processedUsers.filter((user: any) => user.id !== undefined));
-
-				// If URL has conversation ID but not selected yet
-				if (conversationIdFromUrl && !selectedConversation) {
-					setSelectedConversation(conversationIdFromUrl);
-				}
-
-				// If no conversation selected but we have conversations, select the first one
-				if (!selectedConversation && processedUsers.length > 0) {
-					setSelectedConversation(processedUsers[0].conversationId);
-				}
-
-				setLoading(false);
-			} catch (error) {
-				console.error("Error fetching conversations:", error);
-				setLoading(false);
+				setBrandProfiles((prev) => ({
+					...prev,
+					[userId]: data,
+				}));
+				return data;
 			}
-		};
+		} catch (error) {
+			console.error(
+				`Error fetching brand profile for userId ${userId}:`,
+				error
+			);
+		}
+		return null;
+	};
 
-		fetchConversations();
-		fetchTotalUnreadCount();
-	}, [currentUser, selectedConversation, conversationIdFromUrl]);
-
+	// Fetch total unread message count
 	const fetchTotalUnreadCount = async () => {
 		if (!currentUser) return;
 
@@ -234,6 +184,7 @@ const ChatPage = () => {
 		}
 	};
 
+	// Mark messages as read using socket
 	const markMessagesAsReadSocket = (convId: string) => {
 		if (!currentUser || !socket) return;
 
@@ -265,12 +216,114 @@ const ChatPage = () => {
 		}
 	};
 
-	const {
-		joinConversation,
-		leaveConversation,
-		sendMessage: socketSendMessage,
-		socket,
-	} = useSocket();
+	// Fetch all conversations for current user
+	useEffect(() => {
+		if (!currentUser) return;
+
+		const fetchConversations = async () => {
+			try {
+				setLoading(true);
+				const response = await fetch(
+					`/api/conversations?userId=${currentUser.uid}`
+				);
+
+				if (!response.ok) {
+					throw new Error("Failed to fetch conversations");
+				}
+
+				const data = await response.json();
+				setConversations(data.conversations);
+
+				// Process conversations into user format for sidebar
+				const processedUsers = data.conversations.map((conv: Conversation) => {
+					// Find the other participant (not the current user)
+					const otherParticipantId = conv.participants.find(
+						(p: string) => p !== currentUser.uid
+					);
+
+					const participantInfo = otherParticipantId
+						? conv.participantsInfo?.[otherParticipantId]
+						: undefined;
+
+					// Check if avatar is actually a valid URL or a path that's not just the default avatar
+					const avatarUrl = participantInfo?.avatar || "";
+					const isValidAvatar =
+						avatarUrl &&
+						(avatarUrl.startsWith("http") ||
+							(avatarUrl !== "/icons/default-avatar.svg" &&
+								avatarUrl.length > 0));
+
+					// For each user, fetch their brand profile if not already fetched
+					if (otherParticipantId && !brandProfiles[otherParticipantId]) {
+						fetchBrandProfile(otherParticipantId);
+					}
+
+					// Get the unread count specifically for this conversation
+					const unreadCount = conv.unreadCounts?.[currentUser.uid] || 0;
+
+					// Store the actual timestamp for sorting purposes
+					const timestamp = conv.updatedAt
+						? new Date(conv.updatedAt).getTime()
+						: 0;
+
+
+					return {
+						id: otherParticipantId || "",
+						name: otherParticipantId
+							? brandProfiles[otherParticipantId]?.brandName ||
+								participantInfo?.name ||
+								"Unknown User"
+							: "Unknown User",
+						avatar: isValidAvatar ? avatarUrl : "/icons/default-avatar.svg",
+						username: participantInfo?.username || "",
+						lastMessage: conv.lastMessage || "Start a conversation",
+						time: conv.updatedAt
+							? new Date(conv.updatedAt).toLocaleTimeString([], {
+									hour: "2-digit",
+									minute: "2-digit",
+								})
+							: "",
+						conversationId: conv.id,
+						timestamp: timestamp,
+						unreadCount: unreadCount,
+						unreadCounts: unreadCount,
+					};
+				});
+
+				setUsers(processedUsers.filter((user: any) => user.id !== undefined));
+
+				// If URL has conversation ID but not selected yet
+				if (conversationIdFromUrl && !selectedConversation) {
+					setSelectedConversation(conversationIdFromUrl);
+				}
+
+				// If no conversation selected but we have conversations, select the first one
+				if (!selectedConversation && processedUsers.length > 0) {
+					setSelectedConversation(processedUsers[0].conversationId);
+				}
+
+				setLoading(false);
+			} catch (error) {
+				console.error("Error fetching conversations:", error);
+				setLoading(false);
+			}
+		};
+
+		fetchConversations();
+		fetchTotalUnreadCount();
+	}, [currentUser, selectedConversation, conversationIdFromUrl, brandProfiles]);
+
+	useEffect(() => {
+		// Update user names when brandProfiles changes
+		if (Object.keys(brandProfiles).length > 0) {
+			setUsers((prevUsers) =>
+				prevUsers.map((user) => ({
+					...user,
+					name: brandProfiles[user.id]?.brandName || user.name,
+				}))
+			);
+		}
+	}, [brandProfiles]);
 
 	// Listen for socket events
 	useEffect(() => {
@@ -279,6 +332,7 @@ const ChatPage = () => {
 		// Join the selected conversation room
 		joinConversation(selectedConversation);
 
+		// Listen for new messages
 		const handleNewMessage = (message: any) => {
 			setMessages((prev) => {
 				// Check if we already have this message (to prevent duplicates)
@@ -432,17 +486,14 @@ const ChatPage = () => {
 
 		socket.on("new-message", handleNewMessage);
 		socket.on("conversation-updated", handleConversationUpdated);
-
 		socket.on("unread-counts-update", handleUnreadCountsUpdate);
-
-		// In the cleanup function, remove:
-		socket.off("unread-counts-update", handleUnreadCountsUpdate);
 
 		// Clean up when unmounting
 		return () => {
 			leaveConversation(selectedConversation);
 			socket.off("new-message", handleNewMessage);
 			socket.off("conversation-updated", handleConversationUpdated);
+			socket.off("unread-counts-update", handleUnreadCountsUpdate);
 		};
 	}, [
 		selectedConversation,
@@ -566,10 +617,19 @@ const ChatPage = () => {
 		markMessagesAsReadSocket(conversationId);
 
 		// Update URL without full page reload
-		router.push(`/brand/dashboard/messages?conversation=${conversationId}`, {
+		router.push(`/creator/dashboard/messages?conversation=${conversationId}`, {
 			scroll: false,
 		});
 	};
+
+	// Filter users based on search query
+	const filteredUsers = users.filter((user) => {
+		const matchesSearch =
+			user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+			(user.username &&
+				user.username.toLowerCase().includes(searchQuery.toLowerCase()));
+		return matchesSearch;
+	});
 
 	if (!currentUser) {
 		return (
@@ -580,21 +640,21 @@ const ChatPage = () => {
 	}
 
 	return (
-		<div className="flex h-screen bg-white w-full">
+		<div className="flex h-screen bg-white w-[calc(100vw-16rem)]">
 			{/* Left sidebar */}
 			<div className="w-72 border-r flex flex-col">
-				{/* Search bar */}
+				{/* Search and filters */}
 				<div className="p-4">
-  <div className="relative">
-    <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
-    <Input
-      placeholder="Search..."
-      className="pl-8 bg-gray-100 border-0"
-      value={searchQuery}
-      onChange={(e) => setSearchQuery(e.target.value)}
-    />
-  </div>
-</div>
+					<div className="relative mb-3">
+						<Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+						<Input
+							placeholder="Search conversations..."
+							className="pl-8 bg-gray-100 border-0"
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+						/>
+					</div>
+				</div>
 
 				{/* Sort options */}
 				<div className="px-4 py-2 text-sm text-gray-500 flex items-center mb-2">
@@ -621,14 +681,13 @@ const ChatPage = () => {
 				<ScrollArea className="flex-1">
 					{loading ? (
 						<div className="flex justify-center p-4">
-							<div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-orange-500"></div>
+							<div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-orange-600"></div>
 						</div>
 					) : filteredUsers.length === 0 ? (
 						<div className="p-4 text-center text-gray-500">
 							No conversations yet
 						</div>
 					) : (
-						// Inside your user list mapping:
 						filteredUsers.map((user) => (
 							<div
 								key={user.id}
@@ -645,14 +704,20 @@ const ChatPage = () => {
 								<div className="relative">
 									<Avatar className="">
 										<Image
-											src={user.avatar || "/icons/default-avatar.svg"}
+											src={
+												brandProfiles[user.id]?.logoUrl ||
+												(user.avatar &&
+												user.avatar !== "/icons/default-avatar.svg"
+													? user.avatar
+													: "/icons/default-avatar.svg")
+											}
 											alt="Profile"
 											width={60}
 											height={60}
 										/>
 									</Avatar>
 									{user.isActive && (
-										<div className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-orange-500 border-2 border-white"></div>
+										<div className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-white"></div>
 									)}
 								</div>
 								<div className="ml-3 flex-1 overflow-hidden">
@@ -669,13 +734,12 @@ const ChatPage = () => {
 												</span>
 											)}
 										</div>
-										<p className="text-sm text-gray-500">{user.time}</p>
+										<p className="text-xs text-gray-500">{user.time}</p>
 									</div>
-									<div className="flex justify-between items-center">
-										<p className="text-sm text-gray-500 truncate">
-											{user.lastMessage}
-										</p>
-									</div>
+
+									<p className="text-sm text-gray-500 truncate mt-0.5">
+										{user.lastMessage}
+									</p>
 								</div>
 							</div>
 						))
@@ -684,25 +748,34 @@ const ChatPage = () => {
 			</div>
 
 			{/* Main chat area */}
-			<div className="flex-1 flex flex-col w-full">
+			<div className="flex-1 flex flex-col">
 				{/* Chat header */}
 				{selectedUser ? (
-					<div className="py-3 px-4 border-b flex items-center">
-						<Avatar className="">
-							<Image
-								src={selectedUser.avatar || "/icons/default-avatar.svg"}
-								alt="Profile"
-								width={60}
-								height={60}
-							/>
-						</Avatar>
-						<div className="ml-3">
-							<p className="text-base font-medium">{selectedUser.name}</p>
-							{selectedUser.username && (
-								<p className="text-sm text-orange-500">
-									@{selectedUser.username}
-								</p>
-							)}
+					<div className="py-3 px-4 border-b flex justify-between items-center">
+						<div className="flex items-center">
+							<Avatar className="">
+								<Image
+									src={
+										(selectedUser && brandProfiles[selectedUser.id]?.logoUrl) ||
+										(selectedUser?.avatar &&
+										selectedUser.avatar !== "/icons/default-avatar.svg"
+											? selectedUser.avatar
+											: "/icons/default-avatar.svg")
+									}
+									alt="Profile"
+									width={60}
+									height={60}
+								/>
+							</Avatar>
+
+							<div className="ml-3">
+								<p className="text-base font-medium">{selectedUser.name}</p>
+								{selectedUser.username && (
+									<p className="text-xs text-orange-600">
+										@{selectedUser.username}
+									</p>
+								)}
+							</div>
 						</div>
 					</div>
 				) : (
@@ -716,7 +789,7 @@ const ChatPage = () => {
 					<div className="space-y-6">
 						{/* Welcome message for empty conversations */}
 						{messages.length === 0 && !loading && selectedUser && (
-							<div className="flex justify-center items-center text-center bg-[#FFF1F0] text-[#A94004] px-4 py-3 rounded-lg text-base">
+							<div className="flex justify-center items-center text-center bg-orange-50 text-orange-800 px-4 py-3 rounded-lg text-base">
 								Start a conversation with {selectedUser?.name}
 							</div>
 						)}
@@ -724,7 +797,7 @@ const ChatPage = () => {
 						{/* Loading indicator for messages */}
 						{loading && (
 							<div className="flex justify-center p-4">
-								<div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-orange-500"></div>
+								<div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-orange-600"></div>
 							</div>
 						)}
 
@@ -755,8 +828,13 @@ const ChatPage = () => {
 														<Avatar className="h-8 w-8 mt-1 mr-3">
 															<Image
 																src={
-																	selectedUser?.avatar ||
-																	"/icons/default-avatar.svg"
+																	(message.sender !== currentUser?.uid &&
+																		brandProfiles[message.sender]?.logoUrl) ||
+																	(selectedUser?.avatar &&
+																	selectedUser.avatar !==
+																		"/icons/default-avatar.svg"
+																		? selectedUser.avatar
+																		: "/icons/default-avatar.svg")
 																}
 																alt="Profile"
 																width={60}
@@ -769,7 +847,7 @@ const ChatPage = () => {
 														className={`whitespace-pre-line px-4 py-3 rounded-lg text-sm ${
 															message.sender === currentUser?.uid
 																? "bg-orange-100 text-orange-800"
-																: "bg-[#F9FAFB] border-[#EAECF0] border"
+																: "bg-gray-100 border-gray-200 border"
 														}`}
 													>
 														{message.content}
@@ -796,7 +874,7 @@ const ChatPage = () => {
 
 				{/* Message input area */}
 				<div className="border-t p-4 flex items-center">
-					<Paperclip className="h-5 w-5 text-gray-400 mr-2" />
+					<Paperclip className="h-5 w-5 text-gray-400 mr-2 cursor-pointer hover:text-orange-500" />
 					<Input
 						placeholder="Type your message here..."
 						className="flex-1"
@@ -834,4 +912,4 @@ const ChatPage = () => {
 	);
 };
 
-export default ChatPage;
+export default CreatorChatPage;

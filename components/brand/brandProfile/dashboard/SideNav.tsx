@@ -7,6 +7,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useBrandProfile } from "@/hooks/useBrandProfile";
 import BrandProfileDropdown from "@/components/brand/brandProfile/BrandProfileDropdown";
+import { useNotifications } from "@/context/NotificationContext";
 
 interface MenuItemProps {
 	icon: React.ReactNode;
@@ -127,6 +128,8 @@ const MenuItem: React.FC<MenuItemProps> = ({
 };
 
 const SideNav: React.FC = () => {
+	const { totalUnreadCount } = useNotifications();
+
 	return (
 		<div className="min-w-64 max-w-screen-sm bg-[#1A1A1A] text-white min-h-screen flex flex-col justify-between font-satoshi">
 			<nav className="p-4 mt-9">
@@ -195,7 +198,7 @@ const SideNav: React.FC = () => {
 							/>
 						}
 						text="Messages"
-						badge="1"
+						badge={totalUnreadCount > 0 ? totalUnreadCount.toString() : undefined}
 					/>
 					<MenuItem
 						href="/brand/dashboard/transactions"
