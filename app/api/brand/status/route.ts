@@ -11,6 +11,9 @@ export async function GET(request: NextRequest) {
     }
     
     // Verify the token
+    if (!adminAuth) {
+      throw new Error("Firebase admin is not initialized");
+    }
     const decodedToken = await adminAuth.verifyIdToken(token);
     
     const { searchParams } = new URL(request.url);
@@ -26,6 +29,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Get brand profile
+    if (!adminDb) {
+      throw new Error("Firebase admin database is not initialized");
+    }
     const brandRef = adminDb.collection("brandProfiles").doc(email);
     const brandDoc = await brandRef.get();
 
@@ -78,6 +84,9 @@ export async function PUT(request: NextRequest) {
     }
 
     // Update each notification
+    if (!adminDb) {
+      throw new Error("Firebase admin database is not initialized");
+    }
     const batch = adminDb.batch();
     
     for (const id of notificationIds) {

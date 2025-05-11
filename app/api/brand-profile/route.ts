@@ -28,6 +28,9 @@ export async function POST(request: NextRequest) {
 		
 		if (!resolvedUserId) {
 			// Try to find the user by email if userId was not provided
+			if (!adminAuth) {
+				throw new Error("Firebase admin auth is not initialized");
+			}
 			try {
 				const userRecord = await adminAuth.getUserByEmail(email);
 				resolvedUserId = userRecord.uid;
@@ -46,6 +49,10 @@ export async function POST(request: NextRequest) {
 		const newProfileId = profileId || uuidv4();
 
 		// Using Admin SDK for Firestore operations
+		if (!adminDb) {
+			throw new Error("Firebase admin database is not initialized");
+		}
+		
 		const brandRef = adminDb.collection("brandProfiles").doc(email);
 		const docSnap = await brandRef.get();
 
@@ -98,6 +105,9 @@ export async function POST(request: NextRequest) {
 				const filePath = `brand-images/${resolvedUserId}/${newProfileId}/${fileName}`;
 
 				// Get bucket and create file reference
+				if (!adminStorage) {
+					throw new Error("Firebase admin storage is not initialized");
+				}
 				const bucket = adminStorage.bucket();
 				const fileRef = bucket.file(filePath);
 
@@ -210,6 +220,9 @@ export async function GET(request: NextRequest) {
 		// If profileId is provided directly, we can look it up across all users
 		if (profileId) {
 			// First try to find the profile using a query across all users
+			if (!adminDb) {
+				throw new Error("Firebase admin database is not initialized");
+			}
 			const profilesQuery = await adminDb
 				.collectionGroup("brandProfiles")
 				.where("profileId", "==", profileId)
@@ -232,6 +245,9 @@ export async function GET(request: NextRequest) {
 		// If only userId is provided (no email)
 		if (userId && !email) {
 			// Query the brandProfiles collection for documents where userId matches
+			if (!adminDb) {
+				throw new Error("Firebase admin database is not initialized");
+			}
 			const brandProfilesQuery = await adminDb
 				.collection("brandProfiles")
 				.where("userId", "==", userId)
@@ -254,6 +270,9 @@ export async function GET(request: NextRequest) {
 		// If email is provided but no userId, we need to find the associated userId first
 		if (email && !userId) {
 			console.log("Looking up user by email:", email);
+			if (!adminDb) {
+				throw new Error("Firebase admin database is not initialized");
+			}
 			const userQuery = await adminDb
 				.collection("users")
 				.where("email", "==", email)
@@ -262,7 +281,11 @@ export async function GET(request: NextRequest) {
 
 			if (userQuery.empty) {
 				// Try Auth system as fallback
+
 				try {
+					if (!adminAuth) {
+						throw new Error("Firebase admin auth is not initialized");
+					}
 					const userRecord = await adminAuth.getUserByEmail(email);
 					userId = userRecord.uid;
 				} catch {
@@ -288,6 +311,9 @@ export async function GET(request: NextRequest) {
 
 		// If we have both email and userId, try to get the profile by email first
 		if (email) {
+			if (!adminDb) {
+				throw new Error("Firebase admin database is not initialized");
+			}
 			const brandRef = adminDb.collection("brandProfiles").doc(email);
 			const docSnap = await brandRef.get();
 			
@@ -299,6 +325,9 @@ export async function GET(request: NextRequest) {
 		}
 
 		// If we couldn't find by email or no email was provided, try by userId
+		if (!adminDb) {
+			throw new Error("Firebase admin database is not initialized");
+		}
 		const brandProfilesQuery = await adminDb
 			.collection("brandProfiles")
 			.where("userId", "==", userId)
@@ -338,6 +367,9 @@ export async function PUT(request: NextRequest) {
 		}
 
 		// Using top-level brandProfiles collection
+		if (!adminDb) {
+			throw new Error("Firebase admin database is not initialized");
+		}
 		const brandRef = adminDb.collection("brandProfiles").doc(email);
 		const docSnap = await brandRef.get();
 

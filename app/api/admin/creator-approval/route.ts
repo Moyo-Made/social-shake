@@ -75,9 +75,7 @@ async function handleFileUpload(request: NextRequest) {
 		const fileUrl = `https://storage.googleapis.com/${fileRef.bucket.name}/${fileRef.name}`;
 
 		// Update verification document
-		if (!adminDb) {
-			throw new Error("Firebase admin database is not initialized");
-		}
+		
 		if (!adminDb) {
 			throw new Error("Firebase admin database is not initialized");
 		}
@@ -184,6 +182,10 @@ export async function POST(request: NextRequest) {
 			}
 
 			// Get verification document
+			if (!adminDb) {
+				throw new Error("Firebase admin database is not initialized");
+			}
+			
 			const verificationRef = adminDb
 				.collection("creator_verifications")
 				.doc(verificationId);
@@ -245,6 +247,9 @@ export async function POST(request: NextRequest) {
 				updateData as FirebaseFirestore.UpdateData<typeof updateData>
 			);
 
+			if (!adminDb) {
+				throw new Error("Firebase admin database is not initialized");
+			}
 			const creatorProfileRef = adminDb
 				.collection("creatorProfiles")
 				.doc(creatorEmail);
@@ -254,6 +259,9 @@ export async function POST(request: NextRequest) {
 			});
 
 			// Create notification for the creator
+			if (!adminDb) {
+				throw new Error("Firebase admin database is not initialized");
+			}
 			await adminDb.collection("notifications").add({
 				recipientEmail: creatorEmail,
 				message: notificationMessage,
@@ -293,6 +301,9 @@ export async function GET(request: NextRequest) {
 		const id = searchParams.get("id");
 
 		// Handle direct ID lookup if provided
+		if (!adminDb) {
+			throw new Error("Firebase admin database is not initialized");
+		}
 		if (id) {
 			const verificationRef = adminDb
 				.collection("creator_verifications")
@@ -481,6 +492,9 @@ export async function GET(request: NextRequest) {
 				let creatorProfileData = null;
 
 				if (email) {
+					if (!adminDb) {
+						throw new Error("Firebase admin database is not initialized");
+					}
 					try {
 						const profileDoc = await adminDb
 							.collection("creatorProfiles")
@@ -498,6 +512,9 @@ export async function GET(request: NextRequest) {
 					}
 				} else if (userId) {
 					// Try to find user email from users collection if needed
+					if (!adminDb) {
+						throw new Error("Firebase admin database is not initialized");
+					}
 					try {
 						const userDoc = await adminDb.collection("users").doc(userId).get();
 						if (userDoc.exists && userDoc.data()?.email) {
@@ -659,6 +676,9 @@ export async function PUT(request: NextRequest) {
 		}
 
 		// Get verification document
+		if (!adminDb) {
+			throw new Error("Firebase admin database is not initialized");
+		}
 		const verificationRef = adminDb
 			.collection("creator_verifications")
 			.doc(verificationId);

@@ -20,6 +20,10 @@ export async function POST(request: NextRequest) {
     // Get or create user
     let user;
     try {
+      if (!adminAuth) {
+        return NextResponse.json({ error: 'Authentication service is unavailable' }, { status: 500 });
+    
+      }
       user = await adminAuth.getUserByEmail(email);
     } catch {
       // User doesn't exist, create them
@@ -32,6 +36,9 @@ export async function POST(request: NextRequest) {
     await adminAuth.setCustomUserClaims(user.uid, { admin: true });
     
     // Update or create user document
+    if (!adminDb) {
+      return NextResponse.json({ error: 'Database service is unavailable' }, { status: 500 });
+    }
     await adminDb.collection('users').doc(user.uid).set({
       email: user.email,
       role: UserRole.ADMIN,

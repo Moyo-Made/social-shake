@@ -15,6 +15,9 @@ export async function GET(
 
     
     // Get creator profile from userId
+    if (!adminDb) {
+      throw new Error("Firebase admin database is not initialized");
+    }
     const creatorRef = adminDb.collection("creatorProfiles").doc(userId);
     const creatorDoc = await creatorRef.get();
     

@@ -15,6 +15,9 @@ export async function GET(
     }
     
     // Get project details from projectId
+    if (!adminDb) {
+      throw new Error("Firebase admin database is not initialized");
+    }
     const projectRef = adminDb.collection("projects").doc(projectId);
     const projectDoc = await projectRef.get();
     

@@ -32,6 +32,9 @@ export async function POST(request: NextRequest) {
 		}
 
 		// Get project
+		if (!adminDb) {
+			throw new Error("Firebase admin database is not initialized");
+		}
 		const projectRef = adminDb.collection("projects").doc(projectId);
 		const projectDoc = await projectRef.get();
 
@@ -134,7 +137,10 @@ export async function GET(request: NextRequest) {
 		const limit = parseInt(searchParams.get("limit") || "50");
 		const page = parseInt(searchParams.get("page") || "1");
 		const offset = (page - 1) * limit;
-
+		
+		if (!adminDb) {
+			throw new Error("Firebase admin database is not initialized");
+		}
 		let query: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> =
 			adminDb.collection("projects");
 		let countQuery: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> =
