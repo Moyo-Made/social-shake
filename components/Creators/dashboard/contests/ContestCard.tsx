@@ -65,7 +65,7 @@ export default function ContestCard({ contest }: ContestCardProps) {
 		if (contest) {
 			fetchBrandProfile();
 		}
-	});
+	}, [contest, brandProfile]);  // Added proper dependency array
 
 	// Add error handling for date formatting
 	const formattedDate = contest.prizeTimeline?.endDate
@@ -299,6 +299,14 @@ export default function ContestCard({ contest }: ContestCardProps) {
 			: contest.basic.description
 		: "No description available";
 
+	// Prepare the enhanced contest object with brand info for messaging
+	const enhancedContest = {
+		...contest,
+		brandId: contest.userId, // Set the brandId to the userId for message functionality
+		brandName: brandProfile?.brandName, // Pass brand name
+		brandLogo: brandProfile?.logoUrl, // Pass brand logo
+	};
+
 	return (
 		<div className="border border-[#D2D2D2] rounded-lg overflow-hidden bg-white shadow-sm mb-1">
 			<div className="flex">
@@ -390,7 +398,9 @@ export default function ContestCard({ contest }: ContestCardProps) {
 								contestType: contest.contestType || "Unknown",
 								status: contest.status,
 								interestId: contest.interestId,
-								// channelId: contest.channelId,
+								brandId: enhancedContest.brandId,
+								brandName: enhancedContest.brandName,
+								brandLogo: enhancedContest.brandLogo
 							}}
 							refreshData={() => {
 								// Add actual refresh logic here

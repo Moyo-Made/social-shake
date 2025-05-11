@@ -3,6 +3,7 @@ import Link from "next/link";
 import ActionButton from "./ActionButton";
 import CancelApplicationModal from "./CancelApplicationModal";
 import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 // Component to determine what action buttons to show based on status
 interface Contest {
@@ -11,6 +12,9 @@ interface Contest {
 	status: string;
 	interestId?: string;
 	channelId?: string;
+	brandId?: string;  // Used for sending messages
+	brandName?: string; // Added for display in conversation
+	brandLogo?: string; // Added for avatar in conversation
 }
 
 const RenderActionButtons = ({
@@ -22,6 +26,64 @@ const RenderActionButtons = ({
 }) => {
 	const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
 	const { currentUser } = useAuth();
+	const router = useRouter();
+
+	const handleSendMessage = async (brandId: string) => {
+		if (!currentUser) {
+			alert("You need to be logged in to send messages");
+			return;
+		}
+
+		try {
+			console.log("Starting conversation with brand:", brandId);
+
+			// First, fetch brand information
+			const brandResponse = await fetch(`/api/admin/brand-approval?userId=${brandId}`);
+				
+			if (!brandResponse.ok) {
+				throw new Error("Failed to fetch brand information");
+			}
+			const brandData = await brandResponse.json();
+			
+			const response = await fetch("/api/createConversation", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					currentUserId: currentUser.uid,
+					creatorId: brandId,
+					userData: {
+						name: currentUser.displayName || "User",
+						avatar: currentUser.photoURL || "/icons/default-avatar.svg",
+						username: currentUser.email?.split("@")[0] || "",
+					},
+					creatorData: {
+						name: brandData.name || contest.brandName || "Brand",
+						avatar: brandData.logoUrl || contest.brandLogo || "/icons/default-brand-avatar.svg",
+						username: brandData.username || brandId,
+					},
+				}),
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Failed to handle conversation");
+			}
+
+			// The endpoint returns conversationId for both new and existing conversations
+			console.log(
+				`Conversation ${response.status === 201 ? "created" : "found"}`
+			);
+			router.push(
+				`/creator/dashboard/messages?conversation=${data.conversationId}`
+			);
+		} catch (error) {
+			console.error("Error handling conversation:", error);
+			alert("Failed to open conversation. Please try again.");
+		}
+	};
 
 	// Function to handle removing interest (unsaving)
 	const handleRemoveInterest = async () => {
@@ -90,12 +152,12 @@ const RenderActionButtons = ({
 							/>
 						</Link>
 					)}
-					<Link
-						href={`/creator/dashboard/messages/${contest.channelId || contest.contestId}`}
+					<button
+						onClick={() => contest.brandId ? handleSendMessage(contest.brandId) : alert("Brand information not available")}
 						className="flex-1"
 					>
-						<ActionButton text="View Channel" icon="mail" secondary fullWidth />
-					</Link>
+						<ActionButton text="Message Brand" icon="mail" secondary fullWidth />
+					</button>
 				</>
 			);
 		case "pending":
@@ -176,12 +238,12 @@ const RenderActionButtons = ({
 							fullWidth
 						/>
 					</Link>
-					<Link
-						href={`/creator/dashboard/messages/${contest.channelId || contest.contestId}`}
+					<button
+						onClick={() => contest.brandId ? handleSendMessage(contest.brandId) : alert("Brand information not available")}
 						className="flex-1"
 					>
-						<ActionButton text="View Channel" icon="mail" secondary fullWidth />
-					</Link>
+						<ActionButton text="Message Brand" icon="mail" secondary fullWidth />
+					</button>
 				</>
 			);
 		case "approved":

@@ -677,7 +677,7 @@ const ChatPage = () => {
 										<p className="text-sm text-gray-500">{user.time}</p>
 									</div>
 									<div className="flex justify-between items-center">
-										<p className="text-sm text-gray-500 truncate">
+										<p className="text-sm text-gray-500 line-clamp-1">
 											{user.lastMessage}
 										</p>
 									</div>

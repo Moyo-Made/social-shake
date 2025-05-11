@@ -22,6 +22,9 @@ export async function POST(request: NextRequest) {
     }
     
     // Get brand profile
+    if (!adminDb) {
+      return NextResponse.json({ error: "Database connection is not initialized" }, { status: 500 });
+    }
     const brandsSnapshot = await adminDb.collection("brandProfiles")
       .where("userId", "==", userId)
       .limit(1)
@@ -114,7 +117,10 @@ export async function GET(request: NextRequest) {
 
     // If userId is provided, search for brand by userId
     if (userId) {
-  
+
+      if (!adminDb) {
+        return NextResponse.json({ error: "Database connection is not initialized" }, { status: 500 });
+      }
       const brandQuery = adminDb.collection("brandProfiles")
         .where("userId", "==", userId)
         .limit(1);
@@ -137,6 +143,9 @@ export async function GET(request: NextRequest) {
     // If profileId is provided, search by profileId
     if (profileId) {
       console.log(`Searching for brand with profileId: ${profileId}`);
+      if (!adminDb) {
+        return NextResponse.json({ error: "Database connection is not initialized" }, { status: 500 });
+      }
       const brandQuery = adminDb.collection("brandProfiles")
         .where("profileId", "==", profileId)
         .limit(1);
@@ -159,6 +168,9 @@ export async function GET(request: NextRequest) {
     // If email is provided, search by email
     if (email) {
       console.log(`Searching for brand with email: ${email}`);
+      if (!adminDb) {
+        return NextResponse.json({ error: "Database connection is not initialized" }, { status: 500 });
+      }
       const brandRef = adminDb.collection("brandProfiles").doc(email);
       const brandSnapshot = await brandRef.get();
       
@@ -176,6 +188,9 @@ export async function GET(request: NextRequest) {
     }
     
     // If no specific query parameter is provided, return paginated list with filters
+    if (!adminDb) {
+      return NextResponse.json({ error: "Database connection is not initialized" }, { status: 500 });
+    }
     let query: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> = adminDb.collection("brandProfiles");
     
     // Add status filter if provided

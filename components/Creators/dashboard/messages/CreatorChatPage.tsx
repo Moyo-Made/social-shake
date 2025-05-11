@@ -95,7 +95,6 @@ const CreatorChatPage = () => {
 		});
 	};
 
-
 	// State variables
 	const [brandProfiles, setBrandProfiles] = useState<
 		Record<string, BrandProfile>
@@ -110,7 +109,6 @@ const CreatorChatPage = () => {
 	const [loading, setLoading] = useState(true);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [sendingMessage, setSendingMessage] = useState(false);
-
 
 	const {
 		joinConversation,
@@ -265,7 +263,6 @@ const CreatorChatPage = () => {
 					const timestamp = conv.updatedAt
 						? new Date(conv.updatedAt).getTime()
 						: 0;
-
 
 					return {
 						id: otherParticipantId || "",
@@ -614,12 +611,12 @@ const CreatorChatPage = () => {
 		if (selectedConversation !== conversationId) {
 			setMessages([]); // Clear messages only when switching to a different conversation
 		}
-		
+
 		setSelectedConversation(conversationId);
-		
+
 		// Mark messages as read using socket
 		markMessagesAsReadSocket(conversationId);
-		
+
 		// Update URL without full page reload
 		router.push(`/creator/dashboard/messages?conversation=${conversationId}`, {
 			scroll: false,
@@ -724,7 +721,7 @@ const CreatorChatPage = () => {
 										<div className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-white"></div>
 									)}
 								</div>
-								<div className="ml-3 flex-1 overflow-hidden">
+								<div className="ml-3 flex-1 min-w-0">
 									<div className="flex justify-between items-center">
 										<div className="flex gap-2">
 											<p className="text-base font-medium truncate">
@@ -738,10 +735,10 @@ const CreatorChatPage = () => {
 												</span>
 											)}
 										</div>
-										<p className="text-xs text-gray-500">{user.time}</p>
+										<p className="text-xs text-gray-500 flex-shrink-0">{user.time}</p>
 									</div>
 
-									<p className="text-sm text-gray-500 truncate mt-0.5">
+									<p className="text-sm text-gray-500 line-clamp-1 mt-0.5">
 										{user.lastMessage}
 									</p>
 								</div>
@@ -794,7 +791,8 @@ const CreatorChatPage = () => {
 						{/* Welcome message for empty conversations */}
 						{messages.length === 0 && !loading && selectedUser && (
 							<div className="flex justify-center items-center text-center bg-orange-50 text-orange-800 px-4 py-3 rounded-lg text-base">
-								{selectedUser.lastMessage && selectedUser.lastMessage !== "Start a conversation"
+								{selectedUser.lastMessage &&
+								selectedUser.lastMessage !== "Start a conversation"
 									? "Loading conversation..."
 									: `Start a conversation with ${selectedUser?.name}`}
 							</div>
