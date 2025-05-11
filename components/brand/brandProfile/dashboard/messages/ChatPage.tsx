@@ -572,7 +572,7 @@ const ChatPage = () => {
 		markMessagesAsReadSocket(conversationId);
 
 		// Update URL without full page reload
-		router.push(`/creator/dashboard/messages?conversation=${conversationId}`, {
+		router.push(`/brand/dashboard/messages?conversation=${conversationId}`, {
 			scroll: false,
 		});
 	};
