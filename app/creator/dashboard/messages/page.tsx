@@ -1,11 +1,11 @@
 import CreatorChatPage from "@/components/Creators/dashboard/messages/CreatorChatPage";
-import React from "react";
+import React, { Suspense } from "react";
 
 const page = () => {
 	return (
-		<div>
+		<Suspense>
 			<CreatorChatPage />
-		</div>
+		</Suspense>
 	);
 };
 
