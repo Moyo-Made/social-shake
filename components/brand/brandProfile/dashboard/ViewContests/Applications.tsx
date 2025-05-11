@@ -11,6 +11,8 @@ import {
 import { Check, ChevronLeft, Mail, Search, X } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 interface ApplicationsProps {
 	contestData: {
@@ -90,6 +92,59 @@ const Applications: React.FC<ApplicationsProps> = ({ contestData }) => {
 	const [showApproveModal, setShowApproveModal] = useState(false);
 	const [showRejectModal, setShowRejectModal] = useState(false);
 	const [pendingActionId, setPendingActionId] = useState<string | null>(null);
+	const { currentUser } = useAuth();
+		const router = useRouter();
+
+	const handleSendMessage = async (creator: Creator) => {
+		if (!currentUser) {
+			alert("You need to be logged in to send messages");
+			return;
+		}
+
+		try {
+			console.log("Starting conversation with creator:", creator.id);
+
+			const response = await fetch("/api/createConversation", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					currentUserId: currentUser.uid,
+					creatorId: creator.id,
+					userData: {
+						name: currentUser.displayName || "User",
+						avatar: currentUser.photoURL || "/icons/default-avatar.svg",
+						username: currentUser.email?.split("@")[0] || "",
+					},
+					creatorData: {
+						name:
+							`${creator.firstName} ${creator.lastName}`.trim() ||
+							creator.username,
+						avatar: creator.logoUrl || "/icons/default-avatar.svg",
+						username: creator.username,
+					},
+				}),
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Failed to handle conversation");
+			}
+
+			// The endpoint returns conversationId for both new and existing conversations
+			console.log(
+				`Conversation ${response.status === 201 ? "created" : "found"}`
+			);
+			router.push(
+				`/brand/dashboard/messages?conversation=${data.conversationId}`
+			);
+		} catch (error) {
+			console.error("Error handling conversation:", error);
+			alert("Failed to open conversation. Please try again.");
+		}
+	};
 
 	// Approve Confirmation Modal
 	const ApproveModal = () => {
@@ -757,8 +812,14 @@ const Applications: React.FC<ApplicationsProps> = ({ contestData }) => {
 								</div>
 							</div>
 
-							<Button className="w-full bg-pink-500 hover:bg-pink-600 text-white">
-								<Mail className="mr-2 h-4 w-4" />
+							<Button
+								onClick={() =>
+									selectedApplication?.creator &&
+									handleSendMessage(selectedApplication.creator)
+								}
+								className="w-full bg-pink-500 hover:bg-pink-600 text-white flex justify-center items-center rounded-lg"
+							>
+								<Mail className="mr-1 h-4 w-4" />
 								Message Creator
 							</Button>
 

@@ -20,18 +20,18 @@ export async function POST(req: NextRequest) {
       .where('participants', 'array-contains', currentUserId)
       .get();
     
-    let existingConvDoc: { id: string; [key: string]: any } | null = null;
+    let existingConvDoc: { id: string; participants: string[]; [key: string]: any } | null = null as { id: string; participants: string[]; [key: string]: any } | null;
     existingConversation.forEach(doc => {
       const data = doc.data();
       if (data.participants.includes(creatorId)) {
-        existingConvDoc = { id: doc.id, ...data };
+        existingConvDoc = { id: doc.id, participants: data.participants, ...data };
       }
     });
 
     if (existingConvDoc) {
       return new Response(
         JSON.stringify({ 
-          conversationId: existingConvDoc,
+          conversationId: existingConvDoc.id,
           message: 'Existing conversation found' 
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }

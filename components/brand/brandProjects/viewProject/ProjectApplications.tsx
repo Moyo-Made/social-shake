@@ -13,6 +13,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { useAuthApi } from "@/hooks/useAuthApi";
 import { ShippingAddress } from "@/components/Creators/dashboard/projects/available/ProjectApplyModal";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 interface ApplicationsProps {
 	projectData: {
@@ -92,8 +94,63 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 	const [showApproveModal, setShowApproveModal] = useState(false);
 	const [showRejectModal, setShowRejectModal] = useState(false);
 	const [pendingActionId, setPendingActionId] = useState<string | null>(null);
-	const [applicationAddresses, setApplicationAddresses] = useState<Record<string, ShippingAddress>>({});
-	const api = useAuthApi(); 
+	const [applicationAddresses, setApplicationAddresses] = useState<
+		Record<string, ShippingAddress>
+	>({});
+	const api = useAuthApi();
+	const { currentUser } = useAuth();
+	const router = useRouter();
+
+	const handleSendMessage = async (creator: Creator) => {
+		if (!currentUser) {
+			alert("You need to be logged in to send messages");
+			return;
+		}
+
+		try {
+			console.log("Starting conversation with creator:", creator.id);
+
+			const response = await fetch("/api/createConversation", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					currentUserId: currentUser.uid,
+					creatorId: creator.id,
+					userData: {
+						name: currentUser.displayName || "User",
+						avatar: currentUser.photoURL || "/icons/default-avatar.svg",
+						username: currentUser.email?.split("@")[0] || "",
+					},
+					creatorData: {
+						name:
+							`${creator.firstName} ${creator.lastName}`.trim() ||
+							creator.username,
+						avatar: creator.logoUrl || "/icons/default-avatar.svg",
+						username: creator.username,
+					},
+				}),
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Failed to handle conversation");
+			}
+
+			// The endpoint returns conversationId for both new and existing conversations
+			console.log(
+				`Conversation ${response.status === 201 ? "created" : "found"}`
+			);
+			router.push(
+				`/brand/dashboard/messages?conversation=${data.conversationId}`
+			);
+		} catch (error) {
+			console.error("Error handling conversation:", error);
+			alert("Failed to open conversation. Please try again.");
+		}
+	};
 
 	// Approve Confirmation Modal
 	const ApproveModal = () => {
@@ -164,31 +221,37 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 
 	const fetchApplicationAddress = async (applicationId: string) => {
 		try {
-		  const { data, error } = await api.get(`/api/project-application-address?applicationId=${applicationId}`);
-		  
-		  if (error) {
-			console.error(`Failed to load shipping address for application ${applicationId}:`, error);
-			return null;
-		  }
-		  
-		  if (data) {
-			// Store the address in our applicationAddresses state
-			setApplicationAddresses((prev) => ({
-			  ...prev,
-			  [applicationId]: data as ShippingAddress,
-			}));
-			
-			return data;
-		  }
-		  
-		  return null;
-		} catch (err) {
-		  console.error(`Error fetching address for application ${applicationId}:`, err);
-		  return null;
-		}
-	  }
+			const { data, error } = await api.get(
+				`/api/project-application-address?applicationId=${applicationId}`
+			);
 
-	
+			if (error) {
+				console.error(
+					`Failed to load shipping address for application ${applicationId}:`,
+					error
+				);
+				return null;
+			}
+
+			if (data) {
+				// Store the address in our applicationAddresses state
+				setApplicationAddresses((prev) => ({
+					...prev,
+					[applicationId]: data as ShippingAddress,
+				}));
+
+				return data;
+			}
+
+			return null;
+		} catch (err) {
+			console.error(
+				`Error fetching address for application ${applicationId}:`,
+				err
+			);
+			return null;
+		}
+	};
 
 	// Fetch applications data
 	useEffect(() => {
@@ -404,14 +467,17 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 	const handleViewApplication = async (id: string) => {
 		const application = applications.find((app) => app.id === id);
 		if (application) {
-		  setSelectedApplication(application);
-		  
-		  // Only fetch address if the user needs the product
-		  if (application.productOwnership === "need" && !applicationAddresses[id]) {
-			await fetchApplicationAddress(id);
-		  }
+			setSelectedApplication(application);
+
+			// Only fetch address if the user needs the product
+			if (
+				application.productOwnership === "need" &&
+				!applicationAddresses[id]
+			) {
+				await fetchApplicationAddress(id);
+			}
 		}
-	  };
+	};
 
 	// Go back to application list
 	const handleBackToList = () => {
@@ -676,46 +742,61 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 							</div>
 
 							{selectedApplication.productOwnership === "need" && (
-  <div className="flex flex-col space-y-1">
-    <p className="text-sm text-[#667085]">Shipping Address</p>
-    {!applicationAddresses[selectedApplication.id] ? (
-      <div>
-        <p className="font-normal text-[#101828]">Loading shipping address...</p>
-        <button 
-          onClick={() => fetchApplicationAddress(selectedApplication.id)}
-          className="text-sm text-orange-500 hover:underline mt-2"
-        >
-          Retry loading address
-        </button>
-      </div>
-    ) : (
-      <>
-        <p className="font-normal text-[#101828]">
-          {applicationAddresses[selectedApplication.id]?.name}
-        </p>
-        <p className="font-normal text-[#101828]">
-          {applicationAddresses[selectedApplication.id]?.addressLine1}
-        </p>
-        {applicationAddresses[selectedApplication.id]?.addressLine2 && (
-          <p className="font-normal text-[#101828]">
-            {applicationAddresses[selectedApplication.id]?.addressLine2}
-          </p>
-        )}
-        <p className="font-normal text-[#101828]">
-          {applicationAddresses[selectedApplication.id]?.city},{" "}
-          {applicationAddresses[selectedApplication.id]?.state}{" "}
-          {applicationAddresses[selectedApplication.id]?.zipCode}
-        </p>
-        <p className="font-normal text-[#101828]">
-          {applicationAddresses[selectedApplication.id]?.country}
-        </p>
-        <p className="font-normal text-[#101828]">
-          Phone: {applicationAddresses[selectedApplication.id]?.phoneNumber}
-        </p>
-      </>
-    )}
-  </div>
-)}
+								<div className="flex flex-col space-y-1">
+									<p className="text-sm text-[#667085]">Shipping Address</p>
+									{!applicationAddresses[selectedApplication.id] ? (
+										<div>
+											<p className="font-normal text-[#101828]">
+												Loading shipping address...
+											</p>
+											<button
+												onClick={() =>
+													fetchApplicationAddress(selectedApplication.id)
+												}
+												className="text-sm text-orange-500 hover:underline mt-2"
+											>
+												Retry loading address
+											</button>
+										</div>
+									) : (
+										<>
+											<p className="font-normal text-[#101828]">
+												{applicationAddresses[selectedApplication.id]?.name}
+											</p>
+											<p className="font-normal text-[#101828]">
+												{
+													applicationAddresses[selectedApplication.id]
+														?.addressLine1
+												}
+											</p>
+											{applicationAddresses[selectedApplication.id]
+												?.addressLine2 && (
+												<p className="font-normal text-[#101828]">
+													{
+														applicationAddresses[selectedApplication.id]
+															?.addressLine2
+													}
+												</p>
+											)}
+											<p className="font-normal text-[#101828]">
+												{applicationAddresses[selectedApplication.id]?.city},{" "}
+												{applicationAddresses[selectedApplication.id]?.state}{" "}
+												{applicationAddresses[selectedApplication.id]?.zipCode}
+											</p>
+											<p className="font-normal text-[#101828]">
+												{applicationAddresses[selectedApplication.id]?.country}
+											</p>
+											<p className="font-normal text-[#101828]">
+												Phone:{" "}
+												{
+													applicationAddresses[selectedApplication.id]
+														?.phoneNumber
+												}
+											</p>
+										</>
+									)}
+								</div>
+							)}
 						</div>
 					</div>
 
@@ -760,8 +841,14 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 								</div>
 							</div>
 
-							<Button className="w-full bg-pink-500 hover:bg-pink-600 text-white">
-								<Mail className="mr-2 h-4 w-4" />
+							<Button
+								onClick={() =>
+									selectedApplication?.creator &&
+									handleSendMessage(selectedApplication.creator)
+								}
+								className="w-full bg-pink-500 hover:bg-pink-600 text-white flex justify-center items-center rounded-lg"
+							>
+								<Mail className="mr-1 h-4 w-4" />
 								Message Creator
 							</Button>
 

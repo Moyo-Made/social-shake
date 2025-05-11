@@ -1,33 +1,53 @@
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { getAuth } from 'firebase-admin/auth';
+import * as dotenv from 'dotenv';
 
-// Enhanced Firebase Admin initialization
+// Load environment variables explicitly
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config({ path: '.env.local' });
+}
+
+// Enhanced Firebase Admin initialization function
 function initializeFirebaseAdmin() {
   // Prevent re-initialization
   if (getApps().length > 0) {
     return getApps()[0];
   }
 
+  // Check for missing environment variables
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+  const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+
+  // Validation
+  if (!projectId) {
+    throw new Error('FIREBASE_PROJECT_ID environment variable is not defined');
+  }
+  if (!clientEmail) {
+    throw new Error('FIREBASE_CLIENT_EMAIL environment variable is not defined');
+  }
+  if (!privateKey) {
+    throw new Error('FIREBASE_PRIVATE_KEY environment variable is not defined');
+  }
+
   try {
+    // Process private key if needed (sometimes required due to newline characters)
+    // Some environments require replacing "\\n" with actual newlines
+    const processedPrivateKey = privateKey.replace(/\\n/g, '\n');
+
     const app = initializeApp({
       credential: cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY
-          ? process.env.FIREBASE_PRIVATE_KEY
-          : undefined
+        projectId,
+        clientEmail,
+        privateKey: processedPrivateKey
       }),
-      // Optional: Add storage bucket if needed
-      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    });
-    console.log('Firebase config:', {
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY ? 'defined' : 'undefined',
+      storageBucket
     });
 
+    console.log('Firebase Admin initialized successfully');
     return app;
   } catch (error) {
     console.error('Firebase Admin initialization error:', error);
@@ -36,18 +56,24 @@ function initializeFirebaseAdmin() {
 }
 
 // Initialize Firebase Admin app
-const firebaseAdmin = initializeFirebaseAdmin();
+let firebaseAdmin: App | undefined;
+try {
+  firebaseAdmin = initializeFirebaseAdmin();
+} catch (error) {
+  console.error('Failed to initialize Firebase Admin:', error);
+  // Depending on your application, you might want to handle this differently
+}
 
-const adminDb = getFirestore(firebaseAdmin);
-const adminAuth = getAuth(firebaseAdmin);
-const adminStorage = getStorage(firebaseAdmin);
+const adminDb = firebaseAdmin ? getFirestore(firebaseAdmin) : null;
+const adminAuth = firebaseAdmin ? getAuth(firebaseAdmin) : null;
+const adminStorage = firebaseAdmin ? getStorage(firebaseAdmin) : null;
 const getFirebaseAdminApp = () => firebaseAdmin;
 
-export { 
-  firebaseAdmin, 
+export {
+  firebaseAdmin,
   adminDb,
   adminAuth,
   adminStorage,
   getFirebaseAdminApp,
-  initializeFirebaseAdmin  // Keep this for potential manual initialization
+  initializeFirebaseAdmin // Keep this for potential manual initialization
 };
