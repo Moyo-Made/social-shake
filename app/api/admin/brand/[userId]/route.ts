@@ -14,6 +14,9 @@ export async function GET(
     }
     
     // Get brand profile from userId
+    if (!adminDb) {
+      return NextResponse.json({ error: "Database connection is not available" }, { status: 500 });
+    }
     const brandRef = adminDb.collection("brandProfiles").doc(userId);
     const brandDoc = await brandRef.get();
     

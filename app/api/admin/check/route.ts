@@ -10,6 +10,9 @@ export async function GET(request: NextRequest) {
     }
     
     const token = authHeader.split('Bearer ')[1];
+    if (!adminAuth) {
+      throw new Error('Firebase admin is not initialized');
+    }
     const decodedToken = await adminAuth.verifyIdToken(token);
     
     // Check for admin claim

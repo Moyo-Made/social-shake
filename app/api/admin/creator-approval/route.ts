@@ -58,6 +58,9 @@ async function handleFileUpload(request: NextRequest) {
 		}
 
 		// Create a reference to firebase storage
+		if (!adminStorage) {
+			throw new Error("Firebase storage is not initialized");
+		}
 		const fileRef = adminStorage.bucket().file(storagePath);
 
 		// Upload the file
@@ -72,6 +75,12 @@ async function handleFileUpload(request: NextRequest) {
 		const fileUrl = `https://storage.googleapis.com/${fileRef.bucket.name}/${fileRef.name}`;
 
 		// Update verification document
+		if (!adminDb) {
+			throw new Error("Firebase admin database is not initialized");
+		}
+		if (!adminDb) {
+			throw new Error("Firebase admin database is not initialized");
+		}
 		const verificationRef = adminDb
 			.collection("creator_verifications")
 			.doc(verificationId);

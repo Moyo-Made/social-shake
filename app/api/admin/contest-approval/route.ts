@@ -32,6 +32,13 @@ export async function POST(request: NextRequest) {
 		}
 
 		// Get contest
+		if (!adminDb) {
+			return NextResponse.json(
+				{ error: "Database connection is not initialized" },
+				{ status: 500 }
+			);
+		}
+
 		const contestRef = adminDb.collection("contests").doc(contestId);
 		const contestDoc = await contestRef.get();
 
@@ -135,6 +142,9 @@ export async function GET(request: NextRequest) {
 		const page = parseInt(searchParams.get("page") || "1");
 		const offset = (page - 1) * limit;
 
+		if (!adminDb) {
+			throw new Error("Database connection is not initialized");
+		}
 		let query: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> =
 			adminDb.collection("contests");
 		let countQuery: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> =
