@@ -1,17 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { getFirestore } from 'firebase-admin/firestore';
+import { NextRequest } from 'next/server';
 
 const db = getFirestore();
 
-interface RequestBody {
-  json(): { currentUserId: any; creatorId: any; userData: any; creatorData: any; } | PromiseLike<{ currentUserId: any; creatorId: any; userData: any; creatorData: any; }>;
-  currentUserId: string;
-  creatorId: string;
-  userData: Record<string, any>;
-  creatorData: Record<string, any>;
-}
-
-export async function POST(req: RequestBody) {
+export async function POST(req: NextRequest) {
   try {
     const { currentUserId, creatorId, userData, creatorData } = await req.json();
     
