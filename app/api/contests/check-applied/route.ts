@@ -15,6 +15,9 @@ export async function GET(request: NextRequest) {
   
   try {
     // Query the contest_applications collection to check if the user has applied
+    if (!adminDb) {
+			throw new Error("Firebase admin database is not initialized");
+		}
     const applicationsRef = adminDb.collection('contest_applications');
     const query = applicationsRef
       .where('userId', '==', userId)

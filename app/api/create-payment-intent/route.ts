@@ -66,6 +66,9 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString()
     };
     
+    if (!adminDb) {
+      throw new Error("Firebase admin database is not initialized");
+    }
     await adminDb.collection("payments").doc(paymentId).set(paymentData);
     
     return NextResponse.json({

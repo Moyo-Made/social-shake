@@ -18,6 +18,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify that the payment record exists
+    if (!adminDb) {
+      return NextResponse.json(
+        { error: "Database connection is not initialized" },
+        { status: 500 }
+      );
+    }
     const paymentDoc = await adminDb.collection("payments").doc(paymentId).get();
     
     if (!paymentDoc.exists) {

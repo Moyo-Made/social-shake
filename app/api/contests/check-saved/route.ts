@@ -15,6 +15,9 @@ export async function GET(request: NextRequest) {
   
   try {
     // Query the contest_interests collection to check if the user has saved this contest
+    if (!adminDb) {
+			throw new Error("Firebase admin database is not initialized");
+		}
     const interestsRef = adminDb.collection('contest_interests');
     const query = interestsRef
       .where('userId', '==', userId)

@@ -10,7 +10,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Enhanced Firebase Admin initialization function
-function initializeFirebaseAdmin() {
+function initializeFirebaseAdmin(): App {
   // Prevent re-initialization
   if (getApps().length > 0) {
     return getApps()[0];
@@ -35,7 +35,6 @@ function initializeFirebaseAdmin() {
 
   try {
     // Process private key if needed (sometimes required due to newline characters)
-    // Some environments require replacing "\\n" with actual newlines
     const processedPrivateKey = privateKey.replace(/\\n/g, '\n');
 
     const app = initializeApp({
@@ -55,18 +54,21 @@ function initializeFirebaseAdmin() {
   }
 }
 
-// Initialize Firebase Admin app
-let firebaseAdmin: App | undefined;
-try {
-  firebaseAdmin = initializeFirebaseAdmin();
-} catch (error) {
-  console.error('Failed to initialize Firebase Admin:', error);
-  // Depending on your application, you might want to handle this differently
-}
+// Initialize Firebase Admin app - use IIFE to ensure immediate initialization
+const firebaseAdmin = (() => {
+  try {
+    return initializeFirebaseAdmin();
+  } catch (error) {
+    console.error('Failed to initialize Firebase Admin:', error);
+    // Re-throw to prevent using uninitialized Firebase services
+    throw error;
+  }
+})();
 
-const adminDb = firebaseAdmin ? getFirestore(firebaseAdmin) : null;
-const adminAuth = firebaseAdmin ? getAuth(firebaseAdmin) : null;
-const adminStorage = firebaseAdmin ? getStorage(firebaseAdmin) : null;
+// Initialize services directly without conditional checks
+const adminDb = getFirestore(firebaseAdmin);
+const adminAuth = getAuth(firebaseAdmin);
+const adminStorage = getStorage(firebaseAdmin);
 const getFirebaseAdminApp = () => firebaseAdmin;
 
 export {

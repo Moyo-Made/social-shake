@@ -22,6 +22,9 @@ export async function POST(request: NextRequest) {
     
     // Verify the user exists in Auth system
     try {
+      if (!adminAuth) {
+        throw new Error("Firebase admin auth is not initialized");
+      }
       await adminAuth.getUser(userId);
     } catch (error) {
       console.error("Error verifying user:", error);
@@ -35,6 +38,9 @@ export async function POST(request: NextRequest) {
     }
     
     // Create a transaction to handle the contest submission and counter update
+    if (!adminDb) {
+			throw new Error("Firebase admin database is not initialized");
+		}
     const submissionRef = adminDb.collection("contest_submissions").doc();
     const contestRef = adminDb.collection("contests").doc(contestId);
     

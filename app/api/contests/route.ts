@@ -39,6 +39,9 @@ async function processThumbnail(
     const filePath = `contest-images/${userId}/${contestId}/${fileName}`;
 
     // Get bucket and create file reference
+    if (!adminStorage) {
+      throw new Error("Firebase admin storage is not initialized");
+    }
     const bucket = adminStorage.bucket();
     console.log("Storage bucket details:", adminStorage.bucket().name);
     const fileRef = bucket.file(filePath);
@@ -119,6 +122,9 @@ function extractTags(data: any): string[] {
 // Helper function to get brand email for notifications
 async function getBrandEmail(userId: string): Promise<string | null> {
   try {
+    if (!adminDb) {
+      throw new Error("Firebase admin database is not initialized");
+    }
     const brandsSnapshot = await adminDb.collection("brandProfiles")
       .where("userId", "==", userId)
       .limit(1)
@@ -146,7 +152,11 @@ export async function GET(request: NextRequest) {
     if (contestId || (userId && !url.searchParams.has("filter"))) {
       let docRef;
 
+      if (!adminDb) {
+        throw new Error("Firebase admin database is not initialized");
+      }
       if (contestId) {
+
         // Get a complete contest
         docRef = adminDb.collection("contests").doc(contestId);
         
@@ -197,6 +207,9 @@ export async function GET(request: NextRequest) {
       const orderDirection = url.searchParams.get("orderDirection") || "desc";
 
       // Build the query
+      if (!adminDb) {
+            throw new Error("Firebase admin database is not initialized");
+          }
       let query: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> = adminDb.collection("contests");
 
       // Apply filters
@@ -355,6 +368,9 @@ export async function POST(request: NextRequest) {
     // Only check brand approval for final submissions, not drafts
     if (!isDraft) {
       // Get the user's brand profile to check approval status
+      if (!adminDb) {
+        throw new Error("Firebase admin database is not initialized");
+      }
       const brandsSnapshot = await adminDb.collection("brandProfiles")
         .where("userId", "==", userId)
         .limit(1)
@@ -395,6 +411,9 @@ export async function POST(request: NextRequest) {
       };
 
       // Save to Firestore using admin SDK
+      if (!adminDb) {
+        throw new Error("Firebase admin database is not initialized");
+      }
       await adminDb.collection("contestDrafts").doc(userId).set(draftData);
 
       return NextResponse.json({
@@ -417,6 +436,9 @@ export async function POST(request: NextRequest) {
         `contest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
       // Check if the contest already exists
+      if (!adminDb) {
+        throw new Error("Firebase admin database is not initialized");
+      }
       const contestDoc = await adminDb
         .collection("contests")
         .doc(contestId)
@@ -446,6 +468,9 @@ export async function POST(request: NextRequest) {
             "base64"
           );
 
+          if (!adminStorage) {
+            throw new Error("Firebase admin storage is not initialized");
+          }
           const bucket = adminStorage.bucket();
           const timestamp = Date.now();
           const filePath = `contest-images/${userId}/${contestId}/${timestamp}.jpg`;
@@ -694,6 +719,9 @@ export async function PUT(request: NextRequest) {
       };
 
       // Save to Firestore using admin SDK
+      if (!adminDb) {
+        throw new Error("Firebase admin database is not initialized");
+      }
       await adminDb
         .collection("contestDrafts")
         .doc(userId)
@@ -714,6 +742,9 @@ export async function PUT(request: NextRequest) {
       }
 
       // Check if the contest exists
+      if (!adminDb) {
+        throw new Error("Firebase admin database is not initialized");
+      }
       const contestDoc = await adminDb
         .collection("contests")
         .doc(contestId)
@@ -758,7 +789,10 @@ export async function PUT(request: NextRequest) {
           basic.thumbnail.replace(/^data:image\/\w+;base64,/, ""),
           "base64"
         );
-
+        
+        if (!adminStorage) {
+          throw new Error("Firebase admin storage is not initialized");
+        }
         const bucket = adminStorage.bucket();
         const timestamp = Date.now();
         const filePath = `contest-images/${userId}/${contestId}/${timestamp}.jpg`;

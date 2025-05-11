@@ -19,6 +19,9 @@ export async function GET(request: NextRequest) {
 
     // Query Firestore to check if the username exists
     // Using a case-insensitive search since usernames are typically stored lowercase
+    if (!adminDb) {
+			throw new Error("Firebase admin database is not initialized");
+		}
     const usernameQuery = adminDb
       .collection("creatorProfiles")
       .where("username", "==", username.toLowerCase());

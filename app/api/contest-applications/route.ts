@@ -11,6 +11,9 @@ export async function GET(request: NextRequest) {
 
 		// If applicationId is provided, fetch a specific application
 		if (applicationId) {
+			if (!adminDb) {
+						throw new Error("Firebase admin database is not initialized");
+					}
 			const applicationDoc = await adminDb
 				.collection("contest_applications")
 				.doc(applicationId)
@@ -39,6 +42,9 @@ export async function GET(request: NextRequest) {
 			);
 		}
 
+		if (!adminDb) {
+			throw new Error("Firebase admin database is not initialized");
+		}
 		const applicationsSnapshot = await adminDb
 			.collection("contest_applications")
 			.where("contestId", "==", contestId)
@@ -107,6 +113,9 @@ export async function PUT(request: NextRequest) {
 			);
 		}
 
+		if (!adminDb) {
+			throw new Error("Firebase admin database is not initialized");
+		}
 		const applicationRef = adminDb
 			.collection("contest_applications")
 			.doc(applicationId);

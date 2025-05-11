@@ -41,6 +41,9 @@ export async function POST(request: NextRequest) {
 	  }
   
 	  // Verify the user exists in Auth system
+	  if (!adminAuth) {
+		throw new Error("Firebase admin auth is not initialized");
+	}
 	  try {
 		await adminAuth.getUser(userId);
 	  } catch (error) {
@@ -55,6 +58,9 @@ export async function POST(request: NextRequest) {
 	  }
   
 	  // Check if this user has already applied to this contest
+	  if (!adminDb) {
+		throw new Error("Firebase admin database is not initialized");
+	}
 	  const existingApplicationQuery = await adminDb
 		.collection("contest_applications")
 		.where("userId", "==", userId)

@@ -18,6 +18,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Query Firestore to check if the email exists
+    if (!adminDb) {
+      console.error("Firebase admin database is not initialized");
+      return NextResponse.json(
+        { error: "Internal server error" },
+        { status: 500 }
+      );
+    }
+
     const emailQuery = adminDb
       .collection("brandProfiles")
       .where("email", "==", email.toLowerCase());

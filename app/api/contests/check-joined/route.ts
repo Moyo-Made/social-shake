@@ -15,6 +15,9 @@ export async function GET(request: NextRequest) {
 
   try {
     // Query the contest_submissions collection to check if the user has joined
+    if (!adminDb) {
+			throw new Error("Firebase admin database is not initialized");
+		}
     const submissionsRef = adminDb.collection('contest_submissions');
     const query = submissionsRef
       .where('userId', '==', userId)

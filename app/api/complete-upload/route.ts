@@ -25,6 +25,9 @@ export async function POST(request: NextRequest) {
     const urlField = urlFieldMap[fileType] || `${fileType}Url`;
 
     // Make the file public
+    if (!adminStorage) {
+      throw new Error("Firebase admin storage is not initialized");
+    }
     const bucket = adminStorage.bucket();
     const file = bucket.file(uploadPath);
     await file.makePublic();
@@ -32,6 +35,9 @@ export async function POST(request: NextRequest) {
     const fileUrl = `https://storage.googleapis.com/${bucket.name}/${uploadPath}`;
 
     // Update verification document
+    if (!adminDb) {
+			throw new Error("Firebase admin database is not initialized");
+		}
     const verificationRef = adminDb
       .collection("creator_verifications")
       .doc(verificationId);
