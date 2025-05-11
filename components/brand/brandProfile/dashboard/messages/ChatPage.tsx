@@ -103,19 +103,21 @@ const ChatPage = () => {
 	const filteredUsers = users.filter((user) => {
 		// If search query is empty, show all users
 		if (!searchQuery.trim()) return true;
-		
+
 		// Search in name, username, and last message
 		const searchTermLower = searchQuery.toLowerCase();
-		
+
 		return (
-		  // Search in name
-		  user.name.toLowerCase().includes(searchTermLower) ||
-		  // Search in username (if available)
-		  (user.username && user.username.toLowerCase().includes(searchTermLower)) ||
-		  // Search in last message
-		  (user.lastMessage && user.lastMessage.toLowerCase().includes(searchTermLower))
+			// Search in name
+			user.name.toLowerCase().includes(searchTermLower) ||
+			// Search in username (if available)
+			(user.username &&
+				user.username.toLowerCase().includes(searchTermLower)) ||
+			// Search in last message
+			(user.lastMessage &&
+				user.lastMessage.toLowerCase().includes(searchTermLower))
 		);
-	  });
+	});
 
 	// Fetch all conversations for current user
 	useEffect(() => {
@@ -559,18 +561,21 @@ const ChatPage = () => {
 
 	// Handle conversation selection
 	const handleSelectConversation = (conversationId: string) => {
+		// If clicking the same conversation that's already selected, don't clear messages
+		if (selectedConversation !== conversationId) {
+			setMessages([]); // Clear messages only when switching to a different conversation
+		}
+
 		setSelectedConversation(conversationId);
-		setMessages([]); // Clear messages when switching conversations
 
 		// Mark messages as read using socket
 		markMessagesAsReadSocket(conversationId);
 
 		// Update URL without full page reload
-		router.push(`/brand/dashboard/messages?conversation=${conversationId}`, {
+		router.push(`/creator/dashboard/messages?conversation=${conversationId}`, {
 			scroll: false,
 		});
 	};
-
 	if (!currentUser) {
 		return (
 			<div className="flex items-center justify-center h-screen">
@@ -585,16 +590,16 @@ const ChatPage = () => {
 			<div className="w-72 border-r flex flex-col">
 				{/* Search bar */}
 				<div className="p-4">
-  <div className="relative">
-    <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
-    <Input
-      placeholder="Search..."
-      className="pl-8 bg-gray-100 border-0"
-      value={searchQuery}
-      onChange={(e) => setSearchQuery(e.target.value)}
-    />
-  </div>
-</div>
+					<div className="relative">
+						<Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+						<Input
+							placeholder="Search..."
+							className="pl-8 bg-gray-100 border-0"
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+						/>
+					</div>
+				</div>
 
 				{/* Sort options */}
 				<div className="px-4 py-2 text-sm text-gray-500 flex items-center mb-2">
@@ -716,8 +721,11 @@ const ChatPage = () => {
 					<div className="space-y-6">
 						{/* Welcome message for empty conversations */}
 						{messages.length === 0 && !loading && selectedUser && (
-							<div className="flex justify-center items-center text-center bg-[#FFF1F0] text-[#A94004] px-4 py-3 rounded-lg text-base">
-								Start a conversation with {selectedUser?.name}
+							<div className="flex justify-center items-center text-center bg-orange-50 text-orange-800 px-4 py-3 rounded-lg text-base">
+								{selectedUser.lastMessage &&
+								selectedUser.lastMessage !== "Start a conversation"
+									? "Loading conversation..."
+									: `Start a conversation with ${selectedUser?.name}`}
 							</div>
 						)}
 

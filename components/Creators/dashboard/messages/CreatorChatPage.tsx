@@ -610,12 +610,16 @@ const CreatorChatPage = () => {
 
 	// Handle conversation selection
 	const handleSelectConversation = (conversationId: string) => {
+		// If clicking the same conversation that's already selected, don't clear messages
+		if (selectedConversation !== conversationId) {
+			setMessages([]); // Clear messages only when switching to a different conversation
+		}
+		
 		setSelectedConversation(conversationId);
-		setMessages([]); // Clear messages when switching conversations
-
+		
 		// Mark messages as read using socket
 		markMessagesAsReadSocket(conversationId);
-
+		
 		// Update URL without full page reload
 		router.push(`/creator/dashboard/messages?conversation=${conversationId}`, {
 			scroll: false,
@@ -790,7 +794,9 @@ const CreatorChatPage = () => {
 						{/* Welcome message for empty conversations */}
 						{messages.length === 0 && !loading && selectedUser && (
 							<div className="flex justify-center items-center text-center bg-orange-50 text-orange-800 px-4 py-3 rounded-lg text-base">
-								Start a conversation with {selectedUser?.name}
+								{selectedUser.lastMessage && selectedUser.lastMessage !== "Start a conversation"
+									? "Loading conversation..."
+									: `Start a conversation with ${selectedUser?.name}`}
 							</div>
 						)}
 
