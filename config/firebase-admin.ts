@@ -1,19 +1,39 @@
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
-import serviceAccount from '@/config/social-shake-firebase-adminsdk-a2y0c-7c0a54d036.json';
-import { ServiceAccount } from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
-import { getAuth } from 'firebase-admin/auth';
 import { getStorage } from 'firebase-admin/storage';
+import { getAuth } from 'firebase-admin/auth';
 
+// Enhanced Firebase Admin initialization
 function initializeFirebaseAdmin() {
-  if (getApps().length > 0) return getApps()[0];
+  // Prevent re-initialization
+  if (getApps().length > 0) {
+    return getApps()[0];
+  }
 
-  return initializeApp({
-    credential: cert(serviceAccount as ServiceAccount),
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  });
+  try {
+    const app = initializeApp({
+      credential: cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY
+          ? process.env.FIREBASE_PRIVATE_KEY
+          : undefined
+      }),
+      // Optional: Add storage bucket if needed
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    });
+    console.log('Firebase config:', {
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY ? 'defined' : 'undefined',
+    });
+
+    return app;
+  } catch (error) {
+    console.error('Firebase Admin initialization error:', error);
+    throw error;
+  }
 }
-
 
 // Initialize Firebase Admin app
 const firebaseAdmin = initializeFirebaseAdmin();
