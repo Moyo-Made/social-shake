@@ -3,9 +3,40 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import EmptyContest from "./EmptyContest";
 import { Button } from "@/components/ui/button";
+import { useSocket } from "@/context/SocketContext";
+import { Input } from "@/components/ui/input";
 
 interface UserDashboardProps {
 	userId: string;
+}
+
+// Define the Creators interface properly
+interface Creators {
+	id: string;
+	name: string;
+	avatar: string;
+	username: string;
+	bio: string;
+	totalGMV: number;
+	avgGMVPerVideo: number;
+	pricing: {
+		oneVideo: number;
+		threeVideos: number;
+		fiveVideos: number;
+		bulkVideos: number;
+		bulkVideosNote?: string;
+	};
+	profilePictureUrl: string;
+	contentTypes: string[];
+	country: string;
+	tiktokUrl: string;
+	status: string;
+	dateOfBirth: string;
+	gender: string;
+	ethnicity: string;
+	contentLinks: string[];
+	socialMedia?: Record<string, string>;
+	verifiableIDUrl?: string;
 }
 
 export default function UserDashboard({ userId }: UserDashboardProps) {
@@ -36,32 +67,140 @@ export default function UserDashboard({ userId }: UserDashboardProps) {
 		}>;
 	}
 
-	const creatorMessages = [
-		{
-			id: 1,
-			profileIcon: "/icons/colina.svg",
-			creatorName: "Travis Barker",
-			time: "2 hours ago",
-			message: "I just submitted my entry for the contest!",
-		},
+	interface CreatorMessage {
+		id: string;
+		sender: string;
+		content: string;
+		timestamp: string | Date;
+		senderInfo?: {
+			name: string;
+			avatar: string;
+			username?: string;
+			bio?: string;
+		};
+		conversationId: string;
+		isRead?: boolean;
+	}
 
-		{
-			id: 2,
-			profileIcon: "/icons/colina.svg",
-			creatorName: "Travis Barker",
-			time: "2 hours ago",
-			message: "Hey, when is the payment processing?",
-		},
-		{
-			id: 3,
-			profileIcon: "/icons/colina.svg",
-			creatorName: "Travis Barker",
-			time: "2 hours ago",
-			message: "I just submitted my entry for the contest!",
-		},
-	];
+	const [creatorMessages, setCreatorMessages] = useState<CreatorMessage[]>([]);
+	const [loadingMessages, setLoadingMessages] = useState(true);
+	const [replyText, setReplyText] = useState("");
+	const [activeReply, setActiveReply] = useState<string | null>(null);
+	const { sendMessage: socketSendMessage, socket } = useSocket();
 	const [userData, setUserData] = useState<UserData | null>(null);
-	// const [dateRange, setDateRange] = useState("All Time");
+	// Add the selectedCreator state
+	const [selectedCreator, setSelectedCreator] = useState<Creators | null>(null);
+
+	// function to calculate time ago
+	const timeAgo = (timestamp: string | number | Date) => {
+		if (!timestamp) return "just now";
+
+		const now = new Date();
+		const messageTime = new Date(timestamp);
+		const diffMs = now.getTime() - messageTime.getTime();
+		const diffMins = Math.round(diffMs / 60000);
+		const diffHours = Math.round(diffMs / 3600000);
+		const diffDays = Math.round(diffMs / 86400000);
+
+		if (diffMins < 1) return "just now";
+		if (diffMins < 60)
+			return `${diffMins} ${diffMins === 1 ? "minute" : "minutes"} ago`;
+		if (diffHours < 24)
+			return `${diffHours} ${diffHours === 1 ? "hour" : "hours"} ago`;
+		return `${diffDays} ${diffDays === 1 ? "day" : "days"} ago`;
+	};
+
+	const fetchCreatorMessages = async () => {
+		if (!userId) return;
+
+		try {
+			setLoadingMessages(true);
+			// Fetch creator messages from the new specialized endpoint
+			const response = await fetch(
+				`/api/creator-messages?userId=${userId}&limit=4`
+			);
+
+			if (!response.ok) {
+				throw new Error("Failed to fetch creator messages");
+			}
+
+			const data = await response.json();
+			if (data.messages) {
+				// The new endpoint already returns messages in the desired format
+				setCreatorMessages(data.messages);
+			}
+		} catch (error) {
+			console.error("Error fetching creator messages:", error);
+		} finally {
+			setLoadingMessages(false);
+		}
+	};
+
+	//  function to handle reply
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	const handleSendReply = async (conversationId: string, id: string) => {
+		if (!replyText.trim() || !conversationId || !userId) return;
+
+		try {
+			// Use socket to send message
+			if (socketSendMessage) {
+				socketSendMessage(conversationId, replyText);
+			} else {
+				// Fallback to API if socket not available
+				await fetch("/api/messages", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({
+						conversationId,
+						sender: userId,
+						content: replyText,
+					}),
+				});
+			}
+
+			// Clear reply text and close reply input
+			setReplyText("");
+			setActiveReply(null);
+
+			// Remove the specific message from creatorMessages
+			setCreatorMessages((prevMessages) =>
+				prevMessages.filter(
+					(message) => message.conversationId !== conversationId
+				)
+			);
+		} catch (error) {
+			console.error("Error sending reply:", error);
+		}
+	};
+
+	useEffect(() => {
+		fetchCreatorMessages();
+
+		// Listen for new messages via socket if available
+		if (socket) {
+			const handleNewMessage = (message: CreatorMessage) => {
+				// Only refetch if the message is from someone else (a creator)
+				if (message.sender !== userId) {
+					fetchCreatorMessages();
+				}
+			};
+
+			const handleUnreadCountsUpdate = () => {
+				// Refetch messages when unread counts change
+				fetchCreatorMessages();
+			};
+
+			socket.on("new-message", handleNewMessage);
+			socket.on("unread-counts-update", handleUnreadCountsUpdate);
+
+			return () => {
+				socket.off("new-message", handleNewMessage);
+				socket.off("unread-counts-update", handleUnreadCountsUpdate);
+			};
+		}
+	}, [userId, socket]);
 
 	useEffect(() => {
 		const fetchUserData = async () => {
@@ -111,6 +250,94 @@ export default function UserDashboard({ userId }: UserDashboardProps) {
 			currency: "USD",
 			maximumFractionDigits: 0,
 		}).format(numericAmount);
+	};
+
+	// Fix the handleViewProfile function
+	const handleViewProfile = async (creator: {
+		id: string;
+		name: string;
+		avatar: string;
+		username: string;
+		bio: string;
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		[key: string]: any;
+	}) => {
+		// Create a proper Creators object with required fields
+		const creatorObj: Creators = {
+			id: creator.id,
+			name: creator.name,
+			avatar: creator.avatar,
+			username: creator.username || "",
+			bio: creator.bio || "",
+			totalGMV: 0,
+			avgGMVPerVideo: 0,
+			pricing: {
+				oneVideo: 0,
+				threeVideos: 0,
+				fiveVideos: 0,
+				bulkVideos: 0,
+				bulkVideosNote: "",
+			},
+			profilePictureUrl: "",
+			contentTypes: [],
+			country: "",
+			tiktokUrl: "",
+			status: "",
+			dateOfBirth: "",
+			gender: "",
+			ethnicity: "",
+			contentLinks: [],
+		};
+
+		// Set the initial creator object
+		setSelectedCreator(creatorObj);
+
+		try {
+			// Fetch complete creator details
+			const response = await fetch(
+				`/api/admin/creator-approval?status=approved`
+			);
+			if (!response.ok) throw new Error("Failed to fetch creator details");
+
+			const data = await response.json();
+			// Find the creator with matching ID
+
+			const fullCreatorData = data.creators.find(
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				(c: any) => c.userId === creator.id
+			);
+
+			if (fullCreatorData) {
+				// Update the creator with full details
+				setSelectedCreator((prev) => {
+					if (!prev) return null;
+
+					return {
+						...prev,
+						bio: fullCreatorData.bio || prev.bio,
+						contentTypes: fullCreatorData.contentTypes || [],
+						pricing: {
+							oneVideo: fullCreatorData.pricing?.oneVideo || 0,
+							threeVideos: fullCreatorData.pricing?.threeVideos || 0,
+							fiveVideos: fullCreatorData.pricing?.fiveVideos || 0,
+							bulkVideos: fullCreatorData.pricing?.bulkVideos || 0,
+							bulkVideosNote: fullCreatorData.pricing?.bulkVideosNote || "",
+						},
+						socialMedia: fullCreatorData.socialMedia || {},
+						country: fullCreatorData.country || "",
+						gender: fullCreatorData.gender || "",
+						ethnicity: fullCreatorData.ethnicity || "",
+					};
+				});
+			}
+		} catch (error) {
+			console.error("Error fetching creator details:", error);
+		}
+	};
+
+	// Function to close the creator profile modal
+	const handleCloseProfile = () => {
+		setSelectedCreator(null);
 	};
 
 	return (
@@ -215,7 +442,11 @@ export default function UserDashboard({ userId }: UserDashboardProps) {
 						</thead>
 						<tbody className="bg-white divide-y divide-gray-200">
 							{userData.projects
-								.filter((project) => project.status === "active" || project.status === "accepting pitches")
+								.filter(
+									(project) =>
+										project.status === "active" ||
+										project.status === "accepting pitches"
+								)
 								.slice(0, 5) // Limit to 5 projects for the dashboard
 								.map((project, index) => (
 									<tr key={project.projectId || index}>
@@ -340,66 +571,154 @@ export default function UserDashboard({ userId }: UserDashboardProps) {
 				</div>
 			)}
 
+			{/* Creator Messages Section */}
 			<div>
 				<div className="flex justify-between items-center mb-4">
 					<h2 className="text-2xl font-semibold text-gray-800">
 						Creator Messages
 					</h2>
-					<div className="flex bg-orange-500 w-fit rounded-full px-2 py-1 text-white">
-						<p className="text-sm">4 New</p>
-						<Image
-							src="/icons/star.svg"
-							alt="New Messages"
-							width={10}
-							height={10}
-							className="ml-1"
-						/>
-					</div>
+					{creatorMessages.length > 0 && (
+						<div className="flex bg-orange-500 w-fit rounded-full px-2 py-1 text-white">
+							<p className="text-sm">{creatorMessages.length} New</p>
+							<Image
+								src="/icons/star.svg"
+								alt="New Messages"
+								width={10}
+								height={10}
+								className="ml-1"
+							/>
+						</div>
+					)}
 				</div>
 			</div>
 
 			<div className="mb-12">
-				{creatorMessages.map((message) => (
-					<div
-						key={message.id}
-						className="bg-[#FFF4EE] border border-[#6670854D] rounded-xl px-7 py-6 mb-4"
-					>
-						<div className="flex justify-between mb-4">
-							<div className="flex gap-2">
-								<Image
-									src={message.profileIcon}
-									alt="Profile Icon"
-									width={40}
-									height={40}
-									className="rounded-full"
-								/>
-								<div className="flex flex-col">
-									<p className="text-sm font-medium text-gray-800">
-										{message.creatorName}
-									</p>
-									<p className="text-xs text-orange-500 hover:underline">
-										View profile
-									</p>
-								</div>
-							</div>
-							<p className="text-xs text-gray-800">{message.time}</p>
-						</div>
-
-						<p className="text-sm text-gray-600">{message.message}</p>
-
-						<div className="flex justify-end mt-4">
-							<Button className="bg-orange-500 hover:bg-orange-600 text-white py-1 px-3 rounded-full text-sm">
-								Reply
-								<Image
-									src="/icons/messageIcon.svg"
-									alt="Reply"
-									width={15}
-									height={15}
-								/>
-							</Button>
-						</div>
+				{loadingMessages ? (
+					<div className="flex flex-col justify-center items-center h-32">
+						<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+						<p className="mt-2">Loading messages...</p>
 					</div>
-				))}
+				) : creatorMessages.length === 0 ? (
+					<div className="bg-[#FFF4EE] border border-[#6670854D] rounded-xl px-7 py-6 mb-4 text-center">
+						<p className="text-gray-600">No new messages from creators</p>
+					</div>
+				) : (
+					creatorMessages.map((message) => (
+						<div
+							key={message.id}
+							className="bg-[#FFF4EE] border border-[#6670854D] rounded-xl px-7 py-6 mb-4"
+						>
+							<div className="flex justify-between mb-4">
+								<div className="flex gap-2">
+									<Image
+										src={message.senderInfo?.avatar || "/icons/colina.svg"}
+										alt="Profile Icon"
+										width={40}
+										height={40}
+										className="rounded-full"
+									/>
+									<div className="flex flex-col">
+										<p className="text-sm font-medium text-gray-800">
+											{message.senderInfo?.name || "Unknown Creator"}
+										</p>
+										<button
+											onClick={() =>
+												message.senderInfo &&
+												handleViewProfile({
+													id: message.sender,
+													name: message.senderInfo.name,
+													avatar: message.senderInfo.avatar,
+													username: message.senderInfo.username || "",
+													bio: message.senderInfo.bio || "",
+												})
+											}
+											className="text-xs text-orange-500 hover:underline"
+										>
+											View profile
+										</button>
+									</div>
+								</div>
+								<p className="text-xs text-gray-800">
+									{timeAgo(message.timestamp)}
+								</p>
+							</div>
+
+							<p className="text-sm text-gray-600">{message.content}</p>
+
+							<div className="flex justify-end mt-4">
+								{activeReply === message.id ? (
+									<div className="w-full">
+										<div className="flex gap-2 mt-2 w-full">
+											<Input
+												type="text"
+												value={replyText}
+												onChange={(e) => setReplyText(e.target.value)}
+												className="flex-1 border border-gray-300  rounded-full px-4 py-2 text-sm"
+												placeholder="Type your reply..."
+												onKeyDown={(e) => {
+													if (e.key === "Enter") {
+														handleSendReply(message.conversationId, message.id);
+													}
+												}}
+											/>
+											<Button
+												onClick={() =>
+													handleSendReply(message.conversationId, message.id)
+												}
+												className="bg-orange-500 hover:bg-orange-600 text-white rounded-full"
+												disabled={!replyText.trim()}
+											>
+												Send
+											</Button>
+											<Button
+												onClick={() => {
+													setActiveReply(null);
+													setReplyText("");
+												}}
+												className="bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-full"
+											>
+												Cancel
+											</Button>
+										</div>
+									</div>
+								) : (
+									<div className="flex gap-2">
+										<Button
+											onClick={() => setActiveReply(message.id)}
+											className="bg-orange-500 hover:bg-orange-600 text-white py-1 px-3 rounded-full text-sm flex items-center"
+										>
+											Reply
+											<Image
+												src="/icons/messageIcon.svg"
+												alt="Reply"
+												width={15}
+												height={15}
+												className="-ml-1"
+											/>
+										</Button>
+										<Link
+											href={`/brand/dashboard/messages?conversation=${message.conversationId}`}
+										>
+											<Button className="bg-gray-200 hover:bg-gray-300 text-gray-700 py-1 px-3 rounded-full text-sm">
+												View Chat
+											</Button>
+										</Link>
+									</div>
+								)}
+							</div>
+						</div>
+					))
+				)}
+
+				{creatorMessages.length > 0 && (
+					<div className="flex justify-center mt-4">
+						<Link href="/brand/dashboard/messages">
+							<Button className="bg-transparent hover:bg-gray-100 text-orange-500 border border-orange-500 py-2 px-4 rounded-md">
+								View All Messages
+							</Button>
+						</Link>
+					</div>
+				)}
 			</div>
 
 			<div>
@@ -421,13 +740,135 @@ export default function UserDashboard({ userId }: UserDashboardProps) {
 					</Link>
 
 					<Link
-						href="/brand/dashboard/projects"
+						href="/brand/dashboard/transactions"
 						className="bg-black text-white py-2 px-6 rounded-lg flex items-center justify-center"
 					>
 						Approve Payments +
 					</Link>
 				</div>
 			</div>
+
+			{/* Creator Profile Modal */}
+			{selectedCreator && (
+				<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+					<div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+						<div className="flex justify-between items-center mb-4">
+							<h2 className="text-xl font-semibold">Creator Profile</h2>
+							<button
+								onClick={handleCloseProfile}
+								className="text-gray-500 hover:text-gray-700"
+							>
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									className="h-5 w-5"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+								>
+									<path
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										strokeWidth={2}
+										d="M6 18L18 6M6 6l12 12"
+									/>
+								</svg>
+							</button>
+						</div>
+
+						<div className="flex items-center mb-6">
+							<Image
+								src={selectedCreator.avatar || "/placeholder.jpg"}
+								alt={`${selectedCreator.name}'s profile picture`}
+								width={50}
+								height={50}
+								className="rounded-full mr-4"
+							/>
+							<div>
+								<h3 className="text-base font-medium">
+									{selectedCreator.name}
+								</h3>
+								{selectedCreator.username && (
+									<p className="text-sm text-gray-600">
+										@{selectedCreator.username}
+									</p>
+								)}
+							</div>
+						</div>
+
+						{/* Creator profile content here */}
+						<div className="space-y-4">
+							<div className="border-t pt-4">
+								<h4 className="font-medium text-base mb-2">Creator Bio</h4>
+								<p className="text-gray-700">
+									{selectedCreator.bio || "No bio available."}
+								</p>
+							</div>
+
+							{selectedCreator.contentTypes &&
+								selectedCreator.contentTypes.length > 0 && (
+									<div>
+										<h4 className="font-medium text-base mb-2">
+											Content Types
+										</h4>
+										<div className="flex flex-wrap gap-2">
+											<span className="bg-gray-100 px-3 py-1 rounded-full text-sm">
+												{selectedCreator.contentTypes}
+											</span>
+										</div>
+									</div>
+								)}
+
+							<div>
+								<h4 className="font-medium text-base mb-2">Pricing</h4>
+								<div className="grid grid-cols-4 gap-4">
+									<div className="bg-gray-100 p-3 rounded-lg">
+										<p className="text-sm text-gray-600">One Video</p>
+										<p className="text-base font-bold">
+											${selectedCreator.pricing?.oneVideo || 0}
+										</p>
+									</div>
+									<div className="bg-gray-100 p-3 rounded-lg">
+										<p className="text-sm text-gray-600">Three Videos</p>
+										<p className="text-base font-bold">
+											${selectedCreator.pricing?.threeVideos || 0}
+										</p>
+									</div>
+									<div className="bg-gray-100 p-3 rounded-lg">
+										<p className="text-sm text-gray-600">Five Videos</p>
+										<p className="text-base font-bold">
+											${selectedCreator.pricing?.fiveVideos || 0}
+										</p>
+									</div>
+									<div className="bg-gray-100 p-3 rounded-lg">
+										<p className="text-sm text-gray-600">Bulk Videos</p>
+										<p className="text-base font-bold">
+											${selectedCreator.pricing?.bulkVideos || 0}
+										</p>
+									</div>
+								</div>
+							</div>
+
+							<div className="flex justify-end space-x-3 mt-6">
+								<Button
+									onClick={() => {
+										// Navigate to messages with this creator
+										window.location.href = `/brand/dashboard/messages?creator=${selectedCreator.id}`;
+									}}
+									className="bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-md"
+								>
+									Message Creator
+								</Button>
+								<Button
+									onClick={handleCloseProfile}
+									className="bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 px-4 rounded-md"
+								>
+									Close
+								</Button>
+							</div>
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }

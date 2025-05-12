@@ -19,6 +19,7 @@ export interface Creators {
 	name: string;
 	username: string;
 	bio: string;
+	avatar: string;
 	totalGMV: number;
 	avgGMVPerVideo: number;
 	avgImpressions?: string;

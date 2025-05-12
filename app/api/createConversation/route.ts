@@ -38,7 +38,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create new conversation with unreadCounts
+    // Determine roles based on user IDs
+    // This assumes the creator has a specific ID pattern or is fetched from a creators collection
+    const determineRole = (userId: string) => {
+      // Example logic - you might want to replace this with a more robust method
+      if (userId === creatorId) {
+        return 'creator';
+      }
+      return 'user';
+    };
+
+    // Create new conversation with unreadCounts and roles
     const conversationData = {
       participants: [currentUserId, creatorId],
       participantsInfo: {
@@ -46,11 +56,13 @@ export async function POST(req: NextRequest) {
           name: userData.name,
           avatar: userData.avatar,
           username: userData.username || '',
+          role: determineRole(currentUserId), // Add role
         },
         [creatorId]: {
           name: creatorData.name,
           avatar: creatorData.avatar,
           username: creatorData.username || '',
+          role: determineRole(creatorId), // Add role
         }
       },
       createdAt: new Date(),
