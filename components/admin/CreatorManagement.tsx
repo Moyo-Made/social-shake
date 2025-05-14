@@ -420,7 +420,7 @@ const CreatorManagement: React.FC = () => {
 										{creator.logoUrl ? (
 											<Image
 												className="h-10 w-10 object-cover rounded-full mr-3"
-												src={creator.logoUrl}
+												src={creator.logoUrl }
 												alt={`${creator.creator} logo`}
 												width={40}
 												height={40}

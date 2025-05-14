@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb, adminStorage, adminAuth } from "@/config/firebase-admin";
+import { adminDb, adminStorage } from "@/config/firebase-admin";
 
 export async function POST(request: NextRequest) {
   try {
@@ -148,18 +148,100 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const profileId = searchParams.get("profileId");
-    let userId = searchParams.get("userId");
+    const userId = searchParams.get("userId");
     const email = searchParams.get("email");
+    let tiktokId = searchParams.get("tiktokId");
 
     console.log("Received query for creator profile lookup:", {
       profileId,
       userId,
       email,
+      tiktokId
     });
 
-    // If profileId is provided directly, we can look it up across all users
+    // Handle TikTok provider format in userId (e.g. tiktok:12345)
+    if (userId && userId.includes(':')) {
+      const [provider, providerId] = userId.split(':');
+      console.log(`Detected provider format in userId: ${provider}:${providerId}`);
+      
+      if (provider === 'tiktok') {
+        // Store the extracted TikTok ID
+        tiktokId = providerId;
+        console.log(`Extracted TikTok ID from userId: ${tiktokId}`);
+      }
+    }
+
+    // 1. First try checking for the full userId as it is, including provider prefix
+    if (userId) {
+      console.log(`Checking for creator profile with full userId: ${userId}`);
+      const userIdQuery = await adminDb
+        .collection("creatorProfiles")
+        .where("userId", "==", userId)
+        .limit(1)
+        .get();
+
+      if (!userIdQuery.empty) {
+        const profileData = userIdQuery.docs[0].data();
+        console.log("Found creator profile using full userId:", profileData);
+        return NextResponse.json(profileData);
+      }
+    }
+
+    // 2. Try by TikTok ID if available
+    if (tiktokId) {
+      console.log(`Checking for creator profile with tiktokId: ${tiktokId}`);
+      const tiktokQuery = await adminDb
+        .collection("creatorProfiles")
+        .where("tiktokId", "==", tiktokId)
+        .limit(1)
+        .get();
+
+      if (!tiktokQuery.empty) {
+        const profileData = tiktokQuery.docs[0].data();
+        console.log("Found creator profile using tiktokId:", profileData);
+        return NextResponse.json(profileData);
+      }
+    }
+
+    // 3. If we have a provider prefix and no profile found yet, try more combinations
+    if (userId && userId.includes(':')) {
+      const [provider, providerId] = userId.split(':');
+      
+      // Try the provider ID directly (without prefix)
+      console.log(`Checking for creator profile with providerId: ${providerId}`);
+      const providerIdQuery = await adminDb
+        .collection("creatorProfiles")
+        .where("userId", "==", providerId)
+        .limit(1)
+        .get();
+
+      if (!providerIdQuery.empty) {
+        const profileData = providerIdQuery.docs[0].data();
+        console.log("Found creator profile using providerId as userId:", profileData);
+        return NextResponse.json(profileData);
+      }
+
+      // For TikTok specifically, also try "provider" + "Id" fields
+      if (provider === 'tiktok') {
+        // Try the provider field approach
+        console.log(`Checking with ${provider}Id field (tiktokId): ${providerId}`);
+        const providerFieldQuery = await adminDb
+          .collection("creatorProfiles")
+          .where(`${provider}Id`, "==", providerId)
+          .limit(1)
+          .get();
+
+        if (!providerFieldQuery.empty) {
+          const profileData = providerFieldQuery.docs[0].data();
+          console.log(`Found creator profile using ${provider}Id field:`, profileData);
+          return NextResponse.json(profileData);
+        }
+      }
+    }
+
+    // 4. If profile by ID still not found, try by profileId if provided
     if (profileId) {
-      // First try to find the profile using a query across all users
+      console.log(`Checking for creator profile with profileId: ${profileId}`);
       const profilesQuery = await adminDb
         .collectionGroup("creatorProfiles")
         .where("profileId", "==", profileId)
@@ -168,76 +250,14 @@ export async function GET(request: NextRequest) {
 
       if (!profilesQuery.empty) {
         const profileData = profilesQuery.docs[0].data();
-        console.log("Retrieved creator profile data:", profileData);
+        console.log("Found creator profile using profileId:", profileData);
         return NextResponse.json(profileData);
       }
-
-      console.warn(`No creator profile found for profileId: ${profileId}`);
-      return NextResponse.json(
-        { error: "Creator profile not found" },
-        { status: 404 }
-      );
     }
 
-    // If only userId is provided (no email)
-    if (userId && !email) {
-      // Query the creatorProfiles collection for documents where userId matches
-      const creatorProfilesQuery = await adminDb
-        .collection("creatorProfiles")
-        .where("userId", "==", userId)
-        .limit(1)
-        .get();
-
-      if (!creatorProfilesQuery.empty) {
-        const profileData = creatorProfilesQuery.docs[0].data();
-        console.log("Retrieved creator profile data by userId:", profileData);
-        return NextResponse.json(profileData);
-      }
-
-      console.warn(`No creator profile found for userId: ${userId}`);
-      return NextResponse.json(
-        { error: "Creator profile not found" },
-        { status: 404 }
-      );
-    }
-
-    // If email is provided but no userId, we need to find the associated userId first
-    if (email && !userId) {
-      console.log("Looking up user by email:", email);
-      const userQuery = await adminDb
-        .collection("users")
-        .where("email", "==", email)
-        .limit(1)
-        .get();
-
-      if (userQuery.empty) {
-        // Try Auth system as fallback
-        try {
-          const userRecord = await adminAuth.getUserByEmail(email);
-          userId = userRecord.uid;
-        } catch {
-          console.warn(`No user found for email: ${email}`);
-          return NextResponse.json(
-            { error: "User not found" },
-            { status: 404 }
-          );
-        }
-      } else {
-        userId = userQuery.docs[0].id;
-      }
-    }
-
-    // If we still have no userId at this point, return an error
-    if (!userId) {
-      console.warn("No userId available for creator profile lookup");
-      return NextResponse.json(
-        { error: "UserID or email is required" },
-        { status: 400 }
-      );
-    }
-
-    // If we have both email and userId, try to get the profile by email first
+    // 5. Try by email if available
     if (email) {
+      console.log(`Checking for creator profile with email: ${email}`);
       const creatorRef = adminDb.collection("creatorProfiles").doc(email);
       const docSnap = await creatorRef.get();
       
@@ -247,25 +267,26 @@ export async function GET(request: NextRequest) {
           ...docSnap.data(),
           email: email,
         };
-        console.log("Retrieved creator profile data by email:", profileData);
+        console.log("Found creator profile using email as document ID:", profileData);
+        return NextResponse.json(profileData);
+      }
+
+      // Also try email as a field
+      const emailQuery = await adminDb
+        .collection("creatorProfiles")
+        .where("email", "==", email)
+        .limit(1)
+        .get();
+
+      if (!emailQuery.empty) {
+        const profileData = emailQuery.docs[0].data();
+        console.log("Found creator profile using email field:", profileData);
         return NextResponse.json(profileData);
       }
     }
 
-    // If we couldn't find by email or no email was provided, try by userId
-    const creatorProfilesQuery = await adminDb
-      .collection("creatorProfiles")
-      .where("userId", "==", userId)
-      .limit(1)
-      .get();
-
-    if (!creatorProfilesQuery.empty) {
-      const profileData = creatorProfilesQuery.docs[0].data();
-      console.log("Retrieved creator profile data by userId fallback:", profileData);
-      return NextResponse.json(profileData);
-    }
-
-    console.warn(`No creator profile found for userId: ${userId}`);
+    // If we're here, we couldn't find the profile with any method
+    console.warn("No creator profile found with any of the provided identifiers");
     return NextResponse.json(
       { error: "Creator profile not found" },
       { status: 404 }

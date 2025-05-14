@@ -4,6 +4,7 @@ export interface Creator {
 	userId: string;
 	creator: string;
 	status: string;
+	photoURL: string | null;
 	createdAt: string;
 	logoUrl: string | null;
 	bio: string;
@@ -17,6 +18,7 @@ export interface Creator {
 	};
 	firstName: string;
 	lastName: string;
+	displayName: string;
 	email: string;
 	username: string;
 	contentTypes: string[];
@@ -37,6 +39,8 @@ export interface Creator {
 	totalGMV: number;
 	avgGMVPerVideo: number;
 	avgImpressions: number;
+	tiktokConnected?: boolean;
+	tiktokId?: string;
 }
 
 export interface CreatorProfileData {
@@ -77,4 +81,6 @@ export interface CreatorProfileData {
 	username: string;
 	verifiableIDUrl: string | null;
 	verificationVideoUrl: string | null;
+	tiktokConnected?: boolean;
+	tiktokId?: string;
 }

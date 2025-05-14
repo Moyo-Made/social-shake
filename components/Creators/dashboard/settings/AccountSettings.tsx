@@ -618,7 +618,7 @@ const AccountSettings: React.FC = () => {
 							<Input
 								id="tiktok"
 								name="tiktok"
-								value={formData?.socialMedia.tiktok || ""}
+								value={formData?.socialMedia?.tiktok || ""}
 								onChange={handleInputChange}
 								className="w-full"
 								placeholder="https://www.tiktok.com/@username"

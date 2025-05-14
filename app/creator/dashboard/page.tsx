@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/brand/brandProfile/ProtectedRoute";
 import CreatorContentWrapper from "@/components/Creators/dashboard/CreatorContentWrapper";
 import CreatorDashboard from "@/components/Creators/dashboard/CreatorDashboard";
+import ToastHandler from "@/components/Creators/ToastHandler";
 
 export default function DashboardPage() {
 	const [isLoading, setIsLoading] = useState(true);
@@ -33,7 +34,8 @@ export default function DashboardPage() {
 	}
 
 	return (
-		<CreatorContentWrapper userId={currentUser.uid} pageType="dashboard">
+		<CreatorContentWrapper userId={currentUser.uid} pageType="dashboard"> 
+		<ToastHandler />
 			<div className="p-6">
 				<ProtectedRoute>
 					<CreatorDashboard userId={currentUser.uid} />

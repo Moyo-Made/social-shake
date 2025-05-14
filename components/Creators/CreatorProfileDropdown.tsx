@@ -6,28 +6,93 @@ import Link from "next/link";
 import { ChevronDown, LogOut, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { CreatorProfile, useCreatorProfile } from "@/hooks/useCreatorProfile";
+import { useCreatorProfile } from "@/hooks/useCreatorProfile";
+import { toast } from "sonner";
 
 interface CreatorProfileDropdownProps {
 	dropdownPosition?: "header" | "sidenav";
-	creatorProfile: CreatorProfile;
 }
 
 const CreatorProfileDropdown: React.FC<CreatorProfileDropdownProps> = ({
 	dropdownPosition = "header",
 }) => {
-	// Use the hook with complete profile data access - note we're NOT manually refreshing
+	// Use the hook with complete profile data access
 	const { creatorProfile, loading, error, refreshCreatorProfile } =
 		useCreatorProfile("view");
 
+	// Debug helper - keep this to diagnose connection issues
 	useEffect(() => {
 		console.log("Current creator profile data:", creatorProfile);
 	}, [creatorProfile]);
 
 	const [isOpen, setIsOpen] = useState(false);
 	const dropdownRef = useRef<HTMLDivElement>(null);
-	const { logout } = useAuth();
+	const { logout, currentUser } = useAuth();
 	const router = useRouter();
+	const [localTikTokStatus, setLocalTikTokStatus] = useState<boolean | null>(
+		null
+	);
+
+	// Function to handle connecting to TikTok
+	const handleConnectTikTok = () => {
+		if (!currentUser?.uid) {
+			toast.error("You need to be logged in to connect your TikTok account");
+			return;
+		}
+
+		// Close the dropdown
+		setIsOpen(false);
+
+		// Redirect to the TikTok connect route with the user ID
+		window.location.href = `/api/auth/tiktok/connect?user_id=${currentUser.uid}`;
+	};
+
+	// Function to handle disconnecting TikTok
+	const handleDisconnectTikTok = async () => {
+		if (!currentUser?.uid) {
+			toast.error("You need to be logged in to disconnect your TikTok account");
+			return;
+		}
+
+		try {
+			// Call API endpoint to disconnect TikTok
+			const response = await fetch(`/api/auth/tiktok/disconnect`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ userId: currentUser.uid }),
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Failed to disconnect TikTok account");
+			}
+
+			// Immediately update local state
+			setLocalTikTokStatus(false);
+
+			// Then refresh profile data
+			await refreshCreatorProfile();
+
+			// Refresh creator profile to update UI
+			await refreshCreatorProfile();
+
+			// Show success toast
+			toast.success("TikTok account successfully disconnected");
+
+			// Close dropdown
+			setIsOpen(false);
+		} catch (error) {
+			console.error("Error disconnecting TikTok:", error);
+			toast.error(
+				error instanceof Error
+					? error.message
+					: "Failed to disconnect TikTok account"
+			);
+		}
+	};
 
 	// Function to get creator initials from whatever data is available
 	const getCreatorInitials = () => {
@@ -64,14 +129,27 @@ const CreatorProfileDropdown: React.FC<CreatorProfileDropdownProps> = ({
 
 	// Get display name from available profile data
 	const getDisplayName = () => {
+		// Check for Tiktok profile data first
+		if (creatorProfile?.tiktokUsername) {
+			return String(creatorProfile.tiktokUsername);
+		}
+
 		// First try verification data if available
 		if (creatorProfile?.profileData?.fullName) {
-			return creatorProfile.profileData.fullName as string;
+			return String(creatorProfile.profileData.fullName);
 		}
 
 		// Then check displayUsername
 		if (creatorProfile?.displayUsername) {
-			return creatorProfile.displayUsername;
+			return String(creatorProfile.displayUsername);
+		}
+
+		if (creatorProfile?.username) {
+			return String(creatorProfile.username);
+		}
+
+		if (creatorProfile?.displayName) {
+			return String(creatorProfile.displayName);
 		}
 
 		// Check email as fallback
@@ -79,11 +157,11 @@ const CreatorProfileDropdown: React.FC<CreatorProfileDropdownProps> = ({
 			// Extract username part of email
 			const emailParts = creatorProfile.email.split("@");
 			if (emailParts.length > 0) {
-				return emailParts[0];
+				return String(emailParts[0]);
 			}
 		}
 
-		return "Complete Your Profile";
+		return "Complete Your Profile" as string;
 	};
 
 	// Handle click outside to close dropdown
@@ -168,7 +246,10 @@ const CreatorProfileDropdown: React.FC<CreatorProfileDropdownProps> = ({
 	const getProfilePictureUrl = () => {
 		if (!creatorProfile) return null;
 
-		// First try the standard profile picture URL - this is set from either source in the hook
+		// First try the Tiktok profile picture if available
+		if (creatorProfile.tiktokAvatarUrl) {
+			return creatorProfile.tiktokAvatarUrl as string;
+		}
 
 		// Then check for logoUrl which is used in AccountSettings
 		if (creatorProfile.logoUrl) {
@@ -191,6 +272,41 @@ const CreatorProfileDropdown: React.FC<CreatorProfileDropdownProps> = ({
 
 		return null;
 	};
+
+	// Improved TikTok connection status check - checks multiple possible locations
+	const hasTikTokConnected = () => {
+		// If no profile data at all, definitely not connected
+		if (!creatorProfile) return false;
+
+		// Most reliable approach: check if we have explicit false values
+		if (creatorProfile.tiktokConnected === false) return false;
+		if (creatorProfile.profileData?.tiktokConnected === false) return false;
+
+		// Only consider connected if we have BOTH an explicit connected flag AND TikTok data
+		const hasExplicitFlag =
+			creatorProfile.tiktokConnected === true ||
+			creatorProfile.profileData?.tiktokConnected === true;
+
+		const hasTikTokData =
+			Boolean(creatorProfile.tiktokId) &&
+			Boolean(creatorProfile.tiktokUsername);
+
+		return hasExplicitFlag && hasTikTokData;
+	};
+
+	useEffect(() => {
+		if (localTikTokStatus === null && creatorProfile) {
+			// Initialize local state from fetched data
+			setLocalTikTokStatus(hasTikTokConnected());
+		}
+	}, [creatorProfile]);
+
+	// Run a profile refresh on mount and when the dropdown is opened
+	// This ensures we always have the latest connection status
+	useEffect(() => {
+		refreshCreatorProfile();
+	}, []);
+
 	if (error) {
 		return (
 			<div className="text-red-500 text-sm flex items-center gap-2">
@@ -207,6 +323,10 @@ const CreatorProfileDropdown: React.FC<CreatorProfileDropdownProps> = ({
 
 	const profilePicture = getProfilePictureUrl();
 	const verificationStatus = getVerificationStatusInfo();
+	const isTikTokConnected = hasTikTokConnected();
+
+	// Debug indicator for TikTok connection status
+	console.log("TikTok connected status:", isTikTokConnected);
 
 	return (
 		<div className="relative" ref={dropdownRef}>
@@ -320,6 +440,56 @@ const CreatorProfileDropdown: React.FC<CreatorProfileDropdownProps> = ({
 					</div>
 
 					<div className="py-1">
+						{/* TikTok Connection Button */}
+						{isTikTokConnected ? (
+							<div className="flex flex-col px-4 py-2">
+								<div
+									className={`flex items-center text-sm ${
+										dropdownPosition === "header"
+											? "text-green-600"
+											: "text-green-400"
+									}`}
+								>
+									<Image
+										src="/icons/tiktok.svg"
+										alt="Tiktok"
+										width={10}
+										height={10}
+										className="mr-2 h-4 w-4"
+									/>
+									TikTok Connected
+								</div>
+								<button
+									onClick={handleDisconnectTikTok}
+									className={`text-start ml-6 text-xs mt-1 ${
+										dropdownPosition === "header"
+											? "text-red-500 hover:text-red-700"
+											: "text-red-400 hover:text-red-300"
+									}`}
+								>
+									Disconnect account
+								</button>
+							</div>
+						) : (
+							<button
+								onClick={handleConnectTikTok}
+								className={`flex items-center w-full text-left px-4 py-2 text-sm ${
+									dropdownPosition === "header"
+										? "text-blue-600 hover:bg-gray-100"
+										: "text-blue-400 hover:bg-gray-700"
+								}`}
+							>
+								<Image
+										src="/icons/tiktok.svg"
+										alt="Tiktok"
+										width={10}
+										height={10}
+										className="mr-2 h-4 w-4"
+									/>
+								Connect to TikTok
+							</button>
+						)}
+
 						<Link
 							href="/creator/dashboard/settings"
 							className={`flex items-center px-4 py-2 text-sm ${

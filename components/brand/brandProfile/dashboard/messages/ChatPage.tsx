@@ -31,6 +31,7 @@ type User = {
 	username?: string;
 	unreadCounts: number;
 	unreadCount?: number;
+	creator: string;
 };
 
 type Message = {
@@ -113,6 +114,7 @@ const ChatPage = () => {
 			// Search in username (if available)
 			(user.username &&
 				user.username.toLowerCase().includes(searchTermLower)) ||
+			(user.creator && user.creator.toLowerCase().includes(searchTermLower)) ||
 			// Search in last message
 			(user.lastMessage &&
 				user.lastMessage.toLowerCase().includes(searchTermLower))

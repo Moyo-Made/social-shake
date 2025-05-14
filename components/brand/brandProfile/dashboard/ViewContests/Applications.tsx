@@ -694,7 +694,7 @@ const Applications: React.FC<ApplicationsProps> = ({ contestData }) => {
 							<div>
 								<p className="text-sm text-[#667085]">Creator Full Name</p>
 								<p className="font-normal text-[#101828]">
-									{creator.firstName} {creator.lastName}
+									{creator.creator}
 								</p>
 							</div>
 
@@ -973,7 +973,7 @@ const Applications: React.FC<ApplicationsProps> = ({ contestData }) => {
 											</div>
 											<div className="truncate">
 												<span className="font-medium text-gray-800">
-													{creator?.username}
+													{creator?.username || creator?.creator}
 												</span>
 											</div>
 										</div>

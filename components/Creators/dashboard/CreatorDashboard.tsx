@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import EmptyContest from "@/components/brand/brandProfile/dashboard/EmptyContest";
 import { OngoingProjectsSection } from "./OngoingProjectsSection";
 import ContestsGrid from "./CreatorContestsGrid";
+import { useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 
 interface UserDashboardProps {
 	userId: string;
@@ -41,6 +43,30 @@ export default function CreatorDashboard({ userId }: UserDashboardProps) {
 	const [loading, setLoading] = useState(true);
 
 	const [userData, setUserData] = useState<UserData | null>(null);
+	const searchParams = useSearchParams();
+
+	// Add this useEffect to detect TikTok connection success
+	useEffect(() => {
+		const tiktokStatus = searchParams.get("tiktok");
+
+		if (tiktokStatus === "success") {
+			// Use the toast to show connection success
+			toast.success("TikTok account successfully connected!");
+
+			// Remove the parameters from URL to prevent multiple refreshes
+			const currentUrl = window.location.pathname;
+			window.history.replaceState({}, "", currentUrl);
+		}
+
+		if (tiktokStatus === "error") {
+			// Use the toast to show connection success
+			toast.success("Failed to connect TikTok account!");
+
+			// Remove the parameters from URL to prevent multiple refreshes
+			const currentUrl = window.location.pathname;
+			window.history.replaceState({}, "", currentUrl);
+		}
+	}, [searchParams]);
 
 	// Fetch User Data
 	useEffect(() => {

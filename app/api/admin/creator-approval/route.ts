@@ -75,7 +75,7 @@ async function handleFileUpload(request: NextRequest) {
 		const fileUrl = `https://storage.googleapis.com/${fileRef.bucket.name}/${fileRef.name}`;
 
 		// Update verification document
-		
+
 		if (!adminDb) {
 			throw new Error("Firebase admin database is not initialized");
 		}
@@ -95,6 +95,7 @@ async function handleFileUpload(request: NextRequest) {
 
 		// Check if user is authorized to update this verification
 		const verificationData = verificationDoc.data();
+
 		if (verificationData?.userId !== userId) {
 			return NextResponse.json(
 				{ error: "Unauthorized to update this verification" },
@@ -150,142 +151,172 @@ async function handleFileUpload(request: NextRequest) {
 export async function POST(request: NextRequest) {
 	// Check content type to determine if it's a JSON request or a FormData request
 	const contentType = request.headers.get("content-type") || "";
-
+  
 	// Handle file upload with FormData
 	if (contentType.includes("multipart/form-data")) {
-		return handleFileUpload(request);
+	  return handleFileUpload(request);
 	}
 	// Handle JSON requests (status updates)
 	else {
-		try {
-			const data = await request.json();
-			const { creatorEmail, userId, verificationId, action, message } = data;
-
-			// Validate required fields
-			if (!userId || !action) {
-				return NextResponse.json(
-					{ error: "User ID and action are required" },
-					{ status: 400 }
-				);
-			}
-
-			if (!creatorEmail || !verificationId) {
-				return NextResponse.json(
-					{ error: "Creator email and verification ID are required" },
-					{ status: 400 }
-				);
-			}
-
-			// Check if action is valid
-			if (!["approve", "reject", "request_info", "suspend"].includes(action)) {
-				return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-			}
-
-			// Get verification document
-			if (!adminDb) {
-				throw new Error("Firebase admin database is not initialized");
-			}
-			
-			const verificationRef = adminDb
-				.collection("creator_verifications")
-				.doc(verificationId);
-			const verificationDoc = await verificationRef.get();
-
-			if (!verificationDoc.exists) {
-				return NextResponse.json(
-					{ error: "Verification record not found" },
-					{ status: 404 }
-				);
-			}
-
-			// Update creator status based on action
-			interface UpdateData {
-				status: string;
-				updatedAt: string;
-				feedbackMessage?: string;
-			}
-
-			const updateData: UpdateData = {
-				status:
-					action === "approve"
-						? "approved"
-						: action === "reject"
-							? "rejected"
-							: action === "request_info"
-								? "info_requested"
-								: action === "suspend"
-									? "suspended"
-									: "pending",
-				updatedAt: new Date().toISOString(),
-			};
-
-			// Add feedback message if provided
-			if (message) {
-				updateData.feedbackMessage = message;
-			}
-
-			// Prepare notification message
-			let notificationMessage = "";
-			switch (action) {
-				case "approve":
-					notificationMessage =
-						"Your creator profile has been approved! You can now create content.";
-					break;
-				case "reject":
-					notificationMessage = `Your creator profile has been rejected. Reason: ${message || "Your profile does not meet our requirements."}`;
-					break;
-				case "request_info":
-					notificationMessage = `We need more information about your creator profile: ${message || "Please provide additional information."}`;
-					break;
-				case "suspend":
-					notificationMessage = `Your creator account has been suspended. Reason: ${message || "Your account has been suspended."}`;
-					break;
-			}
-
-			// Update verification document
-			await verificationRef.update(
-				updateData as FirebaseFirestore.UpdateData<typeof updateData>
-			);
-
-			if (!adminDb) {
-				throw new Error("Firebase admin database is not initialized");
-			}
+	  try {
+		const data = await request.json();
+		const { creatorEmail, userId, verificationId, action, message } = data;
+  
+		// Validate required fields
+		if (!userId || !action) {
+		  return NextResponse.json(
+			{ error: "User ID and action are required" },
+			{ status: 400 }
+		  );
+		}
+  
+		if (!verificationId) {
+		  return NextResponse.json(
+			{ error: "Creator verification ID is required" },
+			{ status: 400 }
+		  );
+		}
+  
+		// Check if action is valid
+		if (!["approve", "reject", "request_info", "suspend"].includes(action)) {
+		  return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+		}
+  
+		// Get verification document
+		if (!adminDb) {
+		  throw new Error("Firebase admin database is not initialized");
+		}
+  
+		const verificationRef = adminDb
+		  .collection("creator_verifications")
+		  .doc(verificationId);
+		const verificationDoc = await verificationRef.get();
+  
+		if (!verificationDoc.exists) {
+		  return NextResponse.json(
+			{ error: "Verification record not found" },
+			{ status: 404 }
+		  );
+		}
+  
+		const verificationData = verificationDoc.data();
+		// Get the creatorEmail from the verification document if not provided in the request
+		const emailToUse = creatorEmail || verificationData?.profileData?.email || verificationData?.email;
+  
+		// Update creator status based on action
+		interface UpdateData {
+		  status: string;
+		  updatedAt: string;
+		  feedbackMessage?: string;
+		}
+  
+		const updateData: UpdateData = {
+		  status:
+			action === "approve"
+			  ? "approved"
+			  : action === "reject"
+			  ? "rejected"
+			  : action === "request_info"
+			  ? "info_requested"
+			  : action === "suspend"
+			  ? "suspended"
+			  : "pending",
+		  updatedAt: new Date().toISOString(),
+		};
+  
+		// Add feedback message if provided
+		if (message) {
+		  updateData.feedbackMessage = message;
+		}
+  
+		// Prepare notification message
+		let notificationMessage = "";
+		switch (action) {
+		  case "approve":
+			notificationMessage =
+			  "Your creator profile has been approved! You can now create content.";
+			break;
+		  case "reject":
+			notificationMessage = `Your creator profile has been rejected. Reason: ${message || "Your profile does not meet our requirements."}`;
+			break;
+		  case "request_info":
+			notificationMessage = `We need more information about your creator profile: ${message || "Please provide additional information."}`;
+			break;
+		  case "suspend":
+			notificationMessage = `Your creator account has been suspended. Reason: ${message || "Your account has been suspended."}`;
+			break;
+		}
+  
+		// Update verification document
+		await verificationRef.update(
+		  updateData as FirebaseFirestore.UpdateData<typeof updateData>
+		);
+  
+		// Update creator profile only if we have a valid email
+		if (emailToUse && emailToUse.trim() !== "") {
+		  try {
 			const creatorProfileRef = adminDb
-				.collection("creatorProfiles")
-				.doc(creatorEmail);
-			await creatorProfileRef.update({
+			  .collection("creatorProfiles")
+			  .doc(emailToUse);
+			
+			// Check if profile exists before updating
+			const profileDoc = await creatorProfileRef.get();
+			if (profileDoc.exists) {
+			  await creatorProfileRef.update({
 				verificationStatus: updateData.status,
 				updatedAt: updateData.updatedAt,
-			});
-
-			// Create notification for the creator
-			if (!adminDb) {
-				throw new Error("Firebase admin database is not initialized");
+			  });
+			} else {
+			  console.log(
+				`Creator profile for ${emailToUse} does not exist, skipping update`
+			  );
 			}
+		  } catch (profileError) {
+			console.error(
+			  `Error updating creator profile for ${emailToUse}:`,
+			  profileError
+			);
+			// Continue execution even if profile update fails
+		  }
+  
+		  // Create notification for the creator
+		  try {
 			await adminDb.collection("notifications").add({
-				recipientEmail: creatorEmail,
-				message: notificationMessage,
-				status: "unread",
-				type: "status_update",
-				createdAt: new Date().toISOString(),
-				relatedTo: "creator_profile",
+			  recipientEmail: emailToUse,
+			  message: notificationMessage,
+			  status: "unread",
+			  type: "status_update",
+			  createdAt: new Date().toISOString(),
+			  relatedTo: "creator_profile",
 			});
-
-			return NextResponse.json({
-				success: true,
-				message: `Creator profile successfully ${action}d`,
-				data: { creatorEmail, action, updatedStatus: updateData.status },
-			});
-		} catch (error) {
-			console.error("Error in creator approval process:", error);
-			const errorMessage =
-				error instanceof Error
-					? error.message
-					: "Failed to process creator approval";
-			return NextResponse.json({ error: errorMessage }, { status: 500 });
+		  } catch (notificationError) {
+			console.error(
+			  `Error creating notification for ${emailToUse}:`,
+			  notificationError
+			);
+			// Continue execution even if notification creation fails
+		  }
+		} else {
+		  console.log(
+			"No valid creator email found, skipping profile update and notification"
+		  );
 		}
+  
+		return NextResponse.json({
+		  success: true,
+		  message: `Creator profile successfully ${action}d`,
+		  data: { creatorEmail: emailToUse, action, updatedStatus: updateData.status },
+		});
+	  } catch (error) {
+		console.error("Error in creator approval process:", error);
+		const errorMessage =
+		  error instanceof Error
+			? error.message
+			: "Failed to process creator approval";
+		return NextResponse.json({ error: errorMessage }, { status: 500 });
+	  }
 	}
-}
+  }
 
 /**
  * GET handler to fetch creator data with proper file URLs and consolidated information
@@ -434,13 +465,6 @@ export async function GET(request: NextRequest) {
 				.orderBy("createdAt", "desc");
 		}
 
-		if (userId) {
-			query = adminDb
-				.collection("creator_verifications")
-				.where("userId", "==", userId)
-				.orderBy("createdAt", "desc");
-		}
-
 		// Execute the query without pagination to get all matching documents
 		const verificationSnapshot = await query.get();
 
@@ -454,6 +478,42 @@ export async function GET(request: NextRequest) {
 					pages: 0,
 				},
 			});
+		}
+
+		// Filter by userId if specified (with multiple format variations)
+		let filteredDocs = verificationSnapshot.docs;
+		if (userId) {
+			const decodedUserId = decodeURIComponent(userId);
+			const normalizedUserId = decodedUserId.replace(/%3A/g, ":");
+
+			// Create variations of the userId to check against
+			const userIdVariations = [
+				userId, // Original as provided
+				decodedUserId, // URL decoded version
+				normalizedUserId, // With %3A replaced by :
+				encodeURIComponent(userId), // Re-encoded version
+				userId.replace(/:/g, "%3A"), // Replace : with %3A
+			];
+
+			// Filter documents that match any of the userId variations
+			filteredDocs = verificationSnapshot.docs.filter((doc) => {
+				const docUserId = doc.data().userId;
+				return userIdVariations.some(
+					(idVariation) => docUserId === idVariation
+				);
+			});
+
+			// Log diagnostic info if no matches found
+			if (filteredDocs.length === 0) {
+				console.log(
+					"No matches found. Searched for these userId variations:",
+					userIdVariations
+				);
+				console.log(
+					"Available userIds in database:",
+					verificationSnapshot.docs.map((doc) => doc.data().userId)
+				);
+			}
 		}
 
 		// Group verification documents by userId (or email) to consolidate duplicates
@@ -490,6 +550,7 @@ export async function GET(request: NextRequest) {
 			async ({ doc, verificationData, userId, email }) => {
 				// Attempt to fetch matching creator profile
 				let creatorProfileData = null;
+				let userData = null;
 
 				if (email) {
 					if (!adminDb) {
@@ -511,6 +572,13 @@ export async function GET(request: NextRequest) {
 						);
 					}
 				} else if (userId) {
+					// Get user data to access displayName
+					const userDoc = await adminDb.collection("users").doc(userId).get();
+
+					if (userDoc.exists) {
+						userData = userDoc.data();
+					}
+
 					// Try to find user email from users collection if needed
 					if (!adminDb) {
 						throw new Error("Firebase admin database is not initialized");
@@ -563,12 +631,12 @@ export async function GET(request: NextRequest) {
 							? `${profileData.firstName} ${profileData.lastName}`
 							: creatorProfileData?.firstName && creatorProfileData?.lastName
 								? `${creatorProfileData.firstName} ${creatorProfileData.lastName}`
-								: "Unknown Creator",
+								: userData?.displayName || "Unknown Creator",
 					status: verificationData.status,
 					createdAt:
 						verificationData.createdAt?.toDate?.() ||
 						verificationData.createdAt,
-						logoUrl:
+					logoUrl:
 						profileData.logoUrl ||
 						verificationData.profileData?.logoUrl ||
 						verificationData.logoUrl ||

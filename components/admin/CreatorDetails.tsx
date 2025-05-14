@@ -8,6 +8,7 @@ import { useParams } from "next/navigation";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Creator } from "@/types/creators";
+import { useCreatorProfile } from "@/hooks/useCreatorProfile";
 
 const CreatorDetailsPage: React.FC = () => {
 	const params = useParams();
@@ -22,16 +23,70 @@ const CreatorDetailsPage: React.FC = () => {
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [actionType, setActionType] = useState<string>("");
 	const [actionMessage, setActionMessage] = useState<string>("");
+	const { creatorProfile } = useCreatorProfile();
+
+	// 1. Add a function to get profile picture similar to CreatorProfileDropdown's getProfilePictureUrl
+	const getProfilePictureUrl = () => {
+		if (!creator) return null;
+
+		// First try the Tiktok profile picture if available
+		if (creator.photoURL) {
+			return creator.photoURL;
+		}
+
+		// Check for logoUrl which is already being used
+		if (creator.logoUrl) {
+			return creator.logoUrl;
+		}
+
+		return null;
+	};
+
+	// 2. Add a function to get display name similar to CreatorProfileDropdown's getDisplayName
+	const getDisplayName = () => {
+		if (!creator) return "";
+
+		// Check the creator name field which is already being used
+		if (creator.creator) {
+			return String(creator.creator);
+		}
+
+		// Try username
+		if (creator.username) {
+			return String(creator.username);
+		}
+
+		// Check displayName field
+		if (creator.displayName) {
+			return String(creator.displayName);
+		}
+
+		// Email as fallback
+		if (creator.email) {
+			const emailParts = creator.email.split("@");
+			if (emailParts.length > 0) {
+				return String(emailParts[0]);
+			}
+		}
+
+		return "Creator";
+	};
+
+	const profilePicture = getProfilePictureUrl();
 
 	// Fetch creator details
+	// Fixed useEffect code for fetchCreatorDetails
 	useEffect(() => {
 		// When fetching creator details, find the specific creator by userId
 		const fetchCreatorDetails = async () => {
 			try {
 				setLoading(true);
 
+				// We'll use the raw userId from params to make the API call
+				const encodedUserId = encodeURIComponent(userId);
+
 				const response = await fetch(
-					`/api/admin/creator-approval?userId=${userId}`
+					`/api/admin/creator-approval?userId=${encodedUserId}`
 				);
 
 				if (!response.ok) {
@@ -42,7 +97,7 @@ const CreatorDetailsPage: React.FC = () => {
 
 				// Check if creators array exists and contains at least one creator
 				if (data.creators && data.creators.length > 0) {
-					// Find the creator with matching userId
+					// Find the creator by comparing userId directly without additional processing
 					const foundCreator = data.creators.find(
 						(c: { userId: string }) => c.userId === userId
 					);
@@ -50,7 +105,22 @@ const CreatorDetailsPage: React.FC = () => {
 					if (foundCreator) {
 						setCreator(foundCreator);
 					} else {
-						setError("Creator not found with the specified userId");
+						// If no exact match, try comparing normalized userId values
+						const normalizedUserId = userId.replace(/%3A/g, ":");
+						const foundByNormalized = data.creators.find(
+							(c: { userId: string }) => c.userId === normalizedUserId
+						);
+
+						if (foundByNormalized) {
+							setCreator(foundByNormalized);
+						} else {
+							console.error("User ID mismatch. Looking for:", userId);
+							console.error(
+								"Available user IDs:",
+								data.creators.map((c: { userId: string }) => c.userId)
+							);
+							setError("Creator not found with the specified userId");
+						}
 					}
 				} else {
 					setError("No creators found");
@@ -78,7 +148,6 @@ const CreatorDetailsPage: React.FC = () => {
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
-					creatorEmail: creator.email,
 					userId: creator.userId,
 					verificationId: creator.verificationId,
 					action: actionType,
@@ -305,10 +374,10 @@ const CreatorDetailsPage: React.FC = () => {
 				{/* Creator header with avatar, name, and actions */}
 				<div className="p-6 flex flex-col md:flex-row justify-between items-start md:items-center rounded-xl border border-[#6670854D] space-x-52">
 					<div className="flex items-center mb-4 md:mb-0">
-						{creator.logoUrl ? (
+						{profilePicture ? (
 							<Image
-								src={creator.logoUrl}
-								alt={`${creator.creator} profile`}
+								src={profilePicture}
+								alt={`${getDisplayName()} profile`}
 								width={100}
 								height={100}
 								className="w-24 h-24 object-cover rounded-full mr-6"
@@ -316,9 +385,7 @@ const CreatorDetailsPage: React.FC = () => {
 						) : (
 							<div className="w-32 h-32 bg-gradient-to-br from-orange-400 to-pink-500 rounded-full flex items-center justify-center mr-6">
 								<span className="text-white text-4xl font-bold">
-									{creator.creator
-										? creator.creator.substring(0, 2).toUpperCase()
-										: ""}
+									{getDisplayName().substring(0, 2).toUpperCase()}
 								</span>
 							</div>
 						)}
@@ -403,7 +470,9 @@ const CreatorDetailsPage: React.FC = () => {
 						<div className="grid grid-cols-1 md:grid-cols-3 gap-y-6 gap-x-8">
 							<div>
 								<p className="text-gray-500 mb-1">First Name</p>
-								<p className="text-black">{creator.firstName}</p>
+								<p className="text-black">
+									{creator.firstName || creator.creator}
+								</p>
 							</div>
 
 							<div>
@@ -413,7 +482,9 @@ const CreatorDetailsPage: React.FC = () => {
 
 							<div>
 								<p className="text-gray-500 mb-1">Username</p>
-								<p className="text-black">@{creator.username}</p>
+								<p className="text-black">
+									@{creator.username || creatorProfile?.displayUsername}{" "}
+								</p>
 							</div>
 
 							<div className="md:col-span-3">

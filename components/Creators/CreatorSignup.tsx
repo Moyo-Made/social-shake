@@ -76,6 +76,7 @@ const CreatorSignup = () => {
 						</div>
 					</CardHeader>
 					<CardContent className="space-y-3">
+			
 						<Button className="w-full bg-[#FD5C02] hover:bg-orange-600 text-white text-base md:text-[17px] py-5 font-normal">
 							<Link
 								href="/creator/create-account"
