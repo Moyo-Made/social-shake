@@ -1,13 +1,14 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export interface Creator {
 	id: string;
 	verificationId: string;
 	userId: string;
 	creator: string;
 	status: string;
-	photoURL: string | null;
+	photoURL?: string | null;
 	createdAt: string;
 	logoUrl: string | null;
-	bio: string;
+	bio: string | null;
 	socialMedia: {
 		instagram?: string;
 		twitter?: string;
@@ -16,17 +17,17 @@ export interface Creator {
 		tiktok?: string;
 		[key: string]: string | undefined;
 	};
-	firstName: string;
-	lastName: string;
-	displayName: string;
-	email: string;
-	username: string;
-	contentTypes: string[];
-	contentLinks: string[];
-	country: string;
-	gender: string;
+	firstName: string | null;
+	lastName: string | null;
+	displayName?: string;
+	email: string | null;
+	username: string | null;
+	contentTypes: string[] | null;
+	contentLinks: string[] | null;
+	country: string | null;
+	gender: string | null;
 	ethnicity: string | null;
-	dateOfBirth: string;
+	dateOfBirth: string ;
 	verifiableIDUrl: string | null;
 	verificationVideoUrl: string | null;
 	pricing: {
@@ -36,11 +37,101 @@ export interface Creator {
 		bulkVideos: number;
 		bulkVideosNote?: string;
 	};
-	totalGMV: number;
-	avgGMVPerVideo: number;
-	avgImpressions: number;
-	tiktokConnected?: boolean;
-	tiktokId?: string;
+	
+	// TikTok data from the tiktokData object
+	tiktokData?: {
+		tiktokHandle?: string | null;
+		tiktokFollowers?: number | null;
+		tiktokEngagementRate?: number | null;
+		tiktokContentCategory?: string | null;
+		tiktokAverageViews?: number | null;
+	};
+	
+	// TikTok metrics object
+	tiktokMetrics?: {
+		followers: { 
+			count: number; 
+			insights: any | null 
+		};
+		videos: { 
+			count: number; 
+			recentVideos: any[] 
+		};
+		engagement?: {
+			rate?: number;
+			averageLikes?: number;
+			averageComments?: number;
+			averageShares?: number;
+			averageViews?: number;
+		};
+		views?: number;
+		likes?: number;
+		comments?: number;
+		shares?: number;
+	};
+	
+	// Analytics fields
+	totalGMV?: number;
+	avgGMVPerVideo?: number;
+	avgImpressions?: number;
+	
+	// Additional fields from the response
+	profileLinks?: any | null;
+	brandCollaborations?: any | null;
+	demographics?: any | null;
+	specialties?: any | null;
+	languages?: any | null;
+	preferredContactMethod?: string | null;
+	availability?: any | null;
+	portfolioItems?: any[] | null;
+	businessInformation?: any | null;
+	achievements?: any | null;
+	
+	// Full creator profile data
+	creatorProfileData?: {
+		createdAt: string;
+		firstName: string;
+		lastName: string;
+		displayUsername: string;
+		userType: string;
+		userId: string;
+		email: string;
+		username: string;
+		tiktokConnected?: boolean;
+		tiktokFollowerCount?: number;
+		tiktokUsername?: string;
+		tiktokDisplayName?: string;
+		tiktokId?: string;
+		tiktokProfileLink?: string;
+		tiktokEngagementRate?: number;
+		tiktokAvatarUrl?: string;
+		tiktokMetrics?: {
+			followers: {
+				count: number;
+				insights: any | null;
+			};
+			videos: {
+				count: number;
+				recentVideos: any[];
+			};
+			engagement: {
+				rate: number;
+				averageLikes: number;
+				averageComments: number;
+				averageShares: number;
+				averageViews: number;
+			};
+			views: number;
+			likes: number;
+			comments: number;
+			shares: number;
+		};
+		updatedAt: {
+			_seconds: number;
+			_nanoseconds: number;
+		} | string;
+		[key: string]: any; // To allow for any additional fields in creatorProfileData
+	};
 }
 
 export interface CreatorProfileData {

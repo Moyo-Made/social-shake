@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { User } from "@/types/user";
 
 export interface CreatorProfile {
 	displayUsername?: string;
@@ -28,6 +29,29 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 	const [error, setError] = useState<string | null>(null);
 	const [mode, setMode] = useState<ProfileMode>(initialMode);
 
+	const constructProfileApiUrl = (
+		currentUser: User | null,
+		timestamp: number
+	) => {
+		// Start with the base URL
+		let profileApiUrl = `/api/creator-profile?_t=${timestamp}`;
+
+		// Add userId if available
+		if (currentUser?.uid) {
+			profileApiUrl += `&userId=${currentUser.uid}`;
+		}
+
+		// Add email if available
+		if (currentUser?.email) {
+			profileApiUrl += `&email=${encodeURIComponent(currentUser.email)}`;
+		}
+
+		return profileApiUrl;
+	};
+
+	const timestamp = Date.now(); // Current timestamp to prevent caching
+	const profileApiUrl = constructProfileApiUrl(currentUser, timestamp);
+
 	const fetchCreatorProfile = async () => {
 		if (!currentUser?.uid) {
 			setLoading(false);
@@ -40,8 +64,6 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 		try {
 			// First fetch basic profile data
 			// Add timestamp to prevent caching
-			const timestamp = new Date().getTime();
-			const profileApiUrl = `/api/creator-profile?userId=${currentUser.uid}&_t=${timestamp}`;
 			const profileResponse = await fetch(profileApiUrl);
 
 			if (!profileResponse.ok) {

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -39,6 +40,7 @@ export interface Creators {
 		facebook: string;
 		youtube: string;
 	};
+
 	tiktokUrl: string;
 	status: string;
 	dateOfBirth: string;
@@ -47,6 +49,52 @@ export interface Creators {
 	contentLinks: string[];
 	verificationVideoUrl?: string;
 	verifiableIDUrl?: string;
+	creatorProfileData?: {
+		createdAt: string;
+		firstName: string;
+		lastName: string;
+		displayUsername: string;
+		userType: string;
+		userId: string;
+		email: string;
+		username: string;
+		tiktokConnected?: boolean;
+		tiktokFollowerCount?: number;
+		tiktokUsername?: string;
+		tiktokDisplayName?: string;
+		tiktokId?: string;
+		tiktokProfileLink?: string;
+		tiktokEngagementRate?: number;
+		tiktokAvatarUrl?: string;
+		tiktokMetrics?: {
+			followers: {
+				count: number;
+				insights: any | null;
+			};
+			videos: {
+				count: number;
+				recentVideos: any[];
+			};
+			engagement: {
+				rate: number;
+				averageLikes: number;
+				averageComments: number;
+				averageShares: number;
+				averageViews: number;
+			};
+			views: number;
+			likes: number;
+			comments: number;
+			shares: number;
+		};
+		updatedAt:
+			| {
+					_seconds: number;
+					_nanoseconds: number;
+			  }
+			| string;
+		[key: string]: any; // To allow for any additional fields in creatorProfileData
+	};
 }
 
 const defaultProfileImg = "";
@@ -54,7 +102,7 @@ const defaultProfileImg = "";
 const CreatorMarketplace = () => {
 	const router = useRouter();
 	const pathname = usePathname();
-	const {currentUser} = useAuth();
+	const { currentUser } = useAuth();
 
 	const isSavedCreatorsPage = pathname === "/brand/dashboard/creators/saved";
 
@@ -93,6 +141,7 @@ const CreatorMarketplace = () => {
 						bio?: string;
 						totalGMV?: number;
 						avgGMVPerVideo?: number;
+
 						pricing: {
 							oneVideo?: number;
 							threeVideos?: number;
@@ -113,6 +162,10 @@ const CreatorMarketplace = () => {
 						contentLinks?: string[];
 						verificationVideoUrl?: string;
 						verifiableIDUrl?: string;
+						creatorProfileData?: {
+							tiktokAvatarUrl?: string;
+							tiktokDisplayName?: string;
+						};
 					}) => ({
 						id: creator.userId,
 						name: `${creator.firstName || ""} ${creator.lastName || ""}`.trim(),
@@ -129,6 +182,12 @@ const CreatorMarketplace = () => {
 							bulkVideosNote: creator.pricing?.bulkVideosNote || "",
 						},
 						profilePictureUrl: creator.logoUrl || defaultProfileImg,
+						creatorProfileData: {
+							tiktokAvatarUrl:
+								creator.creatorProfileData?.tiktokAvatarUrl || "",
+							tiktokDisplayName:
+								creator.creatorProfileData?.tiktokDisplayName || "",
+						},
 						contentTypes: creator.contentTypes || [],
 						country: creator.country || "",
 						socialMedia: creator.socialMedia || {
@@ -203,48 +262,49 @@ const CreatorMarketplace = () => {
 
 	const handleSendMessage = async (creator: Creators) => {
 		if (!currentUser) {
-		  alert("You need to be logged in to send messages");
-		  return;
+			alert("You need to be logged in to send messages");
+			return;
 		}
-		
+
 		try {
-		  // Show loading indicator or disable button here if needed
-		  
-		  const response = await fetch('/api/createConversation', {
-			method: 'POST',
-			headers: {
-			  'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({
-			  currentUserId: currentUser.uid,
-			  creatorId: creator.id,
-			  userData: {
-				name: currentUser.displayName || "User",
-				avatar: currentUser.photoURL || "/icons/default-avatar.svg",
-				username: currentUser.email?.split('@')[0] || "",
-			  },
-			  creatorData: {
-				name: creator.name,
-				avatar: creator.profilePictureUrl,
-				username: creator.username
-			  }
-			}),
-		  });
-		  
-		  const data = await response.json();
-		  
-		  if (!response.ok) {
-			throw new Error(data.error || 'Failed to create conversation');
-		  }
-		  
-		  // Navigate to chat page with this conversation
-		  router.push(`/brand/dashboard/messages?conversation=${data.conversationId}`);
+			// Show loading indicator or disable button here if needed
+
+			const response = await fetch("/api/createConversation", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					currentUserId: currentUser.uid,
+					creatorId: creator.id,
+					userData: {
+						name: currentUser.displayName || "User",
+						avatar: currentUser.photoURL || "/icons/default-avatar.svg",
+						username: currentUser.email?.split("@")[0] || "",
+					},
+					creatorData: {
+						name: creator.name,
+						avatar: creator.profilePictureUrl,
+						username: creator.username,
+					},
+				}),
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Failed to create conversation");
+			}
+
+			// Navigate to chat page with this conversation
+			router.push(
+				`/brand/dashboard/messages?conversation=${data.conversationId}`
+			);
 		} catch (error) {
-		  console.error("Error creating conversation:", error);
-		  alert("Failed to start conversation. Please try again.");
+			console.error("Error creating conversation:", error);
+			alert("Failed to start conversation. Please try again.");
 		}
-	  };
-		  
+	};
 
 	const isCreatorSaved = (creatorId: string): boolean => {
 		return savedCreators.some((creator) => creator.id === creatorId);
@@ -289,7 +349,7 @@ const CreatorMarketplace = () => {
 	const EmptyState = ({ message }: { message: string }) => (
 		<div className="flex flex-col items-center justify-center py-8 md:py-16">
 			<div className="">
-			<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
 			</div>
 			<h3 className="mt-2 text-center">
 				{isLoading ? "Loading Creators..." : message}
@@ -346,13 +406,26 @@ const CreatorMarketplace = () => {
 			<div className="container mx-auto p-3 md:p-4 max-w-4xl">
 				{showAlert && <AlertNotification />}
 
+				<div className="pt-4 md:pt-6 border-t mt-4 md:mt-6">
+					<button
+						onClick={handleBackToList}
+						className="px-3 py-1.5 md:px-4 md:py-2 hover:underline flex items-center text-sm md:text-base"
+					>
+						<ArrowLeft size={16} className="mr-1 md:mr-2" />
+						Back to {isSavedCreatorsPage ? "Saved Creators" : "All Creators"}
+					</button>
+				</div>
+
 				<div className="overflow-hidden">
 					<div className="p-4 md:p-6 bg-white border border-[#FDE5D7] rounded-lg mt-3 md:mt-5">
 						<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
 							<div className="flex flex-col md:flex-row md:items-center gap-4">
 								<div className="h-24 w-24 md:h-32 md:w-32 lg:h-40 lg:w-40 rounded-full overflow-hidden border-4 border-orange-100 mx-auto md:mx-0">
 									<Image
-										src={selectedCreator.profilePictureUrl}
+										src={
+											selectedCreator.creatorProfileData?.tiktokAvatarUrl ||
+											selectedCreator.profilePictureUrl
+										}
 										alt={selectedCreator.name}
 										className="h-full w-full object-cover"
 										width={160}
@@ -361,10 +434,14 @@ const CreatorMarketplace = () => {
 								</div>
 								<div className="text-center md:text-left">
 									<h2 className="text-xl md:text-2xl font-bold">
-										{selectedCreator.name}
+										{selectedCreator.creatorProfileData?.tiktokDisplayName ||
+											selectedCreator.name}
 									</h2>
 									<p className="text-gray-600 text-sm md:text-base">
-										{selectedCreator.contentTypes}
+										{Array.isArray(selectedCreator.contentTypes)
+											? selectedCreator.contentTypes.join(", ")
+											: selectedCreator.contentTypes ||
+												"No content type specified"}
 									</p>
 									<p className="text-gray-500 text-sm md:text-base">
 										@{selectedCreator.username}
@@ -524,16 +601,6 @@ const CreatorMarketplace = () => {
 							</div>
 						</div>
 					</div>
-
-					<div className="pt-4 md:pt-6 border-t mt-4 md:mt-6">
-						<button
-							onClick={handleBackToList}
-							className="px-3 py-1.5 md:px-4 md:py-2 bg-gray-200 rounded-md flex items-center text-sm md:text-base"
-						>
-							<ArrowLeft size={16} className="mr-1 md:mr-2" />
-							Back to {isSavedCreatorsPage ? "Saved Creators" : "All Creators"}
-						</button>
-					</div>
 				</div>
 			</div>
 		);
@@ -565,7 +632,10 @@ const CreatorMarketplace = () => {
 										<div className="flex items-center">
 											<div className="w-12 h-12 md:w-16 md:h-16 rounded-full overflow-hidden mr-3 md:mr-4">
 												<Image
-													src={creator.profilePictureUrl}
+													src={
+														creator.creatorProfileData?.tiktokAvatarUrl ||
+														creator.profilePictureUrl
+													}
 													alt={creator.name}
 													className="w-full h-full object-cover"
 													width={64}
@@ -574,7 +644,8 @@ const CreatorMarketplace = () => {
 											</div>
 											<div>
 												<h3 className="text-base md:text-lg font-bold">
-													{creator.name}
+													{creator.creatorProfileData?.tiktokDisplayName ||
+														creator.name}
 												</h3>
 												<p className="text-orange-500 text-sm md:text-base">
 													@{creator.username}
@@ -791,7 +862,10 @@ const CreatorMarketplace = () => {
 									<div className="flex items-center">
 										<div className="w-12 h-12 md:w-16 md:h-16 rounded-full overflow-hidden mr-3 md:mr-4">
 											<Image
-												src={creator.profilePictureUrl}
+												src={
+													creator.creatorProfileData?.tiktokAvatarUrl ||
+													creator.profilePictureUrl
+												}
 												alt={creator.name}
 												className="w-full h-full object-cover"
 												width={64}
@@ -800,7 +874,8 @@ const CreatorMarketplace = () => {
 										</div>
 										<div>
 											<h3 className="text-base md:text-lg font-bold">
-												{creator.name}
+												{creator.creatorProfileData?.tiktokDisplayName ||
+													creator.name}
 											</h3>
 											<p className="text-orange-500 text-sm md:text-base">
 												@{creator.username}

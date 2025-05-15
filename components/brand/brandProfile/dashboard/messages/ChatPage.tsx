@@ -32,6 +32,10 @@ type User = {
 	unreadCounts: number;
 	unreadCount?: number;
 	creator: string;
+	creatorProfile?: {
+		avatarUrl: string | null;
+		displayName: string | null;
+	};
 };
 
 type Message = {
@@ -54,6 +58,10 @@ type Conversation = {
 	>;
 	lastMessage?: string;
 	updatedAt?: any;
+	creatorProfile?: {
+		avatarUrl: string | null;
+		displayName: string | null;
+	};
 };
 
 const ChatPage = () => {
@@ -652,7 +660,11 @@ const ChatPage = () => {
 								<div className="relative">
 									<Avatar className="">
 										<Image
-											src={user.avatar || "/icons/default-avatar.svg"}
+											src={
+												user.creatorProfile?.avatarUrl ||
+												user.avatar ||
+												"/icons/default-avatar.svg"
+											}
 											alt="Profile"
 											width={60}
 											height={60}
@@ -666,7 +678,7 @@ const ChatPage = () => {
 									<div className="flex justify-between items-center">
 										<div className="flex gap-2">
 											<p className="text-base font-medium truncate">
-												{user.name}
+												{user.creatorProfile?.displayName || user.name}
 											</p>
 											{(user.unreadCount ?? 0) > 0 && (
 												<span className="bg-orange-500 text-white text-xs rounded-full h-4 w-4 mt-1 flex items-center justify-center">
@@ -697,14 +709,20 @@ const ChatPage = () => {
 					<div className="py-3 px-4 border-b flex items-center">
 						<Avatar className="">
 							<Image
-								src={selectedUser.avatar || "/icons/default-avatar.svg"}
+								src={
+									selectedUser.creatorProfile?.avatarUrl ||
+									selectedUser.avatar ||
+									"/icons/default-avatar.svg"
+								}
 								alt="Profile"
 								width={60}
 								height={60}
 							/>
 						</Avatar>
 						<div className="ml-3">
-							<p className="text-base font-medium">{selectedUser.name}</p>
+							<p className="text-base font-medium">
+								{selectedUser.creatorProfile?.displayName || selectedUser.name}
+							</p>
 							{selectedUser.username && (
 								<p className="text-sm text-orange-500">
 									@{selectedUser.username}
@@ -765,6 +783,7 @@ const ChatPage = () => {
 														<Avatar className="h-8 w-8 mt-1 mr-3">
 															<Image
 																src={
+																	selectedUser?.creatorProfile?.avatarUrl ||
 																	selectedUser?.avatar ||
 																	"/icons/default-avatar.svg"
 																}

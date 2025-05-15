@@ -38,10 +38,54 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Get creator profile from database to ensure consistent avatar and display name
+    let creatorProfile = null;
+    try {
+      // First try to query creatorProfiles by userId field
+      const creatorProfilesQuery = await db.collection('creatorProfiles')
+        .where('userId', '==', creatorId)
+        .limit(1)
+        .get();
+      
+      if (!creatorProfilesQuery.empty) {
+        // Found profile by userId
+        const profileData = creatorProfilesQuery.docs[0].data();
+        creatorProfile = {
+          avatarUrl: profileData?.tiktokAvatarUrl || creatorData.avatar,
+          displayName: profileData?.tiktokDisplayName || creatorData.name
+        };
+      } else {
+        // If not found by userId, try to get email from users collection
+        const userDoc = await db.collection('users').doc(creatorId).get();
+        if (userDoc.exists && userDoc.data()?.email) {
+          const creatorEmail = userDoc.data()?.email;
+          
+          // Try to get profile by email
+          const creatorDoc = await db.collection('creatorProfiles').doc(creatorEmail).get();
+          if (creatorDoc.exists) {
+            const profileData = creatorDoc.data();
+            creatorProfile = {
+              avatarUrl: profileData?.tiktokAvatarUrl || creatorData.avatar,
+              displayName: profileData?.tiktokDisplayName || creatorData.name
+            };
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error fetching creator profile for ${creatorId}:`, error);
+      // Use default creatorData if creatorProfile fetch fails
+      creatorProfile = {
+        avatarUrl: creatorData.avatar,
+        displayName: creatorData.name
+      };
+    }
+
+    // Use fetched profile or fallback to provided data
+    const creatorAvatarUrl = creatorProfile?.avatarUrl || creatorData.avatar;
+    const creatorDisplayName = creatorProfile?.displayName || creatorData.name;
+
     // Determine roles based on user IDs
-    // This assumes the creator has a specific ID pattern or is fetched from a creators collection
     const determineRole = (userId: string) => {
-      // Example logic - you might want to replace this with a more robust method
       if (userId === creatorId) {
         return 'creator';
       }
@@ -56,22 +100,28 @@ export async function POST(req: NextRequest) {
           name: userData.name,
           avatar: userData.avatar,
           username: userData.username || '',
-          role: determineRole(currentUserId), // Add role
+          role: determineRole(currentUserId),
         },
         [creatorId]: {
-          name: creatorData.name,
-          avatar: creatorData.avatar,
+          name: creatorDisplayName,
+          avatar: creatorAvatarUrl,
           username: creatorData.username || '',
-          role: determineRole(creatorId), // Add role
+          role: determineRole(creatorId),
+          tiktokAvatarUrl: creatorProfile?.avatarUrl || creatorData.avatar,
+          tiktokDisplayName: creatorProfile?.displayName || creatorData.name
         }
       },
       createdAt: new Date(),
       updatedAt: new Date(),
       lastMessage: "Start a conversation",
       unreadCounts: {
-        // Initialize unread counts to 0
         [currentUserId]: 0,
         [creatorId]: 0
+      },
+      // Store creator profile data at the conversation level for easier retrieval
+      creatorProfile: {
+        avatarUrl: creatorProfile?.avatarUrl || creatorData.avatar,
+        displayName: creatorProfile?.displayName || creatorData.name
       }
     };
 

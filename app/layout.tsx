@@ -50,15 +50,13 @@ export default function RootLayout({
 	return (
 		<html lang="en">
 			<body className={`${inter.variable} ${satoshi.variable}`}>
-  <AuthProvider>
-    <SocketProvider>
-      <NotificationsProvider>
-        {children}
-      </NotificationsProvider>
-    </SocketProvider>
-  </AuthProvider>
-  <Toaster />
-</body>
+				<AuthProvider>
+					<SocketProvider>
+						<NotificationsProvider>{children}</NotificationsProvider>
+					</SocketProvider>
+				</AuthProvider>
+				<Toaster />
+			</body>
 		</html>
 	);
 }

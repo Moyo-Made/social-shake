@@ -8,7 +8,6 @@ import { useParams } from "next/navigation";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Creator } from "@/types/creators";
-import { useCreatorProfile } from "@/hooks/useCreatorProfile";
 
 const CreatorDetailsPage: React.FC = () => {
 	const params = useParams();
@@ -23,15 +22,13 @@ const CreatorDetailsPage: React.FC = () => {
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [actionType, setActionType] = useState<string>("");
 	const [actionMessage, setActionMessage] = useState<string>("");
-	const { creatorProfile } = useCreatorProfile();
 
-	// 1. Add a function to get profile picture similar to CreatorProfileDropdown's getProfilePictureUrl
 	const getProfilePictureUrl = () => {
 		if (!creator) return null;
 
 		// First try the Tiktok profile picture if available
-		if (creator.photoURL) {
-			return creator.photoURL;
+		if (creator.creatorProfileData?.tiktokAvatarUrl) {
+			return creator.creatorProfileData?.tiktokAvatarUrl;
 		}
 
 		// Check for logoUrl which is already being used
@@ -390,8 +387,8 @@ const CreatorDetailsPage: React.FC = () => {
 							</div>
 						)}
 						<div>
-							<h1 className="text-xl font-semibold ">{creator.creator}</h1>
-							<p className=" text-base">@{creator.username}</p>
+							<h1 className="text-xl font-semibold ">{creator.creatorProfileData?.tiktokDisplayName || creator.creator}</h1>
+							<p className=" text-base">@{creator.creatorProfileData?.tiktokUsername || creator.username}</p>
 							<p className="text-gray-600 mt-px text-sm">{creator.email}</p>
 						</div>
 					</div>
@@ -483,7 +480,7 @@ const CreatorDetailsPage: React.FC = () => {
 							<div>
 								<p className="text-gray-500 mb-1">Username</p>
 								<p className="text-black">
-									@{creator.username || creatorProfile?.displayUsername}{" "}
+									@{creator.creatorProfileData?.tiktokUsername || creator.username }{" "}
 								</p>
 							</div>
 
@@ -542,7 +539,7 @@ const CreatorDetailsPage: React.FC = () => {
 
 							<div className="md:col-span-2">
 								<p className="text-gray-500 mb-1">Types of content</p>
-								<p className="text-black">{creator.contentTypes.join(", ")}</p>
+								<p className="text-black">{creator.contentTypes}</p>
 							</div>
 
 							<div className="md:col-span-3">
@@ -599,7 +596,7 @@ const CreatorDetailsPage: React.FC = () => {
 								{/* Links of best tiktok */}
 								<div className="md:col-span-1">
 									<p className="text-gray-500 mb-1 mt-4">Best TikTok Links</p>
-									{creator.contentLinks.map((link, index) => (
+									{creator.contentLinks?.map((link, index) => (
 										<Link
 											key={index}
 											href={link}

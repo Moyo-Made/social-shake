@@ -13,6 +13,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
+import { Creator } from "@/types/creators";
 
 interface ApplicationsProps {
 	contestData: {
@@ -21,40 +22,6 @@ interface ApplicationsProps {
 			whoCanJoin: string;
 		};
 	};
-}
-
-interface Creator {
-	id: string;
-	verificationId: string;
-	userId: string;
-	creator: string;
-	status: string;
-	createdAt: string;
-	logoUrl: string | null;
-	bio: string;
-	socialMedia: {
-		instagram?: string;
-		twitter?: string;
-		facebook?: string;
-		youtube?: string;
-		tiktok?: string;
-		[key: string]: string | undefined;
-	};
-	firstName: string;
-	lastName: string;
-	email: string;
-	username: string;
-	contentTypes: string[];
-	contentLinks: string[];
-	country: string;
-	gender: string;
-	ethnicity: string | null;
-	dateOfBirth: string;
-	verifiableIDUrl: string | null;
-	verificationVideoUrl: string | null;
-	// Extended properties for application display
-	following?: number;
-	gmv?: number;
 }
 
 interface Application {
@@ -93,7 +60,7 @@ const Applications: React.FC<ApplicationsProps> = ({ contestData }) => {
 	const [showRejectModal, setShowRejectModal] = useState(false);
 	const [pendingActionId, setPendingActionId] = useState<string | null>(null);
 	const { currentUser } = useAuth();
-		const router = useRouter();
+	const router = useRouter();
 
 	const handleSendMessage = async (creator: Creator) => {
 		if (!currentUser) {
@@ -636,37 +603,7 @@ const Applications: React.FC<ApplicationsProps> = ({ contestData }) => {
 
 	// If an application is selected, show its details
 	if (selectedApplication) {
-		const creator = selectedApplication.creator || {
-			id: "",
-			userId: "",
-			verificationId: "",
-			creator: "",
-			status: "",
-			createdAt: "",
-			logoUrl: "",
-			bio: "",
-			socialMedia: {
-				instagram: "",
-				twitter: "",
-				facebook: "",
-				youtube: "",
-				tiktok: "@unknown",
-			},
-			firstName: "",
-			lastName: "",
-			email: "Unknown",
-			username: "Unknown Creator",
-			contentTypes: [],
-			contentLinks: [],
-			country: "",
-			gender: "",
-			ethnicity: null,
-			dateOfBirth: "",
-			verifiableIDUrl: null,
-			verificationVideoUrl: null,
-			following: 0,
-			gmv: 0,
-		};
+		const creator = selectedApplication.creator as Creator;
 
 		return (
 			<>
@@ -693,9 +630,7 @@ const Applications: React.FC<ApplicationsProps> = ({ contestData }) => {
 						<div className="space-y-4">
 							<div>
 								<p className="text-sm text-[#667085]">Creator Full Name</p>
-								<p className="font-normal text-[#101828]">
-									{creator.creator}
-								</p>
+								<p className="font-normal text-[#101828]">{creator.creator}</p>
 							</div>
 
 							<div>
@@ -786,14 +721,14 @@ const Applications: React.FC<ApplicationsProps> = ({ contestData }) => {
 									Creator TikTok Following
 								</p>
 								<p className="font-medium text-[#101828] text-sm">
-									{creator.following?.toLocaleString() || "Unknown"}
+									{creator.creatorProfileData?.tiktokMetrics?.followers.count || "Unknown"}
 								</p>
 							</div>
 
 							<div>
 								<p className="text-sm text-[#667085]">Total GMV</p>
 								<p className="font-medium text-[#101828] text-sm">
-									${creator.gmv?.toLocaleString() || "0"}
+									${creator.avgGMVPerVideo?.toLocaleString() || "0"}
 								</p>
 							</div>
 
@@ -964,7 +899,9 @@ const Applications: React.FC<ApplicationsProps> = ({ contestData }) => {
 										<div className="col-span-3 flex items-center">
 											<div className="flex-shrink-0 mr-3">
 												<Image
-													src={creator?.logoUrl || ""}
+													src={
+														creator?.creatorProfileData?.tiktokAvatarUrl || creator?.logoUrl || ""
+													}
 													alt="Creator profile"
 													className="h-8 w-8 rounded-full object-cover"
 													width={32}
@@ -973,7 +910,7 @@ const Applications: React.FC<ApplicationsProps> = ({ contestData }) => {
 											</div>
 											<div className="truncate">
 												<span className="font-medium text-gray-800">
-													{creator?.username || creator?.creator}
+													{creator?.creatorProfileData?.tiktokDisplayName || creator?.creator}
 												</span>
 											</div>
 										</div>

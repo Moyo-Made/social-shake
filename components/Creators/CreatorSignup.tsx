@@ -109,11 +109,11 @@ const CreatorSignup = () => {
 
 						<p className="text-sm md:text-base text-center text-[#000] pt-2">
 							By signing up, you confirm that you have read and agree to our{" "}
-							<Link href="#" className="text-[#FD5C02] hover:underline">
+							<Link href="/privacy-policy" className="text-[#FD5C02] hover:underline">
 								Privacy Policy
 							</Link>{" "}
 							and{" "}
-							<Link href="#" className="text-[#FD5C02] hover:underline">
+							<Link href="/terms-of-use" className="text-[#FD5C02] hover:underline">
 								Terms of Use
 							</Link>
 						</p>

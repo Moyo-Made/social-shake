@@ -146,6 +146,41 @@ const CreatorManagement: React.FC = () => {
 		}
 	};
 
+	const getProfilePictureUrl = (creator: Creator) => {
+		if (!creator) return null;
+
+		// First try the Tiktok profile picture if available
+		if (creator.creatorProfileData?.tiktokAvatarUrl) {
+			return creator.creatorProfileData?.tiktokAvatarUrl;
+		}
+
+		// Then check for logoUrl
+		if (creator.logoUrl) {
+			return creator.logoUrl;
+		}
+
+		return null;
+	};
+
+	const getTikTokProfileUrl = (creator: Creator) => {
+		// First check for direct TikTok username - common approach is to construct URL
+		if (creator.creatorProfileData?.tiktokUsername) {
+			return `https://www.tiktok.com/@${creator.creatorProfileData?.tiktokUsername}`;
+		}
+
+		// Then check for TikTok URL in socialMedia object
+		if (creator.socialMedia?.tiktok) {
+			return creator.socialMedia.tiktok;
+		}
+
+		// // Check if there's a TikTok URL in profileData
+		// if (creator.profileData?.tiktokUrl) {
+		// 	return creator.profileData.tiktokUrl;
+		// }
+
+		return null;
+	};
+
 	// Fetch creators when status filter, page, or limit changes
 	useEffect(() => {
 		fetchCreators();
@@ -417,10 +452,10 @@ const CreatorManagement: React.FC = () => {
 								</td>
 								<td className="px-6 py-4 whitespace-nowrap">
 									<div className="flex items-center">
-										{creator.logoUrl ? (
+										{getProfilePictureUrl(creator) ? (
 											<Image
 												className="h-10 w-10 object-cover rounded-full mr-3"
-												src={creator.logoUrl }
+												src={getProfilePictureUrl(creator) || ""}
 												alt={`${creator.creator} logo`}
 												width={40}
 												height={40}
@@ -428,14 +463,16 @@ const CreatorManagement: React.FC = () => {
 										) : (
 											<div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center mr-3">
 												<span className="text-gray-500 font-medium">
-													{creator.creator &&
-														creator.creator.charAt(0).toUpperCase()}
+													{creator.creatorProfileData?.tiktokUsername ||
+														(creator.creator &&
+															creator.creator.charAt(0).toUpperCase())}
 												</span>
 											</div>
 										)}
 										<div>
 											<div className="font-medium text-gray-900">
-												{creator.creator}
+												{creator.creatorProfileData?.tiktokDisplayName ||
+													creator.creator}
 											</div>
 											<div className="text-sm text-gray-500">
 												{creator.email}
@@ -443,10 +480,11 @@ const CreatorManagement: React.FC = () => {
 										</div>
 									</div>
 								</td>
+
 								<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-									{creator.socialMedia?.tiktok ? (
+									{getTikTokProfileUrl(creator) ? (
 										<Link
-											href={creator.socialMedia.tiktok}
+											href={getTikTokProfileUrl(creator) || ""}
 											className="text-blue-500 hover:underline"
 											target="_blank"
 											rel="noopener noreferrer"
