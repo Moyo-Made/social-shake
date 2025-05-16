@@ -2,65 +2,89 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/config/firebase-admin";
 import Stripe from "stripe";
 
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+  apiVersion: "2025-03-31.basil",
+});
+
 export async function GET(request: NextRequest) {
   try {
+    // Get the payment_id and session_id from URL params
     const url = new URL(request.url);
-    const paymentId = url.searchParams.get("payment_id");
-    const sessionId = url.searchParams.get("session_id");
-
+    const paymentId = url.searchParams.get('payment_id');
+    const sessionId = url.searchParams.get('session_id');
+    
     if (!paymentId || !sessionId) {
-      return NextResponse.json(
-        { error: "Payment ID and Session ID are required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ 
+        success: false, 
+        error: "Missing payment ID or session ID" 
+      }, { status: 400 });
     }
-
-    // Verify the payment with Stripe
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-      apiVersion: "2025-03-31.basil",
-    });
-
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
-
-    if (session.payment_status !== "paid") {
-      return NextResponse.json(
-        { error: "Payment has not been completed" },
-        { status: 400 }
-      );
-    }
-
-    // Check if this payment has already been processed
+    
+    // Verify the payment record exists
     const paymentDoc = await adminDb.collection("payments").doc(paymentId).get();
-    
-    if (paymentDoc.exists && paymentDoc.data()?.status === "completed") {
-      return NextResponse.json(
-        { 
-          success: true,
-          message: "Payment already processed",
-          contestId: paymentDoc.data()?.contestId 
-        }
-      );
+    if (!paymentDoc.exists) {
+      return NextResponse.json({ 
+        success: false, 
+        error: "Payment record not found" 
+      }, { status: 404 });
     }
     
-    // Update payment status to verified (but not yet completed)
+    const paymentData = paymentDoc.data();
+    
+    // Check that the session ID matches
+    if (paymentData?.stripeSessionId !== sessionId) {
+      return NextResponse.json({ 
+        success: false, 
+        error: "Session ID mismatch" 
+      }, { status: 400 });
+    }
+    
+    // Retrieve the Stripe session
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    
+    // Get the payment intent
+    const paymentIntentId = session.payment_intent as string;
+    if (!paymentIntentId) {
+      return NextResponse.json({ 
+        success: false, 
+        error: "No payment intent found" 
+      }, { status: 400 });
+    }
+    
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    
+    // Check payment status - for manual capture, "requires_capture" is a successful state
+    // The payment is authorized but not yet captured
+    const isSuccessful = 
+      paymentIntent.status === "succeeded" || 
+      paymentIntent.status === "requires_capture";
+    
+    if (!isSuccessful) {
+      return NextResponse.json({ 
+        success: false, 
+        error: `Payment not successful. Status: ${paymentIntent.status}` 
+      }, { status: 400 });
+    }
+    
+    // Update payment record with payment intent ID and status
     await adminDb.collection("payments").doc(paymentId).update({
-      status: "verified",
-      stripeSessionId: sessionId,
-      verifiedAt: new Date().toISOString()
+      stripePaymentIntentId: paymentIntentId,
+      stripePaymentStatus: paymentIntent.status,
+      updatedAt: new Date().toISOString(),
     });
-
-    return NextResponse.json({
+    
+    return NextResponse.json({ 
       success: true,
-      message: "Payment verified successfully",
+      paymentStatus: paymentIntent.status,
+      requiresCapture: paymentIntent.status === "requires_capture"
     });
+    
   } catch (error) {
     console.error("Error verifying payment:", error);
-    return NextResponse.json(
-      {
-        error: "Failed to verify payment",
-        details: error instanceof Error ? error.message : String(error),
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      error: "Failed to verify payment",
+      details: error instanceof Error ? error.message : String(error),
+    }, { status: 500 });
   }
 }

@@ -13,7 +13,6 @@ import { db } from "@/config/firebase";
 import Applications from "./Applications";
 import AnalyticsDashboard from "./Metrics";
 import GMVMetrics from "./GMVMetrics";
-import Leaderboard from "./Leaderboard";
 import GMVData from "./GMVData";
 import {
 	BasicFormData,
@@ -21,6 +20,7 @@ import {
 	PrizeTimelineFormData,
 	RequirementsFormData,
 } from "@/types/contestFormData";
+import Leaderboard from "./Leaderboard";
 
 interface ContestData {
 	basic?: BasicFormData;
@@ -540,7 +540,7 @@ export default function ContestDetailPage({
 
 						{/* Dynamic Leaderboard Tab */}
 						<TabsContent value="leaderboard">
-							{contestType === "Leaderboard" ? <Leaderboard /> : <GMVData />}
+							{contestType === "Leaderboard" ?  <Leaderboard contestId={contestId} /> : <GMVData />}
 						</TabsContent>
 					</Tabs>
 				</div>

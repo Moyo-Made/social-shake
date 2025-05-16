@@ -910,7 +910,7 @@ const Applications: React.FC<ApplicationsProps> = ({ contestData }) => {
 											</div>
 											<div className="truncate">
 												<span className="font-medium text-gray-800">
-													{creator?.creatorProfileData?.tiktokDisplayName || creator?.creator}
+													{creator?.creatorProfileData?.tiktokUsername || creator?.creator}
 												</span>
 											</div>
 										</div>

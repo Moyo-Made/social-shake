@@ -21,6 +21,7 @@ export interface RequirementsFormData {
 }
 
 export interface PrizeTimelineFormData {
+	submissionEndDate: string | number | Date;
 	totalBudget: number;
 	winnerCount: number;
 	positions: number[];
@@ -32,6 +33,7 @@ export interface PrizeTimelineFormData {
 export type ContestType = "Leaderboard" | "GMV";
 
 export interface ContestFormData {
+	computedStatus: unknown;
 	userId: string;
 	brandInfo: {
 		name: string;

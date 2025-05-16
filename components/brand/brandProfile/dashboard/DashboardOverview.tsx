@@ -5,6 +5,7 @@ import EmptyContest from "./EmptyContest";
 import { Button } from "@/components/ui/button";
 import { useSocket } from "@/context/SocketContext";
 import { Input } from "@/components/ui/input";
+import { ContestFormData } from "@/types/contestFormData";
 
 interface UserDashboardProps {
 	userId: string;
@@ -39,6 +40,25 @@ interface Creators {
 	verifiableIDUrl?: string;
 }
 
+// Define ContestParticipant interface
+interface ContestParticipant {
+	id: string;
+	userId: string;
+	contestId: string;
+	postUrl: string;
+	status: string;
+	position?: number;
+	profileImage?: string;
+	username?: string;
+	fullName?: string;
+	metrics?: {
+		views: number;
+		likes: number;
+		comments: number;
+		followers?: number;
+	};
+}
+
 export default function UserDashboard({ userId }: UserDashboardProps) {
 	const [loading, setLoading] = useState(true);
 	interface UserData {
@@ -60,11 +80,7 @@ export default function UserDashboard({ userId }: UserDashboardProps) {
 				budgetPerVideo: number;
 			};
 		}>;
-		contests: Array<{
-			basic?: {
-				contestName: string;
-			};
-		}>;
+		contests: Array<ContestFormData>;
 	}
 
 	interface CreatorMessage {
@@ -88,8 +104,16 @@ export default function UserDashboard({ userId }: UserDashboardProps) {
 	const [activeReply, setActiveReply] = useState<string | null>(null);
 	const { sendMessage: socketSendMessage, socket } = useSocket();
 	const [userData, setUserData] = useState<UserData | null>(null);
-	// Add the selectedCreator state
 	const [selectedCreator, setSelectedCreator] = useState<Creators | null>(null);
+
+	// Add state for latest contest and leaderboard data
+	const [latestContest, setLatestContest] = useState<ContestFormData | null>(
+		null
+	);
+	const [leaderboardData, setLeaderboardData] = useState<ContestParticipant[]>(
+		[]
+	);
+	const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
 
 	// function to calculate time ago
 	const timeAgo = (timestamp: string | number | Date) => {
@@ -175,6 +199,155 @@ export default function UserDashboard({ userId }: UserDashboardProps) {
 		}
 	};
 
+	// Function to fetch contest leaderboard data
+	const fetchLeaderboardData = async (contestId: string) => {
+		if (!contestId) return;
+
+		try {
+			setLoadingLeaderboard(true);
+
+			// Fetch applications for the contest
+			const response = await fetch(
+				`/api/contest-applications?contestId=${contestId}`
+			);
+
+			if (!response.ok) {
+				throw new Error("Failed to fetch applications");
+			}
+
+			const data = await response.json();
+
+			// Filter only approved applications
+			const approvedApplications = data.filter(
+				(app: { status: string }) => app.status.toLowerCase() === "approved"
+			);
+
+			// If there are no approved applications, set empty array and stop loading
+			if (approvedApplications.length === 0) {
+				setLeaderboardData([]);
+				setLoadingLeaderboard(false);
+				return;
+			}
+
+			// Fetch creator data for each approved application
+			const creatorDataArray = await Promise.all(
+				approvedApplications.map(
+					async (app: { postUrl: string; userId: string }) => {
+						try {
+							const creatorRes = await fetch(
+								`/api/admin/creator-approval?userId=${app.userId}`
+							);
+
+							if (creatorRes.ok) {
+								const response = await creatorRes.json();
+
+								if (response.creators && response.creators.length > 0) {
+									const creator = response.creators[0];
+
+									// Combine application data with creator data
+									return {
+										...app,
+										metrics: {
+											// Get metrics from TikTok data
+											views:
+												creator.tiktokMetrics?.views ||
+												creator.creatorProfileData?.tiktokMetrics?.views ||
+												creator.tiktokData?.tiktokAverageViews ||
+												0,
+											likes:
+												creator.tiktokMetrics?.likes ||
+												creator.creatorProfileData?.tiktokMetrics?.likes ||
+												0,
+											comments:
+												creator.tiktokMetrics?.comments ||
+												creator.creatorProfileData?.tiktokMetrics?.comments ||
+												0,
+											followers:
+												creator.tiktokMetrics?.followers?.count ||
+												creator.creatorProfileData?.tiktokMetrics?.followers
+													?.count ||
+												creator.tiktokData?.tiktokFollowers ||
+												0,
+										},
+										position: 0, // Will be calculated later
+										profileImage:
+											creator.creatorProfileData?.tiktokAvatarUrl ||
+											creator.logoUrl ||
+											"/icons/colina.svg",
+										username:
+											creator.creatorProfileData?.tiktokUsername ||
+											creator.username ||
+											"Unknown",
+										fullName:
+											`${creator.firstName || ""} ${creator.lastName || ""}`.trim() ||
+											creator.creatorProfileData?.tiktokDisplayName ||
+											"Unknown Creator",
+									};
+								}
+							}
+							return null;
+						} catch (err) {
+							console.error(
+								`Error fetching creator data for user ID ${app.userId}:`,
+								err
+							);
+							return null;
+						}
+					}
+				)
+			);
+
+			// Filter out null values and sort by views
+			const validCreators = creatorDataArray
+				.filter((creator) => creator !== null)
+				.sort((a, b) => (b.metrics?.views || 0) - (a.metrics?.views || 0));
+
+			// Assign positions based on sorting
+			const creatorsWithPositions = validCreators.map((creator, index) => ({
+				...creator,
+				position: index + 1,
+			}));
+
+			setLeaderboardData(creatorsWithPositions);
+		} catch (err) {
+			console.error("Error fetching leaderboard data:", err);
+		} finally {
+			setLoadingLeaderboard(false);
+		}
+	};
+
+	// Fetch the latest contest and its data
+	const fetchLatestContest = async () => {
+		try {
+			// Use the contest API to fetch the user's contests, ordered by creation date
+			const response = await fetch(
+				`/api/contests?creatorId=${userId}&orderBy=createdAt&orderDirection=desc&limit=1`
+			);
+
+			if (!response.ok) {
+				throw new Error(`Failed to fetch latest contest: ${response.status}`);
+			}
+
+			const result = await response.json();
+
+			// Check if any contests were returned
+			if (result.success && result.data && result.data.length > 0) {
+				const latestContest = result.data[0];
+				setLatestContest(latestContest);
+
+				// Fetch leaderboard data for the latest contest
+				if (latestContest.contestId) {
+					fetchLeaderboardData(latestContest.contestId);
+				}
+			} else {
+				console.log("No contests found for this user");
+				setLatestContest(null);
+			}
+		} catch (error) {
+			console.error("Error fetching latest contest:", error);
+		}
+	};
+
 	useEffect(() => {
 		fetchCreatorMessages();
 
@@ -224,6 +397,13 @@ export default function UserDashboard({ userId }: UserDashboardProps) {
 		fetchUserData();
 	}, [userId]);
 
+	// Effect to fetch latest contest when userData changes
+	useEffect(() => {
+		if (userData?.contests && userData.contests.length > 0) {
+			fetchLatestContest();
+		}
+	}, [userData]);
+
 	if (loading) {
 		return (
 			<div className="flex flex-col justify-center items-center h-64">
@@ -250,6 +430,16 @@ export default function UserDashboard({ userId }: UserDashboardProps) {
 			currency: "USD",
 			maximumFractionDigits: 0,
 		}).format(numericAmount);
+	};
+
+	// Format number for metrics (views, likes, comments)
+	const formatNumber = (num: number) => {
+		if (num >= 1000000) {
+			return (num / 1000000).toFixed(1) + "M";
+		} else if (num >= 1000) {
+			return (num / 1000).toFixed(1) + "k";
+		}
+		return num.toString();
 	};
 
 	// Fix the handleViewProfile function
@@ -484,7 +674,7 @@ export default function UserDashboard({ userId }: UserDashboardProps) {
 			</div>
 
 			{/* Latest Contest Section */}
-			{userData.contests.length > 0 && (
+			{latestContest && (
 				<div className="mb-12">
 					<div className="flex justify-between items-center mb-4">
 						<h2 className="text-2xl font-semibold text-gray-800">
@@ -500,73 +690,102 @@ export default function UserDashboard({ userId }: UserDashboardProps) {
 
 					{/* Contest Info */}
 					<div className="bg-white rounded-lg shadow overflow-hidden mb-4">
-						<div className="p-6">
-							<h3 className="text-2xl font-bold text-gray-800">
-								{userData.contests[0]?.basic?.contestName || "Contest Name"}
+						<div className="flex justify-between p-4">
+							<h3 className="text-lg font-semibold text-gray-800">
+								{latestContest.basic?.contestName || "Contest Name"}
 							</h3>
+
+							<div className="">
+								<Link
+									href={`/brand/dashboard/contests/${latestContest.contestId}`}
+									className="text-orange-500 text-sm font-medium hover:underline"
+								>
+									View Contest Details
+								</Link>
+							</div>
 						</div>
 
 						{/* Leaderboard */}
-						<table className="min-w-full divide-y divide-gray-200">
-							<thead className="bg-gray-50">
-								<tr>
-									<th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
-										Position
-									</th>
-									<th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
-										Creator Username
-									</th>
-									<th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
-										Views
-									</th>
-									<th className="px-6 py-3 text-left text-sm font-medium text-gray-500 ">
-										Likes
-									</th>
-									<th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
-										Comments
-									</th>
-								</tr>
-							</thead>
-							<tbody className="bg-white divide-y divide-gray-200">
-								{/* Sample leaderboard data - in a real app, you would fetch this data */}
-								{[1, 2, 3, 4, 5].map((position) => (
-									<tr key={position}>
-										<td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-											#{position}
-										</td>
-										<td className="px-6 py-4 whitespace-nowrap">
-											<div className="flex items-center">
-												<div className="flex-shrink-0 h-10 w-10">
-													<Image
-														className="h-10 w-10 rounded-full"
-														src="/icons/colina.svg"
-														alt="Creator avatar"
-														width={40}
-														height={40}
-													/>
-												</div>
-												<div className="ml-4">
-													<div className="text-sm font-medium text-gray-900">
-														<a href="#" className="underline">
-															Colina42rf
-														</a>
+						{loadingLeaderboard ? (
+							<div className="flex flex-col justify-center items-center py-8">
+								<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+								<p className="ml-2">Loading leaderboard...</p>
+							</div>
+						) : leaderboardData.length > 0 ? (
+							<>
+								<h4 className="px-4 text-base font-medium text-gray-800 mb-1">
+									Contest Leaderboard
+								</h4>
+								<table className="min-w-full divide-y divide-gray-200">
+									<thead className="bg-gray-50">
+										<tr>
+											<th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+												Position
+											</th>
+											<th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+												Creator Username
+											</th>
+											<th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+												Views
+											</th>
+											<th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+												Likes
+											</th>
+											<th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+												Comments
+											</th>
+										</tr>
+									</thead>
+									<tbody className="bg-white divide-y divide-gray-200">
+										{leaderboardData.slice(0, 5).map((participant) => (
+											<tr key={participant.id}>
+												<td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+													#{participant.position}
+												</td>
+												<td className="px-6 py-4 whitespace-nowrap">
+													<div className="flex items-center">
+														<div className="flex-shrink-0 h-10 w-10">
+															<Image
+																className="h-10 w-10 rounded-full"
+																src={
+																	participant.profileImage ||
+																	"/icons/colina.svg"
+																}
+																alt="Creator avatar"
+																width={40}
+																height={40}
+															/>
+														</div>
+														<div className="ml-4">
+															<div className="text-sm font-medium text-gray-900">
+																<p>@{participant.username}</p>
+															</div>
+														</div>
 													</div>
-												</div>
-											</div>
-										</td>
-										<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-											12.5k
-										</td>
-										<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-											2.2k
-										</td>
-										<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-											500
-										</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
+												</td>
+												<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+													{formatNumber(participant.metrics?.views || 0)}
+												</td>
+												<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+													{formatNumber(participant.metrics?.likes || 0)}
+												</td>
+												<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+													{formatNumber(participant.metrics?.comments || 0)}
+												</td>
+											</tr>
+										))}
+									</tbody>
+								</table>
+							</>
+						) : (
+							<div className="px-6 py-8 text-center text-gray-600">
+								<p>No leaderboard data available yet for this contest.</p>
+								<p className="text-sm mt-2">
+									Creators will appear here once their applications are approved
+									and their content is posted.
+								</p>
+							</div>
+						)}
 					</div>
 				</div>
 			)}

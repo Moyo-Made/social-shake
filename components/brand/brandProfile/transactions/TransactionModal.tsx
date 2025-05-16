@@ -215,7 +215,7 @@ const handleDownloadPDF = () => {
 									{(transaction.status === "Pending" ||
 										transaction.status === "Refunded") && (
 										<div
-											className={`w-1 h-1 rounded-full mr-1 ${transaction.status === "Pending" ? "bg-[#1A1A1A]" : "bg-[#F04438]"}`}
+											className={`w-1 h-1 text-sm rounded-full mr-1 ${transaction.status === "Pending" ? "bg-[#1A1A1A]" : "bg-[#F04438]"}`}
 										></div>
 									)}
 									{transaction.status}
@@ -248,7 +248,7 @@ const handleDownloadPDF = () => {
 							</div>
 
 							<div>
-								<p className="text-[#667085]">Project Completed:</p>
+								<p className="text-[#667085]">Project Approved:</p>
 								<p className="text-base text-[#101828]">
 									{transaction.projectCompleted}
 								</p>

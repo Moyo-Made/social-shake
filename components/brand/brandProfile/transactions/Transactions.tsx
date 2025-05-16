@@ -9,11 +9,12 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import TransactionModal from "./TransactionModal";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
 
 // Define Transaction type
 type TransactionStatus = "Processed" | "Pending" | "Refunded";
@@ -29,6 +30,8 @@ interface Transaction {
 	paymentDate: string;
 	projectCompleted: string;
 	actions: string;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	rawData?: any; // Optional raw data for debugging
 }
 
 interface TotalTransactions {
@@ -37,60 +40,8 @@ interface TotalTransactions {
 	totalProcessed: string;
 }
 
-// Mock data for Transactions
-const transactions: Transaction[] = [
-	{
-		id: "781673156",
-		transactionDate: "March 24, 2025",
-		description: "Summer Skincare Routine Project",
-		amount: "2,000",
-		type: "Project",
-		status: "Processed",
-		paymentDate: "March 3rd, 2025",
-		projectCompleted: "March 1st, 2025",
-		actions: "View Transaction",
-	},
-	{
-		id: "781673157",
-		transactionDate: "March 24, 2025",
-		description: "Summer Skincare Routine Contest Prizes",
-		amount: "5,000",
-		type: "Contest",
-		status: "Pending",
-		paymentDate: "Pending",
-		projectCompleted: "March 1st, 2025",
-		actions: "View Transaction",
-	},
-	{
-		id: "781673158",
-		transactionDate: "March 24, 2025",
-		description: "Summer Skincare Routine Refund",
-		amount: "10,000",
-		type: "Project",
-		status: "Refunded",
-		paymentDate: "March 20th, 2025",
-		projectCompleted: "March 15th, 2025",
-		actions: "View Transaction",
-	},
-	{
-		id: "781673159",
-		transactionDate: "March 24, 2025",
-		description: "Summer Skincare Routine Refund",
-		amount: "10,000",
-		type: "Project",
-		status: "Refunded",
-		paymentDate: "March 22nd, 2025",
-		projectCompleted: "March 18th, 2025",
-		actions: "View Transaction",
-	},
-];
 
-const totalTransactions: TotalTransactions = {
-	totalSpend: "12,250",
-	pendingPayments: "4,250",
-	totalProcessed: "8,000",
-};
-
+	
 // Helper function to get type badge styling
 const getTypeBadgeStyle = (type: TransactionType): string => {
 	switch (type) {
@@ -148,13 +99,78 @@ const getStatusIcon = (status: TransactionStatus): React.ReactNode => {
 
 const Transactions: React.FC = () => {
 	const [modalOpen, setModalOpen] = useState<boolean>(false);
-	const [selectedTransaction, setSelectedTransaction] =
+	const [selectedTransaction, setSelectedTransaction] = 
 		useState<Transaction | null>(null);
 	const [searchTerm, setSearchTerm] = useState<string>("");
 	const [typeFilter, setTypeFilter] = useState<string>("");
 	const [statusFilter, setStatusFilter] = useState<string>("");
-	// For demonstration purposes - set to true to test empty state
-	const [hasTransactions] = useState<boolean>(true);
+	
+	// Add loading and error states
+	const [loading, setLoading] = useState<boolean>(true);
+	const [error, setError] = useState<string | null>(null);
+	
+	// State to hold the real data
+	const [transactions, setTransactions] = useState<Transaction[]>([]);
+	const [totalTransactions, setTotalTransactions] = useState<TotalTransactions>({
+		totalSpend: "0",
+		pendingPayments: "0",
+		totalProcessed: "0"
+	});
+	const {currentUser} = useAuth();
+
+	// Whether the user has any transactions
+	const hasTransactions = transactions.length > 0;
+	
+	// Fetch transactions when the component mounts
+	const fetchTransactions = async () => {
+		// Don't try to fetch if there's no user
+		if (!currentUser) {
+		  setLoading(false);
+		  return;
+		}
+		
+		try {
+		  setLoading(true);
+		  setError(null);
+		  
+		  // Use the user ID as a query parameter instead of in the header
+		  const response = await fetch(`/api/transactions?userId=${currentUser.uid}`, {
+			method: "GET",
+			headers: {
+			  "Content-Type": "application/json",
+			},
+		  });
+		  
+		  if (!response.ok) {
+			const errorData = await response.json();
+			throw new Error(errorData.error || "Failed to fetch transactions");
+		  }
+		  
+		  const data = await response.json();
+		  
+		  // Update state with the fetched data
+		  setTransactions(data.transactions || []);
+		  setTotalTransactions(data.totals || {
+			totalSpend: "0",
+			pendingPayments: "0",
+			totalProcessed: "0"
+		  });
+		  
+		  setLoading(false);
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		} catch (error: any) {
+		  console.error("Error fetching transactions:", error);
+		  setError(error.message || "An error occurred while fetching transactions");
+		  setLoading(false);
+		}
+	  };
+
+	  useEffect(() => {
+		// Only fetch if there's a user
+		if (currentUser) {
+		  fetchTransactions();
+		}
+	  }, [currentUser]);
 
 	const handleViewTransaction = (transaction: Transaction): void => {
 		setSelectedTransaction(transaction);
@@ -197,12 +213,40 @@ const Transactions: React.FC = () => {
 
 			return matchesSearch && matchesType && matchesStatus;
 		});
-	}, [searchTerm, typeFilter, statusFilter, hasTransactions]);
+	}, [searchTerm, typeFilter, statusFilter, hasTransactions, transactions]);
+
+	// Render loading state
+	if (loading) {
+		return (
+			<div className="w-full flex flex-col items-center justify-center py-12">
+				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+				<p className="mt-4 text-gray-600">Loading transactions...</p>
+			</div>
+		);
+	}
+
+	// Render error state
+	if (error) {
+		return (
+			<div className="w-full flex flex-col items-center justify-center py-12">
+				<div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+					<strong className="font-bold">Error: </strong>
+					<span className="block sm:inline">{error}</span>
+				</div>
+				<Button 
+					className="mt-4 bg-orange-500 hover:bg-orange-600 text-white"
+					onClick={() => window.location.reload()}
+				>
+					Try Again
+				</Button>
+			</div>
+		);
+	}
 
 	return (
 		<div>
 			{/* Affiliate Payout Cards */}
-			<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-8">
+			<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-6 mb-8">
 				<Card className="py-10 flex flex-col items-center justify-center border border-[#6670854D] shadow-none">
 					<p className="text-lg text-[#000] mb-1 mt-2">Total Spend</p>
 					<h2 className="text-2xl text-[#101828] font-semibold">
@@ -330,7 +374,7 @@ const Transactions: React.FC = () => {
 								className="grid grid-cols-7 p-3 items-center border-t border-gray-200 text-sm text-[#101828] hover:bg-gray-50"
 							>
 								<div className="col-span-1 pl-4">{item.transactionDate}</div>
-								<div className="col-span-2 pr-4">{item.description}</div>
+								<div className="col-span-2 pr-4">{item.description} </div>
 								<div className="col-span-1">${item.amount}</div>
 								<div className="col-span-1">
 									<span
@@ -341,7 +385,7 @@ const Transactions: React.FC = () => {
 								</div>
 								<div className="col-span-1">
 									<span
-										className={`w-fit px-3 py-1 rounded-full text-sm ${getStatusBadgeStyle(item.status)}`}
+										className={`w-fit px-2 py-1 rounded-full text-xs ${getStatusBadgeStyle(item.status)}`}
 									>
 										{getStatusIcon(item.status)}
 										{item.status}

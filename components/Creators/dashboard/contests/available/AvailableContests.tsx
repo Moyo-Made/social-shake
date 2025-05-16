@@ -33,17 +33,27 @@ const CreatorContestDashboard: React.FC = () => {
 	const [sortBy, setSortBy] = useState("newest");
 	const [budgetRange, setBudgetRange] = useState("all");
 
-	const fetchContests = async (reset = true) => {
+	const fetchActiveContests = async (reset = true) => {
 		if (!currentUser?.uid) return;
 
 		try {
 			setLoading(true);
 
+			// Build the API URL for active contests using our dedicated endpoint
 			let url = `/api/contests`;
-
+			
+			// Add pagination parameter if needed
 			if (!reset && lastDocId) {
-				url += `&startAfter=${lastDocId}`;
+				url += `?startAfter=${lastDocId}`;
+			} else {
+				url += '?';
 			}
+
+			// Add sorting parameter
+			url += `&orderBy=createdAt&orderDirection=desc`;
+			
+			// Set default limit
+			url += `&limit=12`;
 
 			const response = await fetch(url);
 
@@ -87,7 +97,7 @@ const CreatorContestDashboard: React.FC = () => {
 
 	useEffect(() => {
 		if (currentUser?.uid) {
-			fetchContests();
+			fetchActiveContests();
 		}
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [currentUser?.uid]);
@@ -185,7 +195,7 @@ const CreatorContestDashboard: React.FC = () => {
 	};
 
 	const loadMore = () => {
-		fetchContests(false);
+		fetchActiveContests(false);
 	};
 
 	return (
@@ -288,7 +298,7 @@ const CreatorContestDashboard: React.FC = () => {
 			return (
 				<div className="text-center py-12">
 					<p className="text-red-500">{error}</p>
-					<Button className="mt-4" onClick={() => fetchContests()}>
+					<Button className="mt-4" onClick={() => fetchActiveContests()}>
 						Try Again
 					</Button>
 				</div>
@@ -300,7 +310,7 @@ const CreatorContestDashboard: React.FC = () => {
 				<div className="text-center py-12">
 					<p className="text-gray-500">
 						{contests.length === 0
-							? "No contests found."
+							? "No active contests found."
 							: "No contests match your filters."}
 					</p>				
 					{contests.length > 0 && (
@@ -330,7 +340,7 @@ const CreatorContestDashboard: React.FC = () => {
 					))}
 				</div>
 
-				{hasMore && contests.length > filteredContests.length && (
+				{hasMore && (
 					<div className="flex justify-center mt-8">
 						<Button variant="outline" onClick={loadMore} disabled={loading}>
 							{loading ? (

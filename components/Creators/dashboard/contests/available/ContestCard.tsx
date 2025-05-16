@@ -15,6 +15,8 @@ interface BrandProfile {
 
 interface ContestCardProps {
 	contest: ContestFormData;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	computedStatus?: any; 
 }
 
 export const ContestCard: React.FC<ContestCardProps> = ({ contest }) => {

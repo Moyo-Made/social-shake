@@ -84,6 +84,8 @@ export async function GET(request: NextRequest) {
     }
     
     console.log(`Fetching payment methods for userId: ${userIdToFetch}`);
+
+    
     
     // Fetch all payment methods for the target user
     const methodsSnapshot = await adminDb

@@ -1,102 +1,133 @@
-import Image from 'next/image';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 
-interface CountdownTimerProps {
-  targetDate: string;
+interface Contest {
+  prizeTimeline: {
+    startDate: string;
+    endDate: string;
+  };
 }
 
-const CountdownTimer: React.FC<CountdownTimerProps> = ({ targetDate }) => {
-  const [timeRemaining, setTimeRemaining] = useState({
+const CountdownTimer: React.FC<{ contest: Contest }> = ({ contest }) => {
+  const [timeLeft, setTimeLeft] = useState({
     days: 0,
     hours: 0,
     minutes: 0,
-    seconds: 0,
-    isComplete: false
+    seconds: 0
   });
+  
+  const [isExpired, setIsExpired] = useState(false);
+  const [countingToStart, setCountingToStart] = useState(false);
 
   useEffect(() => {
-    // Function to calculate the time difference
-    const calculateTimeRemaining = () => {
-      const now = new Date().getTime();
-      const target = new Date(targetDate).getTime();
-      const difference = target - now;
+    if (!contest?.prizeTimeline) return;
+    
+    // Get the start and end dates from contest data
+    const startDate = new Date(contest.prizeTimeline.startDate);
+    const endDate = new Date(contest.prizeTimeline.endDate);
+    const now = new Date();
+    
+    // Determine which date to count down to
+    let targetDate;
+    if (now < startDate) {
+      // Count down to contest start
+      targetDate = startDate;
+      setCountingToStart(true);
+    } else if (now < endDate) {
+      // Count down to contest end
+      targetDate = endDate;
+      setCountingToStart(false);
+    } else {
+      // Contest has ended
+      setIsExpired(true);
+      return;
+    }
+
+    // Calculate the time difference between now and target date
+    const calculateTimeLeft = () => {
+      const difference = targetDate.getTime() - new Date().getTime();
       
-      // If the countdown is complete
       if (difference <= 0) {
-        setTimeRemaining({
+        setIsExpired(true);
+        return {
           days: 0,
           hours: 0,
           minutes: 0,
-          seconds: 0,
-          isComplete: true
-        });
-        return;
+          seconds: 0
+        };
       }
       
-      // Calculate remaining time
-      const days = Math.floor(difference / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((difference % (1000 * 60)) / 1000);
-      
-      setTimeRemaining({
-        days,
-        hours,
-        minutes,
-        seconds,
-        isComplete: false
-      });
+      return {
+        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((difference / 1000 / 60) % 60),
+        seconds: Math.floor((difference / 1000) % 60)
+      };
     };
 
-    // Initial calculation
-    calculateTimeRemaining();
+    // Set initial countdown
+    setTimeLeft(calculateTimeLeft());
     
-    // Update the countdown every second
-    const intervalId = setInterval(calculateTimeRemaining, 1000);
-    
-    // Clean up interval on component unmount
-    return () => clearInterval(intervalId);
-  }, [targetDate]);
+    // Update countdown every second
+    const timer = setInterval(() => {
+      const updatedTimeLeft = calculateTimeLeft();
+      setTimeLeft(updatedTimeLeft);
+      
+      // Check if countdown has expired
+      if (updatedTimeLeft.days === 0 && 
+          updatedTimeLeft.hours === 0 && 
+          updatedTimeLeft.minutes === 0 && 
+          updatedTimeLeft.seconds === 0) {
+        setIsExpired(true);
+        clearInterval(timer);
+      }
+    }, 1000);
 
-  const { days, hours, minutes, seconds, isComplete } = timeRemaining;
+    // Cleanup timer
+    return () => clearInterval(timer);
+  }, [contest]);
 
-  // Format numbers to always show two digits (e.g., 05 instead of 5)
+  // Format numbers to always show two digits
   const formatNumber = (num: number) => {
-    return num < 10 ? `0${num}` : num;
+    return num.toString().padStart(2, '0');
   };
 
   return (
-    <div className="flex flex-col items-center text-center mb-3">
-      <h2 className="text-gray-600 text-xl mb-1 font-medium">Time Remaining</h2>
+    <div className="flex flex-col items-center my-8">
+      <h2 className="text-2xl font-bold mb-4">
+        {isExpired ? "Contest Ended" : 
+         countingToStart ? "Contest Starts In" : 
+         "Contest Ends In"}
+      </h2>
       
-      {!isComplete ? (
-        <div className="flex items-center justify-center text-3xl sm:text-4xl md:text-5xl font-bold">
-          <div className="flex flex-col items-center">
-            <span className="text-black">{days}</span>
-            <span className="text-gray-500 text-sm sm:text-base mt-1">Days</span>
+      <div className="flex space-x-4">
+        <div className="flex flex-col items-center">
+          <div className="bg-gray-100 text-gray-800 rounded-lg w-16 h-16 flex items-center justify-center text-2xl font-bold">
+            {formatNumber(timeLeft.days)}
           </div>
-          <span className="mx-2 text-black -mt-10">:</span>
-          <div className="flex flex-col items-center">
-            <span className="text-black">{formatNumber(hours)}</span>
-            <span className="text-gray-500 text-sm sm:text-base mt-1">Hours</span>
-          </div>
-          <span className="mx-2 text-black -mt-10">:</span>
-          <div className="flex flex-col items-center">
-            <span className="text-black">{formatNumber(minutes)}</span>
-            <span className="text-gray-500 text-sm sm:text-base mt-1">Minutes</span>
-          </div>
-          <span className="mx-2 text-black -mt-10">:</span>
-          <div className="flex flex-col items-center">
-            <span className="text-black">{formatNumber(seconds)}</span>
-            <span className="text-gray-500 text-sm sm:text-base mt-1">Seconds</span>
-          </div>
+          <span className="text-sm mt-1">Days</span>
         </div>
-      ) : (
-        <div className="flex items-center gap-1 text-3xl font-bold">
-			<Image src="/icons/confetti.png" alt="Confetti" width={35} height={35} />
-          <span>Contest Concluded</span>
+        
+        <div className="flex flex-col items-center">
+          <div className="bg-gray-100 text-gray-800 rounded-lg w-16 h-16 flex items-center justify-center text-2xl font-bold">
+            {formatNumber(timeLeft.hours)}
+          </div>
+          <span className="text-sm mt-1">Hours</span>
         </div>
-      )}
+        
+        <div className="flex flex-col items-center">
+          <div className="bg-gray-100 text-gray-800 rounded-lg w-16 h-16 flex items-center justify-center text-2xl font-bold">
+            {formatNumber(timeLeft.minutes)}
+          </div>
+          <span className="text-sm mt-1">Minutes</span>
+        </div>
+        
+        <div className="flex flex-col items-center">
+          <div className="bg-gray-100 text-gray-800 rounded-lg w-16 h-16 flex items-center justify-center text-2xl font-bold">
+            {formatNumber(timeLeft.seconds)}
+          </div>
+          <span className="text-sm mt-1">Seconds</span>
+        </div>
+      </div>
     </div>
   );
 };

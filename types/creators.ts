@@ -1,5 +1,12 @@
+import { StaticImport } from "next/dist/shared/lib/get-img-props";
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export interface Creator {
+	tiktokLink: string;
+	fullName: string;
+	profileImage: string | StaticImport;
+	metrics: any;
+	position: any;
 	id: string;
 	verificationId: string;
 	userId: string;

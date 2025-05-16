@@ -42,7 +42,9 @@ export default function PaymentSuccessHandler() {
           ...formData,
           isDraft: false,
           paymentId,
-          stripeSessionId: sessionId
+          stripeSessionId: sessionId,
+          paymentStatus: verifyResponse.data.paymentStatus,
+          requiresCapture: verifyResponse.data.requiresCapture
         };
         
         // Call the contests API to create the contest
@@ -56,10 +58,10 @@ export default function PaymentSuccessHandler() {
         sessionStorage.removeItem('contestFormData');
         sessionStorage.removeItem('contestFormStep');
         
-        // Update payment record to mark as completed
+        // Update payment record to mark as completed (pending admin approval for capture)
         await axios.post('/api/update-payment', {
           paymentId,
-          status: 'completed',
+          status: verifyResponse.data.requiresCapture ? 'pending_capture' : 'completed',
           contestId: contestResponse.data.data.contestId
         });
         
@@ -67,7 +69,7 @@ export default function PaymentSuccessHandler() {
         
         // Redirect to contest details or dashboard
         setTimeout(() => {
-          router.push(`/brand/dashboard?contest=${contestResponse.data.data.contestId}`);
+          router.push(`/brand/dashboard/contests`);
         }, 2000);
         
       } catch (error) {
@@ -98,7 +100,7 @@ export default function PaymentSuccessHandler() {
           <p>{error}</p>
         </div>
         <button 
-          onClick={() => router.push('/brand/create-contest')}
+          onClick={() => router.push('/brand/contest/new')}
           className="bg-black hover:bg-gray-800 text-white py-2 px-4 rounded"
         >
           Return to Contest Creation
@@ -113,6 +115,7 @@ export default function PaymentSuccessHandler() {
         <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded max-w-md mx-auto mb-4">
           <h1 className="text-xl font-bold mb-2">Payment Successful!</h1>
           <p>Your contest has been created successfully.</p>
+          <p className="text-sm mt-2">Note: Your payment is authorized and waiting for admin approval.</p>
         </div>
         <p className="text-gray-600 mb-4">Redirecting you to your dashboard...</p>
       </div>
