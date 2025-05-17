@@ -165,31 +165,37 @@ export default function ProjectList() {
 		setFilteredProjects(filtered);
 	}, [projects, activeTab, searchQuery, sortOption, currentUser]);
 
+	const hasProjects = projects.length > 0;
+
 	return (
 		<div className="max-w-6xl mx-auto p-4">
-			<div className="flex justify-between items-center mb-6">
 				<SearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
-				<div className="flex items-center">
-					<span className="mr-2 text-gray-600 text-sm">Sort By</span>
-					<Select value={sortOption} onValueChange={setSortOption}>
-						<SelectTrigger className="w-[120px] h-9">
-							<SelectValue placeholder="Sort by" />
-						</SelectTrigger>
-						<SelectContent className="bg-[#f7f7f7]">
-							<SelectItem value="latest">Latest</SelectItem>
-							<SelectItem value="oldest">Oldest</SelectItem>
-							<SelectItem value="popular">Most Popular</SelectItem>
-							<SelectItem value="relevant">Most Relevant</SelectItem>
-						</SelectContent>
-					</Select>
-				</div>
+			<div className="flex justify-between items-center mb-6">
+				{hasProjects && (
+					<div className="flex items-center">
+						<span className="mr-2 text-gray-600 text-sm">Sort By</span>
+						<Select value={sortOption} onValueChange={setSortOption}>
+							<SelectTrigger className="w-[120px] h-9">
+								<SelectValue placeholder="Sort by" />
+							</SelectTrigger>
+							<SelectContent className="bg-[#f7f7f7]">
+								<SelectItem value="latest">Latest</SelectItem>
+								<SelectItem value="oldest">Oldest</SelectItem>
+								<SelectItem value="popular">Most Popular</SelectItem>
+								<SelectItem value="relevant">Most Relevant</SelectItem>
+							</SelectContent>
+						</Select>
+					</div>
+				)}
 			</div>
 
-			<StatusTabs
-				activeTab={activeTab}
-				setActiveTab={setActiveTab}
-				counts={counts}
-			/>
+			{hasProjects && (
+				<StatusTabs
+					activeTab={activeTab}
+					setActiveTab={setActiveTab}
+					counts={counts}
+				/>
+			)}
 
 			<div className="space-y-4 mt-4">
 				{isLoading ? (
@@ -197,8 +203,16 @@ export default function ProjectList() {
 						<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
 						<div className="text-center">Loading projects...</div>
 					</div>
+				) : projects.length === 0 ? (
+					<div className="text-center py-8">
+						<p className="text-lg text-gray-600">No projects found</p>
+						<p className="text-sm text-gray-500 mt-2">Your projects will appear here once you&apos;ve applied or shown interest</p>
+					</div>
 				) : filteredProjects.length === 0 ? (
-					<div className="text-center py-8">No projects found</div>
+					<div className="text-center py-8">
+						<p className="text-lg text-gray-600">No matching projects found</p>
+						<p className="text-sm text-gray-500 mt-2">Try adjusting your search criteria or tab selection</p>
+					</div>
 				) : (
 					filteredProjects.map((project) => (
 						<ProjectCard key={project.projectId} project={project} />

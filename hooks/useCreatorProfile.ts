@@ -74,8 +74,7 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 			}
 
 			const profileData = await profileResponse.json();
-			console.log("Profile data fetched:", profileData);
-
+			
 			// Fetch verification data if we have an ID
 			const verificationId = profileData.verificationId || null;
 			console.log("Verification ID:", verificationId);
@@ -91,10 +90,7 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 
 					if (verificationResponse.ok) {
 						verificationData = await verificationResponse.json();
-						console.log(
-							"Verification data fetched by userId:",
-							verificationData
-						);
+						
 					} else {
 						console.warn(
 							"Failed to fetch verification by userId, status:",
@@ -105,8 +101,6 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 					console.error("Error fetching verification by userId:", err);
 				}
 			}
-
-			console.log("Final verification data:", verificationData);
 
 			// Merge the data with clear priorities
 			const combinedProfileData: CreatorProfile = {
@@ -138,18 +132,7 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 			};
 
 			setCreatorProfile(combinedProfileData);
-			console.log("Combined profile after fetching:", combinedProfileData);
-
-			// Log specific URLs for debugging
-			console.log(
-				"Profile Picture URL:",
-				combinedProfileData.profilePictureUrl
-			);
-			console.log(
-				"Verification Video URL:",
-				combinedProfileData.verificationVideoUrl
-			);
-			console.log("Verifiable ID URL:", combinedProfileData.verifiableIDUrl);
+			
 		} catch (err) {
 			console.error("Error fetching creator profile:", err);
 			setError("Failed to fetch creator profile");
@@ -171,7 +154,6 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 	useEffect(() => {
 		// Function to handle global profile update events
 		const handleProfileUpdate = () => {
-			console.log("Profile update event detected in hook, refreshing data");
 			fetchCreatorProfile();
 		};
 
@@ -269,7 +251,6 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 			const result = await response.json();
 
 			if (response.ok) {
-				console.log("TikTok account disconnected successfully");
 
 				// Immediately update local state to reflect the disconnection
 				if (creatorProfile) {
@@ -329,21 +310,13 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 				return { success: false, error: "User not authenticated" };
 			}
 
-			console.log("Starting verification submission with data:", {
-				hasVideo: !!verificationData.verificationVideo,
-				hasID: !!verificationData.verifiableID,
-				hasPicture: !!verificationData.profilePicture,
-				profileDataKeys: Object.keys(verificationData.profileData),
-			});
 
 			// Upload files in parallel
 			const uploadFile = async (file: File | undefined, uploadType: string) => {
 				if (!file) {
-					console.log(`No ${uploadType} file provided to upload`);
 					return null;
 				}
 
-				console.log(`Uploading ${uploadType} file:`, file.name);
 
 				const formData = new FormData();
 				formData.append("userId", currentUser.uid);
@@ -357,7 +330,6 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 
 				if (response.ok) {
 					const result = await response.json();
-					console.log(`${uploadType} upload success:`, result.publicUrl);
 					return result.publicUrl;
 				} else {
 					const errorResult = await response
@@ -384,12 +356,6 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 				profilePictureUrl,
 			};
 
-			console.log("Submitting verification with URLs:", {
-				verificationVideoUrl,
-				verifiableIDUrl,
-				profilePictureUrl,
-			});
-
 			const response = await fetch("/api/submit-verification", {
 				method: "POST",
 				headers: {
@@ -401,7 +367,6 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 			const result = await response.json();
 
 			if (response.ok) {
-				console.log("Verification submission successful:", result);
 				// Refresh profile after submission
 				await fetchCreatorProfile();
 				return { success: true, verificationId: result.verificationId };

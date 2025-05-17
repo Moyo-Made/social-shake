@@ -53,9 +53,9 @@ export default function RootLayout({
 				<AuthProvider>
 					<SocketProvider>
 						<NotificationsProvider>{children}</NotificationsProvider>
+						<Toaster />
 					</SocketProvider>
 				</AuthProvider>
-				<Toaster />
 			</body>
 		</html>
 	);

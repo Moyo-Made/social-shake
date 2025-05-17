@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { useSocket } from "@/context/SocketContext";
 import { Input } from "@/components/ui/input";
 import { ContestFormData } from "@/types/contestFormData";
+import dynamic from 'next/dynamic';
+
+
 
 interface UserDashboardProps {
 	userId: string;
@@ -59,7 +62,14 @@ interface ContestParticipant {
 	};
 }
 
-export default function UserDashboard({ userId }: UserDashboardProps) {
+const LoadingState = () => (
+	<div className="flex flex-col justify-center items-center h-64">
+	  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+	  <p>Loading dashboard..</p>
+	</div>
+  );
+
+const UserDashboard = dynamic(() => Promise.resolve(({ userId }: UserDashboardProps) => {
 	const [loading, setLoading] = useState(true);
 	interface UserData {
 		summary: {
@@ -1089,5 +1099,10 @@ export default function UserDashboard({ userId }: UserDashboardProps) {
 				</div>
 			)}
 		</div>
-	);
-}
+)}), { 
+	ssr: false,
+	loading: () => <LoadingState />
+});
+
+
+export default UserDashboard;

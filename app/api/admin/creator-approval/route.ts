@@ -450,3 +450,51 @@ export async function GET(request: NextRequest) {
 		);
 	}
 }
+
+export async function POST(request: NextRequest) {
+	try {
+	  const body = await request.json();
+	  const { verificationId, action, message } = body;
+	  
+	  if (!adminDb) {
+		throw new Error("Firebase admin database is not initialized");
+	  }
+	  
+	  // Handle different actions (approve, reject, request_info, suspend)
+	  const verificationRef = adminDb
+		.collection("creator_verifications")
+		.doc(verificationId);
+		
+	  let updateData = {};
+	  
+	  switch (action) {
+		case "approve":
+		  updateData = { status: "approved" };
+		  break;
+		case "reject":
+		  updateData = { status: "rejected", rejectionReason: message };
+		  break;
+		case "request_info":
+		  updateData = { status: "info_requested", infoRequest: message };
+		  break;
+		case "suspend":
+		  updateData = { status: "suspended", suspensionReason: message };
+		  break;
+		default:
+		  throw new Error("Invalid action type");
+	  }
+	  
+	  await verificationRef.update(updateData);
+	  
+	  return NextResponse.json({ success: true });
+	} catch (error) {
+	  console.error("Error updating creator status:", error);
+	  return NextResponse.json(
+		{
+		  error: "Failed to update creator status",
+		  details: error instanceof Error ? error.message : String(error),
+		},
+		{ status: 500 }
+	  );
+	}
+  }

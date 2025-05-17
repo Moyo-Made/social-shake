@@ -39,9 +39,16 @@ interface UserData {
 	}>;
 }
 
-export default function CreatorDashboard({ userId }: UserDashboardProps) {
-	const [loading, setLoading] = useState(true);
+const LoadingState = () => (
+	<div className="flex flex-col justify-center items-center h-64">
+		<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+		<p>Loading dashboard..</p>
+	</div>
+);
 
+// Create the actual dashboard component separately
+const DashboardContent = ({ userId }: UserDashboardProps) => {
+	const [loading, setLoading] = useState(true);
 	const [userData, setUserData] = useState<UserData | null>(null);
 	const searchParams = useSearchParams();
 
@@ -59,8 +66,8 @@ export default function CreatorDashboard({ userId }: UserDashboardProps) {
 		}
 
 		if (tiktokStatus === "error") {
-			// Use the toast to show connection success
-			toast.success("Failed to connect TikTok account!");
+			// Use the toast to show connection error
+			toast.error("Failed to connect TikTok account!");
 
 			// Remove the parameters from URL to prevent multiple refreshes
 			const currentUrl = window.location.pathname;
@@ -92,12 +99,7 @@ export default function CreatorDashboard({ userId }: UserDashboardProps) {
 	}, [userId]);
 
 	if (loading) {
-		return (
-			<div className="flex flex-col justify-center items-center h-64">
-				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
-				<p>Loading dashboard..</p>
-			</div>
-		);
+		return <LoadingState />;
 	}
 
 	if (!userData) {
@@ -133,7 +135,9 @@ export default function CreatorDashboard({ userId }: UserDashboardProps) {
 					/>
 					<div className="mt-2">
 						<h3 className="text-gray-600 text-lg">Active Projects</h3>
-						<p className="text-3xl font-bold mt-2">{userData.activeProjects}</p>
+						<p className="text-3xl font-bold mt-2">
+							{userData.activeProjects}
+						</p>
 					</div>
 				</div>
 
@@ -147,7 +151,9 @@ export default function CreatorDashboard({ userId }: UserDashboardProps) {
 					/>
 					<div className="mt-2">
 						<h3 className="text-gray-600 text-lg">Active Contests</h3>
-						<p className="text-3xl font-bold mt-2">{userData.activeContests}</p>
+						<p className="text-3xl font-bold mt-2">
+							{userData.activeContests}
+						</p>
 					</div>
 				</div>
 
@@ -163,7 +169,7 @@ export default function CreatorDashboard({ userId }: UserDashboardProps) {
 						<div className="mt-2">
 							<h3 className="text-gray-600 text-lg">Total Earnings</h3>
 							<p className="text-3xl font-bold mt-2">
-								{formatCurrency(userData.pendingPayout)}
+								{formatCurrency(userData.totalEarnings)}
 							</p>
 						</div>
 					</div>
@@ -180,7 +186,7 @@ export default function CreatorDashboard({ userId }: UserDashboardProps) {
 					<div className="mt-2">
 						<h3 className="text-gray-600 text-lg">Pending Payouts</h3>
 						<p className="text-3xl font-bold mt-2">
-							{formatCurrency(userData.totalEarnings)}
+							{formatCurrency(userData.pendingPayout)}
 						</p>
 					</div>
 				</div>
@@ -193,4 +199,14 @@ export default function CreatorDashboard({ userId }: UserDashboardProps) {
 			<OngoingProjectsSection userId={userId} />
 		</div>
 	);
-}
+};
+
+// Properly use dynamic import for the dashboard component
+import dynamic from "next/dynamic";
+
+const CreatorDashboard = dynamic(() => Promise.resolve(DashboardContent), {
+	ssr: false,
+	loading: () => <LoadingState />,
+});
+
+export default CreatorDashboard;

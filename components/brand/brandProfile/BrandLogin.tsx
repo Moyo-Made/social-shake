@@ -27,7 +27,6 @@ const Login = () => {
 		error: authError,
 		isLoading,
 		clearError,
-		hasProfile,
 	} = useAuth();
 	const [formData, setFormData] = useState<FormData>({
 		email: "",
@@ -148,38 +147,33 @@ const Login = () => {
 		try {
 			// Attempt to log in
 			await login(formData.email, formData.password);
-
-			// Check if user has a brand profile
-			try {
-				const response = await fetch(
-					`/api/brand-profile?email=${encodeURIComponent(formData.email)}`
-				);
-
-				if (response.ok) {
-					// User has a profile, go to dashboard
-					router.push("/brand/dashboard");
-				} else if (response.status === 404) {
-					// User doesn't have a profile, go to profile creation
-					router.push("/brand/create-profile");
-				} else {
-					// Handle other API errors
-					setFormError(
-						"There was a problem checking your profile. Please try again."
+			
+			// Only proceed with profile check if login was successful
+			if (!authError) {
+				try {
+					const response = await fetch(
+						`/api/brand-profile?email=${encodeURIComponent(formData.email)}`
 					);
-				}
-			} catch (err) {
-				console.error("Profile check error:", err);
-				// If we can't check the profile but authentication succeeded, make a decision based on hasProfile
-				if (hasProfile) {
-					router.push("/brand/dashboard");
-				} else {
-					router.push("/brand/signup");
+
+					if (response.ok) {
+						// User has a profile, go to dashboard
+						router.push("/brand/dashboard");
+					} else {
+						// Handle other API errors
+						setFormError(
+							"There was a problem checking your profile. Please try again or sign up."
+						);
+						setIsSubmitting(false);
+					}
+				} catch (err) {
+					console.error("Profile check error:", err);
+					setFormError("There was a problem checking your profile status. Please try again.");
+					setIsSubmitting(false);
 				}
 			}
 		} catch (err: unknown) {
 			console.error("Login error:", err);
-			// Don't set the error here as it's already handled by the useEffect that watches authError
-		} finally {
+			// The error is already handled by the useEffect that watches authError
 			setIsSubmitting(false);
 		}
 	};

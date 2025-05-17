@@ -57,6 +57,9 @@ const Login = () => {
 			} else if (authError.includes("network-request-failed")) {
 				friendlyMessage =
 					"Network connection issue. Please check your internet connection and try again.";
+			} else if (authError.includes("no-creator-profile")) {
+				friendlyMessage =
+					"We couldn't verify your creator account. If you're a creator, please sign up first.";
 			}
 
 			setFormError(friendlyMessage);
@@ -118,6 +121,28 @@ const Login = () => {
 		return isValid;
 	};
 
+	// Check if creator profile exists before login
+	// Check if creator profile exists before login
+	const checkCreatorProfile = async (email: string): Promise<boolean> => {
+		try {
+			const response = await fetch(
+				`/api/creator-profile?email=${encodeURIComponent(email)}`,
+				{
+					method: "GET",
+				}
+			);
+
+			// If status is 200, we found a profile - return true
+			return response.ok;
+		} catch (error) {
+			console.error("Error checking creator profile:", error);
+			setFormError(
+				"We're having trouble verifying your account. Please try again."
+			);
+			return false;
+		}
+	};
+
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 
@@ -134,8 +159,21 @@ const Login = () => {
 		setIsSubmitting(true);
 
 		try {
-			// Attempt to log in
+			// First check if a creator profile exists for this email
+			const hasCreatorProfile = await checkCreatorProfile(formData.email);
+
+			if (!hasCreatorProfile) {
+				setFormError(
+					"We couldn't verify your creator account. If you're a creator, please sign up first."
+				);
+				setIsSubmitting(false);
+				return;
+			}
+
+			// Only if creator profile exists, attempt to log in
 			await login(formData.email, formData.password);
+
+			// If login successful, redirect to dashboard
 			router.push("/creator/dashboard");
 		} catch (err: unknown) {
 			// This catches any errors not handled by the auth context
@@ -173,8 +211,7 @@ const Login = () => {
 							Welcome Back
 						</h1>
 						<p className="w-full mb-5 text-sm md:text-base text-[#000] font-normal">
-							Log in to connect with brands and track your
-							success.
+							Log in to connect with brands and track your success.
 						</p>
 					</CardHeader>
 
@@ -235,12 +272,14 @@ const Login = () => {
 
 							<Button
 								type="submit"
-								disabled={isLoading}
+								disabled={isLoading || isSubmitting}
 								className={`w-full bg-[#FD5C02] hover:bg-orange-600 text-white text-[17px] py-5 font-normal ${
-									isSubmitting ? "opacity-50 cursor-not-allowed" : ""
+									isLoading || isSubmitting
+										? "opacity-50 cursor-not-allowed"
+										: ""
 								}`}
 							>
-								{isLoading ? (
+								{isLoading || isSubmitting ? (
 									"Logging in..."
 								) : (
 									<>

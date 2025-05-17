@@ -6,10 +6,8 @@ export default function RootLayout({
 	children: React.ReactNode;
 }>) {
 	return (
-		<html lang="en">
-			<body className="">
-				<SideNavLayout>{children}</SideNavLayout>
-			</body>
-		</html>
+		<div className="">
+			<SideNavLayout>{children}</SideNavLayout>
+		</div>
 	);
 }

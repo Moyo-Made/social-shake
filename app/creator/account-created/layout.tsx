@@ -1,21 +1,16 @@
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
 
-
 export default function RootLayout({
-  children,
+	children,
 }: Readonly<{
-  children: React.ReactNode;
+	children: React.ReactNode;
 }>) {
-  return (
-	<html lang="en">
-	  <body
-		className=""
-	  >
-		<Navbar />
-		{children}
-		<Footer />
-	  </body>
-	</html>
-  );
+	return (
+		<div className="">
+			<Navbar />
+			{children}
+			<Footer />
+		</div>
+	);
 }

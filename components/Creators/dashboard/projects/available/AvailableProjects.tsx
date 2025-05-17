@@ -40,9 +40,8 @@ const CreatorProjectDashboard: React.FC = () => {
 			setLoading(true);
 
 			let url = `/api/projects`;
-
 			if (!reset && lastDocId) {
-				url += `&startAfter=${lastDocId}`;
+				url += `?startAfter=${lastDocId}`;
 			}
 
 			const response = await fetch(url);
@@ -346,8 +345,11 @@ const CreatorProjectDashboard: React.FC = () => {
 		return (
 			<>
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mt-6">
-					{filteredProjects.map((project) => (
-						<ProjectCard key={project.userId} project={project} />
+					{filteredProjects.map((project, index) => (
+						<ProjectCard
+							key={project.projectId || `project-${index}`}
+							project={project}
+						/>
 					))}
 				</div>
 

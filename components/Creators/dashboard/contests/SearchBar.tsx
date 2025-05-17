@@ -5,7 +5,7 @@ interface SearchBarProps {
   
   export default function SearchBar({ searchQuery, setSearchQuery }: SearchBarProps) {
 	return (
-	  <div className="relative">
+	  <div className="fixed top-20 left-[17rem]">
 		<input
 		  type="text"
 		  className="pl-3 pr-4 py-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-transparent placeholder:text-sm"
