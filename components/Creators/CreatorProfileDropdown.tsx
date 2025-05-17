@@ -6,11 +6,12 @@ import Link from "next/link";
 import { ChevronDown, LogOut, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { useCreatorProfile } from "@/hooks/useCreatorProfile";
+import { CreatorProfile, useCreatorProfile } from "@/hooks/useCreatorProfile";
 import { toast } from "sonner";
 
 interface CreatorProfileDropdownProps {
 	dropdownPosition?: "header" | "sidenav";
+	creatorProfile: CreatorProfile; 
 }
 
 const CreatorProfileDropdown: React.FC<CreatorProfileDropdownProps> = ({

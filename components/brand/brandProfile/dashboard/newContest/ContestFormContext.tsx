@@ -57,6 +57,7 @@ const defaultFormData: ContestFormData = {
 		startDate: undefined,
 		endDate: undefined,
 		criteria: "views",
+		submissionEndDate: ""
 	},
 	contestType: "Leaderboard",
 	incentives: [],
@@ -71,7 +72,8 @@ const defaultFormData: ContestFormData = {
 		description: undefined
 	},
 	participantsCount: 0,
-	createdAt: ""
+	createdAt: "",
+	computedStatus: undefined
 };
 
 interface ContestFormContextType {
