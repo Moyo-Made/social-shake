@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { MdOutlinePayment } from "react-icons/md";
-import { useRouter } from "next/navigation";
 import { ProjectFormProvider, useProjectForm } from "./ProjectFormContext";
 import { CheckCircle2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -16,17 +15,23 @@ import TikTokShopCreatorPricingTab from "./TikTokShopCreatorPricing";
 import CreatorProjectReview from "./ProjectReview";
 import TikTokShopProjectReview from "./TikTokShopReview";
 import ContentRequirements from "./ContentRequirements";
+import { loadStripe } from "@stripe/stripe-js";
+import axios from "axios";
+
+// Define stripePromise
+const stripePromise = loadStripe(
+	process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY || ""
+);
 
 const ProjectFormContent = () => {
 	const [step, setStep] = useState(1);
-	const router = useRouter();
 	const { currentUser } = useAuth();
 
 	const {
 		formData,
 		isLoading,
+		setIsLoading,
 		saveDraft,
-		submitContest,
 		saveCurrentState,
 		validateStep,
 		validateAllSteps,
@@ -321,11 +326,13 @@ const ProjectFormContent = () => {
 	const handleSubmit = async () => {
 		console.log("Submit button clicked");
 		try {
+			setIsLoading(true);
 			setSubmissionError(null);
 			setValidationError(null);
 
 			if (!currentUser?.email) {
-				setSubmissionError("You must be logged in to submit a contest");
+				setSubmissionError("You must be logged in to submit a project");
+				setIsLoading(false);
 				return;
 			}
 
@@ -334,77 +341,70 @@ const ProjectFormContent = () => {
 				setValidationError(
 					"Please complete all required fields before submitting"
 				);
+				setIsLoading(false);
 				return;
 			}
 
 			// Save current state before submission
 			saveCurrentState();
 
-			console.log(
-				"Thumbnail before submission:",
-				formData.projectDetails.projectThumbnail
-			);
-			// Create FormData for file upload
-			const submitFormData = new FormData();
+			// Save form data to sessionStorage for recovery after payment
+			const completeFormData = {
+				...formData,
+				userId: currentUser.uid
+			};
+			sessionStorage.setItem("projectFormData", JSON.stringify(completeFormData));
 
-			// Add the thumbnail file separately
-			if (formData.projectDetails.projectThumbnail instanceof File) {
-				submitFormData.append(
-					"projectThumbnail",
-					formData.projectDetails.projectThumbnail
+			// Create payment intent with just the necessary payment data
+			const paymentFormData = new FormData();
+			paymentFormData.append("userId", currentUser.uid);
+			paymentFormData.append("brandEmail", currentUser.email || "");
+			paymentFormData.append("amount", creatorPricing.totalAmount.toString());
+			paymentFormData.append("projectName", formData.projectDetails.projectName);
+
+			const paymentResponse = await axios.post("/api/create-payment-intent", paymentFormData);
+
+			if (!paymentResponse.data.success) {
+				throw new Error(paymentResponse.data.error || "Failed to initiate payment");
+			}
+
+			const { paymentId } = paymentResponse.data;
+
+			// Step 2: Initialize Stripe checkout with the payment ID
+			const stripe = await stripePromise;
+
+			if (!stripe) {
+				setSubmissionError(
+					"Stripe is not initialized. Please try again later."
 				);
+				setIsLoading(false);
+				return;
 			}
 
-			// Add the rest of the data as JSON strings
-			submitFormData.append(
-				"projectDetails",
-				JSON.stringify({
-					...formData.projectDetails,
-					projectThumbnail:
-						formData.projectDetails.projectThumbnail instanceof File
-							? null // For new files
-							: formData.projectDetails.projectThumbnail, // Preserve existing URL
-				})
-			);
-			submitFormData.append(
-				"projectRequirements",
-				JSON.stringify(formData.projectRequirements)
-			);
-			submitFormData.append(
-				"creatorPricing",
-				JSON.stringify(formData.creatorPricing)
-			);
+			// Create a checkout session
+			const response = await axios.post("/api/create-checkout-session", {
+				amount: creatorPricing.totalAmount,
+				paymentId: paymentId,
+				projectTitle: formData.projectDetails.projectName || "Project",
+				userEmail: currentUser.email,
+				userId: currentUser.uid,
+				// Add this to differentiate between project and contest
+				paymentType: "project"
+			});
 
-			// Add status fields to explicitly mark this as a published contest (not a draft)
-			submitFormData.append("status", "published");
-			submitFormData.append("isDraft", "false");
+			const { sessionId } = response.data;
 
-			// Add brandEmail and userId for proper association
-			submitFormData.append("brandEmail", currentUser.email);
-			submitFormData.append("userId", currentUser.uid);
+			// Redirect to Stripe checkout
+			const { error } = await stripe.redirectToCheckout({ sessionId });
 
-			// Add timestamp for sorting in dashboard
-			submitFormData.append(
-				"createdAt",
-				JSON.stringify(new Date().toISOString())
-			);
-			submitFormData.append(
-				"updatedAt",
-				JSON.stringify(new Date().toISOString())
-			);
-
-			// Submit using the context method with submitFormData
-			const result = await submitContest();
-
-			if (!result.success) {
-				throw new Error(result.error || "Failed to create contest");
+			if (error) {
+				console.error("Error redirecting to checkout:", error);
+				setSubmissionError("Payment initiation failed. Please try again.");
+				setIsLoading(false);
 			}
 
-			// On success, clear saved step
+			// On success, clear saved step (happens after redirect)
 			sessionStorage.removeItem("projectFormStep");
-
-			// Redirect to success page
-			router.push("/brand/dashboard/projects/payment-successful");
 		} catch (error) {
 			console.error("Submission error:", error);
 			setSubmissionError(
@@ -412,6 +412,7 @@ const ProjectFormContent = () => {
 					? error.message
 					: "An error occurred during submission"
 			);
+			setIsLoading(false);
 		}
 	};
 

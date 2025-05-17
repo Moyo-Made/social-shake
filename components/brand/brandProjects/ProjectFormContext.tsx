@@ -124,6 +124,7 @@ interface ProjectFormContextType {
 	updateCreatorPricing: (data: Partial<CreatorPricing>) => void;
 	saveDraft: () => Promise<ApiResponse>;
 	submitContest: () => Promise<ApiResponse>;
+	setIsLoading: (loading: boolean) => void;
 	resetDraft: () => void;
 	draftSaved: boolean;
 	isLoading: boolean;
@@ -606,6 +607,7 @@ export const ProjectFormProvider: React.FC<{
 				draftSaved,
 				isLoading,
 				error,
+				setIsLoading,
 				setDraftSaved,
 				loadDraftData,
 				saveCurrentState,

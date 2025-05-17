@@ -19,6 +19,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-03-31.basil", // Use the correct API version
 });
 
+// Set the default page size
+const DEFAULT_PAGE_SIZE = 10;
+
 /**
  * Helper function to verify Firebase authentication token
  */
@@ -36,13 +39,32 @@ async function verifyAuthToken(authHeader: string | null) {
 }
 
 /**
- * GET handler for fetching transactions
+ * GET handler for fetching transactions with pagination
  */
 export async function GET(request: NextRequest) {
   try {
     // Get the URL to extract query parameters
     const url = new URL(request.url);
     const userId = url.searchParams.get("userId");
+    
+    // Get pagination parameters with defaults
+    const page = parseInt(url.searchParams.get("page") || "1", 10);
+    const pageSize = parseInt(url.searchParams.get("pageSize") || String(DEFAULT_PAGE_SIZE), 10);
+    
+    // Validate pagination parameters
+    if (isNaN(page) || page < 1) {
+      return NextResponse.json(
+        { error: "Invalid page parameter" },
+        { status: 400 }
+      );
+    }
+    
+    if (isNaN(pageSize) || pageSize < 1 || pageSize > 50) {
+      return NextResponse.json(
+        { error: "Invalid pageSize parameter (must be between 1 and 50)" },
+        { status: 400 }
+      );
+    }
 
     let uid;
 
@@ -63,35 +85,61 @@ export async function GET(request: NextRequest) {
       throw new Error("Unauthorized: No user ID provided");
     }
 
-    // Fetch payment intents
+    // Calculate Stripe API pagination parameters
+    const limit = pageSize;
+    const startingAfter = page > 1 ? url.searchParams.get("cursor") : undefined;
+
+    // Fetch payment intents with pagination
     const paymentIntents = await stripe.paymentIntents.list({
-      limit: 50,
+      limit,
+      starting_after: startingAfter || undefined,
       // customer: stripeCustomerId, // In production, use customer ID
     });
 
-    // Fetch charges
+    // Fetch charges with pagination
     const charges = await stripe.charges.list({
-      limit: 50,
+      limit,
+      ...(startingAfter ? { starting_after: startingAfter } : {}),
       // customer: stripeCustomerId, // In production, use customer ID
     });
 
     // Combine and format the data
-    const transactions = await formatTransactionData([
+    const combinedData = [
       ...paymentIntents.data,
       ...charges.data.filter(
         (charge) =>
           // Avoid duplicates by filtering out charges associated with payment intents already listed
           !paymentIntents.data.some((pi) => pi.latest_charge === charge.id)
       ),
-    ]);
+    ];
 
-    // Get total calculations
+    // Sort by created date (newest first)
+    combinedData.sort((a, b) => b.created - a.created);
+    
+    // Apply pagination to the combined data
+    const paginatedData = combinedData.slice(0, pageSize);
+    
+    // Format the transactions
+    const transactions = await formatTransactionData(paginatedData);
+
+    // Calculate pagination metadata
+    const hasMore = paymentIntents.has_more || charges.has_more;
+    const nextCursor = paginatedData.length > 0 ? paginatedData[paginatedData.length - 1].id : null;
+
+    // Get total calculations (might be based on paginatedData for efficiency)
     const totals = calculateTransactionTotals(transactions);
 
-    // Ensure we return a proper JSON response
+    // Return paginated response
     return NextResponse.json({
       transactions,
       totals,
+      pagination: {
+        page,
+        pageSize,
+        hasMore,
+        nextCursor,
+        totalCount: null, // Stripe doesn't provide a total count directly
+      }
     });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
