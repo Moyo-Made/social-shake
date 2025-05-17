@@ -7,6 +7,7 @@ import axios from 'axios';
 export default function PaymentSuccessHandler() {
   const [status, setStatus] = useState('verifying');
   const [error, setError] = useState<string | null>(null);
+  const [paymentType, setPaymentType] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -15,6 +16,9 @@ export default function PaymentSuccessHandler() {
       try {
         const paymentId = searchParams.get('payment_id');
         const sessionId = searchParams.get('session_id');
+        const type = searchParams.get('type') || 'contest'; // Default to contest if not specified
+        
+        setPaymentType(type);
         
         if (!paymentId || !sessionId) {
           setError('Missing payment information');
@@ -23,22 +27,24 @@ export default function PaymentSuccessHandler() {
         }
         
         // First verify the payment was successful
-        const verifyResponse = await axios.get(`/api/payment-success?payment_id=${paymentId}&session_id=${sessionId}`);
+        const verifyResponse = await axios.get(`/api/payment-success?payment_id=${paymentId}&session_id=${sessionId}&type=${type}`);
         
         if (!verifyResponse.data.success) {
           throw new Error(verifyResponse.data.error || 'Payment verification failed');
         }
         
-        // Get stored form data from sessionStorage
-        const storedFormData = sessionStorage.getItem('contestFormData');
+        // Get stored form data from sessionStorage based on type
+        const storageKey = type === 'project' ? 'projectFormData' : 'contestFormData';
+        const storedFormData = sessionStorage.getItem(storageKey);
+        
         if (!storedFormData) {
-          throw new Error('Contest form data not found');
+          throw new Error(`${type.charAt(0).toUpperCase() + type.slice(1)} form data not found`);
         }
         
         const formData = JSON.parse(storedFormData);
         
-        // Create the contest using your existing API
-        const contestData = {
+        // Create the contest or project using the appropriate API
+        const paymentData = {
           ...formData,
           isDraft: false,
           paymentId,
@@ -47,33 +53,39 @@ export default function PaymentSuccessHandler() {
           requiresCapture: verifyResponse.data.requiresCapture
         };
         
-        // Call the contests API to create the contest
-        const contestResponse = await axios.post('/api/contests', contestData);
+        // Call the appropriate API based on type
+        const apiEndpoint = type === 'project' ? '/api/projects' : '/api/contests';
+        const response = await axios.post(apiEndpoint, paymentData);
         
-        if (!contestResponse.data.success) {
-          throw new Error(contestResponse.data.error || 'Failed to create contest');
+        if (!response.data.success) {
+          throw new Error(response.data.error || `Failed to create ${type}`);
         }
         
         // Clear form data from sessionStorage
-        sessionStorage.removeItem('contestFormData');
-        sessionStorage.removeItem('contestFormStep');
+        sessionStorage.removeItem(storageKey);
+        sessionStorage.removeItem(`${type}FormStep`);
+        
+        // Get the created item ID
+        const itemId = type === 'project' ? response.data.data.projectId : response.data.data.contestId;
         
         // Update payment record to mark as completed (pending admin approval for capture)
         await axios.post('/api/update-payment', {
           paymentId,
           status: verifyResponse.data.requiresCapture ? 'pending_capture' : 'completed',
-          contestId: contestResponse.data.data.contestId
+          type,
+          itemId
         });
         
         setStatus('success');
         
-        // Redirect to contest details or dashboard
+        // Redirect to appropriate dashboard based on type
         setTimeout(() => {
-          router.push(`/brand/dashboard/contests`);
+          const redirectPath = type === 'project' ? '/brand/dashboard/projects' : '/brand/dashboard/contests';
+          router.push(redirectPath);
         }, 2000);
         
       } catch (error) {
-        console.error('Error processing payment:', error);
+        console.error(`Error processing ${paymentType || 'payment'}:`, error);
         setError(error instanceof Error ? error.message : 'An error occurred');
         setStatus('error');
       }
@@ -82,12 +94,16 @@ export default function PaymentSuccessHandler() {
     processPayment();
   }, [searchParams, router]);
   
+  const getItemTypeDisplay = () => {
+    return paymentType === 'project' ? 'project' : 'contest';
+  };
+  
   if (status === 'verifying') {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
         <h1 className="text-2xl font-bold mb-2">Processing your payment...</h1>
-        <p className="text-gray-600">Please wait while we verify your payment and create your contest.</p>
+        <p className="text-gray-600">Please wait while we verify your payment and create your {getItemTypeDisplay()}.</p>
       </div>
     );
   }
@@ -100,10 +116,10 @@ export default function PaymentSuccessHandler() {
           <p>{error}</p>
         </div>
         <button 
-          onClick={() => router.push('/brand/contest/new')}
+          onClick={() => router.push(paymentType === 'project' ? '/brand/project/new' : '/brand/contest/new')}
           className="bg-black hover:bg-gray-800 text-white py-2 px-4 rounded"
         >
-          Return to Contest Creation
+          Return to {paymentType === 'project' ? 'Project' : 'Contest'} Creation
         </button>
       </div>
     );
@@ -114,7 +130,7 @@ export default function PaymentSuccessHandler() {
       <div className="flex flex-col items-center justify-center min-h-screen">
         <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded max-w-md mx-auto mb-4">
           <h1 className="text-xl font-bold mb-2">Payment Successful!</h1>
-          <p>Your contest has been created successfully.</p>
+          <p>Your {getItemTypeDisplay()} has been created successfully.</p>
           <p className="text-sm mt-2">Note: Your payment is authorized and waiting for admin approval.</p>
         </div>
         <p className="text-gray-600 mb-4">Redirecting you to your dashboard...</p>
