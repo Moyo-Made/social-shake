@@ -29,7 +29,7 @@ export default function ProjectList() {
 	const counts = {
 		"All Projects": projects.length,
 		Applied: projects.filter((project) => project.status === "pending").length,
-		"In Progress": projects.filter(p => p.status === "approved").length,
+		"In Progress": projects.filter((p) => p.status === "approved").length,
 		Interested: projects.filter((project) => project.status === "interested")
 			.length,
 		Rejected: projects.filter((project) => project.status === "rejected")
@@ -169,10 +169,10 @@ export default function ProjectList() {
 
 	return (
 		<div className="max-w-6xl mx-auto p-4">
-				<SearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
-			<div className="flex justify-between items-center mb-6">
+			<SearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+			<div className="flex justify-end items-center mb-6">
 				{hasProjects && (
-					<div className="flex items-center">
+					<div className="flex justif-end items-center">
 						<span className="mr-2 text-gray-600 text-sm">Sort By</span>
 						<Select value={sortOption} onValueChange={setSortOption}>
 							<SelectTrigger className="w-[120px] h-9">
@@ -206,12 +206,17 @@ export default function ProjectList() {
 				) : projects.length === 0 ? (
 					<div className="text-center py-8">
 						<p className="text-lg text-gray-600">No projects found</p>
-						<p className="text-sm text-gray-500 mt-2">Your projects will appear here once you&apos;ve applied or shown interest</p>
+						<p className="text-sm text-gray-500 mt-2">
+							Your projects will appear here once you&apos;ve applied or shown
+							interest
+						</p>
 					</div>
 				) : filteredProjects.length === 0 ? (
 					<div className="text-center py-8">
 						<p className="text-lg text-gray-600">No matching projects found</p>
-						<p className="text-sm text-gray-500 mt-2">Try adjusting your search criteria or tab selection</p>
+						<p className="text-sm text-gray-500 mt-2">
+							Try adjusting your search criteria or tab selection
+						</p>
 					</div>
 				) : (
 					filteredProjects.map((project) => (
