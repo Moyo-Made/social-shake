@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     
     const tiktokProfile = tiktokProfileDoc.data();
     const accessToken = tiktokProfile?.accessToken;
-    const tiktokId = tiktokProfile?.tiktokId;
+    // const tiktokId = tiktokProfile?.tiktokId;
     const actualUserId = tiktokProfile?.userId;
     
     if (!accessToken) {

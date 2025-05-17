@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/config/firebase-admin";
-import Stripe from "stripe";
 import { getAuth } from "firebase-admin/auth";
 
 // Helper function to get the current user ID from the request
@@ -79,9 +78,7 @@ export async function POST(request: NextRequest) {
 	  }
 	  
 	  // Use Stripe to either capture or cancel the payment based on approval decision
-	  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-		apiVersion: "2025-03-31.basil",
-	  });
+	 
 	  
 	  if (approved) {
 		// Capture the payment if approved
