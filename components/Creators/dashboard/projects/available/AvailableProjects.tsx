@@ -210,88 +210,96 @@ const CreatorProjectDashboard: React.FC = () => {
 		fetchProjects(false);
 	};
 
+	const hasAvailableProjects = projects.length > 0;
+
 	return (
 		<div className="container mx-auto px-4 py-8">
-			<div className="flex flex-col space-y-6">
-				{/* Search and filter section - Matches the layout shown in the image */}
-				<div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-					{/* Search input */}
-					<form onSubmit={handleSearch} className="relative md:col-span-1">
-						<Input
-							placeholder="Search Projects"
-							value={searchQuery}
-							onChange={(e) => setSearchQuery(e.target.value)}
-							className="pl-10 pr-4 py-2 w-full"
-						/>
-						<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-					</form>
+			{hasAvailableProjects && (
+				<div className="flex flex-col space-y-6">
+					{/* Search and filter section - Matches the layout shown in the image */}
+					<div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+						{/* Search input */}
+						<form onSubmit={handleSearch} className="relative md:col-span-1">
+							<Input
+								placeholder="Search Projects"
+								value={searchQuery}
+								onChange={(e) => setSearchQuery(e.target.value)}
+								className="pl-10 pr-4 py-2 w-full"
+							/>
+							<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+						</form>
 
-					{/* Filters */}
-					<div className="md:col-span-1">
-						<Select value={projectType} onValueChange={setProjectType}>
-							<SelectTrigger>
-								<SelectValue placeholder="Project Type" />
-							</SelectTrigger>
-							<SelectContent className="bg-[#f7f7f7]">
-								<SelectItem value="all">All Types</SelectItem>
-								<SelectItem value="UGC Content Only">
-									UGC Content Only
-								</SelectItem>
+						{/* Filters */}
+						<div className="md:col-span-1">
+							<Select value={projectType} onValueChange={setProjectType}>
+								<SelectTrigger>
+									<SelectValue placeholder="Project Type" />
+								</SelectTrigger>
+								<SelectContent className="bg-[#f7f7f7]">
+									<SelectItem value="all">All Types</SelectItem>
+									<SelectItem value="UGC Content Only">
+										UGC Content Only
+									</SelectItem>
 
-								<SelectItem value="Creator-Posted UGC">
-									Creator-Posted UGC
-								</SelectItem>
-								<SelectItem value="TikTok Shop">TikTok Shop</SelectItem>
-								<SelectItem value="Spark Ads">Spark Ads</SelectItem>
-							</SelectContent>
-						</Select>
+									<SelectItem value="Creator-Posted UGC">
+										Creator-Posted UGC
+									</SelectItem>
+									<SelectItem value="TikTok Shop">TikTok Shop</SelectItem>
+									<SelectItem value="Spark Ads">Spark Ads</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+
+						<div className="md:col-span-1">
+							<Select value={productType} onValueChange={setProductType}>
+								<SelectTrigger>
+									<SelectValue placeholder="Product Type" />
+								</SelectTrigger>
+								<SelectContent className="bg-[#f7f7f7]">
+									<SelectItem value="all">All Products</SelectItem>
+									<SelectItem value="Virtual">Virtual Product</SelectItem>
+									<SelectItem value="Physical">Physical Product</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+
+						<div className="md:col-span-1">
+							<Select value={sortBy} onValueChange={setSortBy}>
+								<SelectTrigger>
+									<SelectValue placeholder="Sort By" />
+								</SelectTrigger>
+								<SelectContent className="bg-[#f7f7f7]">
+									<SelectItem value="newest">Newest First</SelectItem>
+									<SelectItem value="oldest">Oldest First</SelectItem>
+									<SelectItem value="budget-high">
+										Budget: High to Low
+									</SelectItem>
+									<SelectItem value="budget-low">
+										Budget: Low to High
+									</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+
+						<div className="md:col-span-1">
+							<Select value={budgetRange} onValueChange={setBudgetRange}>
+								<SelectTrigger>
+									<SelectValue placeholder="Budget Range" />
+								</SelectTrigger>
+								<SelectContent className="bg-[#f7f7f7]">
+									<SelectItem value="all">All Budgets</SelectItem>
+									<SelectItem value="under1000">Under $1,000</SelectItem>
+									<SelectItem value="1000to5000">$1,000 - $5,000</SelectItem>
+									<SelectItem value="over5000">Over $5,000</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
 					</div>
 
-					<div className="md:col-span-1">
-						<Select value={productType} onValueChange={setProductType}>
-							<SelectTrigger>
-								<SelectValue placeholder="Product Type" />
-							</SelectTrigger>
-							<SelectContent className="bg-[#f7f7f7]">
-								<SelectItem value="all">All Products</SelectItem>
-								<SelectItem value="Virtual">Virtual Product</SelectItem>
-								<SelectItem value="Physical">Physical Product</SelectItem>
-							</SelectContent>
-						</Select>
-					</div>
-
-					<div className="md:col-span-1">
-						<Select value={sortBy} onValueChange={setSortBy}>
-							<SelectTrigger>
-								<SelectValue placeholder="Sort By" />
-							</SelectTrigger>
-							<SelectContent className="bg-[#f7f7f7]">
-								<SelectItem value="newest">Newest First</SelectItem>
-								<SelectItem value="oldest">Oldest First</SelectItem>
-								<SelectItem value="budget-high">Budget: High to Low</SelectItem>
-								<SelectItem value="budget-low">Budget: Low to High</SelectItem>
-							</SelectContent>
-						</Select>
-					</div>
-
-					<div className="md:col-span-1">
-						<Select value={budgetRange} onValueChange={setBudgetRange}>
-							<SelectTrigger>
-								<SelectValue placeholder="Budget Range" />
-							</SelectTrigger>
-							<SelectContent className="bg-[#f7f7f7]">
-								<SelectItem value="all">All Budgets</SelectItem>
-								<SelectItem value="under1000">Under $1,000</SelectItem>
-								<SelectItem value="1000to5000">$1,000 - $5,000</SelectItem>
-								<SelectItem value="over5000">Over $5,000</SelectItem>
-							</SelectContent>
-						</Select>
-					</div>
+					{/* Project listings */}
+					{renderProjectList()}
 				</div>
-
-				{/* Project listings */}
-				{renderProjectList()}
-			</div>
+			)}
 		</div>
 	);
 

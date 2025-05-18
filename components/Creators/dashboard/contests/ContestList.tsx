@@ -100,23 +100,35 @@ export default function ContestList() {
 		switch (sortOption) {
 			case "latest":
 				filtered.sort((a, b) => {
-					const dateA = a.createdAt && typeof a.createdAt === "object" && "_seconds" in a.createdAt
-						? new Date(a.createdAt._seconds * 1000)
-						: new Date(a.createdAt || 0);
-					const dateB = b.createdAt && typeof b.createdAt === "object" && "_seconds" in b.createdAt
-						? new Date(b.createdAt._seconds * 1000)
-						: new Date(b.createdAt || 0);
+					const dateA =
+						a.createdAt &&
+						typeof a.createdAt === "object" &&
+						"_seconds" in a.createdAt
+							? new Date(a.createdAt._seconds * 1000)
+							: new Date(a.createdAt || 0);
+					const dateB =
+						b.createdAt &&
+						typeof b.createdAt === "object" &&
+						"_seconds" in b.createdAt
+							? new Date(b.createdAt._seconds * 1000)
+							: new Date(b.createdAt || 0);
 					return dateB.getTime() - dateA.getTime(); // Newest first
 				});
 				break;
 			case "oldest":
 				filtered.sort((a, b) => {
-					const dateA = a.createdAt && typeof a.createdAt === "object" && "_seconds" in a.createdAt
-						? new Date(a.createdAt._seconds * 1000)
-						: new Date(a.createdAt || 0);
-					const dateB = b.createdAt && typeof b.createdAt === "object" && "_seconds" in b.createdAt
-						? new Date(b.createdAt._seconds * 1000)
-						: new Date(b.createdAt || 0);
+					const dateA =
+						a.createdAt &&
+						typeof a.createdAt === "object" &&
+						"_seconds" in a.createdAt
+							? new Date(a.createdAt._seconds * 1000)
+							: new Date(a.createdAt || 0);
+					const dateB =
+						b.createdAt &&
+						typeof b.createdAt === "object" &&
+						"_seconds" in b.createdAt
+							? new Date(b.createdAt._seconds * 1000)
+							: new Date(b.createdAt || 0);
 					return dateA.getTime() - dateB.getTime(); // Oldest first
 				});
 				break;
@@ -140,12 +152,18 @@ export default function ContestList() {
 			default:
 				// Default to latest if no valid option is selected
 				filtered.sort((a, b) => {
-					const dateA = a.createdAt && typeof a.createdAt === "object" && "_seconds" in a.createdAt
-						? new Date(a.createdAt._seconds * 1000)
-						: new Date(a.createdAt || 0);
-					const dateB = b.createdAt && typeof b.createdAt === "object" && "_seconds" in b.createdAt
-						? new Date(b.createdAt._seconds * 1000)
-						: new Date(b.createdAt || 0);
+					const dateA =
+						a.createdAt &&
+						typeof a.createdAt === "object" &&
+						"_seconds" in a.createdAt
+							? new Date(a.createdAt._seconds * 1000)
+							: new Date(a.createdAt || 0);
+					const dateB =
+						b.createdAt &&
+						typeof b.createdAt === "object" &&
+						"_seconds" in b.createdAt
+							? new Date(b.createdAt._seconds * 1000)
+							: new Date(b.createdAt || 0);
 					return dateB.getTime() - dateA.getTime();
 				});
 		}
@@ -153,31 +171,40 @@ export default function ContestList() {
 		setFilteredContests(filtered);
 	}, [contests, activeTab, searchQuery, sortOption, currentUser]);
 
+	const hasContests = contests.length > 0;
+
 	return (
 		<div className="max-w-6xl mx-auto p-4">
-			<div className="flex justify-between items-center mb-6">
-				<SearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
-				<div className="flex items-center">
-					<span className="mr-2 text-gray-600 text-sm">Sort By</span>
-					<Select value={sortOption} onValueChange={setSortOption}>
-						<SelectTrigger className="w-[120px] h-9">
-							<SelectValue placeholder="Sort by" />
-						</SelectTrigger>
-						<SelectContent className="bg-[#f7f7f7]">
-							<SelectItem value="latest">Latest</SelectItem>
-							<SelectItem value="oldest">Oldest</SelectItem>
-							<SelectItem value="popular">Most Popular</SelectItem>
-							<SelectItem value="relevant">Most Relevant</SelectItem>
-						</SelectContent>
-					</Select>
+			{hasContests && (
+				<div className="flex justify-between items-center mb-6">
+					<SearchBar
+						searchQuery={searchQuery}
+						setSearchQuery={setSearchQuery}
+					/>
+					<div className="flex items-center">
+						<span className="mr-2 text-gray-600 text-sm">Sort By</span>
+						<Select value={sortOption} onValueChange={setSortOption}>
+							<SelectTrigger className="w-[120px] h-9">
+								<SelectValue placeholder="Sort by" />
+							</SelectTrigger>
+							<SelectContent className="bg-[#f7f7f7]">
+								<SelectItem value="latest">Latest</SelectItem>
+								<SelectItem value="oldest">Oldest</SelectItem>
+								<SelectItem value="popular">Most Popular</SelectItem>
+								<SelectItem value="relevant">Most Relevant</SelectItem>
+							</SelectContent>
+						</Select>
+					</div>
 				</div>
-			</div>
+			)}
 
-			<StatusTabs
-				activeTab={activeTab}
-				setActiveTab={setActiveTab}
-				counts={counts}
-			/>
+			{hasContests && (
+				<StatusTabs
+					activeTab={activeTab}
+					setActiveTab={setActiveTab}
+					counts={counts}
+				/>
+			)}
 
 			<div className="space-y-4 mt-4">
 				{isLoading ? (

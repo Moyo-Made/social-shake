@@ -40,8 +40,6 @@ interface TotalTransactions {
 	totalProcessed: string;
 }
 
-
-	
 // Helper function to get type badge styling
 const getTypeBadgeStyle = (type: TransactionType): string => {
 	switch (type) {
@@ -99,78 +97,122 @@ const getStatusIcon = (status: TransactionStatus): React.ReactNode => {
 
 const Transactions: React.FC = () => {
 	const [modalOpen, setModalOpen] = useState<boolean>(false);
-	const [selectedTransaction, setSelectedTransaction] = 
+	const [selectedTransaction, setSelectedTransaction] =
 		useState<Transaction | null>(null);
 	const [searchTerm, setSearchTerm] = useState<string>("");
 	const [typeFilter, setTypeFilter] = useState<string>("");
 	const [statusFilter, setStatusFilter] = useState<string>("");
-	
+
 	// Add loading and error states
 	const [loading, setLoading] = useState<boolean>(true);
 	const [error, setError] = useState<string | null>(null);
-	
+
 	// State to hold the real data
 	const [transactions, setTransactions] = useState<Transaction[]>([]);
-	const [totalTransactions, setTotalTransactions] = useState<TotalTransactions>({
-		totalSpend: "0",
-		pendingPayments: "0",
-		totalProcessed: "0"
-	});
-	const {currentUser} = useAuth();
+	const [totalTransactions, setTotalTransactions] = useState<TotalTransactions>(
+		{
+			totalSpend: "0",
+			pendingPayments: "0",
+			totalProcessed: "0",
+		}
+	);
+	const [currentPage, setCurrentPage] = useState<number>(1);
+	const [pageSize] = useState<number>(10); // Fixed at 10 items per page
+	const [hasMore, setHasMore] = useState<boolean>(false);
+	const [piCursor, setPiCursor] = useState<string | null>(null);
+	const [chargeCursor, setChargeCursor] = useState<string | null>(null);
+	const { currentUser } = useAuth();
 
 	// Whether the user has any transactions
 	const hasTransactions = transactions.length > 0;
-	
+
 	// Fetch transactions when the component mounts
-	const fetchTransactions = async () => {
+	const fetchTransactions = async (
+		page = 1,
+		piCursorParam: string | null = null,
+		chargeCursorParam: string | null = null
+	) => {
 		// Don't try to fetch if there's no user
 		if (!currentUser) {
-		  setLoading(false);
-		  return;
+			setLoading(false);
+			return;
 		}
-		
-		try {
-		  setLoading(true);
-		  setError(null);
-		  
-		  // Use the user ID as a query parameter instead of in the header
-		  const response = await fetch(`/api/transactions?userId=${currentUser.uid}`, {
-			method: "GET",
-			headers: {
-			  "Content-Type": "application/json",
-			},
-		  });
-		  
-		  if (!response.ok) {
-			const errorData = await response.json();
-			throw new Error(errorData.error || "Failed to fetch transactions");
-		  }
-		  
-		  const data = await response.json();
-		  
-		  // Update state with the fetched data
-		  setTransactions(data.transactions || []);
-		  setTotalTransactions(data.totals || {
-			totalSpend: "0",
-			pendingPayments: "0",
-			totalProcessed: "0"
-		  });
-		  
-		  setLoading(false);
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		} catch (error: any) {
-		  console.error("Error fetching transactions:", error);
-		  setError(error.message || "An error occurred while fetching transactions");
-		  setLoading(false);
-		}
-	  };
 
-	  useEffect(() => {
+		try {
+			setLoading(true);
+			setError(null);
+
+			// Build the URL with pagination parameters
+			let url = `/api/transactions?userId=${currentUser.uid}&page=${page}&pageSize=${pageSize}`;
+			if (piCursorParam) {
+				url += `&piCursor=${piCursorParam}`;
+			}
+			if (chargeCursorParam) {
+				url += `&chargeCursor=${chargeCursorParam}`;
+			}
+
+			const response = await fetch(url, {
+				method: "GET",
+				headers: {
+					"Content-Type": "application/json",
+				},
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || "Failed to fetch transactions");
+			}
+
+			const data = await response.json();
+
+			// Update state with the fetched data
+			setTransactions(data.transactions || []);
+			setTotalTransactions(
+				data.totals || {
+					totalSpend: "0",
+					pendingPayments: "0",
+					totalProcessed: "0",
+				}
+			);
+
+			// Update pagination state
+			setCurrentPage(page);
+			setHasMore(data.pagination?.hasMore || false);
+			setPiCursor(data.pagination?.piCursor || null);
+			setChargeCursor(data.pagination?.chargeCursor || null);
+
+			setLoading(false);
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		} catch (error: any) {
+			console.error("Error fetching transactions:", error);
+			setError(
+				error.message || "An error occurred while fetching transactions"
+			);
+			setLoading(false);
+		}
+	};
+
+	// Update the next page function
+	const goToNextPage = () => {
+		if (hasMore) {
+			fetchTransactions(currentPage + 1, piCursor, chargeCursor);
+		}
+	};
+
+	const goToPreviousPage = () => {
+		if (currentPage > 1) {
+			// Note: Going back a page is tricky without storing previous cursors
+			// A simpler approach for now is to start over and fetch up to the previous page
+			fetchTransactions(currentPage - 1);
+		}
+	};
+
+	useEffect(() => {
 		// Only fetch if there's a user
 		if (currentUser) {
-		  fetchTransactions();
+			fetchTransactions();
 		}
-	  }, [currentUser]);
+	}, [currentUser]);
 
 	const handleViewTransaction = (transaction: Transaction): void => {
 		setSelectedTransaction(transaction);
@@ -188,7 +230,7 @@ const Transactions: React.FC = () => {
 	const filteredTransactions = useMemo(() => {
 		// If there are no transactions at all, return empty array
 		if (!hasTransactions) return [];
-		
+
 		return transactions.filter((transaction) => {
 			// Search term filter (case insensitive)
 			const matchesSearch =
@@ -201,14 +243,14 @@ const Transactions: React.FC = () => {
 
 			// Type filter
 			const matchesType =
-				typeFilter === "" || 
-				typeFilter === "all-types" || 
+				typeFilter === "" ||
+				typeFilter === "all-types" ||
 				transaction.type === typeFilter;
 
 			// Status filter
 			const matchesStatus =
-				statusFilter === "" || 
-				statusFilter === "all-statuses" || 
+				statusFilter === "" ||
+				statusFilter === "all-statuses" ||
 				transaction.status === statusFilter;
 
 			return matchesSearch && matchesType && matchesStatus;
@@ -229,11 +271,14 @@ const Transactions: React.FC = () => {
 	if (error) {
 		return (
 			<div className="w-full flex flex-col items-center justify-center py-12">
-				<div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+				<div
+					className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
+					role="alert"
+				>
 					<strong className="font-bold">Error: </strong>
 					<span className="block sm:inline">{error}</span>
 				</div>
-				<Button 
+				<Button
 					className="mt-4 bg-orange-500 hover:bg-orange-600 text-white"
 					onClick={() => window.location.reload()}
 				>
@@ -352,17 +397,24 @@ const Transactions: React.FC = () => {
 						// No transactions yet state
 						<div className="flex flex-col justify-center items-center py-16">
 							<div className="bg-[#FFF4EE] rounded-full p-6 mb-3">
-								<Image src="/icons/money-bag.svg" alt="Bag Icon" width={50} height={50} className="" />
+								<Image
+									src="/icons/money-bag.svg"
+									alt="Bag Icon"
+									width={50}
+									height={50}
+									className=""
+								/>
 							</div>
 							<h2 className="text-xl text-black font-semibold mb-2">
 								No Transactions Yet
 							</h2>
 							<p className="mb-5 text-gray-500 w-1/2 text-center">
-								You haven&apos;t made any transactions yet. Your transaction history will appear here once you make your first transaction.
+								You haven&apos;t made any transactions yet. Your transaction
+								history will appear here once you make your first transaction.
 							</p>
 							<Button className="bg-orange-500 hover:bg-orange-600 text-white py-2 px-6 text-center">
 								<Link href="/brand/dashboard/projects/new">
-								Create a New Project +
+									Create a New Project +
 								</Link>
 							</Button>
 						</div>
@@ -411,7 +463,7 @@ const Transactions: React.FC = () => {
 								We couldn&apos;t find any transactions matching your search
 								criteria. Try adjusting your search.
 							</p>
-							<Button 
+							<Button
 								className="bg-black text-white py-1 px-5 text-center"
 								onClick={clearSearch}
 							>
@@ -421,6 +473,29 @@ const Transactions: React.FC = () => {
 					)}
 				</div>
 			</div>
+
+			{/* Pagination Controls - Only show if there are transactions */}
+			{hasTransactions && (
+				<div className="flex justify-between items-center mt-4">
+					<div className="text-sm text-gray-500">Page {currentPage}</div>
+					<div className="flex gap-2">
+						<Button
+							onClick={goToPreviousPage}
+							disabled={currentPage <= 1}
+							className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+						>
+							Previous
+						</Button>
+						<Button
+							onClick={goToNextPage}
+							disabled={!hasMore}
+							className="bg-orange-500 hover:bg-orange-600 text-white"
+						>
+							Next
+						</Button>
+					</div>
+				</div>
+			)}
 
 			{/* Transaction Modal */}
 			{selectedTransaction && (

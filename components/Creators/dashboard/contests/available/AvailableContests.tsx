@@ -41,17 +41,17 @@ const CreatorContestDashboard: React.FC = () => {
 
 			// Build the API URL for active contests using our dedicated endpoint
 			let url = `/api/contests`;
-			
+
 			// Add pagination parameter if needed
 			if (!reset && lastDocId) {
 				url += `?startAfter=${lastDocId}`;
 			} else {
-				url += '?';
+				url += "?";
 			}
 
 			// Add sorting parameter
 			url += `&orderBy=createdAt&orderDirection=desc`;
-			
+
 			// Set default limit
 			url += `&limit=12`;
 
@@ -85,7 +85,7 @@ const CreatorContestDashboard: React.FC = () => {
 		if (contests.length > 0) {
 			applyFilters();
 		}
-	// eslint-disable-next-line react-hooks/exhaustive-deps
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [
 		searchQuery,
 		industryType,
@@ -99,7 +99,7 @@ const CreatorContestDashboard: React.FC = () => {
 		if (currentUser?.uid) {
 			fetchActiveContests();
 		}
-	// eslint-disable-next-line react-hooks/exhaustive-deps
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [currentUser?.uid]);
 
 	const applyFilters = () => {
@@ -198,90 +198,100 @@ const CreatorContestDashboard: React.FC = () => {
 		fetchActiveContests(false);
 	};
 
+	const hasAvailableContests = contests.length > 0;
+
 	return (
 		<div className="container mx-auto px-4 py-8">
-			<div className="flex flex-col space-y-6">
-				{/* Search and filter section */}
-				<div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-					{/* Search input */}
-					<form onSubmit={handleSearch} className="relative lg:col-span-1">
-						<Input
-							placeholder="Search Contest"
-							value={searchQuery}
-							onChange={(e) => setSearchQuery(e.target.value)}
-							className="pl-10 pr-4 py-2 w-full"
-						/>
-						<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-					</form>
+			{hasAvailableContests && (
+				<div className="flex flex-col space-y-6">
+					{/* Search and filter section */}
+					<div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+						{/* Search input */}
+						<form onSubmit={handleSearch} className="relative lg:col-span-1">
+							<Input
+								placeholder="Search Contest"
+								value={searchQuery}
+								onChange={(e) => setSearchQuery(e.target.value)}
+								className="pl-10 pr-4 py-2 w-full"
+							/>
+							<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+						</form>
 
-					{/* Filters */}
-					<div className="lg:col-span-1">
-						<Select value={industryType} onValueChange={setIndustryType}>
-							<SelectTrigger>
-								<SelectValue placeholder="Industry Type" />
-							</SelectTrigger>
-							<SelectContent className="bg-[#f7f7f7]">
-								<SelectItem value="all">All Industries</SelectItem>
-								<SelectItem value="technology">Technology</SelectItem>
-								<SelectItem value="healthcare">Healthcare</SelectItem>
-								<SelectItem value="finance">Finance</SelectItem>
-								<SelectItem value="retail">Retail</SelectItem>
-								<SelectItem value="education">Education</SelectItem>
-								<SelectItem value="entertainment">Entertainment</SelectItem>
-							</SelectContent>
-						</Select>
+						{/* Filters */}
+						<div className="lg:col-span-1">
+							<Select value={industryType} onValueChange={setIndustryType}>
+								<SelectTrigger>
+									<SelectValue placeholder="Industry Type" />
+								</SelectTrigger>
+								<SelectContent className="bg-[#f7f7f7]">
+									<SelectItem value="all">All Industries</SelectItem>
+									<SelectItem value="technology">Technology</SelectItem>
+									<SelectItem value="healthcare">Healthcare</SelectItem>
+									<SelectItem value="finance">Finance</SelectItem>
+									<SelectItem value="retail">Retail</SelectItem>
+									<SelectItem value="education">Education</SelectItem>
+									<SelectItem value="entertainment">Entertainment</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+
+						<div className="lg:col-span-1">
+							<Select
+								value={participationType}
+								onValueChange={setParticipationType}
+							>
+								<SelectTrigger>
+									<SelectValue placeholder="Participation Type" />
+								</SelectTrigger>
+								<SelectContent className="bg-[#f7f7f7]">
+									<SelectItem value="all">All Types</SelectItem>
+									<SelectItem value="individual">Individual</SelectItem>
+									<SelectItem value="team">Team</SelectItem>
+									<SelectItem value="both">Both</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+
+						<div className="lg:col-span-1">
+							<Select value={sortBy} onValueChange={setSortBy}>
+								<SelectTrigger>
+									<SelectValue placeholder="Sort By" />
+								</SelectTrigger>
+								<SelectContent className="bg-[#f7f7f7]">
+									<SelectItem value="newest">Newest First</SelectItem>
+									<SelectItem value="oldest">Oldest First</SelectItem>
+									<SelectItem value="budget-high">
+										Budget: High to Low
+									</SelectItem>
+									<SelectItem value="budget-low">
+										Budget: Low to High
+									</SelectItem>
+									<SelectItem value="participants">
+										Most Participants
+									</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+
+						<div className="lg:col-span-1">
+							<Select value={budgetRange} onValueChange={setBudgetRange}>
+								<SelectTrigger>
+									<SelectValue placeholder="Budget Range" />
+								</SelectTrigger>
+								<SelectContent className="bg-[#f7f7f7]">
+									<SelectItem value="all">All Budgets</SelectItem>
+									<SelectItem value="under1000">Under $1,000</SelectItem>
+									<SelectItem value="1000to5000">$1,000 - $5,000</SelectItem>
+									<SelectItem value="over5000">Over $5,000</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
 					</div>
 
-					<div className="lg:col-span-1">
-						<Select
-							value={participationType}
-							onValueChange={setParticipationType}
-						>
-							<SelectTrigger>
-								<SelectValue placeholder="Participation Type" />
-							</SelectTrigger>
-							<SelectContent className="bg-[#f7f7f7]">
-								<SelectItem value="all">All Types</SelectItem>
-								<SelectItem value="individual">Individual</SelectItem>
-								<SelectItem value="team">Team</SelectItem>
-								<SelectItem value="both">Both</SelectItem>
-							</SelectContent>
-						</Select>
-					</div>
-
-					<div className="lg:col-span-1">
-						<Select value={sortBy} onValueChange={setSortBy}>
-							<SelectTrigger>
-								<SelectValue placeholder="Sort By" />
-							</SelectTrigger>
-							<SelectContent className="bg-[#f7f7f7]">
-								<SelectItem value="newest">Newest First</SelectItem>
-								<SelectItem value="oldest">Oldest First</SelectItem>
-								<SelectItem value="budget-high">Budget: High to Low</SelectItem>
-								<SelectItem value="budget-low">Budget: Low to High</SelectItem>
-								<SelectItem value="participants">Most Participants</SelectItem>
-							</SelectContent>
-						</Select>
-					</div>
-
-					<div className="lg:col-span-1">
-						<Select value={budgetRange} onValueChange={setBudgetRange}>
-							<SelectTrigger>
-								<SelectValue placeholder="Budget Range" />
-							</SelectTrigger>
-							<SelectContent className="bg-[#f7f7f7]">
-								<SelectItem value="all">All Budgets</SelectItem>
-								<SelectItem value="under1000">Under $1,000</SelectItem>
-								<SelectItem value="1000to5000">$1,000 - $5,000</SelectItem>
-								<SelectItem value="over5000">Over $5,000</SelectItem>
-							</SelectContent>
-						</Select>
-					</div>
+					{/* Contest listings */}
+					{renderContestList()}
 				</div>
-
-				{/* Contest listings */}
-				{renderContestList()}
-			</div>
+			)}
 		</div>
 	);
 
@@ -312,7 +322,7 @@ const CreatorContestDashboard: React.FC = () => {
 						{contests.length === 0
 							? "No active contests found."
 							: "No contests match your filters."}
-					</p>				
+					</p>
 					{contests.length > 0 && (
 						<Button
 							variant="outline"
