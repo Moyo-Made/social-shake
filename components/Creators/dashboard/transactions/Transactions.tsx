@@ -10,7 +10,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import {
@@ -18,6 +18,7 @@ import {
 	DownloadIcon,
 	SettingsIcon,
 	InfoIcon,
+	Loader2,
 } from "lucide-react";
 import {
 	Popover,
@@ -33,6 +34,8 @@ import {
 	WithdrawalDetailsModal,
 } from "./WithdrawModal";
 import { generateTransactionReportPDF } from "./GeneratePDFs";
+import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 
 // Define Transaction type
 type TransactionStatus = "Withdrawn" | "Processing" | "Processed";
@@ -95,7 +98,8 @@ const getStatusIcon = (status: TransactionStatus): React.ReactNode => {
 	}
 };
 
-
+// Configuration for API delays
+const API_DELAY_MS = 1500; // 1.5 second delay before making API calls
 
 const Transactions: React.FC = () => {
 	// Transaction state and modals
@@ -117,88 +121,155 @@ const Transactions: React.FC = () => {
 	const [statusFilter, setStatusFilter] = useState<string>("");
 	const [date, setDate] = useState<Date | undefined>(new Date());
 
+	// Loading states
+	const [isLoading, setIsLoading] = useState<boolean>(true);
+	const [isInitializing, setIsInitializing] = useState<boolean>(true); // New state for initial loading
+	const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+	const [loadingError, setLoadingError] = useState<string | null>(null);
+
+	// Pagination
+	const [hasMore, setHasMore] = useState<boolean>(false);
+	const [lastId, setLastId] = useState<string | null>(null);
+
 	// Financial data
-	const [availableBalance, setAvailableBalance] = useState<string>("1,250");
-	const [processingPayments, setProcessingPayments] = useState<string>("2,000");
-	const [totalEarnings] = useState<string>("12,250");
+	const [availableBalance, setAvailableBalance] = useState<string>("0");
+	const [processingPayments, setProcessingPayments] = useState<string>("0");
+	const [totalEarnings, setTotalEarnings] = useState<string>("0");
 	const [withdrawalDetailsModalOpen, setWithdrawalDetailsModalOpen] =
 		useState<boolean>(false);
-	// Transaction state and modals
-	const [transactions, setTransactions] = useState<Transaction[]>([
-		{
-			id: "tx-123456",
-			transactionDate: "May 5, 2025",
-			description: "Payment for Logo Design Project",
-			amount: "750.00",
-			status: "Processing",
-			type: "payment",
-			userId: "user-123",
-			createdAt: new Date().toISOString(),
-			lastUpdated: new Date().toISOString(),
-			isDefault: false,
-			projectName: "Logo Design for TechCorp",
-			brand: "TechCorp",
-			processingTime: "5-7 business days",
-			processingStartedAt: new Date().toISOString(),
-		},
-		{
-			id: "tx-654321",
-			transactionDate: "April 28, 2025",
-			description: "Withdrawal to Bank Account",
-			amount: "500.00",
-			status: "Withdrawn",
-			type: "withdrawal",
-			userId: "user-123",
-			createdAt: new Date().toISOString(),
-			lastUpdated: new Date().toISOString(),
-			isDefault: false,
-			paymentMethod: {
-				type: "bank",
-				name: "Chase Bank",
-				maskedAccount: "4567",
-			},
-			processingTime: "1-3 business days",
-		},
-	]);
+	// Transaction data
+	const [transactions, setTransactions] = useState<Transaction[]>([]);
+	const [transactionDetails, setTransactionDetails] = useState<any>(null);
 
-  const handleExportReport = () => {
+	const { currentUser } = useAuth();
 
-    // Generate the PDF with the current filtered transactions
-	generateTransactionReportPDF(transactions, {
-		totalEarnings,
-		processingPayments,
-		availableBalance,
-	});
-  };
+	// Fetch transactions on component mount with delay
+	useEffect(() => {
+		const initializeData = async () => {
+			setIsInitializing(true);
+			
+			// Add delay before fetching data to allow other components to load
+			await new Promise(resolve => setTimeout(resolve, API_DELAY_MS));
+			
+			try {
+				await fetchBalanceData();
+				await fetchTransactions();
+			} catch (error) {
+				console.error("Error initializing data:", error);
+			} finally {
+				setIsInitializing(false);
+			}
+		};
+		
+		initializeData();
+	}, []);
 
-	const handleViewTransaction = (transaction: Transaction): void => {
+	// Fetch balance data
+	const fetchBalanceData = async () => {
+		try {
+			const response = await fetch("/api/creator-transactions/balance?userId=" + currentUser?.uid);
+
+			if (!response.ok) {
+				throw new Error("Failed to fetch balance data");
+			}
+
+			const data = await response.json();
+			setAvailableBalance(data.availableBalance);
+			setProcessingPayments(data.processingPayments);
+			setTotalEarnings(data.totalEarnings);
+		} catch (error) {
+			console.error("Error fetching balance:", error);
+			setLoadingError("Failed to load balance data. Please try again.");
+		}
+	};
+
+	// Fetch transactions
+	const fetchTransactions = async (resetList = true) => {
+		setIsLoading(true);
+		setLoadingError(null);
+
+		try {
+			let url = currentUser
+				? `/api/creator-transactions?userId=${currentUser.uid}`
+				: "/api/creator-transactions";
+
+			// Add pagination params if needed
+			if (!resetList && lastId) {
+				url += `&startAfter=${lastId}`;
+			} else if (!resetList) {
+				url += `?startAfter=${lastId}`;
+			}
+
+			const response = await fetch(url);
+
+			if (!response.ok) {
+				throw new Error("Failed to fetch transactions");
+			}
+
+			const data = await response.json();
+
+			if (resetList) {
+				setTransactions(data.transactions);
+			} else {
+				setTransactions([...transactions, ...data.transactions]);
+			}
+
+			setHasMore(data.hasMore);
+			setLastId(data.lastId);
+		} catch (error) {
+			console.error("Error fetching transactions:", error);
+			setLoadingError("Failed to load transactions. Please try again.");
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	// Fetch transaction details with delay
+	const fetchTransactionDetails = async (transactionId: string) => {
+		try {
+			// Add a small delay before fetching transaction details
+			await new Promise(resolve => setTimeout(resolve, 500));
+			
+			const response = await fetch(
+				`/api/creator-transactions/${transactionId}`
+			);
+
+			if (!response.ok) {
+				throw new Error("Failed to fetch transaction details");
+			}
+
+			const data = await response.json();
+			return data.transaction;
+		} catch (error) {
+			console.error("Error fetching transaction details:", error);
+			toast("Failed to load transaction details");
+			return null;
+		}
+	};
+
+	const handleExportReport = () => {
+		// Generate the PDF with the current filtered transactions
+		generateTransactionReportPDF(filteredTransactions, {
+			totalEarnings,
+			processingPayments,
+			availableBalance,
+		});
+	};
+
+	const handleViewTransaction = async (
+		transaction: Transaction
+	): Promise<void> => {
 		setSelectedTransaction(transaction);
+
+		// Get full transaction details
+		const details = await fetchTransactionDetails(transaction.id);
+		setTransactionDetails(details);
 
 		// Show different modals based on transaction status
 		if (transaction.status === "Withdrawn") {
 			setWithdrawalDetailsModalOpen(true);
 		} else {
 			setTransactionModalOpen(true);
-
-			// If transaction is "Processing", update it to "Processed" after a delay
-			if (transaction.status === "Processing") {
-				// Update the status to "Processed" after 5 seconds (simulating processing completion)
-				setTimeout(() => {
-					setTransactions(
-						(prevTransactions) =>
-							prevTransactions?.map((tx) =>
-								tx.id === transaction.id
-									? { ...tx, status: "Processed" as TransactionStatus }
-									: tx
-							) || []
-					);
-
-					// Also update the selected transaction to reflect the change
-					setSelectedTransaction((prev) =>
-						prev ? { ...prev, status: "Processed" as TransactionStatus } : null
-					);
-				}, 5000);
-			}
 		}
 	};
 
@@ -214,90 +285,63 @@ const Transactions: React.FC = () => {
 		setConfirmationModalOpen(true);
 	};
 
-	// Handle withdrawal confirmation
-	const handleConfirmWithdrawal = () => {
+	// Handle withdrawal confirmation with delay
+	const handleConfirmWithdrawal = async () => {
 		// Close the confirmation modal
 		setConfirmationModalOpen(false);
+		setIsSubmitting(true);
 
-		// Create a payment method object from the withdrawalInfo
-		const paymentMethod = {
-			type: withdrawalInfo.paymentMethod?.type || "",
-			name: getPaymentMethodDisplayName(withdrawalInfo.paymentMethod),
-			maskedAccount: getPaymentMethodMaskedAccount(
-				withdrawalInfo.paymentMethod
-			),
-		};
+		try {
+			// Add delay before processing withdrawal
+			await new Promise(resolve => setTimeout(resolve, 800));
+			
+			const response = await fetch("/api/transactions", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					amount: parseFloat(withdrawalInfo.amount),
+					paymentMethod: withdrawalInfo.paymentMethod,
+				}),
+			});
 
-		// Create a new transaction record
-		const newTransaction: Transaction = {
-			id: `tx-${Date.now().toString().slice(-6)}`, // Generate a simple ID
-			transactionDate: new Date().toLocaleDateString("en-US", {
-				month: "long",
-				day: "numeric",
-				year: "numeric",
-			}),
-			description: `Withdrawal to ${getPaymentMethodDisplayName(withdrawalInfo.paymentMethod)}`,
-			amount: withdrawalInfo.amount,
-			status: "Withdrawn",
-			type: withdrawalInfo.paymentMethod?.type || "withdrawal",
-			paymentMethod: paymentMethod,
-			processingTime: "1-3 business days",
-			userId: withdrawalInfo.paymentMethod?.userId || "",
-			createdAt: new Date().toISOString(),
-			lastUpdated: new Date().toISOString(),
-			isDefault: false,
-		};
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || "Failed to process withdrawal");
+			}
 
-		// Add the new transaction to the list
-		setTransactions([newTransaction, ...(transactions || [])]);
+			const data = await response.json();
 
-		// Update the balances
-		const withdrawalAmount = parseFloat(withdrawalInfo.amount);
-		const currentAvailable = parseFloat(availableBalance.replace(/,/g, ""));
-		const newAvailable = currentAvailable - withdrawalAmount;
-		const currentProcessing = parseFloat(processingPayments.replace(/,/g, ""));
-		const newProcessing = currentProcessing + withdrawalAmount;
+			// Add the new transaction to the list
+			setTransactions([data.transaction, ...transactions]);
 
-		// Format with commas
-		setAvailableBalance(newAvailable.toLocaleString("en-US"));
-		setProcessingPayments(newProcessing.toLocaleString("en-US"));
+			// Refresh balance data
+			await fetchBalanceData();
 
-		// Show the transaction details
-		setSelectedTransaction(newTransaction);
-		setTransactionModalOpen(false);
-	};
+			// Show success message
+			toast("Your withdrawal has been submitted successfully");
 
-	// Helper function to get payment method display name
-	const getPaymentMethodDisplayName = (method: any): string => {
-		if (!method) return "Unknown Payment Method";
-
-		switch (method.type.toLowerCase()) {
-			case "bank":
-				return method.bankName || "Bank Account";
-			case "paypal":
-				return `PayPal (${method.paypalEmail || ""})`;
-			case "card":
-				return `${method.cardType || "Card"} ending in ${method.cardEnding || ""}`;
-			default:
-				return method.type.charAt(0).toUpperCase() + method.type.slice(1);
+			// Show the transaction details
+			setSelectedTransaction(data.transaction);
+			setTransactionModalOpen(true);
+		} catch (error) {
+			console.error("Error processing withdrawal:", error);
+			toast(
+				error instanceof Error ? error.message : "Failed to process withdrawal"
+			);
+		} finally {
+			setIsSubmitting(false);
 		}
 	};
 
-	// Helper function to get masked account
-	const getPaymentMethodMaskedAccount = (method: any): string => {
-		if (!method) return "";
-
-		switch (method.type.toLowerCase()) {
-			case "bank":
-				return method.accountEnding || "";
-			case "paypal":
-				return method.paypalEmail || "";
-			case "card":
-				return method.cardEnding ? `****${method.cardEnding}` : "";
-			default:
-				return "";
+	// Load more transactions
+	const loadMoreTransactions = () => {
+		if (hasMore && !isLoading) {
+			fetchTransactions(false);
 		}
 	};
+
 	// Filter transactions based on search, type, and status
 	const filteredTransactions = useMemo(() => {
 		return transactions?.filter((transaction) => {
@@ -310,7 +354,10 @@ const Transactions: React.FC = () => {
 				transaction.amount.toLowerCase().includes(searchTerm.toLowerCase());
 
 			// Type filter
-			const matchesType = typeFilter === "" || typeFilter === "all-types";
+			const matchesType =
+				typeFilter === "" ||
+				typeFilter === "all-types" ||
+				transaction.type === typeFilter;
 
 			// Status filter
 			const matchesStatus =
@@ -336,12 +383,12 @@ const Transactions: React.FC = () => {
 							<span>This Month</span>
 						</Button>
 					</PopoverTrigger>
-					<PopoverContent className="w-auto p-0 bg-white" align="start">
+					<PopoverContent className="w-auto p-0">
 						<Calendar
 							mode="single"
 							selected={date}
 							onSelect={setDate}
-							initialFocus
+							className="rounded-md border bg-white"
 						/>
 					</PopoverContent>
 				</Popover>
@@ -349,239 +396,256 @@ const Transactions: React.FC = () => {
 				<div className="flex gap-3">
 					<Button
 						variant="outline"
-						className="bg-black text-white hover:bg-gray-800 px-6"
-            onClick={handleExportReport}
+						className="flex items-center gap-2 bg-black text-white"
+						onClick={handleExportReport}
+						disabled={isInitializing || filteredTransactions.length === 0}
 					>
-						<DownloadIcon className="h-5 w-5 mr-1" />
-						Export
+						<DownloadIcon className="h-4 w-4" />
+						<span>Export Report</span>
 					</Button>
-					<Link href="/creator/dashboard/settings">
+					<Link href="/settings/payments">
 						<Button
 							variant="outline"
-							className="bg-neutral-900 text-white hover:bg-gray-800 px-4"
+							className="flex items-center gap-2 bg-black text-white"
 						>
-							<SettingsIcon className="h-5 w-5 mr-1" />
-							Payment Settings
+							<SettingsIcon className="h-4 w-4" />
+							<span>Payment Settings</span>
 						</Button>
 					</Link>
 				</div>
 			</div>
 
-			{/* Info banner */}
-			<div className="bg-[#FDEFE7] p-3 rounded-lg mb-6 flex justify-center items-center">
-				<InfoIcon className="h-5 w-5 text-orange-500 mr-2" />
-				<p className="text-sm text-[#BE4501]">
-					Payments are typically processed within 5-7 business days after
-					project completion or commission payout
-				</p>
-			</div>
+			{/* Balance Cards */}
+			<div className="grid grid-cols-3 gap-4 mb-6">
+				<Card className="p-6 flex flex-col gap-1">
+					<div className="text-gray-600 text-sm mb-1">Available Balance</div>
+					<div className="text-2xl font-medium">
+						{isInitializing ? (
+							<div className="h-8 w-20 bg-gray-200 animate-pulse rounded"></div>
+						) : (
+							`$${availableBalance}`
+						)}
+					</div>
+					<Button
+						className="mt-2 bg-green-500 hover:bg-green-600 text-white"
+						onClick={handleWithdraw}
+						disabled={isInitializing || parseFloat(availableBalance) <= 0}
+					>
+						{isInitializing ? (
+							<Loader2 className="h-4 w-4 animate-spin mr-2" />
+						) : null}
+						Withdraw
+					</Button>
+				</Card>
 
-			{/* Earnings cards */}
-			<div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-				<Card className="p-6 shadow-sm border-gray-200">
-					<div className="flex flex-col items-center justify-center">
-						<p className="text-lg text-gray-900 mb-2">Total Earnings</p>
-						<h2 className="text-3xl font-semibold text-gray-900">
-							${totalEarnings}
-						</h2>
+				<Card className="p-6 flex flex-col gap-1">
+					<div className="text-gray-600 text-sm mb-1">Processing</div>
+					<div className="text-2xl font-medium">
+						{isInitializing ? (
+							<div className="h-8 w-20 bg-gray-200 animate-pulse rounded"></div>
+						) : (
+							`$${processingPayments}`
+						)}
 					</div>
 				</Card>
 
-				<Card className="p-6 shadow-sm border-gray-200">
-					<div className="flex flex-col items-center justify-center">
-						<p className="text-lg text-gray-900 mb-2">Processing Payments</p>
-						<h2 className="text-3xl font-semibold text-gray-900">
-							${processingPayments}
-						</h2>
-						<div className="flex items-center mt-2 text-orange-600">
-							<CalendarIcon className="h-4 w-4 mr-1" />
-							<span>5-7 business days</span>
-						</div>
+				<Card className="p-6 flex flex-col gap-1">
+					<div className="text-gray-600 text-sm mb-1">Total Earnings</div>
+					<div className="text-2xl font-medium">
+						{isInitializing ? (
+							<div className="h-8 w-20 bg-gray-200 animate-pulse rounded"></div>
+						) : (
+							`$${totalEarnings}`
+						)}
 					</div>
-				</Card>
-
-				<Card className="p-6 shadow-sm border-gray-200">
-					<div className="flex flex-col items-center justify-center">
-						<p className="text-lg text-gray-900 mb-2">
-							Available for Withdrawal
-						</p>
-						<h2 className="text-3xl font-semibold text-gray-900">
-							${availableBalance}
-						</h2>
-						<Button
-							className="mt-4 bg-green-700 hover:bg-green-800 text-white w-full"
-							onClick={handleWithdraw}
-							disabled={parseFloat(availableBalance.replace(/,/g, "")) <= 0}
-						>
-							<span className="mr-1">💳</span>
-							Withdraw
-						</Button>
+					<div className="flex items-center gap-1 mt-2 text-sm text-gray-600">
+						<InfoIcon className="h-4 w-4" />
+						<span>Since you joined</span>
 					</div>
 				</Card>
 			</div>
 
-			{/* Search and filters */}
-			<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-				<div className="relative">
-					<Input
-						type="text"
-						className="pl-10 pr-4 py-2 w-full"
-						placeholder="Search Transactions"
-						value={searchTerm}
-						onChange={(e) => setSearchTerm(e.target.value)}
-					/>
-					<div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-						<svg
-							className="w-4 h-4 text-gray-500"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-							xmlns="http://www.w3.org/2000/svg"
-						>
-							<path
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								strokeWidth="2"
-								d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-							></path>
-						</svg>
-					</div>
-				</div>
+			{/* Filters */}
+			<div className="flex gap-4 mb-6">
+				<Input
+					type="text"
+					placeholder="Search..."
+					className="max-w-xs"
+					value={searchTerm}
+					onChange={(e) => setSearchTerm(e.target.value)}
+					disabled={isInitializing}
+				/>
 
-				<Select
-					value={typeFilter}
-					onValueChange={(value: string) => setTypeFilter(value)}
+				<Select 
+					value={typeFilter} 
+					onValueChange={setTypeFilter}
+					disabled={isInitializing}
 				>
-					<SelectTrigger className="w-full">
-						<SelectValue placeholder="Filter by Type" />
+					<SelectTrigger className="w-[180px]">
+						<SelectValue placeholder="All Types" />
 					</SelectTrigger>
 					<SelectContent className="bg-white">
 						<SelectItem value="all-types">All Types</SelectItem>
-						<SelectItem value="withdrawal">Withdrawal</SelectItem>
-						<SelectItem value="payment">Payment</SelectItem>
+						<SelectItem value="payout">Payout</SelectItem>
+						<SelectItem value="sale">Sale</SelectItem>
+						<SelectItem value="refund">Refund</SelectItem>
 					</SelectContent>
 				</Select>
 
-				<Select
-					value={statusFilter}
-					onValueChange={(value: string) => setStatusFilter(value)}
+				<Select 
+					value={statusFilter} 
+					onValueChange={setStatusFilter}
+					disabled={isInitializing}
 				>
-					<SelectTrigger className="w-full">
-						<SelectValue placeholder="Filter by Status" />
+					<SelectTrigger className="w-[180px]">
+						<SelectValue placeholder="All Statuses" />
 					</SelectTrigger>
 					<SelectContent className="bg-white">
 						<SelectItem value="all-statuses">All Statuses</SelectItem>
-						<SelectItem value="Withdrawn">Withdrawn</SelectItem>
-						<SelectItem value="Processing">Processing</SelectItem>
 						<SelectItem value="Processed">Processed</SelectItem>
+						<SelectItem value="Processing">Processing</SelectItem>
+						<SelectItem value="Withdrawn">Withdrawn</SelectItem>
 					</SelectContent>
 				</Select>
 			</div>
 
-			{/* Transaction Table */}
-			{transactions?.length === 0 ? (
-				<div className="flex flex-col items-center justify-center py-16 border border-gray-200 rounded-md">
-					<h2 className="text-2xl font-medium mb-2">No transactions yet</h2>
-					<p className="text-gray-600">
-						Your transactions will appear here once you start earning.
-					</p>
-				</div>
-			) : filteredTransactions?.length === 0 ? (
-				<div className="flex flex-col items-center justify-center py-16 border border-gray-200 rounded-md">
-					<h2 className="text-2xl font-medium mb-2">No Search Results</h2>
-					<p className="text-gray-600 mb-6">
-						We couldn&apos;t find any transactions matching your search
-						criteria. Try adjusting your search.
-					</p>
-					<Button
-						variant="outline"
-						className="bg-black text-white hover:bg-gray-800 px-8"
-						onClick={() => {
-							setSearchTerm("");
-							setTypeFilter("");
-							setStatusFilter("");
-						}}
-					>
-						Clear Search
-					</Button>
-				</div>
-			) : (
-				<div className="border border-gray-200 rounded-md overflow-hidden">
-					{/* Table Header */}
-					<div className="grid grid-cols-6 bg-gray-50 p-4 text-gray-600 text-sm font-medium">
-						<div className="col-span-1">Transaction Date</div>
-						<div className="col-span-2">Description</div>
-						<div className="col-span-1">Amount</div>
-						<div className="col-span-1 ">
-							<span>Status</span>
-						</div>
-						<div className="col-span-1 ">
-							<span>Actions</span>
-						</div>
+			{/* Transactions List */}
+			<div className="mb-6">
+				{isInitializing ? (
+					<div className="flex flex-col items-center justify-center py-10">
+						<Loader2 className="h-8 w-8 animate-spin text-gray-400 mb-2" />
+						<p className="text-gray-500">Initializing transaction data...</p>
 					</div>
+				) : loadingError ? (
+					<div className="flex flex-col items-center justify-center py-10">
+						<p className="text-red-500 mb-2">{loadingError}</p>
+						<Button variant="outline" onClick={() => fetchTransactions()}>
+							Try Again
+						</Button>
+					</div>
+				) : isLoading && transactions.length === 0 ? (
+					<div className="flex justify-center py-10">
+						<Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+					</div>
+				) : filteredTransactions.length === 0 ? (
+					<div className="flex flex-col items-center justify-center py-10">
+						<p className="text-gray-500 mb-2">No transactions found</p>
+						{(searchTerm || typeFilter || statusFilter) && (
+							<Button
+								variant="outline"
+								onClick={() => {
+									setSearchTerm("");
+									setTypeFilter("");
+									setStatusFilter("");
+								}}
+							>
+								Clear Filters
+							</Button>
+						)}
+					</div>
+				) : (
+					<div className="rounded-lg border overflow-hidden">
+						<table className="w-full text-sm">
+							<thead className="bg-gray-50 text-gray-600">
+								<tr>
+									<th className="px-6 py-3 text-left font-medium">
+										Description
+									</th>
+									<th className="px-6 py-3 text-left font-medium">Date</th>
+									<th className="px-6 py-3 text-left font-medium">Status</th>
+									<th className="px-6 py-3 text-left font-medium">Amount</th>
+									<th className="px-6 py-3 text-right font-medium">Action</th>
+								</tr>
+							</thead>
+							<tbody className="divide-y">
+								{filteredTransactions.map((transaction) => (
+									<tr key={transaction.id} className="bg-white">
+										<td className="px-6 py-4">
+											<div className="font-medium">
+												{transaction.description}
+											</div>
+											<div className="text-gray-500 text-xs">
+												{transaction.type}
+											</div>
+										</td>
+										<td className="px-6 py-4 text-gray-600">
+											{transaction.date}
+										</td>
+										<td className="px-6 py-4">
+											<div
+												className={getStatusBadgeStyle(
+													transaction.status as TransactionStatus
+												)}
+											>
+												{getStatusIcon(transaction.status as TransactionStatus)}
+												<span>{transaction.status}</span>
+											</div>
+										</td>
+										<td className="px-6 py-4 font-medium">
+											{transaction.amount}
+										</td>
+										<td className="px-6 py-4 text-right">
+											<Button
+												variant="ghost"
+												className="text-gray-600 hover:text-gray-900"
+												onClick={() => handleViewTransaction(transaction)}
+											>
+												View
+											</Button>
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				)}
 
-					{/* Table Body */}
-					{filteredTransactions?.map((item, index) => (
-						<div
-							key={index}
-							className="grid grid-cols-6 p-4 items-center border-t border-gray-200 text-sm text-gray-800"
+				{/* Load More Button */}
+				{hasMore && !isLoading && !isInitializing && (
+					<div className="flex justify-center mt-4">
+						<Button
+							variant="outline"
+							onClick={loadMoreTransactions}
+							className="border-gray-300"
 						>
-							<div className="col-span-1">{item.transactionDate}</div>
-							<div className="col-span-2">{item.description}</div>
-							<div className="col-span-1">${item.amount}</div>
-							<div className="col-span-1">
-								<span className={getStatusBadgeStyle(item.status)}>
-									{getStatusIcon(item.status)}
-									{item.status}
-								</span>
-							</div>
-							<div className="col-span-1">
-								<button
-									className="text-orange-500 hover:underline"
-									onClick={() => handleViewTransaction(item)}
-								>
-									View Transaction
-								</button>
-							</div>
-						</div>
-					))}
-				</div>
-			)}
+							Load More
+						</Button>
+					</div>
+				)}
+			</div>
 
-			{/* Transaction Modal */}
+			{/* Modals */}
 			{selectedTransaction && (
-				<TransactionModal
-					transaction={selectedTransaction}
-					isOpen={transactionModalOpen}
-					onClose={() => setTransactionModalOpen(false)}
-				/>
+				<>
+					<TransactionModal
+						isOpen={transactionModalOpen}
+						onClose={() => setTransactionModalOpen(false)}
+						transaction={selectedTransaction}
+						details={transactionDetails}
+					/>
+
+					<WithdrawalDetailsModal
+						isOpen={withdrawalDetailsModalOpen}
+						onClose={() => setWithdrawalDetailsModalOpen(false)}
+						transaction={selectedTransaction}
+						details={transactionDetails}
+					/>
+				</>
 			)}
 
-			{/* Withdrawal Modal */}
 			<WithdrawalModal
 				isOpen={withdrawalModalOpen}
 				onClose={() => setWithdrawalModalOpen(false)}
 				onSubmit={handleWithdrawalSubmit}
-				availableBalance={parseFloat(
-					availableBalance.replace(/,/g, "")
-				).toString()}
+				availableBalance={availableBalance}
 			/>
 
-			{/* WithdrawalDetailsModal - For Withdrawn transactions */}
-			{selectedTransaction && (
-				<WithdrawalDetailsModal
-					transaction={selectedTransaction}
-					isOpen={withdrawalDetailsModalOpen}
-					onClose={() => setWithdrawalDetailsModalOpen(false)}
-				/>
-			)}
-
-			{/* Confirmation Modal */}
 			<ConfirmationModal
 				isOpen={confirmationModalOpen}
 				onClose={() => setConfirmationModalOpen(false)}
 				onConfirm={handleConfirmWithdrawal}
 				withdrawalInfo={withdrawalInfo}
+				isLoading={isSubmitting}
 			/>
 		</div>
 	);

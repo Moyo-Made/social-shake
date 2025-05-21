@@ -155,7 +155,7 @@ const ProjectDashboard = () => {
 				// First set projects without submissions to show something to user quickly
 				setProjects(projectsData);
 				setFilteredProjects(projectsData);
-				
+
 				// Then fetch submissions for each project
 				const projectsWithSubmissions = await Promise.all(
 					projectsData.map(async (project) => {
@@ -168,10 +168,10 @@ const ProjectDashboard = () => {
 
 								if (response.ok) {
 									const data = await response.json();
-									
+
 									if (data.success && data.submissions) {
 										const basicSubmissions = data.submissions;
-										
+
 										// Transform the API response to match our Submission interface
 										const transformedSubmissions = basicSubmissions.map(
 											// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -180,14 +180,18 @@ const ProjectDashboard = () => {
 												userId: submission.userId,
 												projectId: submission.projectId,
 												creatorName: submission.creatorName || "Creator",
-												creatorIcon: submission.creatorIcon || "/placeholder-profile.jpg",
-												videoUrl: submission.videoUrl || "/placeholder-video.jpg",
+												creatorIcon:
+													submission.creatorIcon || "/placeholder-profile.jpg",
+												videoUrl:
+													submission.videoUrl || "/placeholder-video.jpg",
 												videoNumber: submission.videoNumber || `#${index + 1}`,
 												revisionNumber: submission.revisionNumber
 													? `#${submission.revisionNumber}`
 													: "",
 												status: submission.status || "new",
-												createdAt: new Date(submission.createdAt).toLocaleDateString(),
+												createdAt: new Date(
+													submission.createdAt
+												).toLocaleDateString(),
 												sparkCode: submission.sparkCode || "",
 											})
 										);
@@ -198,16 +202,21 @@ const ProjectDashboard = () => {
 											submissionsList: transformedSubmissions,
 											submissions: {
 												videos: transformedSubmissions.length,
-												pending: transformedSubmissions.filter((sub: { status: string; }) => sub.status === "pending").length
-											}
+												pending: transformedSubmissions.filter(
+													(sub: { status: string }) => sub.status === "pending"
+												).length,
+											},
 										};
 									}
 								}
 							} catch (err) {
-								console.error(`Error fetching submissions for project ${project.id}:`, err);
+								console.error(
+									`Error fetching submissions for project ${project.id}:`,
+									err
+								);
 							}
 						}
-						
+
 						// If fetch failed or wasn't attempted, return project as is
 						return project;
 					})
@@ -333,7 +342,7 @@ const ProjectDashboard = () => {
 			status.toLowerCase()
 		);
 	};
-	
+
 	return (
 		<div className="bg-gray-50 p-6 min-h-screen w-full">
 			{/* Header with search and filters */}
@@ -486,15 +495,22 @@ const ProjectDashboard = () => {
 								{/* Project Thumbnail */}
 								{project.thumbnailUrl && (
 									<div className="relative mb-6 rounded-xl overflow-hidden">
-										<Image
-											src={project.thumbnailUrl}
-											alt={`${project.title} thumbnail`}
-											className="w-full h-48 object-cover"
-											onError={handleImageError}
-											width={500}
-											height={400}
-											priority={true}
-										/>
+										{project.thumbnailUrl.startsWith("http") ? (
+											<Image
+												src={project.thumbnailUrl}
+												alt={`${project.title} thumbnail`}
+												className="w-full h-48 object-cover"
+												width={500}
+												height={400}
+												priority={true}
+											/>
+										) : (
+											<div className="w-full h-48 bg-gray-200 flex items-center justify-center">
+												<span className="text-gray-500">
+													Thumbnail Preview Unavailable
+												</span>
+											</div>
+										)}
 									</div>
 								)}
 								{/* Project Type Badge */}
@@ -603,7 +619,10 @@ const ProjectDashboard = () => {
 												</span>{" "}
 												<p className="text-sm font-normal">
 													{project.submissionsList.length}{" "}
-													{project.submissionsList.length !== 1 ? "Videos" : "Video"} •{" "}
+													{project.submissionsList.length !== 1
+														? "Videos"
+														: "Video"}{" "}
+													•{" "}
 													{
 														project.submissionsList.filter(
 															(sub) => sub.status === "pending"
@@ -797,8 +816,10 @@ const ProjectDashboard = () => {
 													</span>{" "}
 													<p className="text-sm font-normal">
 														{project.submissionsList.length}{" "}
-														{project.submissionsList.length !== 1 ? "Videos" : "Video"}{" "}
-														 •{" "}
+														{project.submissionsList.length !== 1
+															? "Videos"
+															: "Video"}{" "}
+														•{" "}
 														{
 															project.submissionsList.filter(
 																(sub) => sub.status === "pending"
@@ -994,8 +1015,10 @@ const ProjectDashboard = () => {
 													</span>{" "}
 													<p className="text-sm font-normal">
 														{project.submissionsList.length}{" "}
-														{project.submissionsList.length !== 1 ? "Videos" : "Video"}{" "}
-														 •{" "}
+														{project.submissionsList.length !== 1
+															? "Videos"
+															: "Video"}{" "}
+														•{" "}
 														{
 															project.submissionsList.filter(
 																(sub) => sub.status === "pending"

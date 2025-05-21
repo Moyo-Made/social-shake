@@ -21,6 +21,7 @@ export default function ContestCard({ contest }: ContestCardProps) {
 	// Add state for brand profile
 	const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
 	const [, setBrandEmail] = useState<string>("");
+	const { basic } = contest;
 
 	// Add useEffect to fetch brand profile
 	useEffect(() => {
@@ -311,8 +312,8 @@ export default function ContestCard({ contest }: ContestCardProps) {
 		<div className="border border-[#D2D2D2] rounded-lg overflow-hidden bg-white shadow-sm mb-1">
 			<div className="flex">
 				<div className="w-1/3">
-					<Image
-						src={contest.basic?.thumbnail || "/api/placeholder/300/200"}
+					<img
+						src={basic?.thumbnail || "/api/placeholder/300/200"}
 						alt={contest.basic?.contestName || "Contest thumbnail"}
 						className="w-full h-[20rem] object-cover rounded-xl p-2"
 						width={300}

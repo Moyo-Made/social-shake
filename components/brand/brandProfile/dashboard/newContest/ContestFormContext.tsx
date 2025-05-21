@@ -57,7 +57,7 @@ const defaultFormData: ContestFormData = {
 		startDate: undefined,
 		endDate: undefined,
 		criteria: "views",
-		submissionEndDate: ""
+		submissionEndDate: "",
 	},
 	contestType: "Leaderboard",
 	incentives: [],
@@ -69,11 +69,11 @@ const defaultFormData: ContestFormData = {
 		name: "",
 		logo: "",
 		website: undefined,
-		description: undefined
+		description: undefined,
 	},
 	participantsCount: 0,
 	createdAt: "",
-	computedStatus: undefined
+	computedStatus: undefined,
 };
 
 interface ContestFormContextType {
@@ -118,7 +118,8 @@ export const ContestFormProvider: React.FC<{
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	// Add validation state
-	const [validationFunctions, setValidationFunctions] = useState<ValidationSteps>({});
+	const [validationFunctions, setValidationFunctions] =
+		useState<ValidationSteps>({});
 
 	// Load saved data on first render
 	useEffect(() => {
@@ -129,7 +130,6 @@ export const ContestFormProvider: React.FC<{
 			try {
 				const parsedData = JSON.parse(sessionData);
 				processFormData(parsedData);
-				console.log("Loaded form data from session storage");
 				return; // Exit early if session data exists
 			} catch (error) {
 				console.error("Error parsing session form data:", error);
@@ -142,7 +142,6 @@ export const ContestFormProvider: React.FC<{
 			try {
 				const parsedData = JSON.parse(savedData);
 				processFormData(parsedData);
-				console.log("Loaded form data from local storage");
 			} catch (error) {
 				console.error("Error parsing saved form data:", error);
 				// Fallback to default if parsing fails
@@ -269,17 +268,20 @@ export const ContestFormProvider: React.FC<{
 	}, []);
 
 	// Add validation functions
-	const validateStep = useCallback((step: string, validationFn: ValidationFunction) => {
-		setValidationFunctions(prev => ({
-			...prev,
-			[step]: validationFn
-		}));
-	}, []);
+	const validateStep = useCallback(
+		(step: string, validationFn: ValidationFunction) => {
+			setValidationFunctions((prev) => ({
+				...prev,
+				[step]: validationFn,
+			}));
+		},
+		[]
+	);
 
 	// Validate all steps
 	const validateAllSteps = useCallback(() => {
-		const results = Object.values(validationFunctions).map(fn => fn());
-		return results.every(result => result === true);
+		const results = Object.values(validationFunctions).map((fn) => fn());
+		return results.every((result) => result === true);
 	}, [validationFunctions]);
 
 	// Update your submission function to include validation
@@ -293,7 +295,7 @@ export const ContestFormProvider: React.FC<{
 			setIsLoading(false);
 			return {
 				success: false,
-				error: "Please complete all required fields before submitting"
+				error: "Please complete all required fields before submitting",
 			};
 		}
 
@@ -364,18 +366,8 @@ export const ContestFormProvider: React.FC<{
 				body: formDataForSubmission,
 			});
 
-			// Log what we're about to send (for debugging)
-			console.log("Submitting data:", {
-				basic: formData.basic,
-				requirements: formData.requirements,
-				prizeTimeline: formData.prizeTimeline,
-				contestType: formData.contestType,
-				incentives: formData.incentives,
-			});
-
 			// Parse the response
 			const result = await response.json();
-			console.log("Submission result:", result);
 
 			if (!response.ok || !result.success) {
 				throw new Error(result.error || "Failed to create contest");
@@ -506,7 +498,6 @@ export const ContestFormProvider: React.FC<{
 
 			// Now safely parse the JSON
 			const result = await response.json();
-			console.log("Draft save result:", result);
 
 			if (!result.success) {
 				throw new Error(result.error || "Failed to save draft");
@@ -543,8 +534,6 @@ export const ContestFormProvider: React.FC<{
 			const dataString = JSON.stringify(processedData);
 			localStorage.setItem("contestFormDraft", dataString);
 			sessionStorage.setItem("contestFormSession", dataString);
-
-			console.log("Loaded draft data:", processedData);
 		} catch (error) {
 			console.error("Error loading draft data:", error);
 		}

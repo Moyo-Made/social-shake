@@ -11,7 +11,7 @@ import { toast } from "sonner";
 
 interface CreatorProfileDropdownProps {
 	dropdownPosition?: "header" | "sidenav";
-	creatorProfile: CreatorProfile; 
+	creatorProfile: CreatorProfile;
 }
 
 const CreatorProfileDropdown: React.FC<CreatorProfileDropdownProps> = ({
@@ -130,14 +130,13 @@ const CreatorProfileDropdown: React.FC<CreatorProfileDropdownProps> = ({
 
 	// Get display name from available profile data
 	const getDisplayName = () => {
-		// Check for Tiktok profile data first
-		if (creatorProfile?.tiktokUsername) {
-			return String(creatorProfile.tiktokUsername);
-		}
-
 		// First try verification data if available
 		if (creatorProfile?.profileData?.fullName) {
 			return String(creatorProfile.profileData.fullName);
+		}
+
+		if (creatorProfile?.tiktokUsername) {
+			return String(creatorProfile.tiktokUsername);
 		}
 
 		// Then check displayUsername
@@ -248,13 +247,14 @@ const CreatorProfileDropdown: React.FC<CreatorProfileDropdownProps> = ({
 		if (!creatorProfile) return null;
 
 		// First try the Tiktok profile picture if available
-		if (creatorProfile.tiktokAvatarUrl) {
-			return creatorProfile.tiktokAvatarUrl as string;
-		}
 
 		// Then check for logoUrl which is used in AccountSettings
 		if (creatorProfile.logoUrl) {
 			return creatorProfile.logoUrl as string;
+		}
+
+		if (creatorProfile.tiktokAvatarUrl) {
+			return creatorProfile.tiktokAvatarUrl as string;
 		}
 
 		if (creatorProfile.profilePictureUrl) {
@@ -374,13 +374,16 @@ const CreatorProfileDropdown: React.FC<CreatorProfileDropdownProps> = ({
 						{loading ? (
 							<div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse"></div>
 						) : profilePicture ? (
-							<Image
-								src={profilePicture}
-								alt={getDisplayName()}
-								width={30}
-								height={30}
-								className="rounded-full object-cover"
-							/>
+							<div className="w-8 h-8 overflow-hidden rounded-full flex items-center justify-center">
+								<Image
+									src={profilePicture}
+									alt={getDisplayName()}
+									width={32}
+									height={32}
+									className="w-full h-full object-cover"
+									style={{ objectFit: "cover" }}
+								/>
+							</div>
 						) : (
 							<div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
 								{getCreatorInitials()}
@@ -481,12 +484,12 @@ const CreatorProfileDropdown: React.FC<CreatorProfileDropdownProps> = ({
 								}`}
 							>
 								<Image
-										src="/icons/tiktok.svg"
-										alt="Tiktok"
-										width={10}
-										height={10}
-										className="mr-2 h-4 w-4"
-									/>
+									src="/icons/tiktok.svg"
+									alt="Tiktok"
+									width={10}
+									height={10}
+									className="mr-2 h-4 w-4"
+								/>
 								Connect to TikTok
 							</button>
 						)}

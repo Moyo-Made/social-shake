@@ -459,30 +459,6 @@ const CreatorProjectReview = () => {
 					</div>
 
 					<div className="grid grid-cols-3 gap-4">
-						<div className="font-medium text-gray-600">Extras</div>
-						<div className="col-span-2">
-							<div className="font-medium">
-								${formData.creatorPricing.cost.extrasTotal.toLocaleString()}
-							</div>
-							{formData.creatorPricing.cost.extras.music && (
-								<div className="text-sm text-gray-500">
-									Music - ${formData.creatorPricing.cost.extras.musicPrice} ×{" "}
-									{formData.creatorPricing.creator.totalVideos} Videos = $
-									{formData.creatorPricing.cost.extras.musicTotal}
-								</div>
-							)}
-							{formData.creatorPricing.cost.extras.rawFiles && (
-								<div className="text-sm text-gray-500">
-									Raw Files - $
-									{formData.creatorPricing.cost.extras.rawFilesPrice} ×{" "}
-									{formData.creatorPricing.creator.totalVideos} Videos = $
-									{formData.creatorPricing.cost.extras.rawFilesTotal}
-								</div>
-							)}
-						</div>
-					</div>
-
-					<div className="grid grid-cols-3 gap-4">
 						<div className="font-medium text-gray-600 text-lg">
 							Total Amount
 						</div>

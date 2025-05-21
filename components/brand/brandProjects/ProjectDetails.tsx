@@ -60,41 +60,38 @@ const ProjectDetails: React.FC = () => {
 		const newErrors: Record<string, string> = {};
 		
 		if (!projectDetails.projectName.trim()) {
-			newErrors.projectName = "Project name is required";
+		  newErrors.projectName = "Project name is required";
 		}
 		
 		if (!projectDetails.projectType) {
-			newErrors.projectType = "Please select a project type";
+		  newErrors.projectType = "Please select a project type";
 		}
 		
 		if (!projectDetails.productType) {
-			newErrors.productType = "Please select a product type";
+		  newErrors.productType = "Please select a product type";
 		}
 		
 		if (!projectDetails.projectDescription || !projectDetails.projectDescription[0]?.trim()) {
-			newErrors.projectDescription = "Project description is required";
+		  newErrors.projectDescription = "Project description is required";
 		}
 		
 		// Only validate product link for TikTok Shop
 		if (projectDetails.projectType === "TikTok Shop" && !projectDetails.productLink?.trim()) {
-			newErrors.productLink = "Product link is required for TikTok Shop";
+		  newErrors.productLink = "Product link is required for TikTok Shop";
 		}
 		
-		// Make thumbnail optional as per your question
-		// If you decide to make it required, uncomment the below code
-		/*
-		if (!projectDetails.projectThumbnail) {
-			newErrors.projectThumbnail = "Project thumbnail is required";
+		// Validate thumbnail file size if there is a selected file
+		if (selectedFile && selectedFile.size > MAX_FILE_SIZE) {
+		  newErrors.projectThumbnail = "File size exceeds 1MB limit";
 		}
-		*/
 		
 		setErrors(newErrors);
 		return Object.keys(newErrors).length === 0;
-	};
+	  };
 
 	// Mark field as touched when user interacts with it
 	const handleBlur = (field: string) => {
-		setTouched(prev => ({ ...prev, [field]: true }));
+		setTouched((prev) => ({ ...prev, [field]: true }));
 		validateFields();
 	};
 
@@ -111,7 +108,7 @@ const ProjectDetails: React.FC = () => {
 
 	const handleProductTypeChange = (value: string) => {
 		updateProjectDetails({ productType: value as ProductType });
-		setTouched(prev => ({ ...prev, productType: true }));
+		setTouched((prev) => ({ ...prev, productType: true }));
 		validateFields();
 	};
 
@@ -143,19 +140,34 @@ const ProjectDetails: React.FC = () => {
 		}
 	};
 
+	// Maximum file size in bytes (1MB = 1,048,576 bytes)
+	const MAX_FILE_SIZE = 1048576;
+
 	const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
 		e.preventDefault();
 		e.stopPropagation();
 		setDragActive(false);
+
 		if (e.dataTransfer.files && e.dataTransfer.files[0]) {
 			const file = e.dataTransfer.files[0];
+
+			// Check file size
+			if (file.size > MAX_FILE_SIZE) {
+				setErrors((prev) => ({
+					...prev,
+					projectThumbnail: "File size exceeds 1MB limit",
+				}));
+				setTouched((prev) => ({ ...prev, projectThumbnail: true }));
+				return;
+			}
+
 			setSelectedFile(file);
 			const reader = new FileReader();
 			reader.onload = () => {
 				updateProjectDetails({ projectThumbnail: reader.result as string });
 			};
 			reader.readAsDataURL(file);
-			setTouched(prev => ({ ...prev, projectThumbnail: true }));
+			setTouched((prev) => ({ ...prev, projectThumbnail: true }));
 			validateFields();
 		}
 	};
@@ -163,20 +175,31 @@ const ProjectDetails: React.FC = () => {
 	const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		if (e.target.files && e.target.files[0]) {
 			const file = e.target.files[0];
+
+			// Check file size
+			if (file.size > MAX_FILE_SIZE) {
+				setErrors((prev) => ({
+					...prev,
+					projectThumbnail: "File size exceeds 1MB limit",
+				}));
+				setTouched((prev) => ({ ...prev, projectThumbnail: true }));
+				return;
+			}
+
 			setSelectedFile(file);
 			const reader = new FileReader();
 			reader.onload = () => {
 				updateProjectDetails({ projectThumbnail: reader.result as string });
 			};
 			reader.readAsDataURL(file);
-			setTouched(prev => ({ ...prev, projectThumbnail: true }));
+			setTouched((prev) => ({ ...prev, projectThumbnail: true }));
 			validateFields();
 		}
 	};
 
 	const handleProjectTypeChange = (type: ProjectType) => {
 		updateProjectDetails({ projectType: type });
-		setTouched(prev => ({ ...prev, projectType: true }));
+		setTouched((prev) => ({ ...prev, projectType: true }));
 		validateFields();
 	};
 
@@ -194,7 +217,7 @@ const ProjectDetails: React.FC = () => {
 					placeholder="Spring Campaign UGC"
 					value={projectDetails.projectName}
 					onChange={handleProjectNameChange}
-					onBlur={() => handleBlur('projectName')}
+					onBlur={() => handleBlur("projectName")}
 				/>
 				{errors.projectName && touched.projectName && (
 					<p className="text-red-500 text-sm mt-1">{errors.projectName}</p>
@@ -395,12 +418,14 @@ const ProjectDetails: React.FC = () => {
 						<Input
 							className={cn(
 								"mt-1",
-								errors.productLink && touched.productLink ? "border-red-500" : ""
+								errors.productLink && touched.productLink
+									? "border-red-500"
+									: ""
 							)}
 							placeholder="www.summercream.com"
 							value={projectDetails.productLink}
 							onChange={handleProductLinkChange}
-							onBlur={() => handleBlur('productLink')}
+							onBlur={() => handleBlur("productLink")}
 						/>
 						{errors.productLink && touched.productLink && (
 							<p className="text-red-500 text-sm mt-1">{errors.productLink}</p>
@@ -411,16 +436,19 @@ const ProjectDetails: React.FC = () => {
 
 			<div className="mt-4">
 				<label className="block text-base font-medium text-gray-700 mb-1">
-					What type of product will creators be making content for? <span className="text-red-500">*</span>
+					What type of product will creators be making content for?{" "}
+					<span className="text-red-500">*</span>
 				</label>
 				<Select
 					value={projectDetails.productType}
 					onValueChange={handleProductTypeChange}
 				>
-					<SelectTrigger className={cn(
-						"w-full mt-1",
-						errors.productType && touched.productType ? "border-red-500" : ""
-					)}>
+					<SelectTrigger
+						className={cn(
+							"w-full mt-1",
+							errors.productType && touched.productType ? "border-red-500" : ""
+						)}
+					>
 						<SelectValue
 							placeholder="Select a product type"
 							className="placeholder:text-gray-600"
@@ -428,11 +456,12 @@ const ProjectDetails: React.FC = () => {
 					</SelectTrigger>
 					<SelectContent className="bg-[#f7f7f7]">
 						<SelectItem value="Physical">
-							Physical Product - A tangible item that will be shipped to creators
+							Physical Product - A tangible item that will be shipped to
+							creators
 						</SelectItem>
 						<SelectItem value="Virtual">
-							Virtual Product – A digital or online service that does not require
-							shipping
+							Virtual Product – A digital or online service that does not
+							require shipping
 						</SelectItem>
 					</SelectContent>
 				</Select>
@@ -448,16 +477,20 @@ const ProjectDetails: React.FC = () => {
 				<Textarea
 					className={cn(
 						"mt-1",
-						errors.projectDescription && touched.projectDescription ? "border-red-500" : ""
+						errors.projectDescription && touched.projectDescription
+							? "border-red-500"
+							: ""
 					)}
 					rows={3}
 					placeholder="Describe your goals and what kind of content you're looking for."
 					value={projectDetails.projectDescription}
 					onChange={handleProjectDescriptionChange}
-					onBlur={() => handleBlur('projectDescription')}
+					onBlur={() => handleBlur("projectDescription")}
 				/>
 				{errors.projectDescription && touched.projectDescription && (
-					<p className="text-red-500 text-sm mt-1">{errors.projectDescription}</p>
+					<p className="text-red-500 text-sm mt-1">
+						{errors.projectDescription}
+					</p>
 				)}
 			</div>
 
@@ -470,7 +503,9 @@ const ProjectDetails: React.FC = () => {
 						"border-2 border-dashed rounded-lg p-6 text-center cursor-pointer",
 						dragActive ? "border-[#FD5C02] bg-orange-50" : "border-gray-300",
 						selectedFile && "border-green-500 bg-green-50",
-						errors.projectThumbnail && touched.projectThumbnail ? "border-red-500" : ""
+						errors.projectThumbnail && touched.projectThumbnail
+							? "border-red-500"
+							: ""
 					)}
 					onDragEnter={handleDrag}
 					onDragLeave={handleDrag}
@@ -489,7 +524,8 @@ const ProjectDetails: React.FC = () => {
 								/>
 							</div>
 							<p className="text-green-600">
-								{selectedFile?.name || "Uploaded image"} - Click or drop to change
+								{selectedFile?.name || "Uploaded image"} - Click or drop to
+								change
 							</p>
 						</div>
 					) : (
@@ -506,7 +542,9 @@ const ProjectDetails: React.FC = () => {
 								<span className="text-[#FD5C02]">Click to upload</span> or drag
 								and drop
 							</p>
-							<p className="text-sm text-gray-500 mt-1">PNG or JPG (800x400px)</p>
+							<p className="text-sm text-gray-500 mt-1">
+								PNG or JPG (800x400px)
+							</p>
 						</>
 					)}
 					<input

@@ -13,36 +13,42 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import axios from "axios";
 
-// Define Payment type
-type PaymentStatus = "completed" | "pending_capture" | "canceled";
-type PaymentType = "contest" | "project";
+// Updated Payment type to match API response format
+interface RawPaymentData {
+	id: string;
+	paymentId: string;
+	userId: string;
+	brandEmail: string;
+	amount: number;
+	contestName: string;
+	contestType: string;
+	createdAt: string;
+	paymentName: string;
+	stripeSessionId: string;
+	paymentType: string;
+	stripePaymentIntentId?: string;
+	contestId?: string;
+	processedAt?: string;
+	stripePaymentStatus: string;
+	processedBy?: string;
+	status: string;
+	updatedAt: string;
+}
 
 interface Payment {
 	id: string;
-	amount: number;
-	status: PaymentStatus;
-	createdAt: string;
-	contestId?: string;
-	contestTitle?: string;
-	userId?: string;
-	userEmail?: string;
-	stripePaymentStatus?: string;
-	type: PaymentType;
+	transactionDate: string;
 	description: string;
+	amount: string;
+	type: string;
+	status: string;
+	paymentDate: string;
+	projectCompleted: string;
+	brandEmail: string;
+	actions: string;
+	rawData: RawPaymentData;
 }
 
-interface TotalPayments {
-	totalAmount: string;
-	pendingAmount: string;
-	processedAmount: string;
-}
-
-interface PaginationMeta {
-	totalItems: number;
-	itemsPerPage: number;
-	currentPage: number;
-	totalPages: number;
-}
 
 // Helper function to get type badge styling
 const getTypeBadgeStyle = (type: string): string => {
@@ -58,12 +64,15 @@ const getTypeBadgeStyle = (type: string): string => {
 
 // Helper function to get status badge styling
 const getStatusBadgeStyle = (status: string): string => {
-	switch (status) {
+	switch (status.toLowerCase()) {
+		case "processed":
 		case "completed":
 			return "bg-[#ECFDF3] border border-[#ABEFC6] text-[#067647] flex items-center";
+		case "pending":
 		case "pending_capture":
 			return "bg-[#FFF0C3] border border-[#FDD849] text-[#1A1A1A] flex items-center";
 		case "canceled":
+		case "refunded":
 			return "bg-[#FFE9E7] border border-[#F04438] text-[#F04438] flex items-center";
 		default:
 			return "bg-gray-100 text-gray-700";
@@ -72,7 +81,8 @@ const getStatusBadgeStyle = (status: string): string => {
 
 // Helper function to get status icon
 const getStatusIcon = (status: string): React.ReactNode => {
-	switch (status) {
+	switch (status.toLowerCase()) {
+		case "processed":
 		case "completed":
 			return (
 				<svg
@@ -90,26 +100,14 @@ const getStatusIcon = (status: string): React.ReactNode => {
 					/>
 				</svg>
 			);
+		case "pending":
 		case "pending_capture":
 			return <div className="w-1 h-1 rounded-full bg-[#1A1A1A] mr-1"></div>;
 		case "canceled":
+		case "refunded":
 			return <div className="w-1 h-1 rounded-full bg-[#F04438] mr-1"></div>;
 		default:
 			return null;
-	}
-};
-
-// Format status for display
-const formatStatus = (status: string): string => {
-	switch (status) {
-		case "completed":
-			return "Processed";
-		case "pending_capture":
-			return "Pending";
-		case "canceled":
-			return "Refunded";
-		default:
-			return status;
 	}
 };
 
@@ -125,22 +123,22 @@ export default function AdminPaymentsDashboard() {
 	const [statusFilter, setStatusFilter] = useState<string>("");
 	
 	// Pagination states
-	const [pagination, setPagination] = useState<PaginationMeta>({
-		totalItems: 0,
-		itemsPerPage: 10,
-		currentPage: 1,
-		totalPages: 1,
-	});
 	const [currentPage, setCurrentPage] = useState(1);
-	const [itemsPerPage, setItemsPerPage] = useState(10);
+	const [itemsPerPage,] = useState(10);
+	const [paginationInfo, setPaginationInfo] = useState({
+		totalCount: 0,
+		hasMore: false,
+		cursor: "",
+		pageSize: 10
+	});
 
-	const hasPayments = payments.length > 0;
+	const hasPayments = payments?.length > 0;
 
 	// Total payments summary
-	const [totalPayments, setTotalPayments] = useState<TotalPayments>({
-		totalAmount: "0",
-		pendingAmount: "0",
-		processedAmount: "0",
+	const [totalPayments, setTotalPayments] = useState({
+		totalSpend: "0",
+		pendingPayments: "0",
+		totalProcessed: "0"
 	});
 
 	useEffect(() => {
@@ -179,8 +177,8 @@ export default function AdminPaymentsDashboard() {
 			const response = await axios.get(`/api/admin/payments?${params.toString()}`);
 			
 			// Update states with response data
-			setPayments(response.data.payments);
-			setPagination(response.data.pagination);
+			setPayments(response.data.transactions);
+			setPaginationInfo(response.data.pagination);
 			setTotalPayments(response.data.totals);
 			
 			setError(null);
@@ -254,12 +252,15 @@ export default function AdminPaymentsDashboard() {
 		});
 	}, [searchTerm, typeFilter, hasPayments, payments]);
 
+	// Calculate total pages
+	const totalPages = Math.ceil(paginationInfo.totalCount / paginationInfo.pageSize);
+
 	// Generate pagination buttons
 	const renderPaginationButtons = () => {
 		const buttons = [];
 		const maxVisibleButtons = 5;
 		let startPage = Math.max(1, currentPage - Math.floor(maxVisibleButtons / 2));
-		const endPage = Math.min(pagination.totalPages, startPage + maxVisibleButtons - 1);
+		const endPage = Math.min(totalPages, startPage + maxVisibleButtons - 1);
 
 		// Adjust start page if needed
 		if (endPage - startPage + 1 < maxVisibleButtons) {
@@ -304,12 +305,12 @@ export default function AdminPaymentsDashboard() {
 			<button
 				key="next"
 				className={`px-3 py-1 rounded ${
-					currentPage === pagination.totalPages
+					currentPage === totalPages
 						? "text-gray-400 cursor-not-allowed"
 						: "text-gray-700 hover:bg-gray-100"
 				}`}
 				onClick={() => handlePageChange(currentPage + 1)}
-				disabled={currentPage === pagination.totalPages}
+				disabled={currentPage === totalPages}
 			>
 				&gt;
 			</button>
@@ -356,21 +357,21 @@ export default function AdminPaymentsDashboard() {
 				<Card className="py-10 flex flex-col items-center justify-center border border-[#6670854D] shadow-none">
 					<p className="text-lg text-[#000] mb-1 mt-2">Total Amount</p>
 					<h2 className="text-2xl text-[#101828] font-semibold">
-						${hasPayments ? totalPayments.totalAmount : "0"}
+						${hasPayments ? totalPayments.totalSpend : "0"}
 					</h2>
 				</Card>
 
 				<Card className="py-4 px-5 flex flex-col items-center justify-center border border-[#6670854D] shadow-none">
 					<p className="text-lg text-[#000] mb-1 mt-2">Total Pending Amount</p>
 					<h2 className="text-2xl text-[#101828] font-semibold">
-						${hasPayments ? totalPayments.pendingAmount : "0"}
+						${hasPayments ? totalPayments.pendingPayments : "0"}
 					</h2>
 				</Card>
 
 				<Card className="py-4 px-5 flex flex-col items-center justify-center border border-[#6670854D] shadow-none">
 					<p className="text-lg text-[#000] mb-1 mt-2">Total Processed</p>
 					<h2 className="text-2xl text-[#101828] font-semibold">
-						${hasPayments ? totalPayments.processedAmount : "0"}
+						${hasPayments ? totalPayments.totalProcessed : "0"}
 					</h2>
 				</Card>
 			</div>
@@ -438,25 +439,6 @@ export default function AdminPaymentsDashboard() {
 									<SelectItem value="Refunded">Refunded</SelectItem>
 								</SelectContent>
 							</Select>
-							
-							{/* Items per page dropdown */}
-							<Select
-								value={itemsPerPage.toString()}
-								onValueChange={(value: string) => {
-									setItemsPerPage(parseInt(value));
-									setCurrentPage(1); // Reset to first page when changing items per page
-								}}
-							>
-								<SelectTrigger className="w-24">
-									<SelectValue placeholder="Show" />
-								</SelectTrigger>
-								<SelectContent className="bg-[#f7f7f7]">
-									<SelectItem value="5">5</SelectItem>
-									<SelectItem value="10">10</SelectItem>
-									<SelectItem value="25">25</SelectItem>
-									<SelectItem value="50">50</SelectItem>
-								</SelectContent>
-							</Select>
 						</div>
 					</div>
 				)}
@@ -517,22 +499,17 @@ export default function AdminPaymentsDashboard() {
 									className="grid grid-cols-7 p-3 items-center border-t border-gray-200 text-sm text-[#101828] hover:bg-gray-50"
 								>
 									<div className="col-span-1 pl-4">
-										{new Date(payment.createdAt).toLocaleDateString("en-US", {
-											year: "numeric",
-											month: "long",
-											day: "numeric",
-										})}
+										{payment.transactionDate}
 									</div>
 									<div className="col-span-2 pr-6">
-										<span> {payment.description}</span>
+										<span>{payment.description}</span>
 									</div>
-									<div className="col-span-1">${payment.amount.toFixed(2)}</div>
+									<div className="col-span-1">${payment.amount}</div>
 									<div className="col-span-1">
 										<span
-											className={` text-sm ${getTypeBadgeStyle(payment.type)}`}
+											className={`text-sm ${getTypeBadgeStyle(payment.type)}`}
 										>
-											{payment.type.charAt(0).toUpperCase() +
-												payment.type.slice(1)}
+											{payment.type}
 										</span>
 									</div>
 									<div className="col-span-1">
@@ -540,11 +517,11 @@ export default function AdminPaymentsDashboard() {
 											className={`w-fit px-2 py-1 rounded-full text-xs ${getStatusBadgeStyle(payment.status)}`}
 										>
 											{getStatusIcon(payment.status)}
-											{formatStatus(payment.status)}
+											{payment.status}
 										</span>
 									</div>
 									<div className="col-span-1">
-										{payment.status === "pending_capture" ? (
+										{payment.status === "Pending" ? (
 											<div className="flex space-x-2">
 												<button
 													onClick={() =>
@@ -584,12 +561,11 @@ export default function AdminPaymentsDashboard() {
 							))}
 							
 							{/* Pagination controls */}
-							{pagination.totalPages > 1 && (
+							{totalPages > 1 && (
 								<div className="flex justify-between items-center p-4 border-t border-gray-200">
 									<div className="text-sm text-gray-600">
-										Showing {Math.min((currentPage - 1) * itemsPerPage + 1, pagination.totalItems)} to{' '}
-										{Math.min(currentPage * itemsPerPage, pagination.totalItems)} of{' '}
-										{pagination.totalItems} payments
+										Page {currentPage}
+										
 									</div>
 									<div className="flex gap-1">{renderPaginationButtons()}</div>
 								</div>

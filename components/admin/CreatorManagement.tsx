@@ -149,14 +149,14 @@ const CreatorManagement: React.FC = () => {
 	const getProfilePictureUrl = (creator: Creator) => {
 		if (!creator) return null;
 
-		// First try the Tiktok profile picture if available
-		if (creator.creatorProfileData?.tiktokAvatarUrl) {
-			return creator.creatorProfileData?.tiktokAvatarUrl;
-		}
-
 		// Then check for logoUrl
 		if (creator.logoUrl) {
 			return creator.logoUrl;
+		}
+
+		// First try the Tiktok profile picture if available
+		if (creator.creatorProfileData?.tiktokAvatarUrl) {
+			return creator.creatorProfileData?.tiktokAvatarUrl;
 		}
 
 		return null;

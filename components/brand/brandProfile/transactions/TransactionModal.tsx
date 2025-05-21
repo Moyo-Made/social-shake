@@ -234,7 +234,7 @@ const handleDownloadPDF = () => {
 							<div>
 								<p className="text-[#667085]">Payment Status</p>
 								<p className="text-base text-[#101828]">
-									{transaction.paymentDate}
+									{transaction.status}
 								</p>
 							</div>
 						</div>

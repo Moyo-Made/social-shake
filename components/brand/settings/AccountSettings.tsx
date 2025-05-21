@@ -100,25 +100,14 @@ const AccountSettings: React.FC = () => {
 
 				const data = await response.json();
 
-				// Structure the social media data correctly
-				// Check if data contains socialMedia as an object or as dot notation
-				let socialMedia: SocialMedia;
-
-				if (data.socialMedia && typeof data.socialMedia === "object") {
-					// It's already an object
-					socialMedia = {
-						facebook: data.socialMedia.facebook || "",
-						instagram: data.socialMedia.instagram || "",
-						tiktok: data.socialMedia.tiktok || "",
-					};
-				} else {
-					// It might be using dot notation
-					socialMedia = {
-						facebook: data["socialMedia.facebook"] || "",
-						instagram: data["socialMedia.instagram"] || "",
-						tiktok: data["socialMedia.tiktok"] || "",
-					};
-				}
+				// Updated logic to prioritize flattened fields over the nested object
+				const socialMedia: SocialMedia = {
+					facebook:
+						data["socialMedia.facebook"] || data.socialMedia?.facebook || "",
+					instagram:
+						data["socialMedia.instagram"] || data.socialMedia?.instagram || "",
+					tiktok: data["socialMedia.tiktok"] || data.socialMedia?.tiktok || "",
+				};
 
 				const profileData = {
 					...data,

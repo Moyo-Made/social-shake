@@ -126,7 +126,6 @@ const Transactions: React.FC = () => {
 	// Whether the user has any transactions
 	const hasTransactions = transactions.length > 0;
 
-	// Fetch transactions when the component mounts
 	const fetchTransactions = async (
 		page = 1,
 		piCursorParam: string | null = null,
@@ -142,7 +141,7 @@ const Transactions: React.FC = () => {
 			setLoading(true);
 			setError(null);
 
-			// Build the URL with pagination parameters
+			// Build the URL with pagination parameters - keeping just the user ID
 			let url = `/api/transactions?userId=${currentUser.uid}&page=${page}&pageSize=${pageSize}`;
 			if (piCursorParam) {
 				url += `&piCursor=${piCursorParam}`;
@@ -180,6 +179,11 @@ const Transactions: React.FC = () => {
 			setHasMore(data.pagination?.hasMore || false);
 			setPiCursor(data.pagination?.piCursor || null);
 			setChargeCursor(data.pagination?.chargeCursor || null);
+
+			// Optional: You can also store metadata about user's accounts and brands
+			// if (data.metadata) {
+			// 	setAccountMetadata(data.metadata);
+			// }
 
 			setLoading(false);
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any

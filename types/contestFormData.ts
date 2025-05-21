@@ -98,18 +98,6 @@ export interface CreatorPricing {
 	// Cost information moved here
 	budgetPerVideo: number;
 	totalBudget: number;
-	extras: {
-		captions: boolean;
-		captionsPrice: number;
-		captionsTotal: number;
-		music: boolean;
-		musicPrice: number;
-		musicTotal: number;
-		rawFiles: boolean;
-		rawFilesPrice: number;
-		rawFilesTotal: number;
-	};
-	extrasTotal: number;
 	totalAmount: number;
 	creator: CreatorSelection;
 	cost: CostBreakdown;
@@ -135,20 +123,9 @@ interface CreatorSelection {
 	totalVideos: number;
 }
 
-interface Extras {
-	music: boolean;
-	musicPrice: number;
-	musicTotal: number;
-	rawFiles: boolean;
-	rawFilesPrice: number;
-	rawFilesTotal: number;
-}
-
 interface CostBreakdown {
 	budgetPerVideo: number;
 	totalBudget: number;
-	extras: Extras;
-	extrasTotal: number;
 	totalAmount: number;
 	commissionPerSale: string;
 	serviceFee: number;

@@ -39,6 +39,23 @@ interface UserData {
 	}>;
 }
 
+interface EarningsData {
+	totalEarnings: number;
+	pendingPayout: number;
+	completedPayouts: Array<{
+		payoutId: string;
+		amount: number;
+		date: string;
+		status: string;
+	}>;
+	pendingPayouts: Array<{
+		payoutId: string;
+		amount: number;
+		date: string;
+		status: string;
+	}>;
+}
+
 const LoadingState = () => (
 	<div className="flex flex-col justify-center items-center h-64">
 		<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
@@ -50,6 +67,7 @@ const LoadingState = () => (
 const DashboardContent = ({ userId }: UserDashboardProps) => {
 	const [loading, setLoading] = useState(true);
 	const [userData, setUserData] = useState<UserData | null>(null);
+	const [earningsData, setEarningsData] = useState<EarningsData | null>(null);
 	const searchParams = useSearchParams();
 
 	// Add this useEffect to detect TikTok connection success
@@ -75,27 +93,39 @@ const DashboardContent = ({ userId }: UserDashboardProps) => {
 		}
 	}, [searchParams]);
 
-	// Fetch User Data
+	// Fetch User Data and Earnings Data
 	useEffect(() => {
-		const fetchUserData = async () => {
+		const fetchData = async () => {
 			try {
 				setLoading(true);
-				const response = await fetch(`/api/creator-stats?userId=${userId}`);
-				const data = await response.json();
+				
+				// Fetch basic user data
+				const userResponse = await fetch(`/api/creator-stats?userId=${userId}`);
+				const userData = await userResponse.json();
+				
+				// Fetch earnings data from our new endpoint
+				const earningsResponse = await fetch(`/api/creator-earnings?userId=${userId}`);
+				const earningsData = await earningsResponse.json();
 
-				if (data.success) {
-					setUserData(data.data);
+				if (userData.success) {
+					setUserData(userData.data);
 				} else {
-					console.error("Error fetching user data:", data.error);
+					console.error("Error fetching user data:", userData.error);
+				}
+				
+				if (earningsData.success) {
+					setEarningsData(earningsData.data);
+				} else {
+					console.error("Error fetching earnings data:", earningsData.error);
 				}
 			} catch (error) {
-				console.error("Failed to fetch user data:", error);
+				console.error("Failed to fetch dashboard data:", error);
 			} finally {
 				setLoading(false);
 			}
 		};
 
-		fetchUserData();
+		fetchData();
 	}, [userId]);
 
 	if (loading) {
@@ -169,7 +199,7 @@ const DashboardContent = ({ userId }: UserDashboardProps) => {
 						<div className="mt-2">
 							<h3 className="text-gray-600 text-lg">Total Earnings</h3>
 							<p className="text-3xl font-bold mt-2">
-								{formatCurrency(userData.totalEarnings)}
+								{formatCurrency(earningsData ? earningsData.totalEarnings : 0)}
 							</p>
 						</div>
 					</div>
@@ -186,7 +216,7 @@ const DashboardContent = ({ userId }: UserDashboardProps) => {
 					<div className="mt-2">
 						<h3 className="text-gray-600 text-lg">Pending Payouts</h3>
 						<p className="text-3xl font-bold mt-2">
-							{formatCurrency(userData.pendingPayout)}
+							{formatCurrency(earningsData ? earningsData.pendingPayout : 0)}
 						</p>
 					</div>
 				</div>

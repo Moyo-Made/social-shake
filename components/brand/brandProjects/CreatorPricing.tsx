@@ -9,8 +9,6 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { RadioGroup } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
 import { X } from "lucide-react";
 import Image from "next/image";
 import { useProjectForm } from "./ProjectFormContext";
@@ -35,11 +33,6 @@ export default function CreatorPricingTab() {
 	const [budget, setBudget] = useState(creatorPricing.budgetPerVideo || 0);
 	const [budgetValue, setBudgetValue] = useState(budget ? budget.toString() : "");
 	const [, setBudgetError] = useState("");
-	const [extras, setExtras] = useState({
-		captions: creatorPricing.extras.captions || false,
-		music: creatorPricing.extras.music || false,
-		rawFiles: creatorPricing.extras.rawFiles || false,
-	});
 	
 	const [publicCreatorsCount, setPublicCreatorsCount] = useState(
 		creatorPricing.selectionMethod === "Post Public Brief"
@@ -193,12 +186,9 @@ export default function CreatorPricingTab() {
 		(selectionMethod === "Invite Specific Creators"
 			? invitedCreatorsCount * videosPerCreator
 			: publicCreatorsCount) * videosPerCreator;
-	const musicTotal = extras.music ? 50 * totalVideos : 0;
-	const rawFilesTotal = extras.rawFiles ? 100 * totalVideos : 0;
-	const captionsTotal = extras.captions ? 120 * totalVideos : 0;
 	const totalBudget = budget ;
 	const totalAmount =
-		totalBudget + (musicTotal + rawFilesTotal + captionsTotal);
+		totalBudget * totalVideos;
 	const services = 0.1 * totalAmount;
 
 	// Update context when values change
@@ -218,18 +208,6 @@ export default function CreatorPricingTab() {
 			totalVideos,
 			budgetPerVideo: budget,
 			totalBudget,
-			extras: {
-				captions: extras.captions,
-				captionsPrice: 120,
-				captionsTotal: extras.captions ? 120 * totalVideos : 0,
-				music: extras.music,
-				musicPrice: 50,
-				musicTotal,
-				rawFiles: extras.rawFiles,
-				rawFilesPrice: 100,
-				rawFilesTotal,
-			},
-			extrasTotal: musicTotal + rawFilesTotal,
 			totalAmount,
 			creator: {
 				selectionMethod,
@@ -246,15 +224,6 @@ export default function CreatorPricingTab() {
 			cost: {
 				budgetPerVideo: budget,
 				totalBudget,
-				extras: {
-					music: extras.music,
-					musicPrice: 50,
-					musicTotal,
-					rawFiles: extras.rawFiles,
-					rawFilesPrice: 100,
-					rawFilesTotal,
-				},
-				extrasTotal: musicTotal + rawFilesTotal,
 				totalAmount,
 				serviceFee: services,
 				commissionPerSale: "",
@@ -271,7 +240,6 @@ export default function CreatorPricingTab() {
 		totalVideos,
 		videosPerCreator,
 		budget,
-		extras,
 		ageGroup,
 		gender,
 		industry,
@@ -718,74 +686,6 @@ export default function CreatorPricingTab() {
 						</div>
 
 						<div className="border-t pt-4">
-							<h2 className="text-base font-medium mb-4">Extras</h2>
-							<RadioGroup className="space-y-4">
-								<div className="flex items-start gap-2">
-									<div
-										className={`mt-1 h-4 w-4 rounded-full border border-black flex items-center justify-center cursor-pointer ${extras.captions ? "bg-orange-500 border-orange-500" : "bg-white"}`}
-										onClick={() =>
-											setExtras({ ...extras, captions: !extras.captions })
-										}
-									>
-										{extras.captions && (
-											<div className="h-2 w-2 rounded-full bg-white"></div>
-										)}
-									</div>
-									<div className="flex-1">
-										<Label htmlFor="captions" className="text-base font-medium">
-											Captions- $120
-										</Label>
-										<p className="text-sm text-gray-500">
-											(Subtitles or text overlays used in the video.)
-										</p>
-									</div>
-								</div>
-
-								<div className="flex items-start gap-2">
-									<div
-										className={`mt-1 h-4 w-4 rounded-full border border-black flex items-center justify-center cursor-pointer ${extras.music ? "bg-orange-500 border-orange-500" : "bg-white"}`}
-										onClick={() =>
-											setExtras({ ...extras, music: !extras.music })
-										}
-									>
-										{extras.music && (
-											<div className="h-2 w-2 rounded-full bg-white"></div>
-										)}
-									</div>
-									<div className="flex-1">
-										<Label htmlFor="music" className="text-base font-medium">
-											Music- $50
-										</Label>
-										<p className="text-sm text-gray-500">
-											(Background music or sound effects used in the video.)
-										</p>
-									</div>
-								</div>
-
-								<div className="flex items-start gap-2">
-									<div
-										className={`mt-1 h-4 w-4 rounded-full border border-black flex items-center justify-center cursor-pointer ${extras.rawFiles ? "bg-orange-500 border-orange-500" : "bg-white"}`}
-										onClick={() =>
-											setExtras({ ...extras, rawFiles: !extras.rawFiles })
-										}
-									>
-										{extras.rawFiles && (
-											<div className="h-2 w-2 rounded-full bg-white"></div>
-										)}
-									</div>
-									<div className="flex-1">
-										<Label htmlFor="rawFiles" className="text-base font-medium">
-											Raw Files- $100
-										</Label>
-										<p className="text-sm text-gray-500">
-											Unedited footage or source files from the creator
-										</p>
-									</div>
-								</div>
-							</RadioGroup>
-						</div>
-
-						<div className="border-t pt-4">
 							{selectionMethod === "Invite Specific Creators" ? (
 								<div className="flex justify-between mb-2">
 									<span>No of Creators:</span>
@@ -920,24 +820,7 @@ export default function CreatorPricingTab() {
 								videos)
 							</div>
 
-							<div className="flex gap-1 mb-1">
-								<span>Extras:</span>
-								<span className="font-medium">
-									${(musicTotal + rawFilesTotal).toLocaleString()}
-								</span>
-							</div>
-							<div className="text-sm text-gray-500 mb-1">
-								Music - ${extras.music ? 50 : 0} × {totalVideos} Videos = $
-								{musicTotal}
-							</div>
-							<div className="text-sm text-gray-500 mb-1">
-								Raw Files - ${extras.rawFiles ? 100 : 0} × {totalVideos} Videos
-								= ${rawFilesTotal}
-							</div>
-							<div className="text-sm text-gray-500 mb-4">
-								Captions - ${extras.captions ? 120 : 0} × {totalVideos} Videos =
-								${captionsTotal}
-							</div>
+						
 
 							<div className="flex gap-1 mb-1">
 								<span>Service Fee:</span>

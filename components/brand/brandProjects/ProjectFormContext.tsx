@@ -60,23 +60,10 @@ const defaultFormData: ProjectFormData = {
 		videosPerCreator: 1,
 		totalVideos: 1,
 
-		extras: {
-			captions: false,
-			captionsPrice: 50, // Default price if enabled
-			captionsTotal: 0,
-			music: false,
-			musicPrice: 50, // Default price if enabled
-			musicTotal: 0,
-			rawFiles: false,
-			rawFilesPrice: 100, // Default price if enabled
-			rawFilesTotal: 0,
-		},
-
 		// Default cost values
 		budgetPerVideo: 0,
 		totalBudget: 0,
 
-		extrasTotal: 0,
 		totalAmount: 0,
 		creator: {
 			selectionMethod: "Invite Specific Creators",
@@ -93,15 +80,6 @@ const defaultFormData: ProjectFormData = {
 		cost: {
 			budgetPerVideo: 0,
 			totalBudget: 0,
-			extras: {
-				music: false,
-				musicPrice: 0,
-				musicTotal: 0,
-				rawFiles: false,
-				rawFilesPrice: 0,
-				rawFilesTotal: 0,
-			},
-			extrasTotal: 0,
 			totalAmount: 0,
 			commissionPerSale: "",
 			serviceFee: 0

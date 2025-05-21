@@ -648,26 +648,7 @@ const ProjectDetailsPage: React.FC = () => {
 									</p>
 								</div>
 
-								<div>
-									<p className="text-gray-500 mb-1">Extras</p>
-									<p className="text-black">
-										${project.creatorPricing.extrasTotal || "600.00"}
-									</p>
-									<div className="text-gray-500 text-sm">
-										<p>
-											Music - $
-											{project.creatorPricing.extras?.musicPrice || "50"} ×{" "}
-											{project.creatorPricing.totalVideos || "4"} Videos = $
-											{project.creatorPricing.extras?.musicTotal || "200"}
-										</p>
-										<p>
-											Raw Files - $
-											{project.creatorPricing.extras?.rawFilesPrice || "100"} ×{" "}
-											{project.creatorPricing.totalVideos || "4"} Videos = $
-											{project.creatorPricing.extras?.rawFilesTotal || "400"}
-										</p>
-									</div>
-								</div>
+								
 
 								<div className="pt-4 border-t border-gray-200">
 									<div className="flex justify-between items-center">

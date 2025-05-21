@@ -143,7 +143,6 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -171,6 +170,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Initialize profileData and creatorEmail for later use with verification data
+    let profileData: { [key: string]: unknown; email?: string } = {};
+    let creatorEmail = email; // Initial value is the email parameter
+    let creatorUserId = userId; // Store userId for verification lookup
+
     // 1. First try checking for the full userId as it is, including provider prefix
     if (userId) {
       console.log(`Checking for creator profile with full userId: ${userId}`);
@@ -181,14 +185,15 @@ export async function GET(request: NextRequest) {
         .get();
 
       if (!userIdQuery.empty) {
-        const profileData = userIdQuery.docs[0].data();
+        profileData = userIdQuery.docs[0].data();
+        // Save email for verification lookup
+        if (profileData.email) creatorEmail = profileData.email as string;
         console.log("Found creator profile using full userId:", profileData);
-        return NextResponse.json(profileData);
       }
     }
 
-    // 2. Try by TikTok ID if available
-    if (tiktokId) {
+    // 2. Try by TikTok ID if available and profile not found yet
+    if (tiktokId && Object.keys(profileData).length === 0) {
       console.log(`Checking for creator profile with tiktokId: ${tiktokId}`);
       const tiktokQuery = await adminDb
         .collection("creatorProfiles")
@@ -197,14 +202,16 @@ export async function GET(request: NextRequest) {
         .get();
 
       if (!tiktokQuery.empty) {
-        const profileData = tiktokQuery.docs[0].data();
+        profileData = tiktokQuery.docs[0].data();
+        // Save email for verification lookup
+        if (profileData.email) creatorEmail = profileData.email as string;
+        if (profileData.userId) creatorUserId = profileData.userId as string;
         console.log("Found creator profile using tiktokId:", profileData);
-        return NextResponse.json(profileData);
       }
     }
 
     // 3. If we have a provider prefix and no profile found yet, try more combinations
-    if (userId && userId.includes(':')) {
+    if (userId && userId.includes(':') && Object.keys(profileData).length === 0) {
       const [provider, providerId] = userId.split(':');
       
       // Try the provider ID directly (without prefix)
@@ -216,13 +223,14 @@ export async function GET(request: NextRequest) {
         .get();
 
       if (!providerIdQuery.empty) {
-        const profileData = providerIdQuery.docs[0].data();
+        profileData = providerIdQuery.docs[0].data();
+        // Save email for verification lookup
+        if (profileData.email) creatorEmail = profileData.email as string;
         console.log("Found creator profile using providerId as userId:", profileData);
-        return NextResponse.json(profileData);
       }
 
       // For TikTok specifically, also try "provider" + "Id" fields
-      if (provider === 'tiktok') {
+      if (provider === 'tiktok' && Object.keys(profileData).length === 0) {
         // Try the provider field approach
         console.log(`Checking with ${provider}Id field (tiktokId): ${providerId}`);
         const providerFieldQuery = await adminDb
@@ -232,15 +240,17 @@ export async function GET(request: NextRequest) {
           .get();
 
         if (!providerFieldQuery.empty) {
-          const profileData = providerFieldQuery.docs[0].data();
+          profileData = providerFieldQuery.docs[0].data();
+          // Save email for verification lookup
+          if (profileData.email) creatorEmail = profileData.email as string;
+          if (profileData.userId) creatorUserId = profileData.userId as string;
           console.log(`Found creator profile using ${provider}Id field:`, profileData);
-          return NextResponse.json(profileData);
         }
       }
     }
 
     // 4. If profile by ID still not found, try by profileId if provided
-    if (profileId) {
+    if (profileId && Object.keys(profileData).length === 0) {
       console.log(`Checking for creator profile with profileId: ${profileId}`);
       const profilesQuery = await adminDb
         .collectionGroup("creatorProfiles")
@@ -249,48 +259,166 @@ export async function GET(request: NextRequest) {
         .get();
 
       if (!profilesQuery.empty) {
-        const profileData = profilesQuery.docs[0].data();
+        profileData = profilesQuery.docs[0].data();
+        // Save email for verification lookup
+        if (profileData.email) creatorEmail = profileData.email as string;
+        if (profileData.userId) creatorUserId = profileData.userId as string;
         console.log("Found creator profile using profileId:", profileData);
-        return NextResponse.json(profileData);
       }
     }
 
-    // 5. Try by email if available
-    if (email) {
+    // 5. Try by email if available and profile not found yet
+    if (email && Object.keys(profileData).length === 0) {
       console.log(`Checking for creator profile with email: ${email}`);
       const creatorRef = adminDb.collection("creatorProfiles").doc(email);
       const docSnap = await creatorRef.get();
       
       if (docSnap.exists) {
-        const profileData = {
+        profileData = {
           id: docSnap.id,
           ...docSnap.data(),
           email: email,
         };
+        // Save email for verification lookup
+        creatorEmail = email;
+        if (profileData.userId) creatorUserId = profileData.userId as string;
         console.log("Found creator profile using email as document ID:", profileData);
-        return NextResponse.json(profileData);
-      }
+      } else {
+        // Also try email as a field
+        const emailQuery = await adminDb
+          .collection("creatorProfiles")
+          .where("email", "==", email)
+          .limit(1)
+          .get();
 
-      // Also try email as a field
-      const emailQuery = await adminDb
-        .collection("creatorProfiles")
-        .where("email", "==", email)
-        .limit(1)
-        .get();
-
-      if (!emailQuery.empty) {
-        const profileData = emailQuery.docs[0].data();
-        console.log("Found creator profile using email field:", profileData);
-        return NextResponse.json(profileData);
+        if (!emailQuery.empty) {
+          profileData = emailQuery.docs[0].data();
+          // Save email for verification lookup
+          creatorEmail = email;
+          if (profileData.userId) creatorUserId = profileData.userId as string;
+          console.log("Found creator profile using email field:", profileData);
+        }
       }
     }
 
-    // If we're here, we couldn't find the profile with any method
-    console.warn("No creator profile found with any of the provided identifiers");
-    return NextResponse.json(
-      { error: "Creator profile not found" },
-      { status: 404 }
-    );
+    // If we didn't find a profile with any method
+    if (Object.keys(profileData).length === 0) {
+      console.warn("No creator profile found with any of the provided identifiers");
+      return NextResponse.json(
+        { error: "Creator profile not found" },
+        { status: 404 }
+      );
+    }
+
+    // 6. Fetch verification data now that we have found a profile
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let verificationData: { [key: string]: any } = {};
+    
+    // Try to find verification by email first (most reliable)
+    if (creatorEmail) {
+      console.log(`Fetching verification data for email: ${creatorEmail}`);
+      
+      // Get the most recent verification document
+      const verificationByEmailSnapshot = await adminDb.collection("creator_verifications")
+        .where("profileData.email", "==", creatorEmail)
+        .orderBy("createdAt", "desc")
+        .limit(1)
+        .get();
+      
+      if (!verificationByEmailSnapshot.empty) {
+        const verificationDoc = verificationByEmailSnapshot.docs[0];
+        verificationData = verificationDoc.data();
+        verificationData.id = verificationDoc.id;
+        console.log("Found verification data by email:", verificationData);
+      }
+    }
+    
+    // If no verification found by email but we have userId, try that next
+    if (Object.keys(verificationData).length === 0 && creatorUserId) {
+      console.log(`Searching for verification by userId: ${creatorUserId}`);
+      
+      const verificationByUserIdSnapshot = await adminDb.collection("creator_verifications")
+        .where("userId", "==", creatorUserId)
+        .orderBy("createdAt", "desc")
+        .limit(1)
+        .get();
+      
+      if (!verificationByUserIdSnapshot.empty) {
+        const verificationDoc = verificationByUserIdSnapshot.docs[0];
+        verificationData = verificationDoc.data();
+        verificationData.id = verificationDoc.id;
+        console.log("Found verification data by userId:", verificationData);
+      }
+    }
+
+    // Create comprehensive merged response
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let mergedResponse: { [key: string]: any } = {
+      ...profileData,
+    };
+
+    // Add verification fields if found
+    if (Object.keys(verificationData).length > 0) {
+      // Extract all verification specific fields
+      const {
+        status,
+        createdAt,
+        updatedAt,
+        profilePictureUrl,
+        verificationVideoUrl,
+        verifiableIDUrl,
+        logoUrl,
+        notes,
+        adminNotes,
+        // Exclude profileData to avoid overwriting our main profile data with potentially older data
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        profileData: _profileData,
+        ...otherVerificationFields
+      } = verificationData;
+
+      // Include verification status and ID
+      mergedResponse = {
+        ...mergedResponse,
+        verificationStatus: status || "pending",
+        verificationId: verificationData.id,
+        verificationCreatedAt: createdAt || null,
+        verificationUpdatedAt: updatedAt || null,
+      };
+
+      // Include media URLs from verification
+      if (profilePictureUrl) mergedResponse.profilePictureUrl = profilePictureUrl;
+      if (verificationVideoUrl) mergedResponse.verificationVideoUrl = verificationVideoUrl;
+      if (verifiableIDUrl) mergedResponse.verifiableIDUrl = verifiableIDUrl;
+      if (logoUrl) mergedResponse.logoUrl = logoUrl;
+      
+      // Include notes
+      if (notes) mergedResponse.verificationNotes = notes;
+      if (adminNotes) mergedResponse.adminNotes = adminNotes;
+      
+      // Include any other verification fields not explicitly handled
+      mergedResponse = {
+        ...mergedResponse,
+        ...otherVerificationFields
+      };
+      
+      // Only selectively use profileData from verification if needed
+      if (verificationData.profileData) {
+        // If there are missing fields in our main profile data but present in verification.profileData,
+        // we can use those as fallbacks
+        for (const [key, value] of Object.entries(verificationData.profileData)) {
+          if (mergedResponse[key] === undefined && value !== undefined) {
+            mergedResponse[key] = value;
+          }
+        }
+      }
+    } else {
+      console.log("No verification data found for this creator");
+      mergedResponse.verificationStatus = "not_submitted";
+    }
+    
+    console.log("Final merged response:", mergedResponse);
+    
+    return NextResponse.json(mergedResponse);
   } catch (error) {
     console.error("Detailed error fetching creator profile:", error);
     return NextResponse.json(
@@ -303,52 +431,77 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * Profile update handler for creator profiles
+ */
 export async function PUT(request: NextRequest) {
   try {
     const data = await request.json();
-    const { email } = data;
-
+    const { email, ...updatedFields } = data;
+    
     if (!email) {
-      return NextResponse.json({ error: "Email is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Email is required" },
+        { status: 400 }
+      );
     }
-
-    // Using Admin SDK for Firestore operations
-    const creatorRef = adminDb.collection("creatorProfiles").doc(email);
-    const docSnap = await creatorRef.get();
-
-    if (!docSnap.exists) {
-      return NextResponse.json({ error: "Creator profile not found" }, { status: 404 });
-    }
-
-    // Clean the received data to prevent field duplication
-    const { socialLinks, ...otherData } = data;
     
-    // Remove any dot-notation socialLinks fields if they exist
-    const cleanedData = Object.keys(otherData).reduce((acc, key) => {
-      if (!key.startsWith('socialLinks.')) {
-        acc[key] = otherData[key];
-      }
-      return acc;
-    }, {} as Record<string, unknown>);
-    
-    // Create a clean update object
-    const updateData = {
-      ...cleanedData,
-      socialLinks: socialLinks || {},  // Ensure it's an object
-      updatedAt: new Date().toISOString()
-    };
-
-    // Update the document
-    await creatorRef.update(updateData);
-
-    return NextResponse.json({
-      success: true,
-      message: "Creator profile updated successfully",
-      data: updateData
+    // Update creatorProfiles collection first
+    await adminDb.collection("creatorProfiles").doc(email).update({
+      ...updatedFields,
+      updatedAt: new Date()
     });
+    
+    // Find the latest verification document if it exists and update relevant fields
+    // This ensures data consistency between collections
+    const verificationSnapshot = await adminDb.collection("creator_verifications")
+      .where("profileData.email", "==", email)
+      .orderBy("createdAt", "desc")
+      .limit(1)
+      .get();
+      
+    if (!verificationSnapshot.empty) {
+      const verificationDoc = verificationSnapshot.docs[0];
+      
+      // Update only relevant fields in profileData
+      const profileDataUpdates = {
+        firstName: updatedFields.firstName,
+        lastName: updatedFields.lastName,
+        bio: updatedFields.bio,
+        username: updatedFields.username,
+        country: updatedFields.country,
+        gender: updatedFields.gender,
+        ethnicity: updatedFields.ethnicity,
+        dateOfBirth: updatedFields.dateOfBirth,
+        contentTypes: updatedFields.contentTypes,
+        contentLinks: updatedFields.contentLinks,
+        socialMedia: updatedFields.socialMedia,
+        pricing: updatedFields.pricing
+      };
+      
+      // Filter out undefined values
+      const filteredUpdates = Object.entries(profileDataUpdates)
+        .filter(([, value]) => value !== undefined)
+        .reduce((obj: Record<string, unknown>, [key, value]) => {
+          obj[`profileData.${key}`] = value;
+          return obj;
+        }, {} as Record<string, unknown>);
+        
+      // Only update if we have fields to update
+      if (Object.keys(filteredUpdates).length > 0) {
+        await verificationDoc.ref.update(filteredUpdates);
+      }
+    }
+    
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error updating creator profile:", error);
-    const errorMessage = error instanceof Error ? error.message : "Failed to update creator profile";
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json(
+      { 
+        error: "Failed to update creator profile",
+        details: error instanceof Error ? error.message : String(error)
+      },
+      { status: 500 }
+    );
   }
 }

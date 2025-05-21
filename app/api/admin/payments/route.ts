@@ -1,14 +1,33 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/config/firebase-admin";
-import { Timestamp, Query, CollectionReference } from "firebase-admin/firestore";
+import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { getFirestore, Timestamp, Query, CollectionReference } from "firebase-admin/firestore";
+
+// Initialize Firebase Admin if not already initialized
+if (!getApps().length) {
+  initializeApp({
+    credential: cert({
+      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+    }),
+  });
+}
+
+// Initialize Firestore
+const db = getFirestore();
+
+// Set the default page size
+const DEFAULT_PAGE_SIZE = 10;
 
 // TypeScript type definitions
 type Record = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 };
 
-// Helper function to convert Firestore timestamps to ISO strings
+/**
+ * Helper function to convert Firestore timestamps to ISO strings
+ */
 function convertTimestampsToISO(data: Record | null) {
   if (!data) return data;
   
@@ -27,58 +46,40 @@ function convertTimestampsToISO(data: Record | null) {
   return result;
 }
 
-// Helper function to determine payment type and description
-function generatePaymentTypeAndDescription(paymentData: Record): { type: string, description: string } {
-  // Default values
-  let type = "Project";
-  let description = "Project Payment";
-  
-  // Determine type based on payment data
-  if (paymentData.paymentType) {
-    // If we have an explicit payment type, use it (capitalize first letter)
-    type = paymentData.paymentType.charAt(0).toUpperCase() + paymentData.paymentType.slice(1);
-  } else if (paymentData.contestId) {
-    // If it has a contestId, it's a contest payment
-    type = "Contest";
-  } else if (paymentData.projectId) {
-    // If it has a projectId, ensure it's marked as a project payment
-    type = "Project";
-  }
-  
-  // Generate description based on available data
-  if (paymentData.paymentName) {
-    // If we have a specific payment name, use it in the description
-    description = `${type} Payment: ${paymentData.paymentName}`;
-  } else if (paymentData.contestTitle) {
-    // If we have a contest title, use it in the description
-    description = `Contest Payment: ${paymentData.contestTitle}`;
-  } else if (paymentData.projectTitle) {
-    // If we have a project title, use it in the description
-    description = `Project Payment: ${paymentData.projectTitle}`;
-  } else if (type === "Contest") {
-    // Generic contest description
-    description = "Contest Payment";
-  }
-  
-  return { type, description };
-}
-
+/**
+ * GET handler for fetching transactions with pagination directly from Firestore
+ */
 export async function GET(request: NextRequest) {
   try {
-    console.time('payments-fetch'); // Performance timing start
+    console.time('transactions-fetch'); // Performance timing start
     
-    // Parse query parameters
+    // Get the URL to extract query parameters
     const url = new URL(request.url);
+    const userId = url.searchParams.get("userId");
     const status = url.searchParams.get('status');
     
-    // Pagination parameters
-    const page = parseInt(url.searchParams.get('page') || '1');
-    const limit = parseInt(url.searchParams.get('limit') || '10');
-    const offset = (page - 1) * limit;
+    // Get pagination parameters with defaults
+    const pageSize = parseInt(
+      url.searchParams.get("pageSize") || String(DEFAULT_PAGE_SIZE),
+      10
+    );
     
-    // Build the query
-    const paymentsRef: CollectionReference = adminDb.collection("payments");
+    // Validate pageSize parameter
+    if (isNaN(pageSize) || pageSize < 1 || pageSize > 50) {
+      return NextResponse.json(
+        { error: "Invalid pageSize parameter (must be between 1 and 50)" },
+        { status: 400 }
+      );
+    }
+    
+    // Set up the base query
+    const paymentsRef: CollectionReference = db.collection("payments");
     let queryRef: Query = paymentsRef;
+    
+    // Filter by userId if provided
+    if (userId) {
+      queryRef = queryRef.where("userId", "==", userId);
+    }
     
     // Filter by status if provided
     if (status) {
@@ -88,35 +89,97 @@ export async function GET(request: NextRequest) {
     // Order by creation date, newest first
     queryRef = queryRef.orderBy("createdAt", "desc");
     
+    // Handle cursor-based pagination
+    const cursor = url.searchParams.get("cursor");
+    if (cursor) {
+      try {
+        // The cursor should be a serialized object containing the timestamp and docId
+        const cursorData = JSON.parse(Buffer.from(cursor, 'base64').toString('utf-8'));
+        
+        // Get a reference to the document at the cursor position
+        if (cursorData.timestamp && cursorData.docId) {
+          const cursorTimestamp = new Date(cursorData.timestamp);
+          
+          // Find documents with timestamps equal to or older than the cursor
+          queryRef = queryRef.startAfter(cursorTimestamp, cursorData.docId);
+        }
+      } catch (error) {
+        console.error("Invalid cursor format:", error);
+        return NextResponse.json(
+          { error: "Invalid cursor format" },
+          { status: 400 }
+        );
+      }
+    }
+    
     // OPTIMIZATION 1: Run count query and data query in parallel
     const [countPromise, paymentsPromise] = await Promise.all([
       // Get total count (for pagination info)
       queryRef.count().get(),
-      // Get paginated payments
-      queryRef.limit(limit).offset(offset).get()
+      // Get paginated payments (fetch one extra to determine if there are more results)
+      queryRef.limit(pageSize + 1).get()
     ]);
     
     const totalCount = countPromise.data().count;
-    const paymentDocs = paymentsPromise.docs;
+    const snapshot = paymentsPromise;
     
     // OPTIMIZATION 2: Collect IDs for batch fetching while processing payment data
     const contestIds = new Set<string>();
     const projectIds = new Set<string>();
+    let hasMore = false;
+    
+    // Process results
     const paymentDataArray: Record[] = [];
+    let lastDoc = null;
     
-    // Build an array of payment data while collecting IDs
-    paymentDocs.forEach(doc => {
-      const data = doc.data();
-      if (data.contestId) contestIds.add(data.contestId);
-      if (data.projectId) projectIds.add(data.projectId);
-      
-      paymentDataArray.push({
-        id: doc.id,
-        ...convertTimestampsToISO(data)
+    // If we got more documents than the requested pageSize, there are more results
+    if (snapshot.size > pageSize) {
+      hasMore = true;
+      // Only process up to pageSize documents
+      snapshot.docs.slice(0, pageSize).forEach(doc => {
+        const data = doc.data();
+        if (data.contestId) contestIds.add(data.contestId);
+        if (data.projectId) projectIds.add(data.projectId);
+        
+        paymentDataArray.push({
+          id: doc.id,
+          ...convertTimestampsToISO(data)
+        });
       });
-    });
+      // The last document is our new cursor position
+      lastDoc = snapshot.docs[pageSize - 1];
+    } else {
+      // Process all results
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.contestId) contestIds.add(data.contestId);
+        if (data.projectId) projectIds.add(data.projectId);
+        
+        paymentDataArray.push({
+          id: doc.id,
+          ...convertTimestampsToISO(data)
+        });
+      });
+      // If we have any documents, the last one is our new cursor position
+      if (snapshot.size > 0) {
+        lastDoc = snapshot.docs[snapshot.size - 1];
+      }
+    }
     
-    // OPTIMIZATION 3: Batch fetching related data and calculating totals in parallel
+    // Create the next cursor
+    let nextCursor = null;
+    if (hasMore && lastDoc) {
+      const lastDocData = lastDoc.data();
+      const cursorData = {
+        timestamp: lastDocData.createdAt instanceof Timestamp 
+          ? lastDocData.createdAt.toDate().toISOString() 
+          : lastDocData.createdAt,
+        docId: lastDoc.id
+      };
+      nextCursor = Buffer.from(JSON.stringify(cursorData)).toString('base64');
+    }
+    
+    // OPTIMIZATION 3: Batch fetching related data in parallel
     const promises = [];
     
     // Only add contest fetch promise if we have contest IDs
@@ -131,7 +194,7 @@ export async function GET(request: NextRequest) {
       }
       
       const contestPromises = contestBatches.map(batch => 
-        adminDb.collection("contests").where("__name__", "in", batch).get()
+        db.collection("contests").where("__name__", "in", batch).get()
       );
       promises.push(Promise.all(contestPromises));
     } else {
@@ -150,29 +213,15 @@ export async function GET(request: NextRequest) {
       }
       
       const projectPromises = projectBatches.map(batch => 
-        adminDb.collection("projects").where("__name__", "in", batch).get()
+        db.collection("projects").where("__name__", "in", batch).get()
       );
       promises.push(Promise.all(projectPromises));
     } else {
       promises.push(Promise.resolve([]));
     }
     
-    // OPTIMIZATION 4: Calculate totals using aggregation queries instead of fetching all documents
-    const totalsPromises = [
-      // Total amount (filtered by status if provided)
-      status
-        ? adminDb.collection("payments").where("status", "==", status).get()
-        : adminDb.collection("payments").get(),
-      // Pending amount
-      adminDb.collection("payments").where("status", "==", "pending_capture").get(),
-      // Processed amount
-      adminDb.collection("payments").where("status", "==", "completed").get()
-    ];
-    
-    promises.push(Promise.all(totalsPromises));
-    
     // Wait for all parallel operations to complete
-    const [contestBatchesResults, projectBatchesResults, totalResults] = await Promise.all(promises);
+    const [contestBatchesResults, projectBatchesResults] = await Promise.all(promises);
     
     // Process contest results
     const contestMap = new Map();
@@ -200,82 +249,185 @@ export async function GET(request: NextRequest) {
       });
     }
     
-    // Calculate totals from aggregation queries
-    let totalAmount = 0;
-    let pendingAmount = 0;
-    let processedAmount = 0;
-    
-    if (Array.isArray(totalResults) && totalResults.length === 3) {
-      // Process total amount
-      totalResults[0].forEach(doc => {
-        totalAmount += doc.data().amount || 0;
-      });
-      
-      // Process pending amount
-      totalResults[1].forEach(doc => {
-        pendingAmount += doc.data().amount || 0;
-      });
-      
-      // Process processed amount
-      totalResults[2].forEach(doc => {
-        processedAmount += doc.data().amount || 0;
-      });
-    }
-    
-    // Enhance payment data with related information and generate types/descriptions
-    const payments = paymentDataArray.map(paymentData => {
-      // Add contest title if available
-      if (paymentData.contestId) {
-        paymentData.contestTitle = contestMap.get(paymentData.contestId) || null;
+    // Format transactions with the enhanced data
+    const transactions = paymentDataArray.map(paymentData => {
+      try {
+        // Add contest title if available
+        if (paymentData.contestId) {
+          paymentData.contestTitle = contestMap.get(paymentData.contestId) || null;
+        }
+        
+        // Add project title if available
+        if (paymentData.projectId) {
+          paymentData.projectTitle = projectMap.get(paymentData.projectId) || null;
+        }
+        
+        // Parse dates (already converted to ISO strings by convertTimestampsToISO)
+        const createdAt = paymentData.createdAt ? new Date(paymentData.createdAt) : new Date();
+        const processedAt = paymentData.processedAt ? new Date(paymentData.processedAt) : null;
+        
+        // Format dates for display
+        const transactionDate = createdAt.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+        
+        const paymentDate = processedAt
+          ? processedAt.toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })
+          : "Pending";
+        
+        // Determine status for display
+        let status;
+        if (paymentData.status === "completed" || paymentData.status === "succeeded") {
+          status = "Processed";
+        } else if (paymentData.status === "pending" || paymentData.status === "pending_capture") {
+          status = "Pending";
+        } else if (paymentData.status === "refunded") {
+          status = "Refunded";
+        } else {
+          status = paymentData.status || "Unknown";
+        }
+        
+        // Get amount from the appropriate field
+        let amountValue = 0;
+        if (typeof paymentData.amount60 === 'number') {
+          amountValue = paymentData.amount60;
+        } else if (typeof paymentData.amount === 'number') {
+          amountValue = paymentData.amount;
+        }
+        
+        // Format amount (assuming it's stored in cents)
+        const amount = (amountValue).toLocaleString();
+        
+        // Determine payment type
+        let type = "Project";
+        if (paymentData.paymentType) {
+          // Capitalize first letter
+          type = paymentData.paymentType.charAt(0).toUpperCase() + paymentData.paymentType.slice(1);
+        } else if (paymentData.contestId || paymentData.contestTitle) {
+          type = "Contest";
+        } else if (paymentData.projectId || paymentData.projectTitle) {
+          type = "Project";
+        }
+        
+        // Create description
+        let description;
+        if (paymentData.paymentName) {
+          description = `${type} Payment: ${paymentData.paymentName}`;
+        } else if (paymentData.contestTitle) {
+          description = `Contest Payment: ${paymentData.contestTitle}`;
+        } else if (paymentData.projectTitle) {
+          description = `Project Payment: ${paymentData.projectTitle}`;
+        } else {
+          description = `${type} Payment`;
+        }
+        
+        return {
+          id: paymentData.id,
+          transactionDate,
+          description,
+          amount,
+          type,
+          status,
+          paymentDate,
+          projectCompleted: paymentDate, // Using payment date as completion date
+          brandEmail: paymentData.brandEmail || null,
+          actions: "View Transaction",
+          rawData: paymentData, // Include the raw data for reference
+        };
+      } catch (error) {
+        console.error(`Error formatting transaction ${paymentData.id}:`, error);
+        // Return a fallback object with basic information
+        return {
+          id: paymentData.id,
+          transactionDate: new Date().toLocaleDateString(),
+          description: "Transaction (Error Formatting)",
+          amount: "0",
+          type: "Unknown",
+          status: "Unknown",
+          paymentDate: "Unknown",
+          projectCompleted: "Unknown",
+          actions: "View Transaction",
+          rawData: paymentData,
+          error: "Error formatting transaction"
+        };
       }
-      
-      // Add project title if available
-      if (paymentData.projectId) {
-        paymentData.projectTitle = projectMap.get(paymentData.projectId) || null;
-      }
-      
-      // Generate proper type and description for this payment
-      const { type, description } = generatePaymentTypeAndDescription(paymentData);
-      
-      return {
-        ...paymentData,
-        type,        // Add explicitly determined type
-        description, // Add proper description
-      };
     });
     
-    // Pagination metadata
-    const paginationMeta = {
-      totalItems: totalCount,
-      itemsPerPage: limit,
-      currentPage: page,
-      totalPages: Math.ceil(totalCount / limit)
-    };
+    // Calculate transaction totals
+    const totals = calculateTransactionTotals(transactions);
     
-    // Payment totals
-    const paymentTotals = {
-      totalAmount: totalAmount.toFixed(2),
-      pendingAmount: pendingAmount.toFixed(2),
-      processedAmount: processedAmount.toFixed(2)
-    };
+    console.timeEnd('transactions-fetch'); // Performance timing end
     
-    console.timeEnd('payments-fetch'); // Performance timing end
-    
+    // Return the formatted response
     return NextResponse.json({
-      payments,
-      pagination: paginationMeta,
-      totals: paymentTotals
+      transactions,
+      totals,
+      pagination: {
+        pageSize,
+        hasMore,
+        cursor: nextCursor,
+        totalCount,
+      },
+      metadata: {
+        contestsCount: contestIds.size,
+        projectsCount: projectIds.size
+      }
     });
     
-  } catch (error) {
-    console.error("Error fetching payments:", error);
-    
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } catch (error: any) {
+    console.error("Error fetching transactions:", error);
+
+    // Always return a proper JSON response, even for errors
     return NextResponse.json(
-      {
-        error: "Failed to fetch payments",
-        details: error instanceof Error ? error.message : String(error),
-      },
-      { status: 500 }
+      { error: error.message || "Failed to fetch transactions" },
+      { status: error.message?.includes("Unauthorized") ? 401 : 500 }
     );
   }
+}
+
+/**
+ * Calculate transaction totals
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function calculateTransactionTotals(transactions: any[]) {
+  // Initialize totals
+  let totalSpend = 0;
+  let pendingPayments = 0;
+  let totalProcessed = 0;
+
+  // Calculate totals
+  transactions.forEach((transaction) => {
+    try {
+      // Parse the amount (remove commas and convert to number)
+      const amount = parseFloat(transaction.amount.replace(/,/g, ""));
+
+      if (!isNaN(amount)) {
+        // Add to appropriate total based on status
+        if (transaction.status === "Pending") {
+          pendingPayments += amount;
+        } else if (transaction.status === "Processed") {
+          totalProcessed += amount;
+          totalSpend += amount; // Add processed to total spend
+        }
+        // Note: Refunded amounts don't contribute to totals
+      }
+    } catch (error) {
+      console.error("Error calculating transaction total:", error);
+      // Skip this transaction in the total calculation
+    }
+  });
+
+  // Format totals
+  return {
+    totalSpend: totalSpend.toLocaleString(),
+    pendingPayments: pendingPayments.toLocaleString(),
+    totalProcessed: totalProcessed.toLocaleString(),
+  };
 }

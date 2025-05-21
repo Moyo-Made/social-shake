@@ -14,6 +14,7 @@ import ContestModal from "./available/JoinContestModal";
 import { useAuth } from "@/context/AuthContext";
 import ApplyModal from "./available/ApplyModal";
 import IncentivesModal from "./available/IncentivesModal";
+import { useRouter } from "next/navigation";
 
 interface ContestDetailPageProps {
 	contestId: string;
@@ -38,6 +39,7 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 	const [interestId, setInterestId] = useState<string | null>(null);
 	const [saveLoading, setSaveLoading] = useState<boolean>(false);
 	const [isIncentivesModalOpen, setIsIncentivesModalOpen] = useState(false);
+	const router = useRouter();
 
 	// Function to check if user has joined the contest - made reusable
 	const checkIfJoined = useCallback(async () => {
@@ -354,7 +356,11 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 		if (hasJoined) {
 			return (
 				<button
-					className="mt-4 block w-full text-center py-2 bg-green-500 cursor-not-allowed text-white rounded-md"
+				onClick={() => {
+					router.push(`/creator/dashboard/contest/${contestId}/leaderboard`);
+					
+				  }}
+					className="mt-4 block w-full text-center py-2 bg-orange-500 cursor-not-allowed text-white rounded-md"
 					disabled
 				>
 					<svg
@@ -364,7 +370,7 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 					>
 						<path d="M0 11l2-2 5 5L18 3l2 2L7 18z" />
 					</svg>
-					Contest Joined
+					View Leaderboard
 				</button>
 			);
 		}
@@ -745,7 +751,9 @@ export default function ContestDetails({ contestId }: ContestDetailPageProps) {
 						{contestType.toLowerCase() === "leaderboard" ? (
 							<div className="flex justify-between items-center pb-4 text-sm w-full">
 								<p className="mb-2 text-[#667085]">Winner Count </p>
-								<span>{winnerCount} Winners</span>
+								<span>
+									{winnerCount} {winnerCount > 1 ? "Winners" : "Winner"}
+								</span>
 							</div>
 						) : (
 							<div className="flex justify-between items-center pb-4 text-sm w-full">

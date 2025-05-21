@@ -73,8 +73,9 @@ export async function POST(request: NextRequest) {
                         : `Payment for project: ${projectTitle}`,
                 }
 			},
-			success_url: `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-success?payment_id=${paymentId}&session_id={CHECKOUT_SESSION_ID}`,
-			cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/brand/dashboard/contests/new?canceled=true`,
+			// Make sure to include the type parameter in the success URL
+			success_url: `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-success?payment_id=${paymentId}&session_id={CHECKOUT_SESSION_ID}&type=${type}`,
+			cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/brand/${type}/new?canceled=true`,
 			customer_email: userEmail,
 			metadata: { // Duplicate metadata at the session level for redundancy
 				paymentId,

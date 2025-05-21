@@ -120,10 +120,15 @@ const UserDashboard = dynamic(() => Promise.resolve(({ userId }: UserDashboardPr
 	const [latestContest, setLatestContest] = useState<ContestFormData | null>(
 		null
 	);
+	
 	const [leaderboardData, setLeaderboardData] = useState<ContestParticipant[]>(
 		[]
 	);
 	const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
+
+	const activeProjects = userData && userData.projects
+    .filter(project => project.status === "active" || project.status === "accepting pitches")
+    .length > 0;
 
 	// function to calculate time ago
 	const timeAgo = (timestamp: string | number | Date) => {
@@ -609,6 +614,8 @@ const UserDashboard = dynamic(() => Promise.resolve(({ userId }: UserDashboardPr
 			</div>
 
 			{/* Active Projects Section */}
+
+			
 			<div className="mb-12">
 				<div className="flex justify-between items-center mb-4">
 					<h2 className="text-2xl font-semibold text-gray-800">
@@ -623,66 +630,71 @@ const UserDashboard = dynamic(() => Promise.resolve(({ userId }: UserDashboardPr
 				</div>
 
 				<div className="bg-white rounded-lg shadow overflow-hidden">
-					<table className="min-w-full divide-y divide-gray-200">
-						<thead className="bg-gray-50">
-							<tr>
-								<th className="px-6 py-3 text-left text-sm font-medium text-gray-500 ">
-									Project Name
-								</th>
-								<th className="px-6 py-3 text-left text-sm font-medium text-gray-500 ">
-									Project Type
-								</th>
-								<th className="px-6 py-3 text-left text-sm font-medium text-gray-500 ">
-									Total Amount
-								</th>
-								<th className="px-6 py-3 text-left text-sm font-medium text-gray-500 ">
-									Actions
-								</th>
-							</tr>
-						</thead>
-						<tbody className="bg-white divide-y divide-gray-200">
-							{userData.projects
-								.filter(
-									(project) =>
-										project.status === "active" ||
-										project.status === "accepting pitches"
-								)
-								.slice(0, 5) // Limit to 5 projects for the dashboard
-								.map((project, index) => (
-									<tr key={project.projectId || index}>
-										<td className="px-6 py-4 whitespace-nowrap">
-											<div className="text-sm font-medium text-gray-900">
-												{project.projectDetails?.projectName ||
-													"Untitled Project"}
-											</div>
-										</td>
-										<td className="px-6 py-4 whitespace-nowrap">
-											<div className="text-sm text-gray-500">
-												{project.projectType?.type || "UGC Content Only"}
-											</div>
-										</td>
-										<td className="px-6 py-4 whitespace-nowrap">
-											<div className="text-sm text-gray-900">
-												{formatCurrency(
-													project.creatorPricing?.budgetPerVideo || 0
-												)}
-											</div>
-										</td>
-										<td className="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
-											<Link
-												href={`/brand/dashboard/projects/${project.projectId}`}
-												className="text-orange-500 hover:underline"
-											>
-												View Project
-											</Link>
-										</td>
-									</tr>
-								))}
-						</tbody>
-					</table>
+				{activeProjects ? (
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                Project Name
+              </th>
+              <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                Project Type
+              </th>
+              <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                Total Amount
+              </th>
+              <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {userData.projects
+              .filter(
+                (project) =>
+                  project.status === "active" ||
+                  project.status === "accepting pitches"
+              )
+              .slice(0, 5) // Limit to 5 projects for the dashboard
+              .map((project, index) => (
+                <tr key={project.projectId || index}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">
+                      {project.projectDetails?.projectName ||
+                        "Untitled Project"}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-500">
+                      {project.projectType?.type || "UGC Content Only"}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">
+                      {formatCurrency(
+                        project.creatorPricing?.budgetPerVideo || 0
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
+                    <Link
+                      href={`/brand/dashboard/projects/${project.projectId}`}
+                      className="text-orange-500 hover:underline"
+                    >
+                      View Project
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      ) : (
+        <div className="p-6 text-center">
+          <p className="text-gray-500">No active projects yet</p>
+        </div>
+      )}
 				</div>
 			</div>
-
 			{/* Latest Contest Section */}
 			{latestContest && (
 				<div className="mb-12">

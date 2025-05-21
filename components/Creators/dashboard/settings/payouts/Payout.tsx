@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
 	fetchPaymentMethods,
 	addPaymentMethod,
@@ -19,7 +20,9 @@ import {
 	deletePaymentMethod,
 	setDefaultPaymentMethod,
 } from "@/services/paymentMethodService";
+import axios from "axios";
 import Image from "next/image";
+import StripeConnect from "../StripeConnect";
 
 // Types for our payment methods
 type PaymentMethod = {
@@ -56,6 +59,9 @@ const Payout = () => {
 	const [success, setSuccess] = useState("");
 	const [editingPaymentMethod, setEditingPaymentMethod] =
 		useState<PaymentMethod | null>(null);
+	const [activeTab, setActiveTab] = useState("payment-methods");
+	const [disconnecting, setDisconnecting] = useState(false);
+	const [refreshKey, setRefreshKey] = useState(0);
 
 	// Form states
 	const [accountHolderName, setAccountHolderName] = useState("");
@@ -317,6 +323,30 @@ const Payout = () => {
 		setSetAsDefault(false);
 	};
 
+	const handleDisconnectStripe = async () => {
+		if (!auth.currentUser?.uid) return;
+		
+		try {
+			setDisconnecting(true);
+			setError("");
+			
+			// Call your disconnect endpoint
+			await axios.post("/api/creator/disconnect-stripe-account", {
+				userId: auth.currentUser.uid
+			});
+			
+			// Force refresh the StripeConnect component to show the connect button again
+			setRefreshKey(prev => prev + 1);
+			setSuccess("Stripe account disconnected successfully");
+			
+		} catch (err) {
+			console.error("Error disconnecting Stripe account:", err);
+			setError("Failed to disconnect your Stripe account. Please try again.");
+		} finally {
+			setDisconnecting(false);
+		}
+	};
+
 	// Use fetched data, fallback to mock data if empty
 	const displayPaymentMethods = paymentMethods.length > 0 && paymentMethods;
 
@@ -340,109 +370,154 @@ const Payout = () => {
 				</Alert>
 			)}
 
-			<div className="space-y-4">
-				{Array.isArray(displayPaymentMethods) &&
-					displayPaymentMethods.map((method) => (
-						<div
-							key={method.id}
-							className="border rounded-lg p-4 flex items-center justify-between"
-						>
-							<div className="flex items-center space-x-4">
-								{method.type === "bank" && (
-									<div className="w-10 h-10 bg-gray-100 flex items-center justify-center rounded">
-										<span className="text-xl">🏦</span>
-									</div>
-								)}
-								{method.type === "paypal" && (
-									<Image
-										src="/icons/paypal.svg"
-										alt="Paypal"
-										width={30}
-										height={30}
-									/>
-								)}
-								{method.type === "card" && (
-									<div className="w-10 h-10 bg-yellow-100 flex items-center justify-center rounded">
-										<span className="text-xl">💳</span>
-									</div>
-								)}
+			<Tabs defaultValue="payment-methods" value={activeTab} onValueChange={setActiveTab} className="mt-4">
+				<TabsList className="grid w-full max-w-md grid-cols-2">
+					<TabsTrigger value="payment-methods">Payment Methods</TabsTrigger>
+					<TabsTrigger value="stripe-connect">Stripe Connect</TabsTrigger>
+				</TabsList>
 
-								<div>
-									{method.type === "bank" && (
-										<>
-											<div className="font-medium">{method.bankName}</div>
-											<div className="text-sm text-gray-500">
-												Account ending in {method.accountEnding}
+				{/* Payment Methods Tab Content */}
+				<TabsContent value="payment-methods" className="mt-4">
+					<div className="space-y-4">
+						{Array.isArray(displayPaymentMethods) &&
+							displayPaymentMethods.map((method) => (
+								<div
+									key={method.id}
+									className="border rounded-lg p-4 flex items-center justify-between"
+								>
+									<div className="flex items-center space-x-4">
+										{method.type === "bank" && (
+											<div className="w-10 h-10 bg-gray-100 flex items-center justify-center rounded">
+												<span className="text-xl">🏦</span>
 											</div>
-										</>
-									)}
-									{method.type === "paypal" && (
-										<>
-											<div className="font-medium">Paypal</div>
-											{method.paypalEmail && (
-												<div className="text-sm text-gray-500">
-													{method.paypalEmail}
-												</div>
+										)}
+										{method.type === "paypal" && (
+											<Image
+												src="/icons/paypal.svg"
+												alt="Paypal"
+												width={30}
+												height={30}
+											/>
+										)}
+										{method.type === "card" && (
+											<div className="w-10 h-10 bg-yellow-100 flex items-center justify-center rounded">
+												<span className="text-xl">💳</span>
+											</div>
+										)}
+
+										<div>
+											{method.type === "bank" && (
+												<>
+													<div className="font-medium">{method.bankName}</div>
+													<div className="text-sm text-gray-500">
+														Account ending in {method.accountEnding}
+													</div>
+												</>
 											)}
-										</>
-									)}
-									{method.type === "card" && (
-										<>
-											<div className="font-medium">{method.cardType}</div>
-											<div className="text-sm text-gray-500">
-												Card ending in {method.cardEnding} (Expires:{" "}
-												{method.expiryDate})
-											</div>
-										</>
-									)}
+											{method.type === "paypal" && (
+												<>
+													<div className="font-medium">Paypal</div>
+													{method.paypalEmail && (
+														<div className="text-sm text-gray-500">
+															{method.paypalEmail}
+														</div>
+													)}
+												</>
+											)}
+											{method.type === "card" && (
+												<>
+													<div className="font-medium">{method.cardType}</div>
+													<div className="text-sm text-gray-500">
+														Card ending in {method.cardEnding} (Expires:{" "}
+														{method.expiryDate})
+													</div>
+												</>
+											)}
+										</div>
+									</div>
+
+									<div className="flex items-center space-x-2">
+										{method.isDefault ? (
+											<span className="text-sm text-[#20D5EC] bg-[#F1FEFB] px-3 py-1 rounded-full">
+												Default
+											</span>
+										) : (
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={() => handleSetDefault(method.id)}
+												disabled={isLoading}
+												className="bg-[#6670854D] rounded-full font-light"
+											>
+												Make Default
+											</Button>
+										)}
+										<Button
+											variant="outline"
+											size="icon"
+											onClick={() => handleEditClick(method)}
+										>
+											<PencilIcon className="h-4 w-4" />
+										</Button>
+										<Button
+											variant="outline"
+											size="icon"
+											onClick={() => handleDeletePaymentMethod(method.id)}
+											disabled={isLoading}
+										>
+											<TrashIcon className="h-4 w-4" />
+										</Button>
+									</div>
 								</div>
-							</div>
+							))}
 
-							<div className="flex items-center space-x-2">
-								{method.isDefault ? (
-									<span className="text-sm text-[#20D5EC] bg-[#F1FEFB] px-3 py-1 rounded-full">
-										Default
-									</span>
-								) : (
-									<Button
-										variant="outline"
-										size="sm"
-										onClick={() => handleSetDefault(method.id)}
-										disabled={isLoading}
-										className="bg-[#6670854D] rounded-full font-light"
-									>
-										Make Default
-									</Button>
-								)}
-								<Button
-									variant="outline"
-									size="icon"
-									onClick={() => handleEditClick(method)}
-								>
-									<PencilIcon className="h-4 w-4" />
-								</Button>
-								<Button
-									variant="outline"
-									size="icon"
-									onClick={() => handleDeletePaymentMethod(method.id)}
-									disabled={isLoading}
-								>
-									<TrashIcon className="h-4 w-4" />
-								</Button>
-							</div>
+						<div className="flex justify-end mt-3">
+							<Button
+								onClick={() => setIsAddModalOpen(true)}
+								className="flex items-center py-5 bg-black text-white"
+								variant="outline"
+							>
+								<PlusIcon className="mr-1 h-5 w-5" /> Add Payment Method
+							</Button>
 						</div>
-					))}
+					</div>
+				</TabsContent>
 
-				<div className="flex justify-end mt-3">
-					<Button
-						onClick={() => setIsAddModalOpen(true)}
-						className="flex items-center py-5 bg-black text-white"
-						variant="outline"
-					>
-						<PlusIcon className="mr-1 h-5 w-5" /> Add Payment Method
-					</Button>
-				</div>
-			</div>
+				{/* Stripe Connect Tab Content */}
+				<TabsContent value="stripe-connect" className="mt-4">
+					<div className="border rounded-lg p-6 space-y-4">
+						<div>
+							<h3 className="text-xl font-medium mb-2">Stripe Connect</h3>
+							<p className="text-gray-500">
+								Connect your Stripe account to receive payments
+							</p>
+						</div>
+						
+						<div key={refreshKey}>
+							<StripeConnect
+								userId={auth.currentUser?.uid}
+								redirectPath="/creator/dashboard/settings"
+								testMode={true}
+							/>
+						</div>
+						
+						{/* Disconnect button - shown conditionally based on connected state */}
+						<div className="mt-6 pt-4 border-t border-gray-200">
+							<Button  
+								variant="destructive" 
+								onClick={handleDisconnectStripe} 
+								disabled={disconnecting} 
+								className="mt-2 bg-red-500 text-white hover:bg-red-600" 
+							> 
+								{disconnecting ? "Disconnecting..." : "Disconnect Stripe Account"} 
+							</Button> 
+							<p className="text-xs text-red-600 mt-2"> 
+								Warning: Disconnecting your Stripe account will prevent you from receiving payments 
+							</p> 
+						</div>
+					</div>
+				</TabsContent>
+			</Tabs>
 
 			{/* Add New Payment Method Modal (using divs instead of Dialog) */}
 			{isAddModalOpen && (

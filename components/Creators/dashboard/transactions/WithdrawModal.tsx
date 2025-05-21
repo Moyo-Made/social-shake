@@ -56,6 +56,7 @@ interface ConfirmationModalProps {
 	onClose: () => void;
 	withdrawalInfo: WithdrawalInfo;
 	onConfirm: () => void;
+	isLoading?: boolean; 
 }
 
 
@@ -440,10 +441,12 @@ export interface TransactionModalProps {
 	isOpen: boolean;
 	onClose: () => void;
 	transaction: Transaction;
+	details?: Record<string, unknown>;
 }
 
 // Types
 export interface Transaction {
+	date: string;
 	id: string;
 	transactionDate: string;
 	description: string;

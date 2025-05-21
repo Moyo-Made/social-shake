@@ -4,10 +4,11 @@ import { useRouter } from "next/navigation";
 
 interface SuccessModalProps {
   isOpen: boolean;
+  contestId: string;
   onClose: () => void;
 }
 
-const SuccessModal: React.FC<SuccessModalProps> = ({ isOpen, onClose }) => {
+const SuccessModal: React.FC<SuccessModalProps> = ({ isOpen, onClose, contestId }) => {
   const router = useRouter();
   
   if (!isOpen) return null;
@@ -34,7 +35,7 @@ const SuccessModal: React.FC<SuccessModalProps> = ({ isOpen, onClose }) => {
           
           <button
             onClick={() => {
-              router.push('/contests/dashboard/leaderboard');
+              router.push(`/creator/dashboard/contest/${contestId}/leaderboard`);
               onClose();
             }}
             className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors"

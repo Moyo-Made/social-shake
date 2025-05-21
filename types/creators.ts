@@ -148,7 +148,7 @@ export interface CreatorProfileData {
 	ethnicity: string;
 	dateOfBirth: string;
 	gender: string;
-	contentTypes?: string[];
+	contentTypes?:  string | string[] | undefined;
 	socialMedia: {
 		instagram: string;
 		twitter: string;

@@ -51,73 +51,54 @@ const AccountSettings: React.FC = () => {
 	];
 
 	useEffect(() => {
+		// Alternative approach - fetch from both endpoints in the frontend
 		const fetchCreatorProfile = async (): Promise<void> => {
 			if (!currentUser?.email) {
-				console.warn("No user email found");
-				setIsLoading(false);
-				return;
+			  console.warn("No user email found");
+			  setIsLoading(false);
+			  return;
 			}
-
+		  
 			try {
-				console.log("Fetching creator profile for email:", currentUser.email);
-
-				// Use the new complete profile endpoint
-				const response = await fetch(
-					`/api/admin/creator-approval?email=${encodeURIComponent(currentUser.email)}`,
-					{
-						method: "GET",
-						headers: {
-							"Content-Type": "application/json",
-						},
-					}
-				);
-
-				if (!response.ok) {
-					const errorText = await response.text();
-					throw new Error("Failed to fetch creator profile: " + errorText);
+			  console.log("Fetching creator profile for email:", currentUser.email);
+		  
+			  // Single fetch request for all data
+			  const response = await fetch(
+				`/api/creator-profile?email=${encodeURIComponent(currentUser.email)}`,
+				{
+				  method: "GET",
+				  headers: {
+					"Content-Type": "application/json",
+				  },
 				}
-
-				const responseData = await response.json();
-				console.log("Fetched profile data:", responseData);
-
-				// Extract the current creator's data from the response
-				// The response includes an array of creators in the "creators" property
-				let creatorData = null;
-
-				if (responseData.creators && Array.isArray(responseData.creators)) {
-					// Find the creator that matches the current user's email
-					creatorData = responseData.creators.find(
-						(creator: { email: string }) => creator.email === currentUser.email
-					);
-				} else if (responseData.email === currentUser.email) {
-					// If the response is already a single creator object
-					creatorData = responseData;
-				}
-
-				if (!creatorData) {
-					throw new Error("Creator profile not found");
-				}
-
-				console.log("Current creator data:", creatorData);
-
-				// Initialize content links array from data
-				const links = creatorData.contentLinks || [];
-				setContentLinks(links.length > 0 ? links : [""]);
-
-				// Initialize bio char count
-				if (creatorData.bio) {
-					setCharCount(creatorData.bio.length);
-				}
-
-				setProfileData(creatorData);
-				setFormData(creatorData);
+			  );
+		  
+			  if (!response.ok) {
+				const errorText = await response.text();
+				throw new Error("Failed to fetch creator profile: " + errorText);
+			  }
+		  
+			  const mergedData = await response.json();
+			  console.log("Creator data:", mergedData);
+		  
+			  // Initialize content links array from data
+			  const links = mergedData.contentLinks || [];
+			  setContentLinks(links.length > 0 ? links : [""]);
+		  
+			  // Initialize bio char count
+			  if (mergedData.bio) {
+				setCharCount(mergedData.bio.length);
+			  }
+		  
+			  setProfileData(mergedData);
+			  setFormData(mergedData);
 			} catch (err) {
-				console.error("Detailed error fetching creator profile:", err);
-				setError(err instanceof Error ? err.message : "Failed to load profile");
+			  console.error("Detailed error fetching creator profile:", err);
+			  setError(err instanceof Error ? err.message : "Failed to load profile");
 			} finally {
-				setIsLoading(false);
+			  setIsLoading(false);
 			}
-		};
+		  };
 
 		fetchCreatorProfile();
 	}, [currentUser]);
@@ -225,10 +206,8 @@ const AccountSettings: React.FC = () => {
 		setIsLoading(true);
 
 		// Verify we have the necessary data
-		if (!currentUser?.email || !formData?.verificationId) {
-			setError(
-				"User email and verification ID are required for uploading a logo"
-			);
+		if (!currentUser?.email) {
+			setError("User email is required for uploading a logo");
 			setIsLoading(false);
 			return;
 		}
@@ -237,10 +216,10 @@ const AccountSettings: React.FC = () => {
 		const uploadData = new FormData();
 		uploadData.append("logo", file);
 		uploadData.append("email", currentUser.email);
-		uploadData.append("verificationId", formData.verificationId);
 
 		try {
-			const response = await fetch(`/api/admin/creator-approval`, {
+			// Use the dedicated profile picture endpoint instead
+			const response = await fetch(`/api/creator-profile/profile-picture`, {
 				method: "POST",
 				body: uploadData,
 			});
@@ -318,6 +297,7 @@ const AccountSettings: React.FC = () => {
 				instagram: formData.socialMedia?.instagram || "",
 				twitter: formData.socialMedia?.twitter || "",
 				youtube: formData.socialMedia?.youtube || "",
+				tiktok: formData.socialMedia?.tiktok || formData.tiktokUrl || "",
 			},
 			// Include content links
 			contentLinks: contentLinks.filter((link) => link.trim().length > 0),
@@ -325,7 +305,8 @@ const AccountSettings: React.FC = () => {
 
 		try {
 			setIsSaving(true);
-			// Use both endpoints to update data
+
+			// Use only the creator-profile endpoint
 			const response = await fetch("/api/creator-profile", {
 				method: "PUT",
 				headers: {
@@ -339,65 +320,6 @@ const AccountSettings: React.FC = () => {
 				throw new Error(errorData.error || "Failed to update profile");
 			}
 
-			// If we have a verification ID, update that data too
-			if (formData.verificationId) {
-				// Ensure contentTypes is always an array
-				const contentTypesArray =
-					(Array.isArray(formData.contentTypes) &&
-						formData?.contentTypes.filter((item: string) => item).join(", ")) ||
-					[];
-
-				const verificationUpdate = await fetch("/api/admin/creator-approval", {
-					method: "PUT",
-					headers: {
-						"Content-Type": "application/json",
-					},
-					body: JSON.stringify({
-						verificationId: formData.verificationId,
-						// Send profile data in 'updates' field as expected by the API
-						updates: {
-							profileData: {
-								bio: formData.bio || "",
-								contentTypes: contentTypesArray,
-								contentLinks: dataToSend.contentLinks || [],
-								pricing: formData.pricing || {},
-								socialMedia: dataToSend.socialMedia || {},
-								tiktokUrl:
-									formData.tiktokUrl || formData.socialMedia?.tiktok || "",
-								logoUrl: formData.logoUrl || "",
-								email: currentUser.email,
-								country: formData.country || "",
-								username: formData.username || "",
-								firstName: formData.firstName || "",
-								lastName: formData.lastName || "",
-								gender: formData.gender || "",
-							},
-						},
-					}),
-				});
-
-				if (!verificationUpdate.ok) {
-					const errorData = await verificationUpdate
-						.json()
-						.catch(() => ({ error: "Unknown error" }));
-					console.error("Failed to update verification data:", errorData);
-					throw new Error(
-						errorData.error || "Failed to update verification data"
-					);
-				}
-			}
-
-			setSuccessMessage("Profile updated successfully");
-			// Update the profile data with the new form data
-			setProfileData({ ...formData });
-
-			// Clear success message after 3 seconds
-			setTimeout(() => {
-				setSuccessMessage(null);
-			}, 3000);
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to update profile");
-		} finally {
 			setSuccessMessage("Profile updated successfully");
 			// Update the profile data with the new form data
 			setProfileData({ ...formData });
@@ -409,6 +331,9 @@ const AccountSettings: React.FC = () => {
 			setTimeout(() => {
 				setSuccessMessage(null);
 			}, 3000);
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to update profile");
+		} finally {
 			setIsSaving(false);
 		}
 	};

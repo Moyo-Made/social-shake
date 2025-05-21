@@ -12,7 +12,7 @@ interface BrandProfileDropdownProps {
 		brandName?: string;
 		logoUrl?: string;
 		industry?: string;
-		email?: string;          
+		email?: string;
 	};
 	loading: boolean;
 	dropdownPosition?: "header" | "sidenav";
@@ -109,23 +109,24 @@ const BrandProfileDropdown: React.FC<BrandProfileDropdownProps> = ({
 				)}
 
 				{dropdownPosition === "header" && (
-					<>
+					<div className="h-10 w-10 overflow-hidden rounded-full flex items-center justify-center">
 						{loading ? (
-							<div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse"></div>
+							<div className="w-10 h-10 bg-gray-700 rounded-full animate-pulse"></div>
 						) : brandProfile?.logoUrl ? (
 							<Image
 								src={brandProfile.logoUrl}
 								alt={brandProfile.brandName || "Brand Logo"}
-								width={30}
-								height={30}
-								className="rounded-full object-cover"
+								className="object-cover w-full h-full"
+								width={40}
+								height={40}
+								style={{ objectFit: "cover" }}
 							/>
 						) : (
-							<div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+							<div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold">
 								{getBrandInitials()}
 							</div>
 						)}
-					</>
+					</div>
 				)}
 
 				<ChevronDown
@@ -169,7 +170,6 @@ const BrandProfileDropdown: React.FC<BrandProfileDropdownProps> = ({
 					</div>
 
 					<div className="py-1">
-
 						<Link
 							href="/brand/dashboard/settings"
 							className={`flex items-center px-4 py-2 text-sm ${

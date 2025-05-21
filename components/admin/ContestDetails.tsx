@@ -208,7 +208,7 @@ const ContestDetailsPage: React.FC = () => {
 	}
 
 	return (
-		<div className="bg-white p-6 w-full mx-auto">
+		<div className="bg-white p-6 md:w-[70rem]">
 			{/* Back button */}
 			<BackButton />
 

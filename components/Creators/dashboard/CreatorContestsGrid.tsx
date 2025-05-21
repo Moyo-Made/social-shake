@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from "react";
-import ContestGridCard from "./CreatorContestGridCard";
 import { useAuth } from "@/context/AuthContext";
 import { Contest } from "@/types/contests";
 import Link from "next/link";
-
+import ContestGridCard from "./CreatorContestGridCard";
 
 export default function CreatorContestsGrid() {
   const [contests, setContests] = useState<Contest[]>([]);
@@ -79,8 +78,8 @@ export default function CreatorContestsGrid() {
         {contests.length > 0 ? (
           contests.map((contest) => (
             <ContestGridCard 
-              key={contest.id} 
-              contest={contest} 
+              key={contest.id}
+              contest={contest}
             />
           ))
         ) : (
