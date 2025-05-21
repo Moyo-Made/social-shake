@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { X } from "lucide-react";
 import Image from "next/image";
 import { useProjectForm } from "./ProjectFormContext";
@@ -32,15 +31,6 @@ export default function TikTokShopCreatorPricingTab() {
 	const [affiliateCommission, setAffiliateCommission] = useState(
 		creatorPricing.cost.commissionPerSale || ""
 	);
-	const [extras, setExtras] = useState<{
-		captions: boolean;
-		music: boolean;
-		rawFiles: boolean;
-	}>({
-		captions: creatorPricing.extras?.captions || false,
-		music: creatorPricing.extras?.music || true,
-		rawFiles: creatorPricing.extras?.rawFiles || true,
-	});
 	const [publicCreatorsCount, setPublicCreatorsCount] = useState(
 		creatorPricing.selectionMethod === "Post Public Brief"
 			? creatorPricing.creatorCount || 1
@@ -118,12 +108,8 @@ export default function TikTokShopCreatorPricingTab() {
 	// Calculate totals
 	const totalVideos = creators * videosPerCreator;
 
-	const captionsTotal = extras.captions ? 120 * totalVideos : 0;
-	const musicTotal = extras.music ? 50 * totalVideos : 0;
-	const rawFilesTotal = extras.rawFiles ? 100 * totalVideos : 0;
 	const totalPayment = creatorPayment * totalVideos;
-	const extrasTotal = captionsTotal + musicTotal + rawFilesTotal;
-	const totalAmount = totalPayment + extrasTotal;
+	const totalAmount = totalPayment ;
 	const serviceFee = 0.1 * totalAmount;
 
 	// Update context when values change
@@ -145,18 +131,6 @@ export default function TikTokShopCreatorPricingTab() {
 			totalVideos,
 			budgetPerVideo: creatorPayment,
 			totalBudget: totalPayment,
-			extras: {
-				captions: extras.captions,
-				captionsPrice: 120,
-				captionsTotal,
-				music: extras.music,
-				musicPrice: 50,
-				musicTotal,
-				rawFiles: extras.rawFiles,
-				rawFilesPrice: 100,
-				rawFilesTotal,
-			},
-			extrasTotal,
 			totalAmount,
 			creator: {
 				selectionMethod:
@@ -176,15 +150,6 @@ export default function TikTokShopCreatorPricingTab() {
 			cost: {
 				budgetPerVideo: creatorPayment,
 				totalBudget: totalPayment,
-				extras: {
-					music: extras.music,
-					musicPrice: 50,
-					musicTotal,
-					rawFiles: extras.rawFiles,
-					rawFilesPrice: 100,
-					rawFilesTotal,
-				},
-				extrasTotal,
 				totalAmount,
 				commissionPerSale: affiliateCommission,
 				serviceFee: 0,
@@ -201,7 +166,6 @@ export default function TikTokShopCreatorPricingTab() {
 		totalVideos,
 		videosPerCreator,
 		creatorPayment,
-		extras,
 		ageGroup,
 		gender,
 		industry,
@@ -706,79 +670,7 @@ export default function TikTokShopCreatorPricingTab() {
 							</p>
 						</div>
 
-						<div className="border-t pt-4">
-							<h2 className="text-base font-medium mb-4">Extras</h2>
-							<div className="space-y-3">
-								<div className="flex items-start gap-2">
-									<div
-										className={`mt-1 h-4 w-4 rounded-full border border-black flex items-center justify-center cursor-pointer ${extras.captions ? "bg-orange-500 border-orange-500" : "bg-white"}`}
-										onClick={() =>
-											setExtras({ ...extras, captions: !extras.captions })
-										}
-									>
-										{extras.captions && (
-											<div className="h-2 w-2 rounded-full bg-white"></div>
-										)}
-									</div>
-									<div
-										className={`flex-1 ${extras.captions ? "text-[#1A1A1A]" : "text-[#667085]"}`}
-									>
-										<Label htmlFor="captions" className="text-base font-medium">
-											Captions- $120
-										</Label>
-										<p className="text-sm text-gray-500">
-											(Subtitles or text overlays used in the video.)
-										</p>
-									</div>
-								</div>
-
-								<div className="flex items-start gap-2">
-									<div
-										className={`mt-1 h-4 w-4 rounded-full border border-black flex items-center justify-center cursor-pointer ${extras.music ? "bg-orange-500 border-orange-500" : "bg-white"}`}
-										onClick={() =>
-											setExtras({ ...extras, music: !extras.music })
-										}
-									>
-										{extras.music && (
-											<div className="h-2 w-2 rounded-full bg-white"></div>
-										)}
-									</div>
-									<div
-										className={`flex-1 ${extras.music ? "text-[#1A1A1A]" : "text-[#667085]"}`}
-									>
-										<Label htmlFor="music" className="text-base font-medium">
-											Music- $50
-										</Label>
-										<p className="text-sm text-gray-500">
-											(Background music or sound effects used in the video.)
-										</p>
-									</div>
-								</div>
-
-								<div className="flex items-start gap-2">
-									<div
-										className={`mt-1 h-4 w-4 rounded-full border border-black flex items-center justify-center cursor-pointer ${extras.rawFiles ? "bg-orange-500 border-orange-500" : "bg-white"}`}
-										onClick={() =>
-											setExtras({ ...extras, rawFiles: !extras.rawFiles })
-										}
-									>
-										{extras.rawFiles && (
-											<div className="h-2 w-2 rounded-full bg-white"></div>
-										)}
-									</div>
-									<div
-										className={`flex-1 ${extras.rawFiles ? "text-[#1A1A1A]" : "text-[#667085]"}`}
-									>
-										<Label htmlFor="rawFiles" className="text-base font-medium">
-											Raw Files- $100
-										</Label>
-										<p className="text-sm text-gray-500">
-											Unedited footage or source files from the creator
-										</p>
-									</div>
-								</div>
-							</div>
-						</div>
+						
 
 						<div className="border-t pt-4">
 							{selectionMethod === "Invite Specific Creators" ? (
@@ -908,22 +800,7 @@ export default function TikTokShopCreatorPricingTab() {
 								{totalVideos} videos)
 							</div>
 
-							<div className="flex gap-1 mb-1">
-								<span>Extras:</span>
-								<span className="font-medium">
-									${(musicTotal + rawFilesTotal).toLocaleString()}
-								</span>
-							</div>
-							<div className="text-sm text-gray-500 mb-3">
-								Music - ${extras.music ? 50 : 0} × {totalVideos} Videos = $
-								{musicTotal}
-								{extras.rawFiles && (
-									<>
-										<br />
-										Raw Files - $100 × {totalVideos} Videos = ${rawFilesTotal}
-									</>
-								)}
-							</div>
+						
 
 							<div className="flex gap-1 mb-1">
 								<span>Service Fee:</span>

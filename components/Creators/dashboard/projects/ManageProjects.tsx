@@ -16,10 +16,12 @@ import DeliveryTracking from "./ProductDeliveryTracking";
 interface ProjectDetailPageProps {
 	projectId: string;
 	applicationId: string;
+	contestId: string;
 }
 const ManageProjects = ({
 	projectId,
 	applicationId,
+	contestId
 }: ProjectDetailPageProps) => {
 	//   const router = useRouter();
 	const [project, setProject] = useState<ProjectFormData | null>(null);
@@ -411,53 +413,6 @@ const ManageProjects = ({
 								</p>
 							</div>
 
-							{/* Extras */}
-							{(creatorPricing.extras?.music ||
-								creatorPricing.extras?.rawFiles ||
-								creatorPricing.extras?.captions) && (
-								<>
-									<div className="flex mt-2">
-										<h3 className="text-[#667085] font-normal w-40">Extras:</h3>
-									</div>
-
-									{creatorPricing.extras.music && (
-										<div className="flex gap-36 ml-2">
-											<h3 className="text-[#667085] font-normal w-32">
-												Music:
-											</h3>
-											<p>
-												${creatorPricing.extras.musicPrice || 50} x{" "}
-												{creatorPricing.totalVideos || 2}
-											</p>
-										</div>
-									)}
-
-									{creatorPricing.extras.rawFiles && (
-										<div className="flex gap-36 ml-2">
-											<h3 className="text-[#667085] font-normal w-32">
-												Raw Files:
-											</h3>
-											<p>
-												${creatorPricing.extras.rawFilesPrice || 0} x{" "}
-												{creatorPricing.totalVideos || 2}
-											</p>
-										</div>
-									)}
-
-									{creatorPricing.extras.captions && (
-										<div className="flex gap-36 ml-2">
-											<h3 className="text-[#667085] font-normal w-32">
-												Captions:
-											</h3>
-											<p>
-												${creatorPricing.extras.captionsPrice || 0} x{" "}
-												{creatorPricing.totalVideos || 2}
-											</p>
-										</div>
-									)}
-								</>
-							)}
-
 							{/* Total */}
 							<div className="flex gap-28 pt-4 border-b">
 								<h3 className="text-[#667085] font-normal w-40 mb-2">Total:</h3>
@@ -474,8 +429,7 @@ const ManageProjects = ({
 					<div className="p-8 text-center text-gray-500">
 						<CreatorSubmissionTab
 							projectFormData={project}
-							projectId={projectId}
-						/>
+							projectId={projectId} contestId={contestId}						/>
 					</div>
 				</TabsContent>
 

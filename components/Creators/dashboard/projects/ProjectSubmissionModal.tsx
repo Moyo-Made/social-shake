@@ -11,12 +11,14 @@ interface ProjectModalProps {
 	onClose: () => void;
 	projectId: string;
 	onSubmitSuccess?: (newParticipantCount: number) => void;
+	contestId: string;
 }
 
 const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 	isOpen,
 	onClose,
 	projectId,
+	contestId,
 	onSubmitSuccess,
 }) => {
 	const { currentUser } = useAuth();
@@ -202,6 +204,7 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 
 	if (!isOpen) return null;
 
+
 	// If showing success modal, render it on top of the project modal
 	if (showSuccessModal) {
 		return (
@@ -209,6 +212,7 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 				<SuccessModal
 					isOpen={showSuccessModal}
 					onClose={handleSuccessModalClose}
+					contestId={contestId}
 				/>
 			</div>
 		);

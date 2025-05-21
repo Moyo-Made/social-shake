@@ -24,7 +24,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  { params }: any
 ) {
   try {
     // Get the authorization header

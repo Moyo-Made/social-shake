@@ -16,11 +16,13 @@ import AffiliateLinkModal from "./AffiliateLinkModal";
 interface ProjectSubmissionsProps {
 	projectFormData: ProjectFormData;
 	projectId: string;
+	contestId: string;
 }
 
 export default function CreatorSubmissionTab({
 	projectFormData,
 	projectId,
+	contestId
 }: ProjectSubmissionsProps) {
 	const { currentUser } = useAuth();
 
@@ -470,9 +472,9 @@ export default function CreatorSubmissionTab({
 					);
 				}
 				return;
-				case "affiliateLink_received":
-					case "affiliateLink_verified":
-						return;
+			case "affiliateLink_received":
+			case "affiliateLink_verified":
+				return;
 			case "spark_requested":
 				return (
 					<Button
@@ -800,6 +802,7 @@ export default function CreatorSubmissionTab({
 				onClose={closeProjectModal}
 				projectId={projectId}
 				onSubmitSuccess={handleSubmitSuccess}
+				contestId={contestId}
 			/>
 		</div>
 	);

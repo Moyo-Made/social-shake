@@ -8,7 +8,8 @@ import CreatorLeaderboard from "@/components/Creators/dashboard/CreatorLeaderboa
 export default function ContestLeaderboardPage({ 
   params 
 }: { 
-  params: { contestId: string } 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  params: any;
 }) {
   // Extract contestId directly from params
   const { contestId } = params;

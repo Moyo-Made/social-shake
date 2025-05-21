@@ -238,11 +238,13 @@ const TikTokShopProjectReview = () => {
 							How do you want to select Creators?
 						</div>
 						<div className="col-span-2">
-							{formData.creatorPricing.creator.selectionMethod || "Not specified"}
+							{formData.creatorPricing.creator.selectionMethod ||
+								"Not specified"}
 						</div>
 					</div>
 
-					{formData.creatorPricing.creator.selectionMethod === "Invite Specific Creators" &&
+					{formData.creatorPricing.creator.selectionMethod ===
+						"Invite Specific Creators" &&
 						formData.creatorPricing.creator.selectedCreators && (
 							<div className="grid grid-cols-3 gap-4">
 								<div className="font-medium text-gray-600">
@@ -250,29 +252,32 @@ const TikTokShopProjectReview = () => {
 								</div>
 								<div className="col-span-2">
 									<div className="flex flex-wrap gap-2">
-										{formData.creatorPricing.creator.selectedCreators.map((creator, index) => (
-											<div
-												key={index}
-												className="flex items-center border border-[#D0D5DD] gap-1 bg-white rounded-lg px-3 py-1"
-											>
-												<div className="w-6 h-6 rounded-full bg-gray-200 mr-1 overflow-hidden relative">
-													<Image
-														src={creator.avatar || "/api/placeholder/24/24"}
-														alt={creator.name}
-														width={24}
-														height={24}
-														className="object-cover"
-													/>
+										{formData.creatorPricing.creator.selectedCreators.map(
+											(creator, index) => (
+												<div
+													key={index}
+													className="flex items-center border border-[#D0D5DD] gap-1 bg-white rounded-lg px-3 py-1"
+												>
+													<div className="w-6 h-6 rounded-full bg-gray-200 mr-1 overflow-hidden relative">
+														<Image
+															src={creator.avatar || "/api/placeholder/24/24"}
+															alt={creator.name}
+															width={24}
+															height={24}
+															className="object-cover"
+														/>
+													</div>
+													<span className="text-sm">{creator.name}</span>
 												</div>
-												<span className="text-sm">{creator.name}</span>
-											</div>
-										))}
+											)
+										)}
 									</div>
 								</div>
 							</div>
 						)}
 
-					{formData.creatorPricing.creator.selectionMethod === "Post Public Brief" && (
+					{formData.creatorPricing.creator.selectionMethod ===
+						"Post Public Brief" && (
 						<>
 							<div className="grid grid-cols-3 gap-4">
 								<div className="font-medium text-gray-600">Age Group</div>
@@ -309,7 +314,10 @@ const TikTokShopProjectReview = () => {
 					<div className="grid grid-cols-3 gap-4">
 						<div className="font-medium text-gray-600">No of Creators</div>
 						<div className="col-span-2">
-							{formData.creatorPricing.creator.creatorCount} {formData.creatorPricing.creator.creatorCount <= 1 ? "Creator" : "Creators"}
+							{formData.creatorPricing.creator.creatorCount}{" "}
+							{formData.creatorPricing.creator.creatorCount <= 1
+								? "Creator"
+								: "Creators"}
 						</div>
 					</div>
 
@@ -319,7 +327,9 @@ const TikTokShopProjectReview = () => {
 						</div>
 						<div className="col-span-2">
 							{formData.creatorPricing.creator.videosPerCreator} Video
-							{formData.creatorPricing.creator.videosPerCreator !== 1 ? "s" : ""}
+							{formData.creatorPricing.creator.videosPerCreator !== 1
+								? "s"
+								: ""}
 						</div>
 					</div>
 
@@ -328,7 +338,10 @@ const TikTokShopProjectReview = () => {
 							Total Number of Videos
 						</div>
 						<div className="col-span-2">
-							{formData.creatorPricing.creator.totalVideos} {formData.creatorPricing.creator.totalVideos <= 1 ? "Video" : "Videos"} 
+							{formData.creatorPricing.creator.totalVideos}{" "}
+							{formData.creatorPricing.creator.totalVideos <= 1
+								? "Video"
+								: "Videos"}
 						</div>
 					</div>
 				</div>
@@ -351,8 +364,10 @@ const TikTokShopProjectReview = () => {
 								${formData.creatorPricing.cost.totalBudget.toLocaleString()}
 							</div>
 							<div className="text-sm text-gray-500">
-								(Based on ${formData.creatorPricing.cost.budgetPerVideo.toLocaleString()} per
-								video × {formData.creatorPricing.creator.totalVideos} videos)
+								(Based on $
+								{formData.creatorPricing.cost.budgetPerVideo.toLocaleString()}{" "}
+								per video × {formData.creatorPricing.creator.totalVideos}{" "}
+								videos)
 							</div>
 						</div>
 					</div>
@@ -366,29 +381,6 @@ const TikTokShopProjectReview = () => {
 							<div className="text-sm text-gray-500">
 								It applies to each creator separately
 							</div>
-						</div>
-					</div>
-
-					<div className="grid grid-cols-3 gap-4">
-						<div className="font-medium text-gray-600">Extras</div>
-						<div className="col-span-2">
-							<div className="font-medium">
-								${formData.creatorPricing.cost.extrasTotal.toLocaleString()}
-							</div>
-							{formData.creatorPricing.cost.extras.music && (
-								<div className="text-sm text-gray-500">
-									Music - ${formData.creatorPricing.cost.extras.musicPrice} ×{" "}
-									{formData.creatorPricing.creator.totalVideos} Videos = $
-									{formData.creatorPricing.cost.extras.musicTotal}
-								</div>
-							)}
-							{formData.creatorPricing.cost.extras.rawFiles && (
-								<div className="text-sm text-gray-500">
-									Raw Files - ${formData.creatorPricing.cost.extras.rawFilesPrice} ×{" "}
-									{formData.creatorPricing.creator.totalVideos} Videos = $
-									{formData.creatorPricing.cost.extras.rawFilesTotal}
-								</div>
-							)}
 						</div>
 					</div>
 

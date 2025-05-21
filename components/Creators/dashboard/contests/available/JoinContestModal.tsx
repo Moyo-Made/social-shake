@@ -193,7 +193,7 @@ const ContestModal: React.FC<ContestModalProps> = ({
 
 			// Show success modal instead of closing
 			setShowSuccessModal(true);
-			
+
 			// Important: Don't close the contest modal yet
 			// The parent component shouldn't call closeContestModal() after submission success
 		} catch (error) {
@@ -248,6 +248,7 @@ const ContestModal: React.FC<ContestModalProps> = ({
 				<SuccessModal
 					isOpen={showSuccessModal}
 					onClose={handleSuccessModalClose}
+					contestId={contestId}
 				/>
 			</div>
 		);
