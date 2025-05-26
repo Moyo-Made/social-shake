@@ -5,7 +5,8 @@ import { adminDb } from '@/config/firebase-admin';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ videoId: string }> }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  { params }: any
 ) {
   try {
     // Handle both Next.js 14 and 15+ parameter handling

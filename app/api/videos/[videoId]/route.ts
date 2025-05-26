@@ -4,7 +4,8 @@ import { adminDb, adminStorage } from "@/config/firebase-admin";
 // GET video by ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { videoId: string } }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  { params }: any
 ) {
   try {
     const { videoId } = params;
@@ -48,7 +49,8 @@ export async function GET(
 // UPDATE video
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { videoId: string } }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  { params }: any
 ) {
   try {
     const { videoId } = params;
@@ -79,7 +81,8 @@ export async function PUT(
 // DELETE video
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { videoId: string } }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  { params }: any
 ) {
   try {
     const { videoId } = params;

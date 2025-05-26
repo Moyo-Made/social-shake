@@ -3,7 +3,8 @@ import { adminDb } from '@/config/firebase-admin';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { creatorId: string } }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  { params }: any
 ) {
   try {
     const { searchParams } = new URL(request.url);

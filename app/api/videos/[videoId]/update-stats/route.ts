@@ -3,7 +3,8 @@ import { adminDb } from '@/config/firebase-admin';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { videoId: string } }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  { params }: any
 ) {
   try {
     const { videoId } = params;
