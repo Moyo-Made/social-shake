@@ -8,8 +8,16 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
 
 export async function POST(request: NextRequest) {
 	try {
-		const { amount, paymentId, contestTitle, userEmail, userId, projectTitle } =
-			await request.json();
+		const { 
+			amount, 
+			paymentId, 
+			contestTitle, 
+			projectTitle,
+			videoTitle,
+			userEmail, 
+			userId,
+			paymentType = "contest" // Default for backward compatibility
+		} = await request.json();
 
 		if (!amount || !paymentId || !userEmail) {
 			return NextResponse.json(
@@ -25,6 +33,7 @@ export async function POST(request: NextRequest) {
 				{ status: 500 }
 			);
 		}
+		
 		const paymentDoc = await adminDb
 			.collection("payments")
 			.doc(paymentId)
@@ -37,10 +46,38 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-        // Determine if this is a contest or project
-        const isContest = Boolean(contestTitle);
-        const type = isContest ? "contest" : "project";
-        const name = contestTitle || projectTitle || "Payment";
+		const paymentData = paymentDoc.data();
+
+		// Determine payment details based on type
+		let productName = "";
+		let productDescription = "";
+		let successUrl = "";
+		let cancelUrl = "";
+
+		switch (paymentType) {
+			case "video":
+				productName = videoTitle || paymentData?.videoTitle || "Video Purchase";
+				productDescription = `Purchase of video: ${productName}`;
+				successUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/video-purchase-success?payment_id=${paymentId}&session_id={CHECKOUT_SESSION_ID}`;
+				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/videos?canceled=true`;
+				break;
+			case "project":
+				productName = projectTitle || paymentData?.projectTitle || "Project Payment";
+				productDescription = `Payment for project: ${productName}`;
+				successUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-success?payment_id=${paymentId}&session_id={CHECKOUT_SESSION_ID}&type=project`;
+				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/project/new?canceled=true`;
+				break;
+			case "contest":
+			default:
+				productName = contestTitle || paymentData?.contestName || "Contest Payment";
+				productDescription = `Payment for contest: ${productName}`;
+				successUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-success?payment_id=${paymentId}&session_id={CHECKOUT_SESSION_ID}&type=contest`;
+				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/contest/new?canceled=true`;
+				break;
+		}
+
+		// For video purchases, we might want automatic capture instead of manual
+		const captureMethod = "manual";
 
 		// Create a Stripe checkout session
 		const session = await stripe.checkout.sessions.create({
@@ -50,10 +87,8 @@ export async function POST(request: NextRequest) {
 					price_data: {
 						currency: "usd",
 						product_data: {
-							name: isContest ? contestTitle : projectTitle || "Payment",
-							description: isContest
-								? `Payment for contest: ${contestTitle}`
-								: `Payment for project: ${projectTitle}`,
+							name: productName,
+							description: productDescription,
 						},
 						unit_amount: Math.round(parseFloat(amount) * 100), // Convert to cents
 					},
@@ -62,44 +97,72 @@ export async function POST(request: NextRequest) {
 			],
 			mode: "payment",
 			payment_intent_data: {
-				capture_method: "manual", // This enables the manual capture
+				capture_method: captureMethod,
                 metadata: {
                     paymentId,
                     userId,
-                    type, // "contest" or "project"
-                    name, // The actual title
-                    description: isContest
-                        ? `Payment for contest: ${contestTitle}`
-                        : `Payment for project: ${projectTitle}`,
+                    paymentType,
+                    paymentName: productName,
+                    description: productDescription,
+					// Add video-specific metadata if applicable
+					...(paymentType === "video" && paymentData && {
+						videoId: paymentData.videoId,
+						creatorId: paymentData.creatorId,
+						creatorEmail: paymentData.creatorEmail,
+					}),
                 }
 			},
-			// Make sure to include the type parameter in the success URL
-			success_url: `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-success?payment_id=${paymentId}&session_id={CHECKOUT_SESSION_ID}&type=${type}`,
-			cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/brand/${type}/new?canceled=true`,
+			success_url: successUrl,
+			cancel_url: cancelUrl,
 			customer_email: userEmail,
-			metadata: { // Duplicate metadata at the session level for redundancy
+			metadata: {
 				paymentId,
 				userId,
-				type, // "contest" or "project"
-				name, // The actual title
-                description: isContest
-                    ? `Payment for contest: ${contestTitle}`
-                    : `Payment for project: ${projectTitle}`,
+				paymentType,
+				paymentName: productName,
+                description: productDescription,
+				// Add video-specific metadata if applicable
+				...(paymentType === "video" && paymentData && {
+					videoId: paymentData.videoId,
+					creatorId: paymentData.creatorId,
+					creatorEmail: paymentData.creatorEmail,
+				}),
 			},
 		});
 
 		// Update payment record with sessionId
-		await adminDb.collection("payments").doc(paymentId).update({
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const updateData: any = {
 			stripeSessionId: session.id,
 			updatedAt: new Date().toISOString(),
-            // Also save the type in our own database
-            paymentType: type,
-            paymentName: name
-		});
+			paymentType,
+			paymentName: productName,
+		};
+
+		await adminDb.collection("payments").doc(paymentId).update(updateData);
+
+		// For video purchases, also create a notification for the creator
+		if (paymentType === "video" && paymentData?.creatorId) {
+			const notificationData = {
+				type: "video_purchase_initiated",
+				creatorId: paymentData.creatorId,
+				brandId: userId,
+				videoId: paymentData.videoId,
+				amount: parseFloat(amount),
+				paymentId,
+				sessionId: session.id,
+				status: "pending_payment",
+				createdAt: new Date().toISOString(),
+				message: `A brand has initiated purchase of your video: ${productName}`,
+			};
+
+			await adminDb.collection("notifications").add(notificationData);
+		}
 
 		return NextResponse.json({
 			success: true,
 			sessionId: session.id,
+			paymentType,
 		});
 	} catch (error) {
 		console.error("Error creating checkout session:", error);

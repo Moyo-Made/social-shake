@@ -73,6 +73,35 @@ export async function POST(request: NextRequest) {
         
         return NextResponse.json({ success: true });
       }
+
+      // ADD: Handle checkout session completed for video purchases
+  else if (event.type === 'checkout.session.completed') {
+    const session = event.data.object as Stripe.Checkout.Session;
+    
+    console.log('Checkout session completed:', session.id);
+    
+    // Check if this is a video purchase
+    if (session.metadata?.paymentType === 'video' && session.metadata?.videoId) {
+      console.log('Processing video purchase webhook for video:', session.metadata.videoId);
+      
+      try {
+        // Increment video purchase count
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/videos/${session.metadata.videoId}/increment-purchase`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (!response.ok) {
+          console.error('Failed to increment purchase count:', await response.text());
+        } else {
+          console.log('Successfully incremented purchase count for video:', session.metadata.videoId);
+        }
+        
+      } catch (error) {
+        console.error('Error processing video purchase webhook:', error);
+      }
+    }
+  }
       
       const creatorDoc = creatorsSnapshot.docs[0];
       

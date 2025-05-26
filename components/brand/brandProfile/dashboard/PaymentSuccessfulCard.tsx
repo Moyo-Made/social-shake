@@ -5,7 +5,15 @@ import { Button } from "../../../ui/button";
 import { Card, CardContent, CardHeader } from "../../../ui/card";
 import { FaArrowRight } from "react-icons/fa6";
 
-const PaymentSuccessfulCard = () => {
+interface PaymentSuccessfulCardProps {
+	type?: "project" | "contest";
+}
+
+const PaymentSuccessfulCard = ({ type = "contest" }: PaymentSuccessfulCardProps) => {
+	const isProject = type === "project";
+	const itemName = isProject ? "Project" : "Contest";
+	const dashboardPath = isProject ? "/brand/dashboard/projects" : "/brand/dashboard/contests";
+
 	return (
 		<>
 			{/* Dark Overlay */}
@@ -22,17 +30,17 @@ const PaymentSuccessfulCard = () => {
 							height={80}
 						/>
 						<h1 className="text-xl md:text-2xl lg:text-3xl text-gray-900 font-semibold lg:leading-10">
-							Contest Payment Confirmed
+							{itemName} Payment Confirmed
 						</h1>
 						<p className="w-full mb-5 text-sm md:text-base text-gray-600 font-normal">
-							Your Contest is live and will start receiving applications
+							Your {itemName} is live and will start receiving applications
 						</p>
 					</CardHeader>
 					<CardContent>
 						{/* Submit Button */}
 						<Button className="flex justify-center items-center bg-[#FD5C02] hover:bg-orange-600 text-white text-[17px] py-5 font-normal mx-auto">
-							<Link href="/brand/dashboard/contests" className="flex">
-								<p>View Contest</p>{" "}
+							<Link href={dashboardPath} className="flex">
+								<p>View {itemName}</p>{" "}
 								<FaArrowRight className="w-5 h-5 ml-2 mt-1.5" />
 							</Link>
 						</Button>

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, VideoIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
 import CreatorProfileDropdown from "../CreatorProfileDropdown";
 import { useCreatorProfile } from "@/hooks/useCreatorProfile";
@@ -191,6 +191,14 @@ const SideNav: React.FC = () => {
 					/>
 
 					<MenuItem
+						href="/creator/dashboard/content-library"
+						icon={
+							<VideoIcon size={20}/>
+						}
+						text="Content Library"
+					/>
+
+					<MenuItem
 						href="/creator/dashboard/messages"
 						icon={
 							<Image
@@ -201,7 +209,9 @@ const SideNav: React.FC = () => {
 							/>
 						}
 						text="Messages"
-						badge={totalUnreadCount > 0 ? totalUnreadCount.toString() : undefined}
+						badge={
+							totalUnreadCount > 0 ? totalUnreadCount.toString() : undefined
+						}
 					/>
 					<MenuItem
 						href="/creator/dashboard/transactions"
@@ -260,6 +270,7 @@ const getPageTitle = (pathname: string): string => {
 		"/creator/dashboard/contest": "Available Contests",
 		"/creator/dashboard/contest/applied": "My Contests",
 		"/creator/dashboard/messages": "Messages",
+		"/creator/dashboard/content-library": "Content Library",
 		"/creator/dashboard/transactions": "Transactions",
 		"/creator/dashboard/settings": "Settings",
 		"/creator/dashboard/help-support": "Help & Support",
@@ -285,7 +296,7 @@ const getPageTitle = (pathname: string): string => {
 	if (pathname.startsWith("/creator/dashboard/project")) {
 		return "Available Projects";
 	}
-	
+
 	if (pathname.startsWith("/creator/dashboard/project/all")) {
 		return "Available Projects";
 	}
@@ -298,6 +309,9 @@ const getPageTitle = (pathname: string): string => {
 	}
 	if (pathname.startsWith("/creator/dashboard/messages/")) {
 		return "Messages";
+	}
+	if (pathname.startsWith("/creator/dashboard/content-library")){
+		return "Content Library"
 	}
 	if (pathname.startsWith("/creator/dashboard/transactions/")) {
 		return "Transactions";

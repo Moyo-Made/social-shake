@@ -14,114 +14,107 @@ export default function PaymentSuccessHandler() {
 
 	useEffect(() => {
 		const processPayment = async () => {
-			try {
-				const paymentId = searchParams.get("payment_id");
-				const sessionId = searchParams.get("session_id");
-				// Extract type from URL and explicitly pass it in success_url
-				const type = searchParams.get("type");
-
-				// Log values to help with debugging
-				console.log("Payment processing parameters:", {
-					paymentId,
-					sessionId,
-					type,
-				});
-
-				setPaymentType(type);
-
-				if (!paymentId || !sessionId) {
-					setError("Missing payment information");
-					setStatus("error");
-					return;
-				}
-
-				// First verify the payment was successful
-				const verifyResponse = await axios.get(
-					`/api/payment-success?payment_id=${paymentId}&session_id=${sessionId}&type=${type}`
-				);
-
-				if (!verifyResponse.data.success) {
-					throw new Error(
-						verifyResponse.data.error || "Payment verification failed"
-					);
-				}
-
-				// Determine proper storage key based on payment type
-				let storageKey;
-				if (type === "project") {
-					storageKey = "projectFormData";
-				} else {
-					storageKey = "contestFormData";
-				}
-
-				const storedFormData = sessionStorage.getItem(storageKey);
-
-				if (!storedFormData) {
-					throw new Error(
-						`${type ? type.charAt(0).toUpperCase() + type.slice(1) : "Form"} data not found`
-					);
-				}
-
-				const formData = JSON.parse(storedFormData);
-
-				// Create the contest or project using the appropriate API
-				const paymentData = {
-					...formData,
-					isDraft: false,
-					paymentId,
-					stripeSessionId: sessionId,
-					paymentStatus: verifyResponse.data.paymentStatus,
-					requiresCapture: verifyResponse.data.requiresCapture,
-				};
-
-				// Call the appropriate API based on type
-				const apiEndpoint =
-					type === "project" ? "/api/projects" : "/api/contests";
-				const response = await axios.post(apiEndpoint, paymentData);
-
-				if (!response.data.success) {
-					throw new Error(response.data.error || `Failed to create ${type}`);
-				}
-
-				// Clear form data from sessionStorage
-				sessionStorage.removeItem(storageKey);
-				sessionStorage.removeItem(`${type}FormStep`);
-
-				// Get the created item ID
-				const itemId =
-					type === "project"
-						? response.data.data.projectId
-						: response.data.data.contestId;
-
-				// Update payment record to mark as completed (pending admin approval for capture)
-				await axios.post("/api/update-payment", {
-					paymentId,
-					status: verifyResponse.data.requiresCapture
-						? "pending_capture"
-						: "completed",
-					type,
-					itemId,
-				});
-
-				setStatus("success");
-
-				// Redirect to appropriate dashboard based on type
-				setTimeout(() => {
-					const redirectPath =
-						type === "project"
-							? "/brand/dashboard/projects"
-							: "/brand/dashboard/contests";
-					router.push(redirectPath);
-				}, 2000);
-			} catch (error) {
-				console.error(`Error processing ${paymentType || "payment"}:`, error);
-				setError(error instanceof Error ? error.message : "An error occurred");
-				setStatus("error");
+		  let paymentIntentId = null;
+		  
+		  try {
+			const paymentId = searchParams.get("payment_id");
+			const sessionId = searchParams.get("session_id");
+			const type = searchParams.get("type");
+			setPaymentType(type);
+	
+			if (!paymentId || !sessionId) {
+			  throw new Error("Missing payment information");
 			}
+	
+			// Step 1: Get payment intent ID
+			const sessionResponse = await axios.get(`/api/stripe/session/${sessionId}`);
+			paymentIntentId = sessionResponse.data.paymentIntentId;
+	
+			// Step 2: Verify payment
+			const verifyResponse = await axios.get(
+			  `/api/payment-success?payment_id=${paymentId}&session_id=${sessionId}&type=${type}`
+			);
+	
+			if (!verifyResponse.data.success) {
+			  throw new Error(verifyResponse.data.error || "Payment verification failed");
+			}
+	
+			// Step 3: Process business logic
+			const storageKey = type === "project" ? "projectFormData" : "contestFormData";
+			const storedFormData = sessionStorage.getItem(storageKey);
+	
+			if (!storedFormData) {
+			  throw new Error(`${type} data not found`);
+			}
+	
+			const formData = JSON.parse(storedFormData);
+			const paymentData = {
+			  ...formData,
+			  isDraft: false,
+			  paymentId,
+			  stripeSessionId: sessionId,
+			  paymentStatus: "completed", // Will be completed after capture
+			};
+	
+			// Create contest/project
+			const apiEndpoint = type === "project" ? "/api/projects" : "/api/contests";
+			const response = await axios.post(apiEndpoint, paymentData);
+	
+			if (!response.data.success) {
+			  throw new Error(response.data.error || `Failed to create ${type}`);
+			}
+	
+			const itemId = type === "project" ? response.data.data.projectId : response.data.data.contestId;
+	
+			// Step 4: CAPTURE the payment (everything succeeded)
+			await axios.post("/api/stripe/capture-payment", {
+			  paymentIntentId,
+			  paymentId
+			});
+	
+			// Step 5: Update payment record
+			await axios.post("/api/update-payment", {
+			  paymentId,
+			  status: "completed",
+			  type,
+			  itemId,
+			  completedAt: new Date().toISOString()
+			});
+	
+			// Clean up
+			sessionStorage.removeItem(storageKey);
+			sessionStorage.removeItem(`${type}FormStep`);
+			
+			setStatus("success");
+	
+			// Redirect
+			setTimeout(() => {
+			  const redirectPath = type === "project" ? "/brand/dashboard/projects" : "/brand/dashboard/contests";
+			  router.push(redirectPath);
+			}, 2000);
+	
+		  } catch (error) {
+			console.error(`Error processing ${paymentType || "payment"}:`, error);
+			
+			// CRITICAL: Cancel the payment intent if anything failed
+			if (paymentIntentId) {
+			  try {
+				await axios.post("/api/stripe/cancel-payment", {
+				  paymentIntentId,
+				  paymentId: searchParams.get("payment_id")
+				});
+			  } catch (cancelError) {
+				console.error("Failed to cancel payment:", cancelError);
+			  }
+			}
+			
+			setError(error instanceof Error ? error.message : "An error occurred");
+			setStatus("error");
+		  }
 		};
-
+	
 		processPayment();
-	}, [searchParams, router]);
+	  }, [searchParams, router]);
 
 	const getItemTypeDisplay = () => {
 		return paymentType === "project" ? "project" : "contest";
@@ -164,8 +157,8 @@ export default function PaymentSuccessHandler() {
 	}
 
 	if (status === "success") {
-		return <PaymentSuccessfulCard />;
-	}
+		return <PaymentSuccessfulCard type={paymentType as "project" | "contest"} />;
+	  }
 
 	return null;
 }

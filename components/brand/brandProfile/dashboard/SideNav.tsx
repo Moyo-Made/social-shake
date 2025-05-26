@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, VideoIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useBrandProfile } from "@/hooks/useBrandProfile";
 import BrandProfileDropdown from "@/components/brand/brandProfile/BrandProfileDropdown";
@@ -184,9 +184,19 @@ const SideNav: React.FC = () => {
 						text="Creators"
 						subItems={[
 							{ href: "/brand/dashboard/creators/all", text: "All creators" },
-							{ href: "/brand/dashboard/creators/saved", text: "Saved creators" },
+							{
+								href: "/brand/dashboard/creators/saved",
+								text: "Saved creators",
+							},
 						]}
 					/>
+
+					<MenuItem
+						href="/brand/dashboard/videos/saved"
+						icon={<VideoIcon size={20} />}
+						text="Saved Videos"
+					/>
+
 					<MenuItem
 						href="/brand/dashboard/messages"
 						icon={
@@ -198,7 +208,9 @@ const SideNav: React.FC = () => {
 							/>
 						}
 						text="Messages"
-						badge={totalUnreadCount > 0 ? totalUnreadCount.toString() : undefined}
+						badge={
+							totalUnreadCount > 0 ? totalUnreadCount.toString() : undefined
+						}
 					/>
 					<MenuItem
 						href="/brand/dashboard/transactions"
@@ -267,6 +279,7 @@ const getPageTitle = (pathname: string): string => {
 		"/brand/dashboard/creators": "Creators",
 		"/brand/dashboard/creators/all": "All Creators",
 		"/brand/dashboard/creators/saved": "Saved Creators",
+		"/brand/dashboard/videos/saved": "Saved Videos",
 		"/brand/dashboard/messages": "Messages",
 		"/brand/dashboard/transactions": "Transactions",
 		"/brand/dashboard/settings": "Settings",
@@ -295,6 +308,10 @@ const getPageTitle = (pathname: string): string => {
 
 	if (pathname.startsWith("/brand/dashboard/creators/")) {
 		return "Creators";
+	}
+
+	if (pathname.startsWith("/brand/dashboard/videos/")) {
+		return "Saved Videos";
 	}
 
 	if (pathname.startsWith("/brand/dashboard/settings/")) {

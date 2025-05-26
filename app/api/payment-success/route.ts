@@ -8,7 +8,6 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
 
 export async function GET(request: NextRequest) {
   try {
-    // Get the payment_id and session_id from URL params
     const url = new URL(request.url);
     const paymentId = url.searchParams.get('payment_id');
     const sessionId = url.searchParams.get('session_id');
@@ -53,11 +52,13 @@ export async function GET(request: NextRequest) {
     
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
     
-    // Check payment status - for manual capture, "requires_capture" is a successful state
-    // The payment is authorized but not yet captured
-    const isSuccessful = 
-      paymentIntent.status === "succeeded" || 
-      paymentIntent.status === "requires_capture";
+    // Get payment type from payment record or session metadata
+    const paymentType = paymentData?.paymentType || session.metadata?.type || "contest";
+    
+    // FIXED: Since we're using manual capture for all payment types now,
+    // check for both succeeded and requires_capture as valid states
+    const validStatuses = ["succeeded", "requires_capture"];
+    const isSuccessful = validStatuses.includes(paymentIntent.status);
     
     if (!isSuccessful) {
       return NextResponse.json({ 
@@ -73,9 +74,14 @@ export async function GET(request: NextRequest) {
       updatedAt: new Date().toISOString(),
     });
     
+    // REMOVED: Don't process video purchases here anymore
+    // This will be handled in the success handler after all business logic completes
+    // and the payment is manually captured
+    
     return NextResponse.json({ 
       success: true,
       paymentStatus: paymentIntent.status,
+      paymentType: paymentType,
       requiresCapture: paymentIntent.status === "requires_capture"
     });
     

@@ -13,21 +13,29 @@ export async function POST(request: NextRequest) {
       // Handle form data submission
       const formData = await request.formData();
       
-      // Extract basic payment fields only
+      // Extract basic payment fields
       requestData.userId = formData.get("userId")?.toString();
       requestData.brandEmail = formData.get("brandEmail")?.toString();
       requestData.amount = formData.get("amount")?.toString();
+      requestData.paymentType = formData.get("paymentType")?.toString(); // "contest", "project", "video"
       
-      // Extract minimum required contest info
+      // Extract video-specific fields
+      requestData.videoId = formData.get("videoId")?.toString();
+      requestData.creatorId = formData.get("creatorId")?.toString();
+      requestData.videoTitle = formData.get("videoTitle")?.toString();
+      requestData.creatorEmail = formData.get("creatorEmail")?.toString();
+      
+      // Extract contest/project info
       try {
         const basicJson = formData.get("basic")?.toString();
         if (basicJson) {
           const basic = JSON.parse(basicJson);
           requestData.contestName = basic.contestName;
           requestData.contestType = basic.contestType;
+          requestData.projectTitle = basic.projectTitle;
         }
       } catch (e) {
-        console.error("Error parsing basic contest info:", e);
+        console.error("Error parsing basic info:", e);
       }
     } else {
       // Handle JSON submission
@@ -36,12 +44,22 @@ export async function POST(request: NextRequest) {
         userId: jsonData.userId,
         brandEmail: jsonData.brandEmail,
         amount: jsonData.amount,
+        paymentType: jsonData.paymentType || "contest", // Default to contest for backward compatibility
+        
+        // Video-specific fields
+        videoId: jsonData.videoId,
+        creatorId: jsonData.creatorId,
+        videoTitle: jsonData.videoTitle,
+        creatorEmail: jsonData.creatorEmail,
+        
+        // Contest/Project fields
         contestName: jsonData.basic?.contestName,
-        contestType: jsonData.basic?.contestType
+        contestType: jsonData.basic?.contestType,
+        projectTitle: jsonData.basic?.projectTitle || jsonData.projectTitle
       };
     }
     
-    const { userId, amount } = requestData;
+    const { userId, amount, paymentType } = requestData;
     
     // Validate required fields
     if (!userId || !amount) {
@@ -51,19 +69,63 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Additional validation for video purchases
+    if (paymentType === "video") {
+      if (!requestData.videoId || !requestData.creatorId) {
+        return NextResponse.json(
+          { error: "Video ID and Creator ID are required for video purchases" },
+          { status: 400 }
+        );
+      }
+    }
+    
     // Create a payment ID
     const paymentId = `payment_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     
-    // Store only essential payment intent data in Firestore
+    // Determine payment name based on type
+    let paymentName = "";
+    switch (paymentType) {
+      case "video":
+        paymentName = requestData.videoTitle || "Video Purchase";
+        break;
+      case "project":
+        paymentName = requestData.projectTitle || "Project";
+        break;
+      case "contest":
+      default:
+        paymentName = requestData.contestName || "Contest";
+        break;
+    }
+    
+    // Store payment intent data in Firestore
     const paymentData = {
       paymentId,
       userId,
       brandEmail: requestData.brandEmail || "",
       amount: parseFloat(amount),
-      contestName: requestData.contestName || "Contest",
-      contestType: requestData.contestType || "Leaderboard",
+      paymentType: paymentType || "contest",
+      paymentName,
       status: "pending",
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      
+      // Video-specific fields (only included if it's a video purchase)
+      ...(paymentType === "video" && {
+        videoId: requestData.videoId,
+        creatorId: requestData.creatorId,
+        videoTitle: requestData.videoTitle || "",
+        creatorEmail: requestData.creatorEmail || "",
+      }),
+      
+      // Contest-specific fields
+      ...(paymentType === "contest" && {
+        contestName: requestData.contestName,
+        contestType: requestData.contestType,
+      }),
+      
+      // Project-specific fields
+      ...(paymentType === "project" && {
+        projectTitle: requestData.projectTitle,
+      }),
     };
     
     if (!adminDb) {
@@ -71,10 +133,28 @@ export async function POST(request: NextRequest) {
     }
     await adminDb.collection("payments").doc(paymentId).set(paymentData);
     
+    // For video purchases, also create a purchase record for the creator
+    if (paymentType === "video" && requestData.creatorId) {
+      const purchaseRecord = {
+        purchaseId: paymentId,
+        videoId: requestData.videoId,
+        creatorId: requestData.creatorId,
+        brandId: userId,
+        amount: parseFloat(amount),
+        status: "pending_payment",
+        createdAt: new Date().toISOString(),
+        videoTitle: requestData.videoTitle || "",
+        brandEmail: requestData.brandEmail || "",
+      };
+      
+      await adminDb.collection("video_purchases").doc(paymentId).set(purchaseRecord);
+    }
+    
     return NextResponse.json({
       success: true,
-      message: "Payment intent created",
+      message: `Payment intent created for ${paymentType}`,
       paymentId,
+      paymentType,
     });
   } catch (error) {
     console.error("Error creating payment intent:", error);

@@ -13,6 +13,7 @@ import { useAuth } from "@/context/AuthContext";
 import { BrandProfile } from "@/types/user";
 import { ProjectStatus } from "@/types/projects";
 import ApplyModal from "./available/ProjectApplyModal";
+import { Button } from "@/components/ui/button";
 
 interface ProjectDetailPageProps {
 	projectId: string;
@@ -370,32 +371,40 @@ export default function ProjectDetails({
 	const statusDisplay = getStatusDisplay(projectStatus);
 
 	return (
-		<div className="container px-4 sm:px-5 py-6 max-w-6xl bg-white border border-[#FFD9C3] rounded-lg mx-auto my-5 relative">
-			<div className="mb-5">
+		<div className="px-3 sm:px-4 lg:px-5 py-4 sm:py-6 w-full md:w-[70rem] min-h-[70vh] bg-white border border-[#FFD9C3] rounded-lg mx-auto my-3 sm:my-5 relative">
+			{/* Back Navigation */}
+			<div className="mb-4 sm:mb-5">
 				<Link
 					href="/creator/dashboard/project/all"
-					className="flex items-center gap-2"
+					className="flex items-center gap-2 text-sm sm:text-base"
 				>
 					&larr; <p className="hover:underline">Back to Available Projects</p>
 				</Link>
 			</div>
-			<div className="mb-2 relative">
-				<div className="flex flex-col sm:flex-row gap-3 items-start">
-					<h1 className="text-xl sm:text-2xl font-bold">{projectTitle}</h1>
+
+			{/* Title and Status */}
+			<div className="mb-4 sm:mb-6">
+				<div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-start">
+					<h1 className="text-lg sm:text-xl lg:text-2xl font-bold leading-tight">
+						{projectTitle}
+					</h1>
 					<span
-						className={`mt-1.5 px-2 py-0.5 rounded-full text-xs ${statusDisplay.className}`}
+						className={`px-2 py-0.5 rounded-full text-xs whitespace-nowrap ${statusDisplay.className}`}
 					>
 						{statusDisplay.text}
 					</span>
 				</div>
 			</div>
 
-			<div className="flex flex-col lg:flex-row gap-6 mb-6">
-				<div className="flex flex-col w-full lg:w-2/3 xl:w-3/4">
-					{/* Prize Breakdown Card for Mobile */}
-					<div className="lg:hidden mb-6">
-						<Card className="bg-[#fff] border border-[#FFBF9B] shadow-none py-3 w-full h-auto min-h-36 flex flex-col items-center justify-start">
-							<div className="flex items-center gap-2 px-4 pb-4 w-full">
+			{/* Main Content Layout */}
+			<div className="flex flex-col xl:flex-row gap-4 lg:gap-6">
+				{/* Main Content Column */}
+				<div className="flex-1 min-w-0">
+					{/* Mobile Project Card */}
+					<div className="xl:hidden mb-4 sm:mb-6">
+						<Card className="bg-white border border-[#FFBF9B] shadow-none p-4 w-full">
+							{/* Brand Info */}
+							<div className="flex items-center gap-2 mb-4">
 								{brandLoading ? (
 									<div className="flex items-center">
 										<div className="h-8 w-8 bg-gray-200 rounded-full mr-2 flex items-center justify-center">
@@ -407,129 +416,146 @@ export default function ProjectDetails({
 									<div className="flex items-center w-full">
 										{brandProfile?.logoUrl ? (
 											<Image
-												className="h-8 w-8 rounded-full mr-2 object-cover"
+												className="h-8 w-8 rounded-full mr-2 object-cover flex-shrink-0"
 												src={brandProfile.logoUrl}
 												alt={brandProfile.brandName || "Brand"}
 												width={32}
 												height={32}
 											/>
 										) : (
-											<div className="h-8 w-8 bg-gray-200 rounded-full mr-2 flex items-center justify-center">
+											<div className="h-8 w-8 bg-gray-200 rounded-full mr-2 flex items-center justify-center flex-shrink-0">
 												<span className="text-xs text-gray-500">
 													{brandProfile?.brandName?.charAt(0) || "B"}
 												</span>
 											</div>
 										)}
-										<p className="text-sm font-medium">
+										<p className="text-sm font-medium truncate">
 											{brandProfile?.brandName || "Unknown Brand"}
 										</p>
 									</div>
 								)}
 							</div>
 
-							<div className="flex justify-start items-center">
-								<div className="flex gap-2 text-sm mb-2">
+							{/* Project Details Grid */}
+							<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
+								<div className="flex gap-2 text-sm">
 									<Image
 										src="/icons/dateIcon.svg"
 										alt="Date"
 										width={20}
 										height={20}
+										className="flex-shrink-0"
 									/>
-									<div className="flex flex-col">
-										<p className="text-[#667085]">Published On</p>
-										<span className="text-black font-normal">
+									<div className="min-w-0">
+										<p className="text-[#667085] text-xs">Published On</p>
+										<span className="text-black font-normal text-sm">
 											{publishedDate}
 										</span>
 									</div>
 								</div>
-							</div>
 
-							<div className="flex gap-2 text-sm mb-2">
-								<Image
-									src="/icons/productType.svg"
-									alt="Product Type"
-									width={20}
-									height={20}
-								/>
-								<div className="flex flex-col">
-									<p className="text-[#667085]">Product Type</p>
-									<span className="text-black font-normal">{productType}</span>
+								<div className="flex gap-2 text-sm">
+									<Image
+										src="/icons/productType.svg"
+										alt="Product Type"
+										width={20}
+										height={20}
+										className="flex-shrink-0"
+									/>
+									<div className="min-w-0">
+										<p className="text-[#667085] text-xs">Product Type</p>
+										<span className="text-black font-normal text-sm">
+											{productType}
+										</span>
+									</div>
 								</div>
-							</div>
 
-							<div className="flex gap-2 text-sm mb-2">
-								<Image
-									src="/icons/videos.svg"
-									alt="Videos"
-									width={20}
-									height={20}
-								/>
-								<div className="flex flex-col ">
-									<p className="text-[#667085]">Number of Videos</p>
-									<span className="text-black font-normal">
-										{numberOfVideos}
-									</span>
+								<div className="flex gap-2 text-sm">
+									<Image
+										src="/icons/videos.svg"
+										alt="Videos"
+										width={20}
+										height={20}
+										className="flex-shrink-0"
+									/>
+									<div className="min-w-0">
+										<p className="text-[#667085] text-xs">Number of Videos</p>
+										<span className="text-black font-normal text-sm">
+											{numberOfVideos}
+										</span>
+									</div>
 								</div>
-							</div>
 
-							{projectType === "UGC Content Only" ||
-								projectType === "Creator-Posted UGC" ||
-								(projectType === "Spark Ads" && (
-									<div className="flex gap-2 text-sm mb-2">
+								{/* Payment Information */}
+								{(projectType === "UGC Content Only" ||
+									projectType === "Creator-Posted UGC" ||
+									projectType === "Spark Ads") && (
+									<div className="flex gap-2 text-sm">
 										<Image
 											src="/icons/money.svg"
 											alt="Money"
 											width={20}
 											height={20}
+											className="flex-shrink-0"
 										/>
-										<div className="flex flex-col">
-											<p className="mb-2 text-[#667085]">Payment Per Video</p>
-											<span className="text-black font-normal">
+										<div className="min-w-0">
+											<p className="text-[#667085] text-xs">
+												Payment Per Video
+											</p>
+											<span className="text-black font-normal text-sm">
 												${paymentPerVideo}
 											</span>
 										</div>
 									</div>
-								))}
+								)}
 
-							{projectType === "TikTok Shop" && (
-								<div>
-									<div className="flex gap-2 text-sm mb-2">
-										<Image
-											src="/icons/money.svg"
-											alt="Money"
-											width={20}
-											height={20}
-										/>
-										<div className="flex flex-col">
-											<p className="mb-2 text-[#667085]">Fixed Fee Per Video</p>
-											<span className="text-black font-normal">
-												${fixedFeePerVideo}
-											</span>
+								{projectType === "TikTok Shop" && (
+									<>
+										<div className="flex gap-2 text-sm">
+											<Image
+												src="/icons/money.svg"
+												alt="Money"
+												width={20}
+												height={20}
+												className="flex-shrink-0"
+											/>
+											<div className="min-w-0">
+												<p className="text-[#667085] text-xs">
+													Fixed Fee Per Video
+												</p>
+												<span className="text-black font-normal text-sm">
+													${fixedFeePerVideo}
+												</span>
+											</div>
 										</div>
-									</div>
 
-									<div className="flex gap-2 text-sm mb-2">
-										<Image
-											src="/icons/sales.svg"
-											alt="Commission"
-											width={20}
-											height={20}
-										/>
-										<div className="flex flex-col">
-											<p className="mb-2 text-[#667085]">Commission Per Sale</p>
-											<span className="text-black font-normal">
-												${commissionSale}
-											</span>
+										<div className="flex gap-2 text-sm">
+											<Image
+												src="/icons/sales.svg"
+												alt="Commission"
+												width={20}
+												height={20}
+												className="flex-shrink-0"
+											/>
+											<div className="min-w-0">
+												<p className="text-[#667085] text-xs">
+													Commission Per Sale
+												</p>
+												<span className="text-black font-normal text-sm">
+													${commissionSale}
+												</span>
+											</div>
 										</div>
-									</div>
-								</div>
-							)}
+									</>
+								)}
+							</div>
 
-							<div className="px-4 w-full">
+							{/* Action Buttons */}
+							<div className="space-y-2">
 								<button
 									onClick={hasApplied ? undefined : openApplyModal}
 									disabled={hasApplied}
-									className={`block w-full text-center py-2 ${
+									className={`w-full py-2.5 px-4 text-sm font-medium rounded-md transition-colors ${
 										hasApplied
 											? applicationStatus === "approved"
 												? "bg-green-500 cursor-not-allowed"
@@ -537,7 +563,7 @@ export default function ProjectDetails({
 													? "bg-red-500 cursor-not-allowed"
 													: "bg-gray-400 cursor-not-allowed"
 											: "bg-orange-500 hover:bg-orange-600"
-									} text-white rounded-md transition-colors`}
+									} text-white`}
 								>
 									{hasApplied
 										? applicationStatus === "approved"
@@ -547,25 +573,335 @@ export default function ProjectDetails({
 												: "Application Pending"
 										: "Apply Now"}
 								</button>
-								<ApplyModal
-									isOpen={isApplyModalOpen}
-									onClose={closeApplyModal}
-									projectId={projectId}
-									onSubmitSuccess={handleApplySuccess}
-								/>
 
 								<button
 									onClick={toggleSaved}
 									disabled={saveLoading}
-									className="mt-2 flex justify-center items-center w-full text-center py-2 bg-black text-white rounded-md hover:bg-gray-800 transition-colors"
+									className="w-full flex justify-center items-center py-2.5 px-4 bg-black text-white rounded-md hover:bg-gray-800 transition-colors text-sm font-medium"
 								>
 									{saveLoading ? (
 										<div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
 									) : (
 										<>
-											<p>{isSaved ? "Unsave Project" : "Save for Later"}</p>
+											<span>
+												{isSaved ? "Unsave Project" : "Save for Later"}
+											</span>
 											<BookmarkIcon
-												size={18}
+												size={16}
+												className={`ml-2 ${isSaved ? "fill-white" : ""}`}
+											/>
+										</>
+									)}
+								</button>
+							</div>
+
+							<ApplyModal
+								isOpen={isApplyModalOpen}
+								onClose={closeApplyModal}
+								projectId={projectId}
+								onSubmitSuccess={handleApplySuccess}
+							/>
+						</Card>
+					</div>
+
+					{/* Project Overview Content */}
+					<div className="space-y-4 sm:space-y-6">
+						<div className="grid grid-cols-1 lg:grid-cols-3 gap-2 lg:gap-4 border-b pb-3 sm:pb-4">
+							<h3 className="text-sm sm:text-base text-[#667085] font-medium">
+								Project Type
+							</h3>
+							<p className="lg:col-span-2 text-sm sm:text-base">
+								{projectType}
+							</p>
+						</div>
+
+						<div className="grid grid-cols-1 lg:grid-cols-3 gap-2 lg:gap-4 border-b pb-3 sm:pb-4">
+							<h3 className="text-sm sm:text-base text-[#667085] font-medium">
+								Project Description
+							</h3>
+							<p className="lg:col-span-2 text-sm sm:text-base leading-relaxed">
+								{description}
+							</p>
+						</div>
+
+						<div className="grid grid-cols-1 lg:grid-cols-3 gap-2 lg:gap-4 border-b pb-3 sm:pb-4">
+							<h3 className="text-sm sm:text-base text-[#667085] font-medium">
+								Content Type
+							</h3>
+							<p className="lg:col-span-2 text-sm sm:text-base capitalize">
+								{contentType.replace(/-/g, " ")}
+							</p>
+						</div>
+
+						{projectData?.projectDetails.projectType === "TikTok Shop" && (
+							<div className="grid grid-cols-1 lg:grid-cols-3 gap-2 lg:gap-4 border-b pb-3 sm:pb-4">
+								<h3 className="text-sm sm:text-base text-[#667085] font-medium">
+									Product Link
+								</h3>
+								<div className="lg:col-span-2">
+									<Link
+										href={productLink}
+										target="_blank"
+										rel="noopener noreferrer"
+										className="text-orange-500 hover:underline text-sm sm:text-base break-all"
+									>
+										{productLink}
+									</Link>
+								</div>
+							</div>
+						)}
+
+						<div className="grid grid-cols-1 lg:grid-cols-3 gap-2 lg:gap-4 border-b pb-3 sm:pb-4">
+							<h3 className="text-sm sm:text-base text-[#667085] font-medium">
+								Video Type
+							</h3>
+							<p className="lg:col-span-2 text-sm sm:text-base capitalize">
+								{videoType.replace(/-/g, " ")}
+							</p>
+						</div>
+
+						{projectType === "UGC Content Only" && (
+							<div className="grid grid-cols-1 lg:grid-cols-3 gap-2 lg:gap-4 border-b pb-3 sm:pb-4">
+								<h3 className="text-sm sm:text-base text-[#667085] font-medium">
+									Aspect Ratio
+								</h3>
+								<p className="lg:col-span-2 text-sm sm:text-base">
+									{aspectRatio}
+								</p>
+							</div>
+						)}
+
+						{/* Content Creation Guidance */}
+						<div className="relative">
+							{hasApplied ? (
+								<div className="grid grid-cols-1 lg:grid-cols-3 gap-2 lg:gap-4 border-b pb-3 sm:pb-4">
+									<h3 className="text-sm sm:text-base text-[#667085] font-medium">
+										Client&apos;s Script
+									</h3>
+									<div className="lg:col-span-2 text-sm sm:text-base leading-relaxed">
+										{clientScript}
+									</div>
+								</div>
+							) : (
+								<>
+									<div className="grid grid-cols-1 lg:grid-cols-3 gap-2 lg:gap-4 border-b pb-3 sm:pb-4 filter blur-sm">
+										<h3 className="text-sm sm:text-base text-[#667085] font-medium">
+											Client&apos;s Script
+										</h3>
+										<div className="lg:col-span-2 text-sm sm:text-base leading-relaxed">
+											{clientScript}
+										</div>
+									</div>
+
+									{/* Overlay */}
+									<div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-center px-4 py-8 bg-white bg-opacity-80 rounded-lg">
+										<div className="max-w-md">
+											<h2 className="text-base sm:text-base font-bold mb-2 sm:mb-3 text-gray-800">
+												Apply to the project, and once accepted, you&apos;ll unlock
+												full details to get started!
+											</h2>
+											<Button
+												onClick={openApplyModal}
+												className="px-4 py-2 sm:px-5 sm:py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-md transition-colors text-sm sm:text-base font-medium"
+											>
+												Apply Now
+											</Button>
+										</div>
+									</div>
+								</>
+							)}
+						</div>
+					</div>
+				</div>
+
+				{/* Desktop Sidebar */}
+				<div className="hidden xl:block xl:w-80 flex-shrink-0">
+					<div className="sticky top-4">
+						<Card className="bg-white border border-[#FFBF9B] shadow-none p-4">
+							{/* Brand Info */}
+							<div className="flex items-center gap-2 mb-4">
+								{brandLoading ? (
+									<div className="flex items-center w-full">
+										<div className="h-8 w-8 bg-gray-200 rounded-full mr-2 flex items-center justify-center">
+											<div className="animate-pulse h-4 w-4 bg-gray-300 rounded-full"></div>
+										</div>
+										<div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+									</div>
+								) : (
+									<div className="flex items-center w-full">
+										{brandProfile?.logoUrl ? (
+											<Image
+												className="h-8 w-8 rounded-full mr-2 object-cover flex-shrink-0"
+												src={brandProfile.logoUrl}
+												alt={brandProfile.brandName || "Brand"}
+												width={32}
+												height={32}
+											/>
+										) : (
+											<div className="h-8 w-8 bg-gray-200 rounded-full mr-2 flex items-center justify-center flex-shrink-0">
+												<span className="text-xs text-gray-500">
+													{brandProfile?.brandName?.charAt(0) || "B"}
+												</span>
+											</div>
+										)}
+										<p className="text-sm font-medium truncate">
+											{brandProfile?.brandName || "Unknown Brand"}
+										</p>
+									</div>
+								)}
+							</div>
+
+							{/* Project Details */}
+							<div className="space-y-3 mb-4">
+								<div className="flex gap-2 text-sm">
+									<Image
+										src="/icons/dateIcon.svg"
+										alt="Date"
+										width={20}
+										height={20}
+										className="flex-shrink-0"
+									/>
+									<div className="min-w-0">
+										<p className="text-[#667085] text-xs">Published On</p>
+										<span className="text-black font-normal">
+											{publishedDate}
+										</span>
+									</div>
+								</div>
+
+								<div className="flex gap-2 text-sm">
+									<Image
+										src="/icons/productType.svg"
+										alt="Product Type"
+										width={20}
+										height={20}
+										className="flex-shrink-0"
+									/>
+									<div className="min-w-0">
+										<p className="text-[#667085] text-xs">Product Type</p>
+										<span className="text-black font-normal">
+											{productType}
+										</span>
+									</div>
+								</div>
+
+								<div className="flex gap-2 text-sm">
+									<Image
+										src="/icons/videos.svg"
+										alt="Videos"
+										width={20}
+										height={20}
+										className="flex-shrink-0"
+									/>
+									<div className="min-w-0">
+										<p className="text-[#667085] text-xs">Number of Videos</p>
+										<span className="text-black font-normal">
+											{numberOfVideos} {numberOfVideos > 1 ? "Videos" : "Video"}
+										</span>
+									</div>
+								</div>
+
+								{(projectType === "UGC Content Only" ||
+									projectType === "Creator-Posted UGC" ||
+									projectType === "Spark Ads") && (
+									<div className="flex gap-2 text-sm">
+										<Image
+											src="/icons/money.svg"
+											alt="Money"
+											width={20}
+											height={20}
+											className="flex-shrink-0"
+										/>
+										<div className="min-w-0">
+											<p className="text-[#667085] text-xs mb-1">
+												Payment Per Video
+											</p>
+											<span className="text-black font-normal">
+												${paymentPerVideo}
+											</span>
+										</div>
+									</div>
+								)}
+
+								{projectType === "TikTok Shop" && (
+									<>
+										<div className="flex gap-2 text-sm">
+											<Image
+												src="/icons/money.svg"
+												alt="Money"
+												width={20}
+												height={20}
+												className="flex-shrink-0"
+											/>
+											<div className="min-w-0">
+												<p className="text-[#667085] text-xs mb-1">
+													Fixed Fee Per Video
+												</p>
+												<span className="text-black font-normal">
+													${fixedFeePerVideo}
+												</span>
+											</div>
+										</div>
+
+										<div className="flex gap-2 text-sm">
+											<Image
+												src="/icons/sales.svg"
+												alt="Commission"
+												width={20}
+												height={20}
+												className="flex-shrink-0"
+											/>
+											<div className="min-w-0">
+												<p className="text-[#667085] text-xs mb-1">
+													Commission Per Sale
+												</p>
+												<span className="text-black font-normal">
+													{commissionSale}%
+												</span>
+											</div>
+										</div>
+									</>
+								)}
+							</div>
+
+							{/* Action Buttons */}
+							<div className="space-y-2">
+								<button
+									onClick={hasApplied ? undefined : openApplyModal}
+									disabled={hasApplied}
+									className={`w-full py-2.5 px-4 text-sm font-medium rounded-md transition-colors ${
+										hasApplied
+											? applicationStatus === "approved"
+												? "bg-green-500 cursor-not-allowed"
+												: applicationStatus === "rejected"
+													? "bg-red-500 cursor-not-allowed"
+													: "bg-gray-400 cursor-not-allowed"
+											: "bg-orange-500 hover:bg-orange-600"
+									} text-white`}
+								>
+									{hasApplied
+										? applicationStatus === "approved"
+											? "Application Approved"
+											: applicationStatus === "rejected"
+												? "Application Rejected"
+												: "Application Pending"
+										: "Apply Now"}
+								</button>
+
+								<button
+									onClick={toggleSaved}
+									disabled={saveLoading}
+									className="w-full flex justify-center items-center py-2.5 px-4 bg-black text-white rounded-md hover:bg-gray-800 transition-colors text-sm font-medium"
+								>
+									{saveLoading ? (
+										<div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+									) : (
+										<>
+											<span>
+												{isSaved ? "Unsave Project" : "Save for Later"}
+											</span>
+											<BookmarkIcon
+												size={16}
 												className={`ml-2 ${isSaved ? "fill-white" : ""}`}
 											/>
 										</>
@@ -575,265 +911,12 @@ export default function ProjectDetails({
 						</Card>
 					</div>
 
-					{/* Project Overview Content */}
-					<div className="space-y-6 mt-4">
-						<div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
-							<h3 className="text-base text-[#667085] mb-2">Project Type</h3>
-							<p>{projectType}</p>
-						</div>
-						<div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
-							<h3 className="text-base text-[#667085] mb-2">
-								Project Description
-							</h3>
-							<p>{description}</p>
-						</div>
-						<div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
-							<h3 className="text-base text-[#667085] mb-2">Content Type</h3>
-							<p className="capitalize">{contentType.replace(/-/g, " ")}</p>
-						</div>
-						
-						{projectData?.projectDetails.projectType === "TikTok Shop" && (
-							<div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
-								<h3 className="text-base text-[#667085] mb-2">Product Link</h3>
-								<Link
-									href={productLink}
-									target="_blank"
-									rel="noopener noreferrer"
-									className="text-orange-500 hover:underline"
-								>
-									{productLink}
-								</Link>
-							</div>
-						)}
-						<div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
-							<h3 className="text-base text-[#667085] mb-2">Video Type</h3>
-							<p className="capitalize">{videoType.replace(/-/g, " ")}</p>
-						</div>
-						{projectType === "UGC Content Only" && (
-							<div className="grid grid-cols-1 md:grid-cols-2 border-b pb-4">
-								<h3 className="text-base text-[#667085] mb-2">Aspect Ratio</h3>
-								<p>{aspectRatio}</p>
-							</div>
-						)}
-						{/* Content Creation Guidance */}
-						<div>
-							<div className="relative border-b pb-4">
-								{hasApplied ? (
-									// Show full content when user has applied
-									<div className="grid grid-cols-1 md:grid-cols-2">
-										<h3 className="text-base text-[#667085] mb-2">
-											Client&apos;s Script
-										</h3>
-										<div className="space-y-2">{clientScript}</div>
-									</div>
-								) : (
-									// Show blurred content with overlay for users who haven't applied
-									<>
-										<div className="grid grid-cols-1 md:grid-cols-2 filter blur-sm">
-											<h3 className="text-base text-[#667085] mb-2">
-												Client&apos;s Script
-											</h3>
-											<div className="space-y-2">{clientScript}</div>
-										</div>
-
-										{/* Overlay with clear text and apply button */}
-										<div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-center px-4">
-											<div className="backdrop-blur-sm">
-												<h2 className="text-lg font-bold mb-2 text-gray-800">
-													Apply to the project, and once accepted, you&apos;ll
-													unlock full details to get started!
-												</h2>
-												<button
-													onClick={openApplyModal}
-													className="px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-md transition-colors text-base font-medium"
-												>
-													Apply Now
-												</button>
-											</div>
-										</div>
-									</>
-								)}
-							</div>
-						</div>
-					</div>
-				</div>
-
-				{/* Right column with fixed width - desktop only */}
-				<div className="hidden lg:block lg:w-1/3 xl:w-1/4 mt-14">
-					<Card className="bg-[#fff] border border-[#FFBF9B] shadow-none w-full h-auto min-h-36 flex flex-col justify-start p-4">
-						<div className="flex items-center gap-2 w-full mb-4">
-							{brandLoading ? (
-								<div className="flex items-center w-full">
-									<div className="h-8 w-8 bg-gray-200 rounded-full mr-2 flex items-center justify-center">
-										<div className="animate-pulse h-4 w-4 bg-gray-300 rounded-full"></div>
-									</div>
-									<div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
-								</div>
-							) : (
-								<div className="flex items-center w-full">
-									{brandProfile?.logoUrl ? (
-										<Image
-											className="h-8 w-8 rounded-full mr-2 object-cover"
-											src={brandProfile.logoUrl}
-											alt={brandProfile.brandName || "Brand"}
-											width={32}
-											height={32}
-										/>
-									) : (
-										<div className="h-8 w-8 bg-gray-200 rounded-full mr-2 flex items-center justify-center">
-											<span className="text-xs text-gray-500">
-												{brandProfile?.brandName?.charAt(0) || "B"}
-											</span>
-										</div>
-									)}
-									<p className="text-sm font-medium">
-										{brandProfile?.brandName || "Unknown Brand"}
-									</p>
-								</div>
-							)}
-						</div>
-
-						<div className="flex gap-2 text-sm mb-2">
-							<Image
-								src="/icons/dateIcon.svg"
-								alt="Date"
-								width={20}
-								height={20}
-							/>
-							<div className="flex flex-col ">
-								<p className="text-[#667085]">Published On</p>
-								<span className="text-black font-normal">{publishedDate}</span>
-							</div>
-						</div>
-
-						<div className="flex gap-2 text-sm mb-2">
-							<Image
-								src="/icons/productType.svg"
-								alt="Product Type"
-								width={20}
-								height={20}
-							/>
-							<div className="flex flex-col">
-								<p className="text-[#667085]">Product Type</p>
-								<span className="text-black font-normal">{productType}</span>
-							</div>
-						</div>
-
-						<div className="flex gap-2 text-sm mb-2">
-							<Image
-								src="/icons/videos.svg"
-								alt="Videos"
-								width={20}
-								height={20}
-							/>
-							<div className="flex flex-col">
-								<p className="text-[#667085]">Number of Videos</p>
-								<span className="text-black font-normal">
-									{numberOfVideos} {numberOfVideos > 1 ? "Videos" : "Video"}
-								</span>
-							</div>
-						</div>
-
-						{projectType === "UGC Content Only" ||
-							projectType === "Creator-Posted UGC" ||
-							(projectType === "Spark Ads" && (
-								<div className="flex gap-2 text-sm mb-2">
-									<Image
-										src="/icons/money.svg"
-										alt="Money"
-										width={20}
-										height={20}
-									/>
-									<div className="flex flex-col">
-										<p className="mb-2 text-[#667085]">Payment Per Video</p>
-										<span className="text-black font-normal">
-											${paymentPerVideo}
-										</span>
-									</div>
-								</div>
-							))}
-
-						{projectType === "TikTok Shop" && (
-							<div>
-								<div className="flex gap-2 text-sm mb-2">
-									<Image
-										src="/icons/money.svg"
-										alt="Money"
-										width={20}
-										height={20}
-									/>
-									<div className="flex flex-col">
-										<p className="mb-1 text-[#667085]">Fixed Fee Per Video</p>
-										<span className="text-black font-normal">
-											${fixedFeePerVideo}
-										</span>
-									</div>
-								</div>
-
-								<div className="flex gap-2 text-sm mb-2">
-									<Image
-										src="/icons/sales.svg"
-										alt="Commission"
-										width={20}
-										height={20}
-									/>
-									<div className="flex flex-col">
-										<p className="mb-1 text-[#667085]">Commission Per Sale</p>
-										<span className="text-black font-normal mb-2">
-											{commissionSale}%
-										</span>
-									</div>
-								</div>
-							</div>
-						)}
-
-						<button
-							onClick={hasApplied ? undefined : openApplyModal}
-							disabled={hasApplied}
-							className={`block w-full text-center py-2 ${
-								hasApplied
-									? applicationStatus === "approved"
-										? "bg-green-500 cursor-not-allowed"
-										: applicationStatus === "rejected"
-											? "bg-red-500 cursor-not-allowed"
-											: "bg-gray-400 cursor-not-allowed"
-									: "bg-orange-500 hover:bg-orange-600"
-							} text-white rounded-md transition-colors`}
-						>
-							{hasApplied
-								? applicationStatus === "approved"
-									? "Application Approved"
-									: applicationStatus === "rejected"
-										? "Application Rejected"
-										: "Application Pending"
-								: "Apply Now"}
-						</button>
-
-						<ApplyModal
-							isOpen={isApplyModalOpen}
-							onClose={closeApplyModal}
-							projectId={projectId}
-							onSubmitSuccess={handleApplySuccess}
-						/>
-
-						<button
-							onClick={toggleSaved}
-							disabled={saveLoading}
-							className="mt-2 flex justify-center items-center w-full text-center py-2 bg-black text-white rounded-md hover:bg-gray-800 transition-colors"
-						>
-							{saveLoading ? (
-								<div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-							) : (
-								<>
-									<p>{isSaved ? "Unsave Project" : "Save for Later"}</p>
-									<BookmarkIcon
-										size={18}
-										className={`ml-2 ${isSaved ? "fill-white" : ""}`}
-									/>
-								</>
-							)}
-						</button>
-					</Card>
+					<ApplyModal
+						isOpen={isApplyModalOpen}
+						onClose={closeApplyModal}
+						projectId={projectId}
+						onSubmitSuccess={handleApplySuccess}
+					/>
 				</div>
 			</div>
 		</div>

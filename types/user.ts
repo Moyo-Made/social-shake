@@ -1,5 +1,6 @@
 // types/user.ts
 export interface User {
+	getIdToken(): unknown;
   providerData: string[];
 	photoURL: string;
 	logoUrl: string;

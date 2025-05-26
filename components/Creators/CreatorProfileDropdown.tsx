@@ -21,11 +21,6 @@ const CreatorProfileDropdown: React.FC<CreatorProfileDropdownProps> = ({
 	const { creatorProfile, loading, error, refreshCreatorProfile } =
 		useCreatorProfile("view");
 
-	// Debug helper - keep this to diagnose connection issues
-	useEffect(() => {
-		console.log("Current creator profile data:", creatorProfile);
-	}, [creatorProfile]);
-
 	const [isOpen, setIsOpen] = useState(false);
 	const dropdownRef = useRef<HTMLDivElement>(null);
 	const { logout, currentUser } = useAuth();
@@ -326,8 +321,6 @@ const CreatorProfileDropdown: React.FC<CreatorProfileDropdownProps> = ({
 	const verificationStatus = getVerificationStatusInfo();
 	const isTikTokConnected = hasTikTokConnected();
 
-	// Debug indicator for TikTok connection status
-	console.log("TikTok connected status:", isTikTokConnected);
 
 	return (
 		<div className="relative" ref={dropdownRef}>

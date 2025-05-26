@@ -49,7 +49,6 @@ interface Payment {
 	rawData: RawPaymentData;
 }
 
-
 // Helper function to get type badge styling
 const getTypeBadgeStyle = (type: string): string => {
 	switch (type.toLowerCase()) {
@@ -112,7 +111,8 @@ const getStatusIcon = (status: string): React.ReactNode => {
 };
 
 export default function AdminPaymentsDashboard() {
-	const [payments, setPayments] = useState<Payment[]>([]);
+	// All payments from API (no server-side pagination)
+	const [allPayments, setAllPayments] = useState<Payment[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [processingId, setProcessingId] = useState<string | null>(null);
@@ -122,17 +122,9 @@ export default function AdminPaymentsDashboard() {
 	const [typeFilter, setTypeFilter] = useState<string>("");
 	const [statusFilter, setStatusFilter] = useState<string>("");
 	
-	// Pagination states
+	// Client-side pagination states
 	const [currentPage, setCurrentPage] = useState(1);
-	const [itemsPerPage,] = useState(10);
-	const [paginationInfo, setPaginationInfo] = useState({
-		totalCount: 0,
-		hasMore: false,
-		cursor: "",
-		pageSize: 10
-	});
-
-	const hasPayments = payments?.length > 0;
+	const [itemsPerPage] = useState(10);
 
 	// Total payments summary
 	const [totalPayments, setTotalPayments] = useState({
@@ -141,44 +133,26 @@ export default function AdminPaymentsDashboard() {
 		totalProcessed: "0"
 	});
 
+	const hasPayments = allPayments?.length > 0;
+
 	useEffect(() => {
 		fetchPayments();
-	}, [currentPage, itemsPerPage, statusFilter]);
+	}, []);
+
+	// Reset to first page when filters change
+	useEffect(() => {
+		setCurrentPage(1);
+	}, [searchTerm, typeFilter, statusFilter]);
 
 	const fetchPayments = async () => {
 		try {
 			setLoading(true);
 			
-			// Build query parameters for the API request
-			const params = new URLSearchParams();
-			params.append('page', currentPage.toString());
-			params.append('limit', itemsPerPage.toString());
-			
-			// Add status filter if selected
-			if (statusFilter && statusFilter !== "all-statuses") {
-				// Map the display status back to the API status value
-				let apiStatus;
-				switch (statusFilter) {
-					case "Processed":
-						apiStatus = "completed";
-						break;
-					case "Pending":
-						apiStatus = "pending_capture";
-						break;
-					case "Refunded":
-						apiStatus = "canceled";
-						break;
-					default:
-						apiStatus = statusFilter.toLowerCase();
-				}
-				params.append('status', apiStatus);
-			}
-			
-			const response = await axios.get(`/api/admin/payments?${params.toString()}`);
+			// Simple API call - no pagination parameters needed
+			const response = await axios.get('/api/admin/payments');
 			
 			// Update states with response data
-			setPayments(response.data.transactions);
-			setPaginationInfo(response.data.pagination);
+			setAllPayments(response.data.transactions);
 			setTotalPayments(response.data.totals);
 			
 			setError(null);
@@ -219,8 +193,7 @@ export default function AdminPaymentsDashboard() {
 		setSearchTerm("");
 		setTypeFilter("");
 		setStatusFilter("");
-		setCurrentPage(1); // Reset to first page
-		fetchPayments();
+		setCurrentPage(1);
 	};
 
 	// Handle page change
@@ -228,13 +201,11 @@ export default function AdminPaymentsDashboard() {
 		setCurrentPage(newPage);
 	};
 
-	// Filter payments based on search and type
-	// (status filtering is now handled server-side)
+	// Filter payments based on search, type, and status (all client-side)
 	const filteredPayments = useMemo(() => {
-		// If there are no payments at all, return empty array
 		if (!hasPayments) return [];
 
-		return payments.filter((payment) => {
+		return allPayments.filter((payment) => {
 			// Search term filter (case insensitive)
 			const matchesSearch =
 				searchTerm === "" ||
@@ -248,12 +219,56 @@ export default function AdminPaymentsDashboard() {
 				typeFilter === "all-types" ||
 				payment.type.toLowerCase() === typeFilter.toLowerCase();
 
-			return matchesSearch && matchesType;
-		});
-	}, [searchTerm, typeFilter, hasPayments, payments]);
+			// Status filter
+			const matchesStatus =
+				statusFilter === "" ||
+				statusFilter === "all-statuses" ||
+				payment.status.toLowerCase() === statusFilter.toLowerCase();
 
-	// Calculate total pages
-	const totalPages = Math.ceil(paginationInfo.totalCount / paginationInfo.pageSize);
+			return matchesSearch && matchesType && matchesStatus;
+		});
+	}, [searchTerm, typeFilter, statusFilter, hasPayments, allPayments]);
+
+	// Calculate filtered totals (for display purposes)
+	const filteredTotals = useMemo(() => {
+		let totalSpend = 0;
+		let pendingPayments = 0;
+		let totalProcessed = 0;
+
+		filteredPayments.forEach((transaction) => {
+			try {
+				const amount = parseFloat(transaction.amount.replace(/,/g, ""));
+
+				if (!isNaN(amount)) {
+					if (transaction.status === "Pending") {
+						pendingPayments += amount;
+					} else if (transaction.status === "Processed") {
+						totalProcessed += amount;
+						totalSpend += amount;
+					}
+				}
+			} catch (error) {
+				console.error("Error calculating filtered total:", error);
+			}
+		});
+
+		return {
+			totalSpend: totalSpend.toLocaleString(),
+			pendingPayments: pendingPayments.toLocaleString(),
+			totalProcessed: totalProcessed.toLocaleString(),
+		};
+	}, [filteredPayments]);
+
+	// Calculate total pages based on filtered results
+	const totalPages = Math.ceil(filteredPayments.length / itemsPerPage);
+
+	// Paginate the filtered results - FIXED CALCULATION
+	const paginatedPayments = useMemo(() => {
+		const startIndex = (currentPage - 1) * itemsPerPage;
+		const endIndex = startIndex + itemsPerPage;
+		console.log(`Page ${currentPage}: showing items ${startIndex} to ${endIndex - 1} of ${filteredPayments.length}`);
+		return filteredPayments.slice(startIndex, endIndex);
+	}, [filteredPayments, currentPage, itemsPerPage]);
 
 	// Generate pagination buttons
 	const renderPaginationButtons = () => {
@@ -305,12 +320,12 @@ export default function AdminPaymentsDashboard() {
 			<button
 				key="next"
 				className={`px-3 py-1 rounded ${
-					currentPage === totalPages
+					currentPage >= totalPages
 						? "text-gray-400 cursor-not-allowed"
 						: "text-gray-700 hover:bg-gray-100"
 				}`}
 				onClick={() => handlePageChange(currentPage + 1)}
-				disabled={currentPage === totalPages}
+				disabled={currentPage >= totalPages}
 			>
 				&gt;
 			</button>
@@ -350,31 +365,44 @@ export default function AdminPaymentsDashboard() {
 		);
 	}
 
+	// Determine which totals to show (filtered vs all)
+	const displayTotals = searchTerm || typeFilter || statusFilter ? filteredTotals : totalPayments;
+
 	return (
 		<div className="max-w-6xl mx-auto p-4">
 			{/* Payment Summary Cards */}
-			<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-6 mb-8 ">
+			<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-6 mb-8">
 				<Card className="py-10 flex flex-col items-center justify-center border border-[#6670854D] shadow-none">
-					<p className="text-lg text-[#000] mb-1 mt-2">Total Amount</p>
+					<p className="text-lg text-[#000] mb-1 mt-2">
+						Total Amount
+						{(searchTerm || typeFilter || statusFilter) && " (Filtered)"}
+					</p>
 					<h2 className="text-2xl text-[#101828] font-semibold">
-						${hasPayments ? totalPayments.totalSpend : "0"}
+						${hasPayments ? displayTotals.totalSpend : "0"}
 					</h2>
 				</Card>
 
 				<Card className="py-4 px-5 flex flex-col items-center justify-center border border-[#6670854D] shadow-none">
-					<p className="text-lg text-[#000] mb-1 mt-2">Total Pending Amount</p>
+					<p className="text-lg text-[#000] mb-1 mt-2">
+						Total Pending Amount
+						{(searchTerm || typeFilter || statusFilter) && " (Filtered)"}
+					</p>
 					<h2 className="text-2xl text-[#101828] font-semibold">
-						${hasPayments ? totalPayments.pendingPayments : "0"}
+						${hasPayments ? displayTotals.pendingPayments : "0"}
 					</h2>
 				</Card>
 
 				<Card className="py-4 px-5 flex flex-col items-center justify-center border border-[#6670854D] shadow-none">
-					<p className="text-lg text-[#000] mb-1 mt-2">Total Processed</p>
+					<p className="text-lg text-[#000] mb-1 mt-2">
+						Total Processed
+						{(searchTerm || typeFilter || statusFilter) && " (Filtered)"}
+					</p>
 					<h2 className="text-2xl text-[#101828] font-semibold">
-						${hasPayments ? totalPayments.totalProcessed : "0"}
+						${hasPayments ? displayTotals.totalProcessed : "0"}
 					</h2>
 				</Card>
 			</div>
+			
 			<div className="mx-auto">
 				{/* Filters Section - Only show if there are payments */}
 				{hasPayments && (
@@ -424,10 +452,7 @@ export default function AdminPaymentsDashboard() {
 
 							<Select
 								value={statusFilter}
-								onValueChange={(value: string) => {
-									setStatusFilter(value);
-									setCurrentPage(1); // Reset to first page on status change
-								}}
+								onValueChange={(value: string) => setStatusFilter(value)}
 							>
 								<SelectTrigger className="w-48">
 									<SelectValue placeholder="Filter by Status" />
@@ -443,10 +468,18 @@ export default function AdminPaymentsDashboard() {
 					</div>
 				)}
 
+				{/* Results info */}
+				{hasPayments && filteredPayments.length > 0 && (
+					<div className="mb-4 text-sm text-gray-600">
+						Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredPayments.length)} of {filteredPayments.length} results
+						{(searchTerm || typeFilter || statusFilter) && ` (filtered from ${allPayments.length} total)`}
+					</div>
+				)}
+
 				{/* Payment Table */}
 				<div className="overflow-hidden rounded-lg border border-gray-200">
-					{/* Table Header - Only show if there are payments */}
-					{hasPayments && (
+					{/* Table Header - Only show if there are payments to display */}
+					{hasPayments && paginatedPayments.length > 0 && (
 						<div className="grid grid-cols-7 bg-gray-50 p-3 text-[#475467] text-sm font-normal">
 							<div className="col-span-1 pl-4">Transaction Date</div>
 							<div className="col-span-2">Description</div>
@@ -493,9 +526,9 @@ export default function AdminPaymentsDashboard() {
 					) : filteredPayments.length > 0 ? (
 						// We have payments that match the filters
 						<>
-							{filteredPayments.map((payment, index) => (
+							{paginatedPayments.map((payment, index) => (
 								<div
-									key={index}
+									key={`${payment.id}-${index}`}
 									className="grid grid-cols-7 p-3 items-center border-t border-gray-200 text-sm text-[#101828] hover:bg-gray-50"
 								>
 									<div className="col-span-1 pl-4">
@@ -564,8 +597,7 @@ export default function AdminPaymentsDashboard() {
 							{totalPages > 1 && (
 								<div className="flex justify-between items-center p-4 border-t border-gray-200">
 									<div className="text-sm text-gray-600">
-										Page {currentPage}
-										
+										Page {currentPage} of {totalPages}
 									</div>
 									<div className="flex gap-1">{renderPaginationButtons()}</div>
 								</div>

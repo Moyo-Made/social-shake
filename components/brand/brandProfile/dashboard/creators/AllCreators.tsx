@@ -13,6 +13,10 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import CreatorVideoShowcase from "./CreatorVideoShowcase";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 
 // Define types
 export interface Creators {
@@ -403,204 +407,445 @@ const CreatorMarketplace = () => {
 	// Detail profile view
 	if (selectedCreator) {
 		return (
-			<div className="container mx-auto p-3 md:p-4 max-w-4xl">
+			<div className="container mx-auto p-3 md:p-4 max-w-7xl">
 				{showAlert && <AlertNotification />}
 
+				{/* Back button */}
 				<div className="pt-4 md:pt-6 border-t mt-4 md:mt-6">
-					<button
+					<Button
+						variant="ghost"
 						onClick={handleBackToList}
-						className="px-3 py-1.5 md:px-4 md:py-2 hover:underline flex items-center text-sm md:text-base"
+						className="px-0 hover:bg-transparent"
 					>
-						<ArrowLeft size={16} className="mr-1 md:mr-2" />
+						<ArrowLeft size={16} className="mr-2" />
 						Back to {isSavedCreatorsPage ? "Saved Creators" : "All Creators"}
-					</button>
+					</Button>
 				</div>
 
-				<div className="overflow-hidden">
-					<div className="p-4 md:p-6 bg-white border border-[#FDE5D7] rounded-lg mt-3 md:mt-5">
-						<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-							<div className="flex flex-col md:flex-row md:items-center gap-4">
-								<div className="h-24 w-24 md:h-32 md:w-32 lg:h-40 lg:w-40 rounded-full overflow-hidden border-4 border-orange-100 mx-auto md:mx-0">
-									<Image
-										src={
-											selectedCreator.creatorProfileData?.tiktokAvatarUrl ||
-											selectedCreator.profilePictureUrl
-										}
-										alt={selectedCreator.name}
-										className="h-full w-full object-cover"
-										width={160}
-										height={160}
-									/>
-								</div>
-								<div className="text-center md:text-left">
-									<h2 className="text-xl md:text-2xl font-bold">
-										{selectedCreator.creatorProfileData?.tiktokDisplayName ||
-											selectedCreator.name}
-									</h2>
-									<p className="text-gray-600 text-sm md:text-base">
-										{Array.isArray(selectedCreator.contentTypes)
-											? selectedCreator.contentTypes.join(", ")
-											: selectedCreator.contentTypes ||
-												"No content type specified"}
-									</p>
-									<p className="text-gray-500 text-sm md:text-base">
-										@{selectedCreator.username}
-									</p>
-								</div>
+				{/* Header Section */}
+				<div className="bg-white border border-[#FDE5D7] rounded-lg mt-5 p-4 md:p-6">
+					<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+						<div className="flex flex-col sm:flex-row sm:items-center gap-4 lg:gap-6">
+							<div className="h-12 w-12 sm:h-16 sm:w-16 md:h-28 md:w-28 rounded-full overflow-hidden border-4 border-orange-100 mx-auto sm:mx-0 flex-shrink-0">
+								<Image
+									src={
+										selectedCreator.creatorProfileData?.tiktokAvatarUrl ||
+										selectedCreator.profilePictureUrl
+									}
+									alt={selectedCreator.name}
+									className="h-full w-full object-cover"
+									width={100}
+									height={100}
+								/>
 							</div>
-							<div className="flex flex-col items-center md:items-start gap-2">
-								<div className="flex gap-1 text-sm">
-									<p className="text-[#667085]">Video Pricing:</p>
-									<p className="font-normal">
-										${selectedCreator.pricing.oneVideo}/Video
-									</p>
-								</div>
-								<div className="flex gap-3">
-									<button
-										onClick={() => handleSendMessage(selectedCreator)}
-										className="px-3 py-1.5 md:px-4 md:py-2 bg-orange-500 text-white rounded-md flex items-center text-sm md:text-base"
-									>
-										<Send size={16} className="mr-1 md:mr-2" />
-										Send Message
-									</button>
-									<button
-										onClick={() => handleSaveCreator(selectedCreator)}
-										className={`p-2 rounded-full ${
-											isCreatorSaved(selectedCreator.id)
-												? "bg-pink-500 text-white"
-												: "bg-[#FFF4EE] text-[#000000]"
-										}`}
-									>
-										<Heart
-											size={20}
-											fill={
-												isCreatorSaved(selectedCreator.id) ? "white" : "none"
-											}
-										/>
-									</button>
+							<div className="text-center sm:text-left flex-1">
+								<h2 className="text-lg md:text-xl font-semibold">
+									{selectedCreator.creatorProfileData?.tiktokDisplayName ||
+										selectedCreator.name}
+								</h2>
+								
+								<p className="text-gray-500 text-sm md:text-base mb-1">
+									@{selectedCreator.username}
+								</p>
+								<div className="flex items-center justify-center sm:justify-start gap-2 text-sm text-gray-600">
+									<span>
+										{selectedCreator.country || "Location not specified"}
+									</span>
+									<span>•</span>
+									<span className="flex items-center">
+										<span className="text-yellow-500 mr-1">★</span>
+										New Creator
+									</span>
 								</div>
 							</div>
 						</div>
+
+						{/* Action buttons */}
+						<div className="flex flex-col sm:flex-row items-center gap-3 lg:items-end lg:flex-col lg:gap-2">
+							<div className="text-center lg:text-right">
+								<p className="text-sm text-gray-500">Starting from</p>
+								
+
+								<p className="text-base font-bold text-orange-500">
+									${selectedCreator.pricing.oneVideo} <span className="font-normal text-sm text-gray-500">per video</span>
+								</p>
+								
+								
+							</div>
+							<div className="flex gap-3">
+								<Button
+									onClick={() => handleSendMessage(selectedCreator)}
+									className="bg-orange-500 hover:bg-orange-600 text-white"
+								>
+									<Send size={16} className="mr-2" />
+									Send Message
+								</Button>
+								<Button
+									variant="outline"
+									size="icon"
+									onClick={() => handleSaveCreator(selectedCreator)}
+									className={
+										isCreatorSaved(selectedCreator.id)
+											? "bg-pink-500 border-pink-500 hover:bg-pink-600"
+											: "hover:bg-pink-50 hover:border-pink-200"
+									}
+								>
+									<Heart
+										size={20}
+										className={
+											isCreatorSaved(selectedCreator.id)
+												? "text-white"
+												: "text-gray-600"
+										}
+										fill={
+											isCreatorSaved(selectedCreator.id)
+												? "currentColor"
+												: "none"
+										}
+									/>
+								</Button>
+							</div>
+						</div>
 					</div>
+				</div>
 
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mt-4 md:mt-6">
-						<div className="bg-white border border-[#FDE5D7] rounded-lg p-4 md:p-6">
-							<h3 className="text-lg md:text-xl font-semibold mb-3 md:mb-4">
-								Profile
-							</h3>
+				{/* Tabs Section */}
+				<div className="mt-6">
+					<Tabs defaultValue="profile" className="w-full">
+						<TabsList className="grid w-full grid-cols-3  ">
+							<TabsTrigger value="profile" className="text-sm md:text-base">
+								Profile Info
+							</TabsTrigger>
+							<TabsTrigger value="videos" className="text-sm md:text-base">
+								Video Library
+							</TabsTrigger>
+							<TabsTrigger value="portfolio" className="text-sm md:text-base">
+								Portfolio Links
+							</TabsTrigger>
+						</TabsList>
 
-							<div className="space-y-3 md:space-y-4 text-sm md:text-base">
-								<div className="grid grid-cols-2 gap-2 md:gap-4">
-									<div>
-										<p className="text-gray-500">TikTok Username</p>
-										<p>
-											{selectedCreator.tiktokUrl.split("@")[1] ||
-												"Not specified"}
-										</p>
-									</div>
+						{/* Profile Info Tab */}
+						<TabsContent value="profile" className="mt-6">
+							<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+								{/* Basic Info Card */}
+								<div className="bg-white border border-[#FDE5D7] rounded-lg p-4 md:p-6">
+									<h3 className="text-lg md:text-xl font-semibold mb-4 flex items-center">
+										<svg
+											className="w-5 h-5 mr-2 text-orange-500"
+											fill="currentColor"
+											viewBox="0 0 20 20"
+										>
+											<path
+												fillRule="evenodd"
+												d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+												clipRule="evenodd"
+											/>
+										</svg>
+										Basic Information
+									</h3>
 
-									<div>
-										<p className="text-gray-500">Nationality</p>
-										<p>{selectedCreator.country || "Not specified"}</p>
-									</div>
-								</div>
+									<div className="space-y-4">
+										<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+											<div>
+												<Label className="text-sm font-medium text-gray-500">
+													TikTok Username
+												</Label>
+												<p className="mt-1 text-sm md:text-base">
+													{selectedCreator.tiktokUrl.split("@")[1] ||
+														"Not specified"}
+												</p>
+											</div>
+											<div>
+											<Label className="text-sm font-medium text-gray-500">
+													Content Type
+												</Label>
+												<p className="text-gray-600 text-sm md:text-base">
+													{Array.isArray(selectedCreator.contentTypes)
+														? selectedCreator.contentTypes.join(", ")
+														: selectedCreator.contentTypes ||
+															"No content type specified"}
+												</p>
+											</div>
+											<div>
+												<Label className="text-sm font-medium text-gray-500">
+													Nationality
+												</Label>
+												<p className="mt-1 text-sm md:text-base">
+													{selectedCreator.country || "Not specified"}
+												</p>
+											</div>
+										</div>
 
-								<div className="grid grid-cols-2 gap-2 md:gap-4">
-									<div>
-										<p className="text-gray-500">Member Since:</p>
-										<p>
-											{new Date().toLocaleDateString("en-US", {
-												month: "long",
-												year: "numeric",
-											})}
-										</p>
-									</div>
+										<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+											<div>
+												<Label className="text-sm font-medium text-gray-500">
+													Member Since
+												</Label>
+												<p className="mt-1 text-sm md:text-base">
+													{new Date().toLocaleDateString("en-US", {
+														month: "long",
+														year: "numeric",
+													})}
+												</p>
+											</div>
+											<div>
+												<Label className="text-sm font-medium text-gray-500">
+													Gender
+												</Label>
+												<p className="mt-1 text-sm md:text-base">
+													{selectedCreator.gender || "Not specified"}
+												</p>
+											</div>
+										</div>
 
-									<div>
-										<p className="text-gray-500">Ratings</p>
-										<div className="flex items-center">
-											<span className="text-yellow-500">★</span>
-											<span className="ml-1">New Creator</span>
+										<div>
+											<Label className="text-sm font-medium text-gray-500">
+												Bio
+											</Label>
+											<p className="mt-1 text-sm md:text-base leading-relaxed">
+												{selectedCreator.bio || "No bio available."}
+											</p>
+										</div>
+
+										<div>
+											<Label className="text-sm font-medium text-gray-500">
+												Languages
+											</Label>
+											<p className="mt-1 text-sm md:text-base">English</p>
 										</div>
 									</div>
 								</div>
 
-								<div>
-									<p className="text-gray-500 mb-1 md:mb-2">Creator Bio</p>
-									<p className="text-sm md:text-base">
-										{selectedCreator.bio || "No bio available."}
-									</p>
-								</div>
+								{/* Stats & Pricing Card */}
+								<div className="space-y-6">
+									{/* Stats Card */}
+									<div className="bg-white border border-[#FDE5D7] rounded-lg p-4 md:p-6">
+										<h3 className="text-lg md:text-xl font-semibold mb-4 flex items-center">
+											<svg
+												className="w-5 h-5 mr-2 text-orange-500"
+												fill="currentColor"
+												viewBox="0 0 20 20"
+											>
+												<path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+											</svg>
+											Performance Stats
+										</h3>
 
-								<div>
-									<p className="text-gray-500 mb-1 md:mb-2">Languages</p>
-									<p>English</p>
-								</div>
+										<div className="grid grid-cols-3 gap-4">
+											<div className="text-center p-3 bg-orange-50 rounded-lg">
+												<p className="text-lg md:text-xl font-bold text-orange-600">
+													0
+												</p>
+												<p className="text-xs md:text-sm text-gray-600">
+													Total Projects
+												</p>
+											</div>
+											<div className="text-center p-3 bg-blue-50 rounded-lg">
+												<p className="text-lg md:text-xl font-bold text-blue-600">
+													0+
+												</p>
+												<p className="text-xs md:text-sm text-gray-600">
+													Total Views
+												</p>
+											</div>
+											<div className="text-center p-3 bg-green-50 rounded-lg">
+												<p className="text-lg md:text-xl font-bold text-green-600">
+													0
+												</p>
+												<p className="text-xs md:text-sm text-gray-600">
+													Contests Won
+												</p>
+											</div>
+										</div>
+									</div>
 
-								<div className="grid grid-cols-3 gap-2 md:gap-4 pt-2 md:pt-4">
-									<div className="text-center md:text-start">
-										<p className="text-lg md:text-xl font-medium">0</p>
-										<p className="text-gray-500 text-xs md:text-sm">
-											Total Projects
-										</p>
-									</div>
-									<div className="text-center md:text-start">
-										<p className="text-lg md:text-xl font-medium">0+</p>
-										<p className="text-gray-500 text-xs md:text-sm">
-											Total Views
-										</p>
-									</div>
-									<div className="text-center md:text-start">
-										<p className="text-lg md:text-xl font-medium">0</p>
-										<p className="text-gray-500 text-xs md:text-sm">
-											Contests Won
-										</p>
+									{/* Pricing Card */}
+									<div className="bg-white border border-[#FDE5D7] rounded-lg p-4 md:p-6">
+										<h3 className="text-lg md:text-xl font-semibold mb-4 flex items-center">
+											<svg
+												className="w-5 h-5 mr-2 text-orange-500"
+												fill="currentColor"
+												viewBox="0 0 20 20"
+											>
+												<path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
+												<path
+													fillRule="evenodd"
+													d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z"
+													clipRule="evenodd"
+												/>
+											</svg>
+											Video Pricing
+										</h3>
+
+										<div className="space-y-3">
+											<div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+												<span className="font-medium">1 Video</span>
+												<span className="font-bold text-orange-600">
+													${selectedCreator.pricing.oneVideo}
+												</span>
+											</div>
+											<div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+												<span className="font-medium">3 Videos</span>
+												<span className="font-bold text-orange-600">
+													${selectedCreator.pricing.threeVideos}
+												</span>
+											</div>
+											<div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+												<span className="font-medium">5 Videos</span>
+												<span className="font-bold text-orange-600">
+													${selectedCreator.pricing.fiveVideos}
+												</span>
+											</div>
+											<div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+												<span className="font-medium">Bulk Videos</span>
+												<span className="font-bold text-orange-600">
+													${selectedCreator.pricing.bulkVideos}
+												</span>
+											</div>
+											{selectedCreator.pricing.bulkVideosNote && (
+												<p className="text-xs text-gray-500 mt-2">
+													{selectedCreator.pricing.bulkVideosNote}
+												</p>
+											)}
+										</div>
 									</div>
 								</div>
 							</div>
-						</div>
+						</TabsContent>
 
-						<div className="bg-white border border-[#FDE5D7] rounded-lg p-4 md:p-6">
-							<h3 className="text-lg md:text-xl font-semibold mb-3 md:mb-4">
-								Portfolio Videos
-							</h3>
-							<div className="grid grid-cols-2 gap-2 md:gap-4">
-								{selectedCreator.contentLinks &&
-								selectedCreator.contentLinks.length > 0 ? (
-									selectedCreator.contentLinks
-										.slice(0, 4)
-										.map((link, index) => (
-											<div
-												key={index}
-												className="rounded-lg relative aspect-square"
-											>
-												<Image
-													src="/icons/Vid.svg" // Placeholder image
-													alt={`Creator Video ${index + 1}`}
-													className="w-full h-full object-cover"
-													width={200}
-													height={200}
-												/>
+						{/* Video Library Tab */}
+						<TabsContent value="videos" className="mt-6">
+							<div className="bg-white border border-[#FDE5D7] rounded-lg p-4 md:p-6">
+								<CreatorVideoShowcase
+									userId={selectedCreator.id}
+									creatorName={selectedCreator.name}
+									showHeader={true}
+								/>
+							</div>
+						</TabsContent>
+
+						{/* Portfolio Links Tab */}
+						<TabsContent value="portfolio" className="mt-6">
+							<div className="bg-white border border-[#FDE5D7] rounded-lg p-4 md:p-6">
+								<h3 className="text-lg md:text-xl font-semibold mb-4 flex items-center">
+									<svg
+										className="w-5 h-5 mr-2 text-orange-500"
+										fill="currentColor"
+										viewBox="0 0 20 20"
+									>
+										<path
+											fillRule="evenodd"
+											d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z"
+											clipRule="evenodd"
+										/>
+									</svg>
+									Portfolio & Social Links
+								</h3>
+
+								<div className="space-y-6">
+									{/* Social Media Links */}
+									<div>
+										<h4 className="font-semibold mb-3">Social Media</h4>
+										<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+											{selectedCreator.tiktokUrl && (
 												<a
-													href={link}
+													href={selectedCreator.tiktokUrl}
 													target="_blank"
 													rel="noopener noreferrer"
-													className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 hover:bg-opacity-40 transition-all"
+													className="flex items-center p-3 border rounded-lg hover:bg-gray-50 transition-colors"
 												>
-													<div className="text-white font-medium">View</div>
+													<div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center mr-3">
+														<span className="text-white text-xs font-bold">
+															TT
+														</span>
+													</div>
+													<div>
+														<p className="font-medium">TikTok</p>
+														<p className="text-sm text-gray-500">
+															@
+															{selectedCreator.tiktokUrl.split("@")[1] ||
+																"View Profile"}
+														</p>
+													</div>
 												</a>
-											</div>
-										))
-								) : (
-									<div className="col-span-2 flex items-center justify-center h-40 bg-gray-50 rounded-lg">
-										<p className="text-gray-500">
-											No portfolio videos available
-										</p>
+											)}
+										</div>
 									</div>
-								)}
+
+									{/* Content Links */}
+									{selectedCreator.contentLinks &&
+										selectedCreator.contentLinks.length > 0 && (
+											<div>
+												<h4 className="font-semibold mb-3">
+													Portfolio Content
+												</h4>
+												<div className="space-y-3">
+													{selectedCreator.contentLinks.map((link, index) => (
+														<a
+															key={index}
+															href={link}
+															target="_blank"
+															rel="noopener noreferrer"
+															className="flex items-center p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+														>
+															<div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mr-3">
+																<svg
+																	className="w-4 h-4 text-orange-600"
+																	fill="currentColor"
+																	viewBox="0 0 20 20"
+																>
+																	<path
+																		fillRule="evenodd"
+																		d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A2 2 0 0011.172 3H8.828a2 2 0 00-1.414.586L6.293 4.707A1 1 0 015.586 5H4zm6 9a3 3 0 100-6 3 3 0 000 6z"
+																		clipRule="evenodd"
+																	/>
+																</svg>
+															</div>
+															<div>
+																<p className="font-medium">
+																	Portfolio Item {index + 1}
+																</p>
+																<p className="text-sm text-gray-500 truncate max-w-xs">
+																	{link}
+																</p>
+															</div>
+														</a>
+													))}
+												</div>
+											</div>
+										)}
+
+									{/* Empty state for portfolio */}
+									{(!selectedCreator.contentLinks ||
+										selectedCreator.contentLinks.length === 0) &&
+										!selectedCreator.socialMedia?.instagram && (
+											<div className="text-center py-8">
+												<svg
+													className="mx-auto h-12 w-12 text-gray-400 mb-4"
+													fill="none"
+													stroke="currentColor"
+													viewBox="0 0 24 24"
+												>
+													<path
+														strokeLinecap="round"
+														strokeLinejoin="round"
+														strokeWidth={2}
+														d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+													/>
+												</svg>
+												<p className="text-gray-500">
+													No portfolio links available
+												</p>
+												<p className="text-sm text-gray-400 mt-1">
+													The creator hasn&apos;t added any portfolio content
+													yet
+												</p>
+											</div>
+										)}
+								</div>
 							</div>
-						</div>
-					</div>
+						</TabsContent>
+					</Tabs>
 				</div>
 			</div>
 		);
@@ -990,6 +1235,13 @@ const CreatorMarketplace = () => {
 											<span>5 Videos</span>
 											<span className="font-medium">
 												${creator.pricing.fiveVideos}
+											</span>
+										</div>
+
+										<div className="flex justify-between">
+											<span>Bulk Videos</span>
+											<span className="font-medium">
+												${creator.pricing.bulkVideos}
 											</span>
 										</div>
 									</div>

@@ -181,15 +181,14 @@ export default function CreatorPricingTab() {
 		}
 	};
 
-	// Calculate totals
-	const totalVideos =
-		(selectionMethod === "Invite Specific Creators"
-			? invitedCreatorsCount * videosPerCreator
-			: publicCreatorsCount) * videosPerCreator;
-	const totalBudget = budget ;
-	const totalAmount =
-		totalBudget * totalVideos;
-	const services = 0.1 * totalAmount;
+// Calculate totals
+const totalVideos = selectionMethod === "Invite Specific Creators" 
+    ? invitedCreatorsCount * videosPerCreator 
+    : publicCreatorsCount * videosPerCreator;
+
+const totalBudget = budget * totalVideos;
+const services = 0.1 * totalBudget;
+const totalAmount = totalBudget; // Total amount should equal total budget, not include service fee
 
 	// Update context when values change
 	const updateContextValues = () => {
