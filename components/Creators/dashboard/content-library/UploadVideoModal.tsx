@@ -13,11 +13,12 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { toast } from "sonner";
 
 interface UploadVideoModalProps {
 	isOpen: boolean;
 	onClose: () => void;
-	onSuccess: () => void; // Callback to refresh the video list
+	onSuccess: () => void;
 	userId: string;
 }
 
@@ -29,6 +30,8 @@ export default function UploadVideoModal({
 }: UploadVideoModalProps) {
 	const [isUploading, setIsUploading] = useState(false);
 	const [uploadProgress, setUploadProgress] = useState(0);
+	const [uploadStatus, setUploadStatus] = useState<string>("");
+	const [uploadId, setUploadId] = useState<string | null>(null);
 	const [formData, setFormData] = useState({
 		title: "",
 		description: "",
@@ -38,7 +41,9 @@ export default function UploadVideoModal({
 		file: null as File | null,
 	});
 	const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+	
 	const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
+	const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
 	
 	const validateVideoFile = (file: File) => {
 		if (file.size > MAX_VIDEO_SIZE) {
@@ -59,7 +64,7 @@ export default function UploadVideoModal({
 			const validation = validateVideoFile(file);
 			if (!validation.valid) {
 				alert(validation.error);
-				e.target.value = ""; // Reset input
+				e.target.value = "";
 				return;
 			}
 
@@ -74,7 +79,7 @@ export default function UploadVideoModal({
 		}
 	};
 
-	const generateThumbnail = (videoFile: File): Promise<File> => {
+	const generateThumbnail = (videoFile: File): Promise<{ file: File; base64: string }> => {
 		return new Promise((resolve, reject) => {
 			const video = document.createElement("video");
 			const canvas = document.createElement("canvas");
@@ -95,7 +100,17 @@ export default function UploadVideoModal({
 								const thumbnailFile = new File([blob], "thumbnail.jpg", {
 									type: "image/jpeg",
 								});
-								resolve(thumbnailFile);
+								
+								// Convert to base64 for API
+								const reader = new FileReader();
+								reader.onload = () => {
+									const base64 = (reader.result as string).split(',')[1];
+									resolve({ 
+										file: thumbnailFile, 
+										base64 
+									});
+								};
+								reader.readAsDataURL(blob);
 							} else {
 								reject(new Error("Failed to generate thumbnail"));
 							}
@@ -111,34 +126,149 @@ export default function UploadVideoModal({
 		});
 	};
 
+	const initializeUpload = async (file: File) => {
+		const response = await fetch("/api/videos", {
+			method: "PUT",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				userId,
+				fileName: file.name,
+				fileSize: file.size,
+				fileContentType: file.type,
+			}),
+		});
+
+		if (!response.ok) {
+			const error = await response.json();
+			throw new Error(error.error || "Failed to initialize upload");
+		}
+
+		return response.json();
+	};
+
+	const uploadChunk = async (
+		file: File,
+		chunkIndex: number,
+		totalChunks: number,
+		uploadId: string
+	) => {
+		const start = chunkIndex * CHUNK_SIZE;
+		const end = Math.min(start + CHUNK_SIZE, file.size);
+		const chunk = file.slice(start, end);
+
+		// Convert chunk to base64
+		const chunkBase64 = await new Promise<string>((resolve) => {
+			const reader = new FileReader();
+			reader.onload = () => {
+				const base64 = (reader.result as string).split(',')[1];
+				resolve(base64);
+			};
+			reader.readAsDataURL(chunk);
+		});
+
+		const response = await fetch("/api/videos", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				userId,
+				chunkData: chunkBase64,
+				fileName: file.name,
+				fileContentType: file.type,
+				chunkIndex,
+				totalChunks,
+				uploadId,
+				fileSize: file.size,
+			}),
+		});
+
+		if (!response.ok) {
+			const error = await response.json();
+			throw new Error(error.error || `Failed to upload chunk ${chunkIndex + 1}`);
+		}
+
+		return response.json();
+	};
+
+	const uploadMetadata = async (uploadId: string, thumbnail?: { file: File; base64: string }) => {
+		const thumbnailFileName = thumbnail 
+			? `thumbnails/${Date.now()}_${thumbnail.file.name}`
+			: null;
+
+		const response = await fetch("/api/videos", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				title: formData.title,
+				description: formData.description,
+				price: parseFloat(formData.price),
+				licenseType: formData.licenseType,
+				tags: formData.tags,
+				userId,
+				uploadId,
+				thumbnailData: thumbnail?.base64,
+				thumbnailFileName,
+				thumbnailContentType: thumbnail?.file.type,
+			}),
+		});
+
+		if (!response.ok) {
+			const error = await response.json();
+			throw new Error(error.error || "Failed to save video metadata");
+		}
+
+		return response.json();
+	};
+
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (!formData.file) return;
 
 		setIsUploading(true);
 		setUploadProgress(0);
+		setUploadStatus("Initializing upload...");
 
 		try {
+			// Initialize upload session
+			const initResponse = await initializeUpload(formData.file);
+			const { uploadId: newUploadId, totalChunks } = initResponse;
+			setUploadId(newUploadId);
+
+			setUploadStatus("Uploading video...");
+
+			// Upload chunks
+			for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+				const chunkResponse = await uploadChunk(
+					formData.file,
+					chunkIndex,
+					totalChunks,
+					newUploadId
+				);
+
+				setUploadProgress(chunkResponse.progress || 0);
+				setUploadStatus(chunkResponse.message || `Uploading chunk ${chunkIndex + 1}/${totalChunks}...`);
+
+				// If this was the last chunk and video is now uploaded
+				if (chunkResponse.status === "video_uploaded") {
+					setUploadStatus("Processing thumbnail...");
+					break;
+				}
+			}
+
 			// Generate thumbnail
-			const thumbnailFile = await generateThumbnail(formData.file);
+			const thumbnail = await generateThumbnail(formData.file);
+			setUploadStatus("Finalizing upload...");
 
-			// Create FormData for API request
-			const apiFormData = new FormData();
-			apiFormData.append("title", formData.title);
-			apiFormData.append("description", formData.description);
-			apiFormData.append("price", formData.price);
-			apiFormData.append("licenseType", formData.licenseType);
-			apiFormData.append("tags", formData.tags);
-			apiFormData.append("userId", userId);
-			apiFormData.append("videoFile", formData.file);
-			apiFormData.append("thumbnailFile", thumbnailFile);
+			// Upload metadata and thumbnail
+			await uploadMetadata(newUploadId, thumbnail);
 
-			// Upload with real progress tracking
-			const result = await uploadWithProgress(apiFormData, (progress) => {
-				setUploadProgress(progress);
-			});
-
-			console.log("Upload successful:", result);
+			setUploadStatus("Upload completed!");
+			setUploadProgress(100);
 
 			// Reset form and close modal
 			setFormData({
@@ -155,48 +285,23 @@ export default function UploadVideoModal({
 				setVideoPreviewUrl(null);
 			}
 
-			onSuccess(); // Refresh the video list
+			toast.success("Video uploaded successfully!");
+			onSuccess();
 			onClose();
+
 		} catch (error) {
 			console.error("Upload error:", error);
-			alert(
-				error instanceof Error
-					? error.message
-					: "An error occurred during upload"
-			);
+			const errorMessage = error instanceof Error ? error.message : "Upload failed";
+			setUploadStatus(`Error: ${errorMessage}`);
+			toast.error(errorMessage);
 		} finally {
 			setIsUploading(false);
-			setUploadProgress(0);
+			setTimeout(() => {
+				setUploadProgress(0);
+				setUploadStatus("");
+				setUploadId(null);
+			}, 3000);
 		}
-	};
-
-	const uploadWithProgress = (
-		formData: FormData,
-		onProgress: (progress: number) => void
-	) => {
-		return new Promise((resolve, reject) => {
-			const xhr = new XMLHttpRequest();
-
-			xhr.upload.addEventListener("progress", (e) => {
-				if (e.lengthComputable) {
-					const progress = (e.loaded / e.total) * 100;
-					onProgress(progress);
-				}
-			});
-
-			xhr.addEventListener("load", () => {
-				if (xhr.status >= 200 && xhr.status < 300) {
-					resolve(JSON.parse(xhr.responseText));
-				} else {
-					reject(new Error(`Upload failed: ${xhr.statusText}`));
-				}
-			});
-
-			xhr.addEventListener("error", () => reject(new Error("Upload failed")));
-
-			xhr.open("POST", "/api/videos");
-			xhr.send(formData);
-		});
 	};
 
 	if (!isOpen) return null;
@@ -255,7 +360,7 @@ export default function UploadVideoModal({
 											{(formData.file.size / (1024 * 1024)).toFixed(2)} MB
 											{formData.file.size > 50 * 1024 * 1024 && (
 												<span className="text-amber-600 ml-2">
-													⚠️ Large file - may take longer to upload
+													⚠️ Large file - will be uploaded in chunks
 												</span>
 											)}
 										</p>
@@ -301,11 +406,12 @@ export default function UploadVideoModal({
 								</div>
 							)}
 						</div>
+
 						{/* Upload Progress */}
 						{isUploading && (
 							<div className="mt-4">
 								<div className="flex justify-between text-sm text-gray-600 mb-1">
-									<span>Uploading...</span>
+									<span>{uploadStatus}</span>
 									<span>{Math.round(uploadProgress)}%</span>
 								</div>
 								<div className="w-full bg-gray-200 rounded-full h-2">
@@ -314,6 +420,11 @@ export default function UploadVideoModal({
 										style={{ width: `${uploadProgress}%` }}
 									></div>
 								</div>
+								{uploadId && (
+									<p className="text-xs text-gray-500 mt-1">
+										Upload ID: {uploadId}
+									</p>
+								)}
 							</div>
 						)}
 					</div>
@@ -340,7 +451,7 @@ export default function UploadVideoModal({
 									onChange={(e) =>
 										setFormData({ ...formData, title: e.target.value })
 									}
-									className="w-full border border-gray-300 rounded-lg px-3 py-2 "
+									className="w-full border border-gray-300 rounded-lg px-3 py-2"
 									placeholder="Enter a descriptive title for your video"
 									disabled={isUploading}
 								/>
@@ -360,7 +471,7 @@ export default function UploadVideoModal({
 									onChange={(e) =>
 										setFormData({ ...formData, description: e.target.value })
 									}
-									className="w-full border border-gray-300 rounded-lg px-3 py-2 "
+									className="w-full border border-gray-300 rounded-lg px-3 py-2"
 									placeholder="Describe your video, its use cases, and any relevant details"
 									disabled={isUploading}
 								/>
@@ -412,12 +523,13 @@ export default function UploadVideoModal({
 										id="price"
 										required
 										min="1"
+										step="0.01"
 										value={formData.price}
 										onChange={(e) =>
 											setFormData({ ...formData, price: e.target.value })
 										}
-										className="w-full border border-gray-300 rounded-lg pl-8 pr-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-										placeholder="25"
+										className="w-full border border-gray-300 rounded-lg pl-8 pr-3 py-2"
+										placeholder="25.00"
 										disabled={isUploading}
 									/>
 								</div>
@@ -456,16 +568,13 @@ export default function UploadVideoModal({
 							</h4>
 							<ul className="text-xs text-gray-600 space-y-1">
 								<li>
-									<strong>Standard:</strong> Basic commercial use, up to 500k
-									views
+									<strong>Standard:</strong> Basic commercial use, up to 500k views
 								</li>
 								<li>
-									<strong>Extended:</strong> Unlimited commercial use, resale
-									rights
+									<strong>Extended:</strong> Unlimited commercial use, resale rights
 								</li>
 								<li>
-									<strong>Exclusive:</strong> Buyer gets exclusive rights, you
-									cannot resell
+									<strong>Exclusive:</strong> Buyer gets exclusive rights, you cannot resell
 								</li>
 							</ul>
 						</div>
@@ -487,7 +596,7 @@ export default function UploadVideoModal({
 							className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 						>
 							{isUploading
-								? `Uploading... ${Math.round(uploadProgress)}%`
+								? `${uploadStatus} ${Math.round(uploadProgress)}%`
 								: "Upload Video"}
 						</Button>
 					</div>

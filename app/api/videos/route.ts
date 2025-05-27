@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminStorage } from "@/config/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { v4 as uuidv4 } from "uuid";
 
 // Configuration
 const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB limit
 const MAX_THUMBNAIL_SIZE = 5 * 1024 * 1024; // 5MB limit
+const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
 
 const ALLOWED_IMAGE_TYPES = [
   'image/jpeg',
@@ -13,11 +15,38 @@ const ALLOWED_IMAGE_TYPES = [
   'image/webp'
 ];
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '6mb', // Each chunk should be under this size
+    },
+    responseLimit: false,
+  },
+};
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
     const status = searchParams.get("status");
+    const uploadId = searchParams.get("uploadId");
+    
+    // If uploadId is provided, return upload status
+    if (uploadId) {
+      const uploadDoc = await adminDb.collection("video_uploads").doc(uploadId).get();
+      
+      if (!uploadDoc.exists) {
+        return NextResponse.json(
+          { error: "Upload record not found" },
+          { status: 404 }
+        );
+      }
+      
+      return NextResponse.json(uploadDoc.data());
+    }
     
     if (!userId) {
       return NextResponse.json(
@@ -73,95 +102,252 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
+    const body = await request.json();
     
-    const title = formData.get("title") as string;
-    const description = formData.get("description") as string;
-    const price = parseFloat(formData.get("price") as string);
-    const licenseType = formData.get("licenseType") as string;
-    const tags = formData.get("tags") as string;
-    const userId = formData.get("userId") as string;
-    const videoFile = formData.get("videoFile") as File;
-    const thumbnailFile = formData.get("thumbnailFile") as File;
+    // Check if this is a chunk upload or metadata upload
+    if (body.chunkData) {
+      return handleChunkUpload(body);
+    } else {
+      return handleMetadataUpload(body);
+    }
+  } catch (error) {
+    console.error("Error in POST handler:", error);
+    return NextResponse.json(
+      { 
+        error: "Failed to process request",
+        details: error instanceof Error ? error.message : String(error)
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function handleChunkUpload(body: any) {
+  try {
+    const { 
+      userId, 
+      chunkData, 
+      fileName, 
+      fileContentType,
+      chunkIndex, 
+      totalChunks, 
+      uploadId,
+      fileSize
+    } = body;
+
+    if (!userId || !chunkData || !fileName || chunkIndex === undefined || !totalChunks || !uploadId) {
+      return NextResponse.json(
+        { error: "Missing required parameters for chunk upload" },
+        { status: 400 }
+      );
+    }
+
+    // Validate file size on first chunk
+    if (chunkIndex === 0 && fileSize > MAX_VIDEO_SIZE) {
+      return NextResponse.json(
+        { 
+          error: `Video file too large. Maximum size is ${formatFileSize(MAX_VIDEO_SIZE)}. Your file is ${formatFileSize(fileSize)}.` 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Generate a temp storage path for this upload's chunks
+    const tempChunkPath = `temp/videos/${userId}/${uploadId}`;
+    const bucket = adminStorage.bucket();
+    
+    // For the chunk file
+    const chunkFileName = `${tempChunkPath}/chunk-${chunkIndex}`;
+    const chunkFileRef = bucket.file(chunkFileName);
+    
+    // Decode and save the chunk
+    const chunkBuffer = Buffer.from(chunkData, "base64");
+    await chunkFileRef.save(chunkBuffer);
+
+    // Update upload progress
+    const uploadRef = adminDb.collection("video_uploads").doc(uploadId);
+    const progress = ((chunkIndex + 1) / totalChunks) * 100;
+    
+    await uploadRef.update({
+      [`chunks.${chunkIndex}`]: true,
+      progress: Math.round(progress),
+      lastChunkAt: new Date(),
+      status: chunkIndex === totalChunks - 1 ? "processing" : "uploading"
+    });
+    
+    // If this is the last chunk, combine all chunks
+    if (chunkIndex === totalChunks - 1) {
+      try {
+        // Get all chunks 
+        const [chunkFiles] = await bucket.getFiles({ prefix: tempChunkPath });
+        chunkFiles.sort((a, b) => {
+          const aIndex = parseInt(a.name.split('-').pop() || '0');
+          const bIndex = parseInt(b.name.split('-').pop() || '0');
+          return aIndex - bIndex;
+        });
+        
+        // Final video file path
+        const finalFileName = `videos/${Date.now()}_${sanitizeFileName(fileName)}`;
+        const finalFileRef = bucket.file(finalFileName);
+        
+        // Create a write stream for the final file
+        const writeStream = finalFileRef.createWriteStream({
+          metadata: {
+            contentType: fileContentType,
+            customMetadata: {
+              originalName: fileName,
+              uploadedBy: userId,
+              uploadTimestamp: new Date().toISOString()
+            }
+          },
+          validation: 'crc32c'
+        });
+        
+        // Process each chunk and append to final file
+        for (const chunkFile of chunkFiles) {
+          const [chunkData] = await chunkFile.download();
+          writeStream.write(chunkData);
+        }
+        
+        // Close the write stream and wait for completion
+        await new Promise<void>((resolve, reject) => {
+          writeStream.end();
+          writeStream.on('finish', () => resolve());
+          writeStream.on('error', reject);
+        });
+        
+        // Make the file publicly accessible
+        await finalFileRef.makePublic();
+        
+        // Get the public URL
+        const videoUrl = `https://storage.googleapis.com/${bucket.name}/${finalFileName}`;
+        
+        // Clean up temp chunks
+        const deletePromises = chunkFiles.map(chunkFile => chunkFile.delete());
+        await Promise.all(deletePromises);
+        
+        // Update upload record with video URL
+        await uploadRef.update({
+          videoUrl,
+          status: "video_uploaded",
+          completedAt: new Date(),
+          progress: 100
+        });
+        
+        console.log(`Video chunks combined successfully for upload: ${uploadId}`);
+        
+        return NextResponse.json({
+          success: true,
+          message: "Video uploaded successfully",
+          uploadId,
+          videoUrl,
+          progress: 100,
+          status: "video_uploaded"
+        });
+      } catch (error) {
+        console.error("Error processing video chunks:", error);
+        
+        // Update upload status to failed
+        await uploadRef.update({
+          status: "failed",
+          error: error instanceof Error ? error.message : "Unknown error",
+          failedAt: new Date()
+        });
+        
+        throw error;
+      }
+    } else {
+      // Return progress information for non-final chunks
+      return NextResponse.json({
+        success: true,
+        message: `Chunk ${chunkIndex + 1} of ${totalChunks} uploaded successfully`,
+        uploadId,
+        progress: Math.round(progress),
+        status: "uploading"
+      });
+    }
+  } catch (error) {
+    console.error("Error uploading video chunk:", error);
+    const errorMessage = error instanceof Error ? error.message : "Failed to upload chunk";
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: errorMessage,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function handleMetadataUpload(body: any) {
+  try {
+    const { 
+      title,
+      description,
+      price,
+      licenseType,
+      tags,
+      userId,
+      uploadId,
+      thumbnailData,
+      thumbnailFileName,
+      thumbnailContentType
+    } = body;
 
     // Validate required fields
-    if (!title || !price || !licenseType || !userId || !videoFile) {
+    if (!title || !price || !licenseType || !userId || !uploadId) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Missing required metadata fields" },
         { status: 400 }
       );
     }
 
-    // Validate video file
-    const videoValidation = validateVideoFile(videoFile);
-    if (!videoValidation.valid) {
+    // Get the upload record to check if video is uploaded
+    const uploadRef = adminDb.collection("video_uploads").doc(uploadId);
+    const uploadDoc = await uploadRef.get();
+    
+    if (!uploadDoc.exists) {
       return NextResponse.json(
-        { error: videoValidation.error },
+        { error: "Upload record not found" },
+        { status: 404 }
+      );
+    }
+
+    const uploadData = uploadDoc.data();
+    if (uploadData?.status !== "video_uploaded") {
+      return NextResponse.json(
+        { error: "Video must be uploaded before submitting metadata" },
         { status: 400 }
       );
     }
 
-    // Validate thumbnail file if provided
-    if (thumbnailFile) {
-      const thumbnailValidation = validateThumbnailFile(thumbnailFile);
+    let thumbnailUrl = null;
+
+    // Handle thumbnail upload if provided
+    if (thumbnailData && thumbnailFileName) {
+      // Validate thumbnail
+      const thumbnailValidation = validateThumbnailData(thumbnailData, thumbnailContentType);
       if (!thumbnailValidation.valid) {
         return NextResponse.json(
           { error: thumbnailValidation.error },
           { status: 400 }
         );
       }
-    }
 
-    console.log(`Uploading video for userId: ${userId}, title: ${title}, size: ${formatFileSize(videoFile.size)}`);
-
-    // Upload video file with progress tracking
-    const videoFileName = `videos/${Date.now()}_${sanitizeFileName(videoFile.name)}`;
-    const videoBuffer = Buffer.from(await videoFile.arrayBuffer());
-    const videoFileRef = adminStorage.bucket().file(videoFileName);
-    
-    // Upload with metadata and timeout handling
-    await Promise.race([
-      videoFileRef.save(videoBuffer, {
-        metadata: {
-          contentType: videoFile.type,
-          customMetadata: {
-            originalName: videoFile.name,
-            uploadedBy: userId,
-            uploadTimestamp: new Date().toISOString()
-          }
-        },
-        validation: 'crc32c' // Enable integrity checking
-      }),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Video upload timeout')), 5 * 60 * 1000) // 5 minute timeout
-      )
-    ]);
-
-    // Make the video file publicly accessible
-    await videoFileRef.makePublic();
-    const videoUrl = `https://storage.googleapis.com/${adminStorage.bucket().name}/${videoFileName}`;
-
-    // Upload thumbnail file if provided
-    let thumbnailUrl = null;
-    if (thumbnailFile) {
-      const thumbnailFileName = `thumbnails/${Date.now()}_${sanitizeFileName(thumbnailFile.name)}`;
-      const thumbnailBuffer = Buffer.from(await thumbnailFile.arrayBuffer());
+      const thumbnailBuffer = Buffer.from(thumbnailData, "base64");
       const thumbnailFileRef = adminStorage.bucket().file(thumbnailFileName);
       
-      await Promise.race([
-        thumbnailFileRef.save(thumbnailBuffer, {
-          metadata: {
-            contentType: thumbnailFile.type,
-            customMetadata: {
-              originalName: thumbnailFile.name,
-              uploadedBy: userId
-            }
+      await thumbnailFileRef.save(thumbnailBuffer, {
+        metadata: {
+          contentType: thumbnailContentType,
+          customMetadata: {
+            uploadedBy: userId
           }
-        }),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Thumbnail upload timeout')), 30 * 1000) // 30 second timeout
-        )
-      ]);
+        }
+      });
 
       await thumbnailFileRef.makePublic();
       thumbnailUrl = `https://storage.googleapis.com/${adminStorage.bucket().name}/${thumbnailFileName}`;
@@ -173,13 +359,13 @@ export async function POST(request: NextRequest) {
       description: description?.trim() || "",
       price: Math.round(price * 100) / 100, // Round to 2 decimal places
       licenseType,
-      tags: tags ? tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
-      videoUrl,
+      tags: tags ? tags.split(',').map((tag: string) => tag.trim()).filter(Boolean) : [],
+      videoUrl: uploadData.videoUrl,
       thumbnailUrl,
-      fileName: videoFile.name,
-      fileSize: videoFile.size,
-      fileSizeFormatted: formatFileSize(videoFile.size),
-      contentType: videoFile.type,
+      fileName: uploadData.fileName || "video",
+      fileSize: uploadData.fileSize || 0,
+      fileSizeFormatted: formatFileSize(uploadData.fileSize || 0),
+      contentType: uploadData.fileContentType || "video/mp4",
       views: 0,
       purchases: 0,
       rating: 0,
@@ -187,7 +373,7 @@ export async function POST(request: NextRequest) {
       status: "active",
       uploadedAt: FieldValue.serverTimestamp(),
       createdBy: userId,
-      // Add processing status for future video processing
+      uploadId,
       processing: {
         status: "completed",
         message: "Upload successful"
@@ -196,29 +382,32 @@ export async function POST(request: NextRequest) {
 
     const docRef = await adminDb.collection("videos").add(videoData);
     
-    console.log(`Video uploaded successfully with ID: ${docRef.id}`);
+    // Update upload record to completed
+    await uploadRef.update({
+      status: "completed",
+      videoId: docRef.id,
+      finalizedAt: new Date()
+    });
+    
+    console.log(`Video finalized successfully with ID: ${docRef.id}`);
     
     return NextResponse.json({
       success: true,
       videoId: docRef.id,
-      message: "Video uploaded successfully",
-      videoUrl,
-      thumbnailUrl,
-      fileSize: formatFileSize(videoFile.size)
+      uploadId,
+      message: "Video published successfully",
+      videoUrl: uploadData.videoUrl,
+      thumbnailUrl
     });
 
   } catch (error) {
-    console.error("Error uploading video:", error);
+    console.error("Error processing video metadata:", error);
     
-    // Provide more specific error messages
-    let errorMessage = "Failed to upload video";
+    let errorMessage = "Failed to process video metadata";
     let statusCode = 500;
     
     if (error instanceof Error) {
-      if (error.message.includes('timeout')) {
-        errorMessage = "Upload timeout - please try again or use a smaller file";
-        statusCode = 408;
-      } else if (error.message.includes('storage')) {
+      if (error.message.includes('storage')) {
         errorMessage = "Storage error - please try again";
         statusCode = 503;
       } else if (error.message.includes('network')) {
@@ -230,46 +419,92 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { 
         error: errorMessage,
-        details: error instanceof Error ? error.message : String(error),
-        suggestion: "Try uploading a smaller file or check your internet connection"
+        details: error instanceof Error ? error.message : String(error)
       },
       { status: statusCode }
     );
   }
 }
 
-// Validation functions
-function validateVideoFile(file: File): { valid: boolean; error?: string } {
-  if (!file) {
-    return { valid: false, error: "No video file provided" };
-  }
+// Initialize upload session
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { userId, fileName, fileSize, fileContentType } = body;
 
-  if (file.size > MAX_VIDEO_SIZE) {
-    return { 
-      valid: false, 
-      error: `Video file too large. Maximum size is ${formatFileSize(MAX_VIDEO_SIZE)}. Your file is ${formatFileSize(file.size)}.` 
-    };
-  }
+    if (!userId || !fileName || !fileSize) {
+      return NextResponse.json(
+        { error: "Missing required parameters for upload initialization" },
+        { status: 400 }
+      );
+    }
 
-  if (file.size < 1024) { // Less than 1KB
-    return { valid: false, error: "Video file appears to be empty or corrupted" };
-  }
+    // Validate file size
+    if (fileSize > MAX_VIDEO_SIZE) {
+      return NextResponse.json(
+        { 
+          error: `Video file too large. Maximum size is ${formatFileSize(MAX_VIDEO_SIZE)}. Your file is ${formatFileSize(fileSize)}.` 
+        },
+        { status: 400 }
+      );
+    }
 
-  return { valid: true };
+    const uploadId = uuidv4();
+    const totalChunks = Math.ceil(fileSize / CHUNK_SIZE);
+
+    // Create upload record
+    await adminDb.collection("video_uploads").doc(uploadId).set({
+      userId,
+      fileName,
+      fileSize,
+      fileContentType,
+      totalChunks,
+      chunks: {},
+      progress: 0,
+      status: "initialized",
+      createdAt: new Date(),
+      uploadId
+    });
+
+    return NextResponse.json({
+      success: true,
+      uploadId,
+      totalChunks,
+      chunkSize: CHUNK_SIZE,
+      message: "Upload session initialized"
+    });
+
+  } catch (error) {
+    console.error("Error initializing upload:", error);
+    return NextResponse.json(
+      { 
+        error: "Failed to initialize upload",
+        details: error instanceof Error ? error.message : String(error)
+      },
+      { status: 500 }
+    );
+  }
 }
 
-function validateThumbnailFile(file: File): { valid: boolean; error?: string } {
-  if (file.size > MAX_THUMBNAIL_SIZE) {
-    return { 
-      valid: false, 
-      error: `Thumbnail file too large. Maximum size is ${formatFileSize(MAX_THUMBNAIL_SIZE)}` 
-    };
+// Validation functions
+function validateThumbnailData(data: string, contentType: string): { valid: boolean; error?: string } {
+  if (!data) {
+    return { valid: false, error: "No thumbnail data provided" };
   }
 
-  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+  if (!ALLOWED_IMAGE_TYPES.includes(contentType)) {
     return { 
       valid: false, 
       error: `Unsupported thumbnail format. Allowed formats: ${ALLOWED_IMAGE_TYPES.join(', ')}` 
+    };
+  }
+
+  // Rough size check (base64 is ~33% larger than binary)
+  const estimatedSize = (data.length * 3) / 4;
+  if (estimatedSize > MAX_THUMBNAIL_SIZE) {
+    return { 
+      valid: false, 
+      error: `Thumbnail file too large. Maximum size is ${formatFileSize(MAX_THUMBNAIL_SIZE)}` 
     };
   }
 
@@ -292,5 +527,14 @@ function sanitizeFileName(fileName: string): string {
     .toLowerCase();
 }
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
+// OPTIONS handler for CORS
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
+}
