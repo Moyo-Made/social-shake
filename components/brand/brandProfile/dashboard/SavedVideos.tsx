@@ -306,7 +306,7 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 	}
 
 	return (
-		<div className={`w-full max-w-6xl px-4`}>
+		<div className={`w-full max-w-6xl p-6`}>
 			{/* Header */}
 			<div className="mb-8">
 				<div className="flex items-center gap-1">
