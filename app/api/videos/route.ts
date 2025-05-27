@@ -3,10 +3,10 @@ import { adminDb, adminStorage } from "@/config/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { v4 as uuidv4 } from "uuid";
 
-// Configuration
+// Configuration - Updated for Vercel limits
 const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB limit
 const MAX_THUMBNAIL_SIZE = 5 * 1024 * 1024; // 5MB limit
-const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+const CHUNK_SIZE = 1 * 1024 * 1024; // 1MB chunks (safer for Vercel)
 
 const ALLOWED_IMAGE_TYPES = [
   'image/jpeg',
@@ -18,10 +18,11 @@ const ALLOWED_IMAGE_TYPES = [
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+// Updated config for smaller payloads
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '6mb', // Each chunk should be under this size
+      sizeLimit: '2mb', // Reduced from 6mb
     },
     responseLimit: false,
   },
@@ -102,6 +103,15 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Check content length before parsing
+    const contentLength = parseInt(request.headers.get('content-length') || '0');
+    if (contentLength > 2 * 1024 * 1024) { // 2MB limit
+      return NextResponse.json(
+        { error: "Request payload too large. Maximum size is 2MB." },
+        { status: 413 }
+      );
+    }
+
     const body = await request.json();
     
     // Check if this is a chunk upload or metadata upload
@@ -112,6 +122,15 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error("Error in POST handler:", error);
+    
+    // Handle specific payload size errors
+    if (error instanceof Error && error.message.includes('body limit')) {
+      return NextResponse.json(
+        { error: "Request too large. Please reduce chunk size." },
+        { status: 413 }
+      );
+    }
+    
     return NextResponse.json(
       { 
         error: "Failed to process request",
@@ -143,6 +162,17 @@ async function handleChunkUpload(body: any) {
       );
     }
 
+    // Validate payload size
+    const payloadSize = JSON.stringify(body).length;
+    console.log(`Processing chunk ${chunkIndex + 1}/${totalChunks}, payload size: ${(payloadSize / 1024).toFixed(1)}KB`);
+
+    if (payloadSize > 1.8 * 1024 * 1024) { // 1.8MB safety margin
+      return NextResponse.json(
+        { error: `Chunk payload too large: ${(payloadSize / 1024 / 1024).toFixed(1)}MB. Maximum is 1.8MB.` },
+        { status: 413 }
+      );
+    }
+
     // Validate file size on first chunk
     if (chunkIndex === 0 && fileSize > MAX_VIDEO_SIZE) {
       return NextResponse.json(
@@ -158,12 +188,27 @@ async function handleChunkUpload(body: any) {
     const bucket = adminStorage.bucket();
     
     // For the chunk file
-    const chunkFileName = `${tempChunkPath}/chunk-${chunkIndex}`;
+    const chunkFileName = `${tempChunkPath}/chunk-${String(chunkIndex).padStart(6, '0')}`; // Padded for proper sorting
     const chunkFileRef = bucket.file(chunkFileName);
     
-    // Decode and save the chunk
-    const chunkBuffer = Buffer.from(chunkData, "base64");
-    await chunkFileRef.save(chunkBuffer);
+    try {
+      // Decode and save the chunk
+      const chunkBuffer = Buffer.from(chunkData, "base64");
+      await chunkFileRef.save(chunkBuffer, {
+        metadata: {
+          contentType: 'application/octet-stream',
+          customMetadata: {
+            originalFileName: fileName,
+            chunkIndex: chunkIndex.toString(),
+            uploadId,
+            uploadedBy: userId
+          }
+        }
+      });
+    } catch (storageError) {
+      console.error(`Failed to save chunk ${chunkIndex}:`, storageError);
+      throw new Error(`Storage error: Failed to save chunk ${chunkIndex + 1}`);
+    }
 
     // Update upload progress
     const uploadRef = adminDb.collection("video_uploads").doc(uploadId);
@@ -179,13 +224,20 @@ async function handleChunkUpload(body: any) {
     // If this is the last chunk, combine all chunks
     if (chunkIndex === totalChunks - 1) {
       try {
-        // Get all chunks 
-        const [chunkFiles] = await bucket.getFiles({ prefix: tempChunkPath });
-        chunkFiles.sort((a, b) => {
-          const aIndex = parseInt(a.name.split('-').pop() || '0');
-          const bIndex = parseInt(b.name.split('-').pop() || '0');
-          return aIndex - bIndex;
+        console.log(`Combining ${totalChunks} chunks for upload ${uploadId}`);
+        
+        // Get all chunks with proper ordering
+        const [chunkFiles] = await bucket.getFiles({ 
+          prefix: tempChunkPath,
+          autoPaginate: true
         });
+        
+        // Sort chunks by index (padded names ensure proper order)
+        chunkFiles.sort((a, b) => a.name.localeCompare(b.name));
+        
+        if (chunkFiles.length !== totalChunks) {
+          throw new Error(`Expected ${totalChunks} chunks, found ${chunkFiles.length}`);
+        }
         
         // Final video file path
         const finalFileName = `videos/${Date.now()}_${sanitizeFileName(fileName)}`;
@@ -198,15 +250,16 @@ async function handleChunkUpload(body: any) {
             customMetadata: {
               originalName: fileName,
               uploadedBy: userId,
-              uploadTimestamp: new Date().toISOString()
+              uploadTimestamp: new Date().toISOString(),
+              totalChunks: totalChunks.toString()
             }
-          },
-          validation: 'crc32c'
+          }
         });
         
         // Process each chunk and append to final file
-        for (const chunkFile of chunkFiles) {
-          const [chunkData] = await chunkFile.download();
+        for (let i = 0; i < chunkFiles.length; i++) {
+          console.log(`Processing chunk ${i + 1}/${chunkFiles.length}`);
+          const [chunkData] = await chunkFiles[i].download();
           writeStream.write(chunkData);
         }
         
@@ -224,18 +277,22 @@ async function handleChunkUpload(body: any) {
         const videoUrl = `https://storage.googleapis.com/${bucket.name}/${finalFileName}`;
         
         // Clean up temp chunks
-        const deletePromises = chunkFiles.map(chunkFile => chunkFile.delete());
-        await Promise.all(deletePromises);
+        console.log(`Cleaning up ${chunkFiles.length} temporary chunks`);
+        const deletePromises = chunkFiles.map(chunkFile => 
+          chunkFile.delete().catch(err => console.warn(`Failed to delete chunk ${chunkFile.name}:`, err))
+        );
+        await Promise.allSettled(deletePromises);
         
         // Update upload record with video URL
         await uploadRef.update({
           videoUrl,
           status: "video_uploaded",
           completedAt: new Date(),
-          progress: 100
+          progress: 100,
+          fileName: sanitizeFileName(fileName)
         });
         
-        console.log(`Video chunks combined successfully for upload: ${uploadId}`);
+        console.log(`Video chunks combined successfully for upload: ${uploadId}, URL: ${videoUrl}`);
         
         return NextResponse.json({
           success: true,
@@ -337,20 +394,26 @@ async function handleMetadataUpload(body: any) {
         );
       }
 
-      const thumbnailBuffer = Buffer.from(thumbnailData, "base64");
-      const thumbnailFileRef = adminStorage.bucket().file(thumbnailFileName);
-      
-      await thumbnailFileRef.save(thumbnailBuffer, {
-        metadata: {
-          contentType: thumbnailContentType,
-          customMetadata: {
-            uploadedBy: userId
+      try {
+        const thumbnailBuffer = Buffer.from(thumbnailData, "base64");
+        const thumbnailFileRef = adminStorage.bucket().file(thumbnailFileName);
+        
+        await thumbnailFileRef.save(thumbnailBuffer, {
+          metadata: {
+            contentType: thumbnailContentType,
+            customMetadata: {
+              uploadedBy: userId,
+              uploadId
+            }
           }
-        }
-      });
+        });
 
-      await thumbnailFileRef.makePublic();
-      thumbnailUrl = `https://storage.googleapis.com/${adminStorage.bucket().name}/${thumbnailFileName}`;
+        await thumbnailFileRef.makePublic();
+        thumbnailUrl = `https://storage.googleapis.com/${adminStorage.bucket().name}/${thumbnailFileName}`;
+      } catch (thumbnailError) {
+        console.warn("Failed to upload thumbnail:", thumbnailError);
+        // Continue without thumbnail rather than failing the entire upload
+      }
     }
 
     // Save video metadata to Firestore
@@ -451,6 +514,8 @@ export async function PUT(request: NextRequest) {
 
     const uploadId = uuidv4();
     const totalChunks = Math.ceil(fileSize / CHUNK_SIZE);
+
+    console.log(`Initializing upload: ${fileName} (${formatFileSize(fileSize)}) -> ${totalChunks} chunks`);
 
     // Create upload record
     await adminDb.collection("video_uploads").doc(uploadId).set({

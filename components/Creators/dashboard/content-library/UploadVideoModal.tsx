@@ -43,7 +43,7 @@ export default function UploadVideoModal({
 	const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
 	
 	const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
-	const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+	const CHUNK_SIZE = 1 * 1024 * 1024; // 1MB chunks (base64 will be ~1.33MB)
 	
 	const validateVideoFile = (file: File) => {
 		if (file.size > MAX_VIDEO_SIZE) {
@@ -159,14 +159,33 @@ export default function UploadVideoModal({
 		const chunk = file.slice(start, end);
 
 		// Convert chunk to base64
-		const chunkBase64 = await new Promise<string>((resolve) => {
+		const chunkBase64 = await new Promise<string>((resolve, reject) => {
 			const reader = new FileReader();
 			reader.onload = () => {
 				const base64 = (reader.result as string).split(',')[1];
 				resolve(base64);
 			};
+			reader.onerror = () => reject(new Error('Failed to read chunk'));
 			reader.readAsDataURL(chunk);
 		});
+
+		// Verify chunk size isn't too large after base64 encoding
+		const payloadSize = JSON.stringify({
+			userId,
+			chunkData: chunkBase64,
+			fileName: file.name,
+			fileContentType: file.type,
+			chunkIndex,
+			totalChunks,
+			uploadId,
+			fileSize: file.size,
+		}).length;
+
+		console.log(`Chunk ${chunkIndex + 1}/${totalChunks}: ${(chunk.size / 1024).toFixed(1)}KB -> ${(payloadSize / 1024).toFixed(1)}KB payload`);
+
+		if (payloadSize > 4.5 * 1024 * 1024) { // 4.5MB limit for safety
+			throw new Error(`Chunk ${chunkIndex + 1} payload too large: ${(payloadSize / 1024 / 1024).toFixed(1)}MB`);
+		}
 
 		const response = await fetch("/api/videos", {
 			method: "POST",
@@ -186,8 +205,15 @@ export default function UploadVideoModal({
 		});
 
 		if (!response.ok) {
-			const error = await response.json();
-			throw new Error(error.error || `Failed to upload chunk ${chunkIndex + 1}`);
+			const errorText = await response.text();
+			let errorMessage;
+			try {
+				const errorJson = JSON.parse(errorText);
+				errorMessage = errorJson.error || errorJson.message;
+			} catch {
+				errorMessage = errorText;
+			}
+			throw new Error(errorMessage || `Failed to upload chunk ${chunkIndex + 1}`);
 		}
 
 		return response.json();
@@ -241,17 +267,35 @@ export default function UploadVideoModal({
 
 			setUploadStatus("Uploading video...");
 
-			// Upload chunks
+			// Upload chunks with retry logic
 			for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-				const chunkResponse = await uploadChunk(
-					formData.file,
-					chunkIndex,
-					totalChunks,
-					newUploadId
-				);
+				let retries = 3;
+				let chunkResponse;
+				
+				while (retries > 0) {
+					try {
+						chunkResponse = await uploadChunk(
+							formData.file,
+							chunkIndex,
+							totalChunks,
+							newUploadId
+						);
+						break; // Success, exit retry loop
+					} catch (error) {
+						retries--;
+						console.error(`Chunk ${chunkIndex + 1} failed, retries left: ${retries}`, error);
+						
+						if (retries === 0) {
+							throw new Error(`Failed to upload chunk ${chunkIndex + 1} after 3 attempts: ${error instanceof Error ? error.message : String(error)}`);
+						}
+						
+						// Wait before retry
+						await new Promise(resolve => setTimeout(resolve, 1000));
+					}
+				}
 
 				setUploadProgress(chunkResponse.progress || 0);
-				setUploadStatus(chunkResponse.message || `Uploading chunk ${chunkIndex + 1}/${totalChunks}...`);
+				setUploadStatus(chunkResponse.message || `Uploaded chunk ${chunkIndex + 1}/${totalChunks}`);
 
 				// If this was the last chunk and video is now uploaded
 				if (chunkResponse.status === "video_uploaded") {
