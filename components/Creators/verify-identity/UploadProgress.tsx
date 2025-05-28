@@ -56,9 +56,11 @@ const UploadProgress: React.FC<UploadProgressProps> = ({
           </div>
           
           <div className="flex-1">
-            <h4 className="font-medium text-gray-900">
+            <h4 className="font-medium text-gray-900">          
               {currentFile === 'verificationVideo' && 'Uploading Verification Video'}
               {currentFile === 'verifiableID' && 'Uploading ID Document'}
+              {currentFile === 'portfolioVideos' && 'Uploading Portfolio Videos'}
+              {currentFile === 'aboutMeVideo' && 'Uploading About Me Video'}
               {currentFile === 'profilePicture' && 'Uploading Profile Picture'}
             </h4>
             <p className="text-sm text-gray-500 mt-1">

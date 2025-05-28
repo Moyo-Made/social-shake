@@ -1,5 +1,3 @@
-// File: /app/api/creator-contests/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/config/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";

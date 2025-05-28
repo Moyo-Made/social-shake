@@ -12,6 +12,8 @@ import {
 } from "@/components/Creators/verify-identity/CreatorVerificationContext";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import UploadPortfolioVideos from "@/components/Creators/verify-identity/UploadPortfolioVideos";
+
 
 // Wrap the actual page content in this component to access the context
 function VerifyIdentityContent() {
@@ -20,6 +22,7 @@ function VerifyIdentityContent() {
 	const [activeTab, setActiveTab] = useState<string>("upload-verification");
 	const {
 		isVerificationComplete,
+		isPortfolioComplete,
 		loading,
 	} = useCreatorVerification();
 
@@ -78,13 +81,22 @@ function VerifyIdentityContent() {
 				return;
 			}
 
+			setActiveTab("upload-portfolio");
+		} else if (activeTab === "upload-portfolio") {
+			// Check if portfolio video is complete before proceeding
+			if (!isPortfolioComplete) {
+				toast.error(
+					"Please upload at least 3 portfolio videos before proceeding."
+				);
+				return;
+			}
 			setActiveTab("complete-profile");
 		}
 	};
 
 	if (loading) {
 		return <div className="container mx-auto py-8 px-4">Loading...</div>;
-	  }
+	}
 	// Show loading state or return to login if not authenticated
 	if (!currentUser) {
 		return null;
@@ -107,6 +119,18 @@ function VerifyIdentityContent() {
 							Upload Verification Video
 						</button>
 						<button
+							onClick={() => handleTabChange("upload-portfolio")}
+							className={`w-full text-left py-2 px-3 rounded ${
+								activeTab === "upload-portfolio"
+									? "text-orange-500 underline pl-2"
+									: "text-gray-600"
+							}`}
+							// Only allow going to portfolio tab if verification is complete
+							disabled={!isVerificationComplete}
+						>
+							Upload Portfolio Videos
+						</button>
+						<button
 							onClick={() => handleTabChange("complete-profile")}
 							className={`w-full text-left py-2 px-3 rounded ${
 								activeTab === "complete-profile"
@@ -116,40 +140,37 @@ function VerifyIdentityContent() {
 							// Only allow going to profile tab if verification is complete
 							disabled={!isVerificationComplete}
 						>
-							Complete Creator Profile
+							Complete Your Profile
 						</button>
 					</div>
 				</div>
 
 				{/* Right content area */}
 				<div className="flex-1 max-w-3xl">
-					<div className="mb-8">
-						<h1 className="text-3xl font-semibold mb-2">
-							Verify Your Identity
-						</h1>
-						<p className="text-gray-600">
-							To keep our platform secure and authentic, upload a short
-							verification video to confirm your identity.
-							<br /> Your privacy is our priority.
-						</p>
-					</div>
+					
 
 					{/* Content based on active tab */}
 					<div>
 						{activeTab === "upload-verification" ? (
 							<UploadVerificationVideo />
+						) : activeTab === "upload-portfolio" ? (
+							<UploadPortfolioVideos />
 						) : (
 							<CreatorProfileForm />
 						)}
 					</div>
 
-					{/* Next button - Only shown on the first tab now */}
-					{activeTab === "upload-verification" && (
+					{/* Next button - Show for verification and portfolio tabs */}
+					{(activeTab === "upload-verification" || activeTab === "upload-portfolio") && (
 						<div className="mt-8 flex justify-end mb-10">
 							<Button
 								onClick={handleNextClick}
 								className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md flex items-center"
-								disabled={!isVerificationComplete || loading}
+								disabled={
+									loading || 
+									(activeTab === "upload-verification" && !isVerificationComplete) ||
+									(activeTab === "upload-portfolio" && !isPortfolioComplete)
+								}
 							>
 								{loading ? "Loading..." : "Next"}
 								{!loading && <ArrowRight size={20} className="ml-2" />}

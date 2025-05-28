@@ -82,7 +82,6 @@ const defaultFormData: ProjectFormData = {
 			totalBudget: 0,
 			totalAmount: 0,
 			commissionPerSale: "",
-			serviceFee: 0
 		},
 	},
 	userId: "",
@@ -92,7 +91,9 @@ const defaultFormData: ProjectFormData = {
 	projectId: "",
 	views: 0,
 	applicantsCount: 0,
-	interestId: ""
+	interestId: "",
+	paidfalse: false,
+	paymentAmount: null
 };
 
 interface ProjectFormContextType {

@@ -27,16 +27,19 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { FaMoneyCheck } from "react-icons/fa6";
 
-interface SavedVideo {
-	id: string;
-	videoId: string;
-	title: string;
-	thumbnailUrl?: string;
-	creatorId: string;
-	creatorName: string;
-	savedAt: string;
-	licenseType: string;
+interface PurchasedVideo { 
+    id: string;
+    videoId: string;
+    title: string;
+    thumbnailUrl?: string;
+    creatorId: string;
+    creatorName: string;
+    purchasedAt: string; 
+    licenseType: string;
+    transactionId?: string; 
+    purchasePrice?: number; 
 }
 
 interface Video {
@@ -64,16 +67,17 @@ interface Video {
 	};
 }
 
-interface SavedVideosLibraryProps {
+interface PurchasedVideosLibraryProps {
 	className?: string;
 }
 
-const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
+const PurchasedVideosLibrary: React.FC<PurchasedVideosLibraryProps> = ({
 	className = "",
 }) => {
 	const { currentUser } = useAuth();
 
-	const [savedVideos, setSavedVideos] = useState<SavedVideo[]>([]);
+const [purchasedVideos, setPurchasedVideos] = useState<PurchasedVideo[]>([]);  
+const [selectedVideo, setSelectedVideo] = useState<PurchasedVideo | null>(null);
 	const [fullVideoData, setFullVideoData] = useState<{ [key: string]: Video }>(
 		{}
 	);
@@ -85,12 +89,11 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 	const [selectedCreator, setSelectedCreator] = useState<string>("all");
 	const [isRemoving, setIsRemoving] = useState<string | null>(null);
 	const [isDownloading, setIsDownloading] = useState<string | null>(null);
-	const [selectedVideo, setSelectedVideo] = useState<SavedVideo | null>(null);
 	const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-	// Fetch saved videos
+	// Fetch purchased videos
 	useEffect(() => {
-		const fetchSavedVideos = async () => {
+		const fetchPurchasedVideos = async () => {
 			if (!currentUser) {
 				setLoading(false);
 				return;
@@ -101,19 +104,19 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 				setError(null);
 
 				const response = await fetch(
-					`/api/video-library?userId=${currentUser.uid}`
+					`/api/purchases/create?userId=${currentUser.uid}`
 				);
 
 				if (!response.ok) {
-					throw new Error("Failed to fetch saved videos");
+					throw new Error("Failed to fetch purchased videos");
 				}
 
 				const data = await response.json();
-				setSavedVideos(data.savedVideos || []);
+				setPurchasedVideos(data.purchasedVideos || []); 
 
-				// Fetch full video data for each saved video
+				// Fetch full video data for each purchased video
 				const videoIds =
-					data.savedVideos?.map((sv: SavedVideo) => sv.videoId) || [];
+					data.purchasedVideos?.map((sv: PurchasedVideo) => sv.videoId) || [];
 				if (videoIds.length > 0) {
 					const videoDataPromises = videoIds.map(async (videoId: string) => {
 						try {
@@ -137,35 +140,35 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 					setFullVideoData(videoDataMap);
 				}
 			} catch (err) {
-				console.error("Error fetching saved videos:", err);
-				setError("Failed to load saved videos");
+				console.error("Error fetching purchased videos:", err);
+				setError("Failed to load purchased videos");
 			} finally {
 				setLoading(false);
 			}
 		};
 
-		fetchSavedVideos();
+		fetchPurchasedVideos();
 	}, [currentUser]);
 
 	// Handle download
-	const handleDownload = async (savedVideo: SavedVideo) => {
+	const handleDownload = async (purchasedVideos: PurchasedVideo) => {
 		if (!currentUser) {
 			toast("Please log in to download videos");
 			return;
 		}
 
-		const fullVideo = fullVideoData[savedVideo.videoId];
+		const fullVideo = fullVideoData[purchasedVideos.videoId];
 		if (!fullVideo) {
 			toast("Video data not available");
 			return;
 		}
 
-		setIsDownloading(savedVideo.videoId);
+		setIsDownloading(purchasedVideos.videoId);
 		try {
 			// Create a temporary anchor element to trigger download
 			const link = document.createElement("a");
 			link.href = fullVideo.videoUrl;
-			link.download = fullVideo.fileName || `${savedVideo.title}.mp4`;
+			link.download = fullVideo.fileName || `${purchasedVideos.title}.mp4`;
 			link.target = "_blank";
 
 			// Add to DOM, click, then remove
@@ -182,21 +185,21 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 	};
 
 	// Handle remove from library
-	const handleRemoveFromLibrary = async (savedVideo: SavedVideo) => {
+	const handleRemoveFromLibrary = async (purchasedVideos: PurchasedVideo) => {
 		if (!currentUser) return;
 
-		setIsRemoving(savedVideo.id);
+		setIsRemoving(purchasedVideos.id);
 		try {
 			const response = await fetch(
-				`/api/video-library?userId=${currentUser.uid}&videoId=${savedVideo.videoId}`,
+				`/api/purchases/create?userId=${currentUser.uid}&videoId=${purchasedVideos.videoId}`,
 				{ method: "DELETE" }
 			);
 
 			if (!response.ok) throw new Error("Failed to remove video");
 
 			// Update local state
-			setSavedVideos((prev) =>
-				prev.filter((video) => video.id !== savedVideo.id)
+			setPurchasedVideos((prev) =>
+				prev.filter((video) => video.id !== purchasedVideos.id)
 			);
 			toast("Video removed from library");
 		} catch (error) {
@@ -208,18 +211,18 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 	};
 
 	// Handle video preview
-	const handleVideoPreview = (savedVideo: SavedVideo) => {
-		setSelectedVideo(savedVideo);
+	const handleVideoPreview = (purchasedVideos: PurchasedVideo) => {
+		setSelectedVideo(purchasedVideos);
 		setIsPreviewOpen(true);
 	};
 
 	// Get unique creators for filter
 	const uniqueCreators = Array.from(
-		new Set(savedVideos.map((video) => video.creatorName))
+		new Set(purchasedVideos.map((video) => video.creatorName))
 	).sort();
 
 	// Filter and sort videos
-	const filteredAndSortedVideos = savedVideos
+	const filteredAndSortedVideos = purchasedVideos
 		.filter((video) => {
 			const matchesSearch =
 				video.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -239,10 +242,10 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 				case "creator-desc":
 					return b.creatorName.localeCompare(a.creatorName);
 				case "oldest":
-					return new Date(a.savedAt).getTime() - new Date(b.savedAt).getTime();
+					return new Date(a.purchasedAt).getTime() - new Date(b.purchasedAt).getTime();
 				case "newest":
 				default:
-					return new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime();
+					return new Date(b.purchasedAt).getTime() - new Date(a.purchasedAt).getTime();
 			}
 		});
 
@@ -266,9 +269,9 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 	if (!currentUser) {
 		return (
 			<div className={`text-center py-12 ${className}`}>
-				<BookmarkCheck className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+				<FaMoneyCheck className="mx-auto h-16 w-16 text-gray-300 mb-4" />
 				<p className="text-lg font-semibold text-gray-700">
-					Please log in to view your saved videos
+					Please log in to view your purchased videos
 				</p>
 				<p className="text-sm text-gray-500 mt-1">
 					Sign in to access your video library
@@ -283,7 +286,7 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 				className={`flex flex-col justify-center items-center h-64 ${className}`}
 			>
 				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
-				<span className="ml-3 text-gray-600">Loading your saved videos...</span>
+				<span className="ml-3 text-gray-600">Loading your purchased videos...</span>
 			</div>
 		);
 	}
@@ -309,24 +312,24 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 		<div className={`w-full max-w-6xl p-6`}>
 			{/* Header */}
 			<div className="mb-8">
-				<div className="flex items-center gap-1">
-					<BookmarkCheck className="h-6 w-6 text-orange-500" />
+				<div className="flex items-center gap-2">
+					<FaMoneyCheck className="h-6 w-6 text-orange-500" />
 					<h1 className="text-xl font-semibold text-gray-900">
 						My Video Library
 					</h1>
 				</div>
 				<p className="ml-8 text-gray-600">
-					{savedVideos.length === 0
-						? "Your saved videos will appear here"
-						: `${savedVideos.length} video${savedVideos.length === 1 ? "" : "s"} saved`}
+					{purchasedVideos.length === 0
+						? "Your purchased videos will appear here"
+						: `${purchasedVideos.length} video${purchasedVideos.length === 1 ? "" : "s"} purchased`}
 				</p>
 			</div>
 
-			{savedVideos.length === 0 ? (
+			{purchasedVideos.length === 0 ? (
 				<div className="text-center py-16">
-					<BookmarkCheck className="mx-auto h-16 w-16 text-gray-300 mb-4" />
+					<FaMoneyCheck className="mx-auto h-16 w-16 text-gray-300 mb-4" />
 					<p className="text-xl font-semibold text-gray-700 mb-2">
-						No saved videos yet
+						No purchased videos yet
 					</p>
 					<p className="text-gray-500 mb-6">
 						Start exploring and save videos you want to keep for later
@@ -345,7 +348,7 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 								<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
 								<Input
 									type="text"
-									placeholder="Search saved videos..."
+									placeholder="Search purchased videos..."
 									value={searchQuery}
 									onChange={(e) => setSearchQuery(e.target.value)}
 									className="pl-10"
@@ -414,8 +417,8 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 
 						{/* Results count */}
 						<div className="mt-4 text-sm text-gray-600">
-							Showing {filteredAndSortedVideos.length} of {savedVideos.length}{" "}
-							saved videos
+							Showing {filteredAndSortedVideos.length} of {purchasedVideos.length}{" "}
+							purchased videos
 						</div>
 					</div>
 
@@ -436,11 +439,11 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 								viewMode === "grid" ? "flex flex-wrap gap-6" : "space-y-4"
 							}
 						>
-							{filteredAndSortedVideos.map((savedVideo) => {
-								const fullVideo = fullVideoData[savedVideo.videoId];
+							{filteredAndSortedVideos.map((purchasedVideos) => {
+								const fullVideo = fullVideoData[purchasedVideos.videoId];
 								return (
 									<div
-										key={savedVideo.id}
+										key={purchasedVideos.id}
 										className={`bg-white rounded-lg shadow-sm border overflow-hidden hover:shadow-md transition-all group ${
 											viewMode === "list" ? "flex" : ""
 										}`}
@@ -452,12 +455,12 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 													? "w-48 h-32 flex-shrink-0"
 													: "aspect-video"
 											}`}
-											onClick={() => handleVideoPreview(savedVideo)}
+											onClick={() => handleVideoPreview(purchasedVideos)}
 										>
-											{savedVideo.thumbnailUrl ? (
+											{purchasedVideos.thumbnailUrl ? (
 												<Image
-													src={savedVideo.thumbnailUrl}
-													alt={savedVideo.title}
+													src={purchasedVideos.thumbnailUrl}
+													alt={purchasedVideos.title}
 													className="w-full h-full object-cover"
 													width={viewMode === "list" ? 192 : 300}
 													height={viewMode === "list" ? 128 : 200}
@@ -473,7 +476,7 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 												<div className="opacity-0 group-hover:opacity-100 transform scale-75 group-hover:scale-100 transition-all duration-200">
 													<div className="bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full p-3 shadow-lg">
 														<Play
-															className="w-6 h-6 text-gray-800 ml-0.5"
+															className="w-6 h-6 text-orange-500 ml-0.5"
 															fill="currentColor"
 														/>
 													</div>
@@ -489,18 +492,18 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 											</div>
 
 											{/* License type badge */}
-											{savedVideo && (
+											{purchasedVideos && (
 												<div className="absolute top-2 right-2">
 													<span
 														className={`px-3 py-1 text-xs rounded-full ${
-															savedVideo.licenseType === "exclusive"
+															purchasedVideos.licenseType === "exclusive"
 																? "bg-purple-100 text-purple-800"
-																: savedVideo.licenseType === "extended"
+																: purchasedVideos.licenseType === "extended"
 																	? "bg-blue-100 text-blue-800"
 																	: "bg-gray-100 text-gray-800"
 														}`}
 													>
-														{savedVideo.licenseType}
+														{purchasedVideos.licenseType}
 													</span>
 												</div>
 											)}
@@ -521,7 +524,7 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 													className={viewMode === "list" ? "flex-1 pr-4" : ""}
 												>
 													<h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">
-														{savedVideo.title}
+														{purchasedVideos.title}
 													</h3>
 
 													{fullVideo?.description && (
@@ -532,12 +535,12 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 
 													<div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
 														<User size={14} />
-														<span>{savedVideo.creatorName}</span>
+														<span>{purchasedVideos.creatorName}</span>
 													</div>
 
 													<div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
 														<Clock size={12} />
-														<span>Saved {formatDate(savedVideo.savedAt)}</span>
+														<span>Saved {formatDate(purchasedVideos.purchasedAt)}</span>
 													</div>
 
 													{fullVideo?.tags && fullVideo.tags.length > 0 && (
@@ -575,7 +578,7 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 													}`}
 												>
 													<Button
-														onClick={() => handleVideoPreview(savedVideo)}
+														onClick={() => handleVideoPreview(purchasedVideos)}
 														className="px-3 py-2 text-orange-600 bg-orange-100 hover:bg-orange-200 rounded text-sm transition-colors"
 													>
 														<Eye size={14} className="mr-1" />
@@ -583,13 +586,13 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 													</Button>
 
 													<Button
-														onClick={() => handleDownload(savedVideo)}
+														onClick={() => handleDownload(purchasedVideos)}
 														disabled={
-															isDownloading === savedVideo.videoId || !fullVideo
+															isDownloading === purchasedVideos.videoId || !fullVideo
 														}
 														className="px-3 py-2 bg-green-100 text-green-700 rounded text-sm hover:bg-green-200 disabled:opacity-50 transition-colors"
 													>
-														{isDownloading === savedVideo.videoId ? (
+														{isDownloading === purchasedVideos.videoId ? (
 															<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-700 mx-auto"></div>
 														) : (
 															<>
@@ -600,11 +603,11 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 													</Button>
 
 													<Button
-														onClick={() => handleRemoveFromLibrary(savedVideo)}
-														disabled={isRemoving === savedVideo.id}
+														onClick={() => handleRemoveFromLibrary(purchasedVideos)}
+														disabled={isRemoving === purchasedVideos.id}
 														className="px-3 py-2 text-red-600 bg-red-100 hover:bg-red-200 rounded text-sm transition-colors disabled:opacity-50"
 													>
-														{isRemoving === savedVideo.id ? (
+														{isRemoving === purchasedVideos.id ? (
 															<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mx-auto"></div>
 														) : (
 															<>
@@ -645,7 +648,7 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 									</div>
 									<div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
 										<Clock size={14} />
-										<span>Saved {formatDate(selectedVideo.savedAt)}</span>
+										<span>Saved {formatDate(selectedVideo.purchasedAt)}</span>
 									</div>
 								</div>
 								<Button
@@ -678,7 +681,7 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 
 							<div className="flex justify-between items-center">
 								<div className="text-sm text-gray-600">
-									This video is saved in your library
+									This video is purchased in your library
 									{fullVideoData[selectedVideo.videoId]?.price && (
 										<span className="ml-2 text-lg font-semibold text-gray-900">
 											${fullVideoData[selectedVideo.videoId].price}
@@ -735,4 +738,4 @@ const SavedVideosLibrary: React.FC<SavedVideosLibraryProps> = ({
 	);
 };
 
-export default SavedVideosLibrary;
+export default PurchasedVideosLibrary;

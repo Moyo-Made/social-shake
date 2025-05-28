@@ -51,6 +51,7 @@ export default function RootLayout({
 		<html lang="en">
 			<body className={`${inter.variable} ${satoshi.variable}`}>
 				<AuthProvider>
+					
 					<SocketProvider>
 						<NotificationsProvider>{children}</NotificationsProvider>
 						<Toaster />

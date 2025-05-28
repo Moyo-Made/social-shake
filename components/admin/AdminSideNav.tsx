@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ChevronDown, ChevronRight, DollarSign } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import NotificationSystem from "../notifications/NotificationSystem";
 
 interface MenuItemProps {
 	icon: React.ReactNode;
@@ -320,21 +321,13 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 	};
 
 	return (
-		<div className="flex min-h-screen">
+		<div className="h-screen flex ">
 			<SideNav />
 			<div className="flex-1 flex flex-col items-center justify-center bg-[#FFF9F6] font-satoshi ">
 				<header className="bg-white p-4 w-full flex justify-between items-center border-b border-[#FD5C02]">
 					<h1 className="text-xl font-semibold">{pageTitle}</h1>
 					<div className="flex items-center">
-						<Link href="/brand/dashboard/notifications">
-							<Image
-								src="/icons/notification.svg"
-								alt="Notifications"
-								width={20}
-								height={20}
-								className="mr-4"
-							/>
-						</Link>
+						<NotificationSystem />
 						<div className="flex items-center">
 							<span className="mr-4 text-sm text-gray-500">
 								{currentUser?.email}
@@ -348,9 +341,13 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 						</div>
 					</div>
 				</header>
-				<div className="flex-1 flex items-center justify-center w-full">
+			
+			
+				<main className="flex-1 overflow-y-auto custom-scrollbar">
+					<div className="container mx-auto max-w-6xl">
 					{children}
 				</div>
+				</main>
 			</div>
 		</div>
 	);

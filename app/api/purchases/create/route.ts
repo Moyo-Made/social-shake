@@ -251,3 +251,100 @@ export async function POST(request: NextRequest) {
     }, { status: 500 });
   }
 }
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get("userId");
+    
+    if (!userId) {
+      return NextResponse.json(
+        { error: "User ID is required" },
+        { status: 400 }
+      );
+    }
+
+    console.log(`Fetching purchased videos for userId: ${userId}`);
+     
+    // Query user's purchases, ordered by purchase date (most recent first)
+    const query = adminDb.collection("purchases")
+      .where("userId", "==", userId)
+      .orderBy("purchasedAt", "desc");
+
+    const snapshot = await query.get();
+    
+    if (snapshot.empty) {
+      console.log(`No purchases found for userId: ${userId}`);
+      return NextResponse.json({ purchasedVideos: [] });
+    }
+
+    // Get all unique video IDs for batch fetch
+    const videoIds = snapshot.docs.map(doc => doc.data().videoId);
+    const uniqueVideoIds = [...new Set(videoIds)];
+
+    // Batch fetch video data from videos collection
+    const videoDataMap = new Map();
+    
+    // Firestore batch read limit is 500, so we need to chunk if we have more
+    const chunkSize = 500;
+    for (let i = 0; i < uniqueVideoIds.length; i += chunkSize) {
+      const chunk = uniqueVideoIds.slice(i, i + chunkSize);
+      const videoPromises = chunk.map(videoId => 
+        adminDb.collection("videos").doc(videoId).get()
+      );
+      
+      const videoDocs = await Promise.all(videoPromises);
+      
+      videoDocs.forEach((doc, index) => {
+        if (doc.exists) {
+          videoDataMap.set(chunk[index], doc.data());
+        }
+      });
+    }
+
+    // Enrich purchases with data from the videos collection
+    const enrichedVideos = snapshot.docs.map(doc => {
+      const purchaseData = doc.data();
+      const videoData = videoDataMap.get(purchaseData.videoId) || {};
+
+      return {
+        id: doc.id,
+        videoId: purchaseData.videoId,
+        userId: purchaseData.userId,
+        creatorId: purchaseData.creatorId,
+        paymentId: purchaseData.paymentId,
+        purchasedAt: purchaseData.purchasedAt || null,
+        amount: purchaseData.amount || 0,
+        status: purchaseData.status || "completed",
+        downloadCount: purchaseData.downloadCount || 0,
+        // Video details from videos collection
+        title: videoData.title || purchaseData.videoTitle || "Untitled",
+        description: videoData.description || "",
+        thumbnailUrl: videoData.thumbnailUrl || null,
+        videoUrl: videoData.videoUrl || null,
+        tags: videoData.tags || [],
+        licenseType: videoData.licenseType || null,
+        price: videoData.price || null,
+        views: videoData.views || 0,
+        purchases: videoData.purchases || 0,
+        fileName: videoData.fileName || null,
+        fileSize: videoData.fileSize || null,
+        uploadedAt: videoData.uploadedAt?.toDate?.()?.toISOString() || null,
+        creatorName: videoData.creatorName || "Unknown Creator",
+      };
+    });
+
+    console.log(`Found ${enrichedVideos.length} purchased videos for userId: ${userId}`);
+    return NextResponse.json({ purchasedVideos: enrichedVideos });
+
+  } catch (error) {
+    console.error("Error fetching purchased videos:", error);
+    return NextResponse.json(
+      { 
+        error: "Failed to fetch purchased videos",
+        details: error instanceof Error ? error.message : String(error)
+      },
+      { status: 500 }
+    );
+  }
+}

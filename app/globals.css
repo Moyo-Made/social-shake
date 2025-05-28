@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {}
+@layer base {
+	.custom-scrollbar {
+		scrollbar-width: auto;
+		scrollbar-color: #6b7280 #e5e7eb; /* thumb | track */
+	}
 
+	.custom-scrollbar::-webkit-scrollbar {
+		width: 1px;
+	}
 
+	.custom-scrollbar::-webkit-scrollbar-track {
+		background: #e5e7eb;
+	}
+
+	.custom-scrollbar::-webkit-scrollbar-thumb {
+		background-color: #6b7280;
+		border-radius: 9999px;
+		border: 1px solid transparent;
+	}
+}

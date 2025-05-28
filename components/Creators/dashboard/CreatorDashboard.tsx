@@ -2,7 +2,7 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 import EmptyContest from "@/components/brand/brandProfile/dashboard/EmptyContest";
 import { OngoingProjectsSection } from "./OngoingProjectsSection";
-import ContestsGrid from "./CreatorContestsGrid";
+// import ContestsGrid from "./CreatorContestsGrid";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
@@ -11,6 +11,7 @@ interface UserDashboardProps {
 }
 
 interface UserData {
+	totalProjectsParticipated: number;
 	summary: {
 		acceptedProjects: number;
 		completedProjects: number;
@@ -154,7 +155,7 @@ const DashboardContent = ({ userId }: UserDashboardProps) => {
 	return (
 		<div className="max-w-6xl px-4 py-8">
 			{/* Summary Cards */}
-			<div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+			<div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
 				{/* Active Projects Card */}
 				<div className="bg-white rounded-lg shadow p-6 relative overflow-hidden">
 					<Image
@@ -166,13 +167,13 @@ const DashboardContent = ({ userId }: UserDashboardProps) => {
 					<div className="mt-2">
 						<h3 className="text-gray-600 text-lg">Active Projects</h3>
 						<p className="text-3xl font-bold mt-2">
-							{userData.activeProjects}
+							{userData.totalProjectsParticipated}
 						</p>
 					</div>
 				</div>
 
 				{/* Active Contests Card */}
-				<div className="bg-white rounded-lg shadow p-6 relative overflow-hidden">
+				{/* <div className="bg-white rounded-lg shadow p-6 relative overflow-hidden">
 					<Image
 						src="/icons/total-contests.svg"
 						alt="Total Contests"
@@ -185,7 +186,7 @@ const DashboardContent = ({ userId }: UserDashboardProps) => {
 							{userData.activeContests}
 						</p>
 					</div>
-				</div>
+				</div> */}
 
 				{/* Total Earning Card */}
 				<div className="bg-white rounded-lg shadow p-6 relative overflow-hidden">
@@ -223,7 +224,7 @@ const DashboardContent = ({ userId }: UserDashboardProps) => {
 			</div>
 
 			{/* Contests */}
-			<ContestsGrid />
+			{/* <ContestsGrid /> */}
 
 			{/* Ongoing Projects */}
 			<OngoingProjectsSection userId={userId} />

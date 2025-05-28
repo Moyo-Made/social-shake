@@ -12,6 +12,7 @@ import { compressVideo, needsCompression } from "@/utils/videoCompression";
 import { uploadFileInChunks } from "@/utils/fileUploader";
 
 interface VerificationData {
+	portfolioVideos: (File | null)[];
 	verificationVideo: File | null;
 	verifiableID: File | null;
 	isCompressing: boolean;
@@ -28,8 +29,9 @@ interface CreatorVerificationContextType {
 	updateVerificationData: (data: Partial<VerificationData>) => Promise<void>;
 	updateProfileData: (data: Partial<CreatorProfileData>) => Promise<void>;
 	isVerificationComplete: boolean;
+	isPortfolioComplete: boolean;
 	isProfileComplete: boolean;
-	isFormValid: boolean; // Added isFormValid state
+	isFormValid: boolean;
 	submitVerification: () => Promise<{ success: boolean; message: string }>;
 	loading: boolean;
 	fieldErrors: FieldErrors;
@@ -55,6 +57,7 @@ const defaultVerificationData: VerificationData = {
 	verifiableID: null,
 	isCompressing: false,
 	compressionProgress: 0,
+	portfolioVideos: [],
 };
 
 const defaultProfileData: CreatorProfileData = {
@@ -94,6 +97,8 @@ const defaultProfileData: CreatorProfileData = {
 	verifiableIDUrl: null,
 	verificationVideoUrl: null,
 	profilePictureUrl: null,
+	aboutMeVideo: null,
+	abnNumber: "",
 };
 
 const CreatorVerificationContext = createContext<
@@ -268,7 +273,7 @@ export const CreatorVerificationProvider = ({
 	const [dbInitialized, setDbInitialized] = useState(false);
 	const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 	const [isProfileComplete, setIsProfileComplete] = useState(false);
-	const [isFormValid, setIsFormValid] = useState(false); // Added isFormValid state
+	const [isFormValid, setIsFormValid] = useState(false);
 	const [touched, setTouched] = useState<Record<string, boolean>>({});
 	const [isUploading, setIsUploading] = useState(false);
 	const [currentUploadingFile, setCurrentUploadingFile] = useState<
@@ -324,6 +329,7 @@ export const CreatorVerificationProvider = ({
 						verifiableID: null,
 						isCompressing: false,
 						compressionProgress: 0,
+						portfolioVideos: [],
 					};
 
 					// Restore verification video if it exists
@@ -358,6 +364,37 @@ export const CreatorVerificationProvider = ({
 						}
 					}
 
+					// After restoring aboutMeVideo, add:
+					if (
+						verificationDataFlags?.portfolioVideosExists &&
+						verificationFiles?.portfolioVideosBase64
+					) {
+						try {
+							const portfolioVideos = [];
+							for (
+								let i = 0;
+								i < verificationFiles.portfolioVideosBase64.length;
+								i++
+							) {
+								const base64 = verificationFiles.portfolioVideosBase64[i];
+								const metadata = verificationFiles.portfolioVideosMetadata?.[i];
+
+								if (base64 && metadata) {
+									portfolioVideos[i] = base64ToFile(
+										base64,
+										metadata.name || `portfolio-${i}.mp4`,
+										metadata.type || "video/mp4"
+									);
+								} else {
+									portfolioVideos[i] = null;
+								}
+							}
+							restoredVerificationData.portfolioVideos = portfolioVideos;
+						} catch (error) {
+							console.error("Error restoring portfolio videos:", error);
+						}
+					}
+
 					setVerificationData(restoredVerificationData);
 				}
 
@@ -374,6 +411,7 @@ export const CreatorVerificationProvider = ({
 							...defaultProfileData, // Start with default values
 							...storedProfile, // Override with stored values
 							picture: null, // Will set this separately
+							aboutMeVideo: null, // Will set this separately
 						};
 
 						// Restore profile picture if it exists
@@ -389,6 +427,22 @@ export const CreatorVerificationProvider = ({
 								}
 							} catch (error) {
 								console.error("Error restoring profile picture:", error);
+							}
+						}
+
+						// Restore aboutMeVideo from IndexedDB if it exists
+						if (
+							verificationDataFlags?.aboutMeVideoExists &&
+							verificationFiles?.aboutMeVideoBase64
+						) {
+							try {
+								restoredProfileData.aboutMeVideo = base64ToFile(
+									verificationFiles.aboutMeVideoBase64,
+									verificationFiles.aboutMeVideoName || "aboutme.mp4",
+									verificationFiles.aboutMeVideoType || "video/mp4"
+								);
+							} catch (error) {
+								console.error("Error restoring about me video:", error);
 							}
 						}
 
@@ -432,10 +486,10 @@ export const CreatorVerificationProvider = ({
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const storageData: any = { ...existingFiles }; // Start with existing files
 
-			// Check if we need to compress the video
+			// Check if we need to compress videos
 			let processedVerificationVideo = data.verificationVideo;
 
-			// If there's a new video file and it needs compression
+			// If there's a new verification video and it needs compression
 			if (data.verificationVideo && needsCompression(data.verificationVideo)) {
 				try {
 					// Update compression status
@@ -459,10 +513,10 @@ export const CreatorVerificationProvider = ({
 					);
 
 					console.log(
-						`Video compressed: ${(data.verificationVideo.size / (1024 * 1024)).toFixed(2)}MB → ${(processedVerificationVideo.size / (1024 * 1024)).toFixed(2)}MB`
+						`Verification video compressed: ${(data.verificationVideo.size / (1024 * 1024)).toFixed(2)}MB → ${(processedVerificationVideo.size / (1024 * 1024)).toFixed(2)}MB`
 					);
 				} catch (error) {
-					console.error("Error compressing video:", error);
+					console.error("Error compressing verification video:", error);
 					// Continue with the original file but log the error
 				} finally {
 					// Reset compression status
@@ -478,26 +532,33 @@ export const CreatorVerificationProvider = ({
 			const updatedVerificationData = {
 				verificationVideo:
 					data.verificationVideo !== undefined
-						? data.verificationVideo
+						? processedVerificationVideo
 						: verificationData.verificationVideo,
 				verifiableID:
 					data.verifiableID !== undefined
 						? data.verifiableID
 						: verificationData.verifiableID,
+				portfolioVideos:
+					data.portfolioVideos !== undefined
+						? data.portfolioVideos
+						: verificationData.portfolioVideos,
 			};
 
 			// Set flags based on updated data
+			const existingFlags =
+				(await getFromDB(VERIFICATION_STORE, "flags")) || {};
 			const storageFlags = {
+				...existingFlags,
 				verificationVideoExists: !!updatedVerificationData.verificationVideo,
 				verifiableIDExists: !!updatedVerificationData.verifiableID,
 			};
 
 			// If there's a new verification video, encode it
-			if (data.verificationVideo) {
-				const videoBase64 = await fileToBase64(data.verificationVideo);
+			if (processedVerificationVideo && data.verificationVideo) {
+				const videoBase64 = await fileToBase64(processedVerificationVideo);
 				storageData.verificationVideoBase64 = videoBase64;
-				storageData.verificationVideoName = data.verificationVideo.name;
-				storageData.verificationVideoType = data.verificationVideo.type;
+				storageData.verificationVideoName = processedVerificationVideo.name;
+				storageData.verificationVideoType = processedVerificationVideo.type;
 			}
 
 			// If there's a new ID, encode it
@@ -508,6 +569,36 @@ export const CreatorVerificationProvider = ({
 				storageData.verifiableIDType = data.verifiableID.type;
 			}
 
+			if (data.portfolioVideos) {
+				// Store portfolio videos in IndexedDB
+				const portfolioBase64Array = [];
+				const portfolioMetadata = [];
+
+				for (let i = 0; i < data.portfolioVideos.length; i++) {
+					const video = data.portfolioVideos[i];
+					if (video) {
+						const videoBase64 = await fileToBase64(video);
+						portfolioBase64Array[i] = videoBase64;
+						portfolioMetadata[i] = {
+							name: video.name,
+							type: video.type,
+						};
+					} else {
+						portfolioBase64Array[i] = null;
+						portfolioMetadata[i] = null;
+					}
+				}
+
+				storageData.portfolioVideosBase64 = portfolioBase64Array;
+				storageData.portfolioVideosMetadata = portfolioMetadata;
+			}
+
+			// Update the flags to include portfolio videos
+			storageFlags.portfolioVideosExists = !!(
+				data.portfolioVideos &&
+				data.portfolioVideos.some((video) => video !== null)
+			);
+
 			// Store in IndexedDB
 			await putIntoDB(VERIFICATION_STORE, "flags", storageFlags);
 			await putIntoDB(VERIFICATION_STORE, "files", storageData);
@@ -515,7 +606,14 @@ export const CreatorVerificationProvider = ({
 			// Update state after successful storage
 			setVerificationData((prev) => ({
 				...prev,
-				...updatedVerificationData,
+				verificationVideo:
+					updatedVerificationData.verificationVideo ?? prev.verificationVideo,
+				verifiableID: updatedVerificationData.verifiableID ?? prev.verifiableID,
+				portfolioVideos:
+					updatedVerificationData.portfolioVideos ?? prev.portfolioVideos,
+				compressionProgress:
+					data.compressionProgress ?? prev.compressionProgress,
+				isCompressing: prev.isCompressing,
 			}));
 
 			// Mark fields as touched
@@ -524,6 +622,9 @@ export const CreatorVerificationProvider = ({
 			}
 			if (data.verifiableID !== undefined) {
 				setTouched((prev) => ({ ...prev, verifiableID: true }));
+			}
+			if (data.portfolioVideos !== undefined) {
+				setTouched((prev) => ({ ...prev, portfolioVideos: true }));
 			}
 
 			return;
@@ -536,6 +637,7 @@ export const CreatorVerificationProvider = ({
 	// Enhanced validation function that updates isFormValid state
 	const validateProfileData = (updateErrorState = true) => {
 		const requiredFields = [
+			{ key: "aboutMeVideo", label: "About Me Video" },
 			{ key: "picture", label: "Profile Picture" },
 			{ key: "bio", label: "Bio" },
 			{ key: "tiktokUrl", label: "TikTok URL" },
@@ -553,6 +655,11 @@ export const CreatorVerificationProvider = ({
 		requiredFields.forEach((field) => {
 			if (field.key === "picture") {
 				if (!profileData.picture) {
+					missingFields.push(field.label);
+					errors[field.key] = `${field.label} is required`;
+				}
+			} else if (field.key === "aboutMeVideo") {
+				if (!profileData.aboutMeVideo) {
 					missingFields.push(field.label);
 					errors[field.key] = `${field.label} is required`;
 				}
@@ -631,9 +738,13 @@ export const CreatorVerificationProvider = ({
 				...data,
 				picture:
 					data.picture !== undefined ? data.picture : profileData.picture,
+				aboutMeVideo:
+					data.aboutMeVideo !== undefined
+						? data.aboutMeVideo
+						: profileData.aboutMeVideo,
 			};
 
-			// Prepare data for storage (without the File object)
+			// Prepare data for storage (without the File objects)
 			const profileDataToStore = {
 				bio: updatedData.bio,
 				tiktokUrl: updatedData.tiktokUrl,
@@ -645,6 +756,7 @@ export const CreatorVerificationProvider = ({
 				contentLinks: updatedData.contentLinks,
 				socialMedia: updatedData.socialMedia,
 				pricing: updatedData.pricing,
+				abnNumber: updatedData.abnNumber || null,
 			};
 
 			// Save to local storage
@@ -652,6 +764,56 @@ export const CreatorVerificationProvider = ({
 				PROFILE_DATA_KEY,
 				JSON.stringify(profileDataToStore)
 			);
+
+			// Handle aboutMeVideo storage in IndexedDB
+			if (data.aboutMeVideo) {
+				try {
+					// Get existing files from IndexedDB
+					const existingFiles =
+						(await getFromDB(VERIFICATION_STORE, "files")) || {};
+					const existingFlags =
+						(await getFromDB(VERIFICATION_STORE, "flags")) || {};
+
+					// Compress if needed
+					let processedAboutMeVideo = data.aboutMeVideo;
+					if (
+						data.aboutMeVideo instanceof File &&
+						needsCompression(data.aboutMeVideo)
+					) {
+						processedAboutMeVideo = await compressVideo(data.aboutMeVideo, {
+							onProgress: (progress) => {
+								// Handle compression progress if needed
+								console.log(`About me video compression: ${progress * 100}%`);
+							},
+						});
+					}
+
+					// Store in IndexedDB
+					let aboutMeVideoBase64: string | null = null;
+					if (processedAboutMeVideo instanceof File) {
+						aboutMeVideoBase64 = await fileToBase64(processedAboutMeVideo);
+					} else {
+						throw new Error("processedAboutMeVideo must be a File");
+					}
+					const updatedFiles = {
+						...existingFiles,
+						aboutMeVideoBase64: aboutMeVideoBase64,
+						aboutMeVideoName: processedAboutMeVideo.name,
+						aboutMeVideoType: processedAboutMeVideo.type,
+					};
+
+					const updatedFlags = {
+						...existingFlags,
+						aboutMeVideoExists: true,
+					};
+
+					await putIntoDB(VERIFICATION_STORE, "files", updatedFiles);
+					await putIntoDB(VERIFICATION_STORE, "flags", updatedFlags);
+				} catch (error) {
+					console.error("Error storing aboutMeVideo:", error);
+					throw error;
+				}
+			}
 
 			// If there's a new profile picture, save it separately
 			if (data.picture) {
@@ -720,6 +882,13 @@ export const CreatorVerificationProvider = ({
 		verificationData.verificationVideo && verificationData.verifiableID
 	);
 
+	const isPortfolioComplete = Boolean(
+		verificationData.portfolioVideos &&
+			verificationData.portfolioVideos.length >= 3 &&
+			verificationData.portfolioVideos.filter((video) => video !== null)
+				.length >= 3
+	);
+
 	// Submit all data to the API
 	const submitVerification = async () => {
 		if (!userId) {
@@ -745,6 +914,19 @@ export const CreatorVerificationProvider = ({
 			};
 		}
 
+		if (!isPortfolioComplete) {
+			setFieldErrors((prev) => ({
+				...prev,
+				portfolioVideos: !verificationData.portfolioVideos
+					? "Portfolio video is required"
+					: "",
+			}));
+			return {
+				success: false,
+				message: "Please complete all required verification fields",
+			};
+		}
+
 		if (!profileValidation.isValid) {
 			return {
 				success: false,
@@ -760,7 +942,14 @@ export const CreatorVerificationProvider = ({
 			let filesToUpload = 0;
 			if (verificationData.verificationVideo) filesToUpload++;
 			if (verificationData.verifiableID) filesToUpload++;
+			if (profileData.aboutMeVideo) filesToUpload++;
 			if (profileData.picture) filesToUpload++;
+			// Add portfolio videos count
+			if (verificationData.portfolioVideos) {
+				filesToUpload += verificationData.portfolioVideos.filter(
+					(video) => video !== null
+				).length;
+			}
 
 			setTotalFilesToUpload(filesToUpload);
 			setCompletedUploads(0);
@@ -820,12 +1009,41 @@ export const CreatorVerificationProvider = ({
 				setCompletedUploads((prev) => prev + 1);
 			}
 
+			// Upload about me video if exists
+			if (profileData.aboutMeVideo) {
+				setCurrentUploadingFile("aboutMeVideo");
+				setUploadProgress(0);
+
+				const aboutMeVideoResponse = await uploadFileInChunks(
+					userId,
+					"aboutMeVideo",
+					profileData.aboutMeVideo && profileData.aboutMeVideo instanceof File
+						? profileData.aboutMeVideo
+						: (() => {
+								throw new Error("aboutMeVideo must be a File");
+							})(),
+					verificationId,
+					(progress) => setUploadProgress(progress.totalProgress)
+				);
+
+				if (!aboutMeVideoResponse.success) {
+					throw new Error(
+						aboutMeVideoResponse.message || "Failed to upload about me video"
+					);
+				}
+
+				// Store the URL in the profile data
+				updatedProfileData.aboutMeVideo = aboutMeVideoResponse.fileUrl ?? null;
+				verificationId = aboutMeVideoResponse.verificationId ?? "";
+				setCompletedUploads((prev) => prev + 1);
+			}
+
 			// Upload profile picture if exists
 			if (profileData.picture) {
 				setCurrentUploadingFile("profilePicture");
 				setUploadProgress(0);
 
-				const pictureResponse = await uploadFileInChunks(
+				const profilePictureResponse = await uploadFileInChunks(
 					userId,
 					"profilePicture",
 					profileData.picture,
@@ -833,57 +1051,79 @@ export const CreatorVerificationProvider = ({
 					(progress) => setUploadProgress(progress.totalProgress)
 				);
 
-				if (!pictureResponse.success) {
+				if (!profilePictureResponse.success) {
 					throw new Error(
-						pictureResponse.message || "Failed to upload profile picture"
+						profilePictureResponse.message || "Failed to upload profile picture"
 					);
 				}
 
 				// Store the URL in the profile data
-				updatedProfileData.profilePictureUrl = pictureResponse.fileUrl ?? null;
-				verificationId = pictureResponse.verificationId ?? verificationId;
+				updatedProfileData.profilePictureUrl =
+					profilePictureResponse.fileUrl ?? null;
+				verificationId = profilePictureResponse.verificationId ?? "";
 				setCompletedUploads((prev) => prev + 1);
 			}
 
-			// Complete the verification process by sending profile data WITH the file URLs
-			const completeResponse = await fetch("/api/submit-verification", {
+			// Upload portfolio videos if they exist
+			const portfolioVideoUrls = [];
+			if (
+				verificationData.portfolioVideos &&
+				verificationData.portfolioVideos.length > 0
+			) {
+				for (let i = 0; i < verificationData.portfolioVideos.length; i++) {
+					const portfolioVideo = verificationData.portfolioVideos[i];
+					if (portfolioVideo) {
+						setCurrentUploadingFile(`portfolioVideo-${i + 1}`);
+						setUploadProgress(0);
+
+						const portfolioResponse = await uploadFileInChunks(
+							userId,
+							`portfolioVideo-${i}`, // or however you want to name them
+							portfolioVideo,
+							verificationId,
+							(progress) => setUploadProgress(progress.totalProgress)
+						);
+
+						if (!portfolioResponse.success) {
+							throw new Error(
+								portfolioResponse.message ||
+									`Failed to upload portfolio video ${i + 1}`
+							);
+						}
+
+						portfolioVideoUrls[i] = portfolioResponse.fileUrl ?? null;
+						verificationId = portfolioResponse.verificationId ?? "";
+						setCompletedUploads((prev) => prev + 1);
+					} else {
+						portfolioVideoUrls[i] = null;
+					}
+				}
+			}
+
+			// Now submit the complete profile data with all file URLs
+			const submitData = {
+				...updatedProfileData,
+				userId,
+				verificationId,
+				portfolioVideoUrls,
+			};
+
+			// Make the final API call to submit all the data
+			const response = await fetch("/api/submit-verification", {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
 				},
-				body: JSON.stringify({
-					userId,
-					verificationId,
-					profileData: {
-						bio: updatedProfileData.bio,
-						tiktokUrl: updatedProfileData.tiktokUrl,
-						ethnicity: updatedProfileData.ethnicity,
-						dateOfBirth: updatedProfileData.dateOfBirth,
-						gender: updatedProfileData.gender,
-						contentTypes: updatedProfileData.contentTypes,
-						socialMedia: updatedProfileData.socialMedia,
-						country: updatedProfileData.country,
-						contentLinks: updatedProfileData.contentLinks,
-						pricing: updatedProfileData.pricing,
-						// Add the file URLs to the submitted data
-						verificationVideoUrl: updatedProfileData.verificationVideoUrl,
-						verifiableIDUrl: updatedProfileData.verifiableIDUrl,
-						profilePictureUrl: updatedProfileData.profilePictureUrl,
-					},
-				}),
+				body: JSON.stringify(submitData),
 			});
 
-			if (!completeResponse.ok) {
-				const errorData = await completeResponse.json();
-				throw new Error(errorData.error || "Failed to complete verification");
+			const result = await response.json();
+
+			if (!response.ok) {
+				throw new Error(result.message || "Failed to submit verification");
 			}
 
-			const result = await completeResponse.json();
-
-			// Update state with URLs before clearing
-			setProfileData(updatedProfileData);
-
-			// Clear data after successful submission
+			// Clear form data after successful submission
 			await resetForm();
 
 			return {
@@ -894,46 +1134,46 @@ export const CreatorVerificationProvider = ({
 			console.error("Error submitting verification:", error);
 			return {
 				success: false,
-				message:
-					error instanceof Error
-						? error.message
-						: "Failed to submit verification",
+				message: error instanceof Error ? error.message : "Submission failed",
 			};
 		} finally {
+			setLoading(false);
 			setIsUploading(false);
 			setCurrentUploadingFile(null);
 			setUploadProgress(0);
-			setLoading(false);
+			setTotalFilesToUpload(0);
+			setCompletedUploads(0);
 		}
 	};
 
+	const contextValue: CreatorVerificationContextType = {
+		verificationData,
+		profileData,
+		updateVerificationData,
+		updateProfileData,
+		isVerificationComplete,
+		isPortfolioComplete,
+		isProfileComplete,
+		isFormValid,
+		submitVerification,
+		loading,
+		fieldErrors,
+		validateProfileData,
+		clearFieldError,
+		touched,
+		setTouched,
+		resetForm,
+		isCompressing: verificationData.isCompressing,
+		compressionProgress: verificationData.compressionProgress,
+		isUploading,
+		currentUploadingFile,
+		uploadProgress,
+		totalFilesToUpload,
+		completedUploads,
+	};
+
 	return (
-		<CreatorVerificationContext.Provider
-			value={{
-				verificationData,
-				profileData,
-				updateVerificationData,
-				updateProfileData,
-				isVerificationComplete,
-				isProfileComplete,
-				isFormValid,
-				submitVerification,
-				loading,
-				fieldErrors,
-				validateProfileData,
-				clearFieldError,
-				touched,
-				setTouched,
-				resetForm,
-				isCompressing: verificationData.isCompressing,
-				compressionProgress: verificationData.compressionProgress,
-				isUploading,
-				currentUploadingFile,
-				uploadProgress,
-				totalFilesToUpload,
-				completedUploads,
-			}}
-		>
+		<CreatorVerificationContext.Provider value={contextValue}>
 			{children}
 		</CreatorVerificationContext.Provider>
 	);

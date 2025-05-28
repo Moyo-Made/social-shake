@@ -84,7 +84,7 @@ const CreatorVideoShowcase: React.FC<CreatorVideoShowcaseProps> = ({
 	const [showSuccessMessage, setShowSuccessMessage] = useState<string | null>(
 		null
 	);
-	const [savedVideos, setSavedVideos] = useState<Set<string>>(new Set());
+	const [, setSavedVideos] = useState<Set<string>>(new Set());
 
 	// Filters
 	const [selectedLicense, setSelectedLicense] = useState<string>("all");
@@ -226,13 +226,13 @@ const CreatorVideoShowcase: React.FC<CreatorVideoShowcaseProps> = ({
 					creatorName: creatorName,
 				}),
 			});
-			if (!response.ok) throw new Error("Failed to save video");
+			if (!response.ok) throw new Error("Failed to save purchased video");
 
 			// Show success feedback
-			toast("Video saved to your library!");
+			toast("Video purchased added to your library!");
 		} catch (error) {
 			console.error("Save error:", error);
-			toast("Video has already been saved to your library.");
+			toast("Video purchased has already been added to your library.");
 
 		} finally {
 			setIsSaving(null);
@@ -521,7 +521,7 @@ const CreatorVideoShowcase: React.FC<CreatorVideoShowcaseProps> = ({
 									<div className="opacity-0 group-hover:opacity-100 transform scale-75 group-hover:scale-100 transition-all duration-200">
 										<div className="bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full p-3 shadow-lg">
 											<Play
-												className="w-6 h-6 text-gray-800 ml-0.5"
+												className="w-6 h-6 text-orange-500 ml-0.5"
 												fill="currentColor"
 											/>
 										</div>
@@ -653,17 +653,17 @@ const CreatorVideoShowcase: React.FC<CreatorVideoShowcaseProps> = ({
 													<Button
 														onClick={() => handleSaveToLibrary(video)}
 														disabled={
-															isSaving === video.id || savedVideos.has(video.id)
+															isSaving === video.id || purchasedVideos.has(video.id)
 														}
 														className={`w-full px-3 py-2 rounded text-sm transition-colors ${
-															savedVideos.has(video.id)
+															purchasedVideos.has(video.id)
 																? "bg-gray-100 text-gray-500 cursor-not-allowed"
 																: "bg-blue-100 text-blue-700 hover:bg-blue-200"
 														} disabled:opacity-50`}
 													>
 														{isSaving === video.id ? (
 															<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-700 mx-auto"></div>
-														) : savedVideos.has(video.id) ? (
+														) : purchasedVideos.has(video.id) ? (
 															<>
 																<CheckCircle2
 																	size={16}
@@ -771,17 +771,17 @@ const CreatorVideoShowcase: React.FC<CreatorVideoShowcaseProps> = ({
 												onClick={() => handleSaveToLibrary(selectedVideo)}
 												disabled={
 													isSaving === selectedVideo.id ||
-													savedVideos.has(selectedVideo.id)
+													purchasedVideos.has(selectedVideo.id)
 												}
 												className={`px-4 py-2 rounded disabled:opacity-50 ${
-													savedVideos.has(selectedVideo.id)
+													purchasedVideos.has(selectedVideo.id)
 														? "bg-gray-100 text-gray-500 cursor-not-allowed"
 														: "bg-blue-500 text-white hover:bg-blue-600"
 												}`}
 											>
 												{isSaving === selectedVideo.id ? (
 													<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mx-auto"></div>
-												) : savedVideos.has(selectedVideo.id) ? (
+												) : purchasedVideos.has(selectedVideo.id) ? (
 													<>
 														<CheckCircle2 size={16} className="inline mr-1" />
 														Saved

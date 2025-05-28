@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Heart, Send, ArrowLeft } from "lucide-react";
+import { Heart, Send, ArrowLeft, Video } from "lucide-react";
 import {
 	Card,
 	CardContent,
@@ -17,9 +17,13 @@ import CreatorVideoShowcase from "./CreatorVideoShowcase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import VideoComponent from "./VideoComponent";
+import PortfolioVideosTab from "./PortfolioVideoTab";
+import PerformanceStatsCard from "./PerformanceStatsCard";
 
 // Define types
 export interface Creators {
+	portfolioVideoUrls: string[] | undefined;
 	id: string;
 	name: string;
 	username: string;
@@ -53,6 +57,8 @@ export interface Creators {
 	contentLinks: string[];
 	verificationVideoUrl?: string;
 	verifiableIDUrl?: string;
+	aboutMeVideoUrl?: string;
+	abnNumber?: string;
 	creatorProfileData?: {
 		createdAt: string;
 		firstName: string;
@@ -118,6 +124,9 @@ const CreatorMarketplace = () => {
 	const [isClient, setIsClient] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [currentPlayingVideo, setCurrentPlayingVideo] = useState<string | null>(
+		null
+	);
 
 	// Fetch creators from Firebase
 	useEffect(() => {
@@ -170,6 +179,9 @@ const CreatorMarketplace = () => {
 							tiktokAvatarUrl?: string;
 							tiktokDisplayName?: string;
 						};
+						abnNumber?: string;
+						aboutMeVideoUrl?: string;
+						portfolioVideoUrls?: string[];
 					}) => ({
 						id: creator.userId,
 						name: `${creator.firstName || ""} ${creator.lastName || ""}`.trim(),
@@ -208,6 +220,9 @@ const CreatorMarketplace = () => {
 						contentLinks: creator.contentLinks || [],
 						verificationVideoUrl: creator.verificationVideoUrl || "",
 						verifiableIDUrl: creator.verifiableIDUrl || "",
+						abnNumber: creator.abnNumber,
+						aboutMeVideoUrl: creator.aboutMeVideoUrl,
+						portfolioVideoUrls: creator.portfolioVideoUrls || [],
 					})
 				);
 
@@ -407,7 +422,7 @@ const CreatorMarketplace = () => {
 	// Detail profile view
 	if (selectedCreator) {
 		return (
-			<div className="container mx-auto p-3 md:p-4 max-w-7xl">
+			<div className="container mx-auto h-screen">
 				{showAlert && <AlertNotification />}
 
 				{/* Back button */}
@@ -443,7 +458,7 @@ const CreatorMarketplace = () => {
 									{selectedCreator.creatorProfileData?.tiktokDisplayName ||
 										selectedCreator.name}
 								</h2>
-								
+
 								<p className="text-gray-500 text-sm md:text-base mb-1">
 									@{selectedCreator.username}
 								</p>
@@ -464,21 +479,21 @@ const CreatorMarketplace = () => {
 						<div className="flex flex-col sm:flex-row items-center gap-3 lg:items-end lg:flex-col lg:gap-2">
 							<div className="text-center lg:text-right">
 								<p className="text-sm text-gray-500">Starting from</p>
-								
 
 								<p className="text-base font-bold text-orange-500">
-									${selectedCreator.pricing.oneVideo} <span className="font-normal text-sm text-gray-500">per video</span>
+									${selectedCreator.pricing.oneVideo}{" "}
+									<span className="font-normal text-sm text-gray-500">
+										per video
+									</span>
 								</p>
-								
-								
 							</div>
 							<div className="flex gap-3">
 								<Button
 									onClick={() => handleSendMessage(selectedCreator)}
 									className="bg-orange-500 hover:bg-orange-600 text-white"
 								>
-									<Send size={16} className="mr-2" />
 									Send Message
+									<Send size={16} className="" />
 								</Button>
 								<Button
 									variant="outline"
@@ -512,15 +527,24 @@ const CreatorMarketplace = () => {
 				{/* Tabs Section */}
 				<div className="mt-6">
 					<Tabs defaultValue="profile" className="w-full">
-						<TabsList className="grid w-full grid-cols-3  ">
-							<TabsTrigger value="profile" className="text-sm md:text-base">
+						<TabsList className="grid w-full grid-cols-3 shadow-none">
+							<TabsTrigger
+								value="profile"
+								className="relative text-sm md:text-base data-[state=active]:after:absolute data-[state=active]:after:bottom-0 data-[state=active]:after:left-2 data-[state=active]:after:right-2 data-[state=active]:after:h-[3px] data-[state=active]:after:bg-[#FD5C02] data-[state=active]:after:rounded-full data-[state=inactive]:after:absolute data-[state=inactive]:after:bottom-0 data-[state=inactive]:after:left-2 data-[state=inactive]:after:right-2 data-[state=inactive]:after:h-[3px] data-[state=inactive]:after:bg-gray-300 data-[state=inactive]:after:rounded-full after:content-['']"
+							>
 								Profile Info
 							</TabsTrigger>
-							<TabsTrigger value="videos" className="text-sm md:text-base">
+							<TabsTrigger
+								value="videos"
+								className="relative text-sm md:text-base data-[state=active]:after:absolute data-[state=active]:after:bottom-0 data-[state=active]:after:left-2 data-[state=active]:after:right-2 data-[state=active]:after:h-[3px] data-[state=active]:after:bg-[#FD5C02] data-[state=active]:after:rounded-full data-[state=inactive]:after:absolute data-[state=inactive]:after:bottom-0 data-[state=inactive]:after:left-2 data-[state=inactive]:after:right-2 data-[state=inactive]:after:h-[3px] data-[state=inactive]:after:bg-gray-300 data-[state=inactive]:after:rounded-full after:content-['']"
+							>
 								Video Library
 							</TabsTrigger>
-							<TabsTrigger value="portfolio" className="text-sm md:text-base">
-								Portfolio Links
+							<TabsTrigger
+								value="portfolio"
+								className="relative text-sm md:text-base data-[state=active]:after:absolute data-[state=active]:after:bottom-0 data-[state=active]:after:left-2 data-[state=active]:after:right-2 data-[state=active]:after:h-[3px] data-[state=active]:after:bg-[#FD5C02] data-[state=active]:after:rounded-full data-[state=inactive]:after:absolute data-[state=inactive]:after:bottom-0 data-[state=inactive]:after:left-2 data-[state=inactive]:after:right-2 data-[state=inactive]:after:h-[3px] data-[state=inactive]:after:bg-gray-300 data-[state=inactive]:after:rounded-full after:content-['']"
+							>
+								Portfolio Videos
 							</TabsTrigger>
 						</TabsList>
 
@@ -529,7 +553,7 @@ const CreatorMarketplace = () => {
 							<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 								{/* Basic Info Card */}
 								<div className="bg-white border border-[#FDE5D7] rounded-lg p-4 md:p-6">
-									<h3 className="text-lg md:text-xl font-semibold mb-4 flex items-center">
+									<h3 className="text-base md:text-lg font-semibold mb-4 flex items-center">
 										<svg
 											className="w-5 h-5 mr-2 text-orange-500"
 											fill="currentColor"
@@ -556,7 +580,7 @@ const CreatorMarketplace = () => {
 												</p>
 											</div>
 											<div>
-											<Label className="text-sm font-medium text-gray-500">
+												<Label className="text-sm font-medium text-gray-500">
 													Content Type
 												</Label>
 												<p className="text-gray-600 text-sm md:text-base">
@@ -574,6 +598,16 @@ const CreatorMarketplace = () => {
 													{selectedCreator.country || "Not specified"}
 												</p>
 											</div>
+											{selectedCreator.abnNumber && (
+												<div>
+													<Label className="text-sm font-medium text-gray-500">
+														Australian Business Number
+													</Label>
+													<p className="mt-1 text-sm md:text-base">
+														{selectedCreator.abnNumber}
+													</p>
+												</div>
+											)}
 										</div>
 
 										<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -619,49 +653,11 @@ const CreatorMarketplace = () => {
 								{/* Stats & Pricing Card */}
 								<div className="space-y-6">
 									{/* Stats Card */}
-									<div className="bg-white border border-[#FDE5D7] rounded-lg p-4 md:p-6">
-										<h3 className="text-lg md:text-xl font-semibold mb-4 flex items-center">
-											<svg
-												className="w-5 h-5 mr-2 text-orange-500"
-												fill="currentColor"
-												viewBox="0 0 20 20"
-											>
-												<path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
-											</svg>
-											Performance Stats
-										</h3>
-
-										<div className="grid grid-cols-3 gap-4">
-											<div className="text-center p-3 bg-orange-50 rounded-lg">
-												<p className="text-lg md:text-xl font-bold text-orange-600">
-													0
-												</p>
-												<p className="text-xs md:text-sm text-gray-600">
-													Total Projects
-												</p>
-											</div>
-											<div className="text-center p-3 bg-blue-50 rounded-lg">
-												<p className="text-lg md:text-xl font-bold text-blue-600">
-													0+
-												</p>
-												<p className="text-xs md:text-sm text-gray-600">
-													Total Views
-												</p>
-											</div>
-											<div className="text-center p-3 bg-green-50 rounded-lg">
-												<p className="text-lg md:text-xl font-bold text-green-600">
-													0
-												</p>
-												<p className="text-xs md:text-sm text-gray-600">
-													Contests Won
-												</p>
-											</div>
-										</div>
-									</div>
+									<PerformanceStatsCard userId={selectedCreator.id} />
 
 									{/* Pricing Card */}
 									<div className="bg-white border border-[#FDE5D7] rounded-lg p-4 md:p-6">
-										<h3 className="text-lg md:text-xl font-semibold mb-4 flex items-center">
+										<h3 className="text-base md:text-lg font-semibold mb-4 flex items-center">
 											<svg
 												className="w-5 h-5 mr-2 text-orange-500"
 												fill="currentColor"
@@ -680,27 +676,47 @@ const CreatorMarketplace = () => {
 										<div className="space-y-3">
 											<div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
 												<span className="font-medium">1 Video</span>
-												<span className="font-bold text-orange-600">
-													${selectedCreator.pricing.oneVideo}
-												</span>
+												<div>
+													<span className="font-medium text-orange-600">
+														${selectedCreator.pricing.oneVideo}
+													</span>
+													<Button className="bg-orange-500 hover:bg-orange-600 text-white ml-3 shadow-none">
+														Buy
+													</Button>
+												</div>
 											</div>
 											<div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
 												<span className="font-medium">3 Videos</span>
-												<span className="font-bold text-orange-600">
-													${selectedCreator.pricing.threeVideos}
-												</span>
+												<div>
+													<span className="font-medium text-orange-600">
+														${selectedCreator.pricing.threeVideos}
+													</span>
+													<Button className="bg-orange-500 hover:bg-orange-600 text-white ml-3 shadow-none">
+														Buy
+													</Button>
+												</div>
 											</div>
 											<div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
 												<span className="font-medium">5 Videos</span>
-												<span className="font-bold text-orange-600">
-													${selectedCreator.pricing.fiveVideos}
-												</span>
+												<div>
+													<span className="font-medium text-orange-600">
+														${selectedCreator.pricing.fiveVideos}
+													</span>
+													<Button className="bg-orange-500 hover:bg-orange-600 text-white ml-3 shadow-none">
+														Buy
+													</Button>
+												</div>
 											</div>
 											<div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
 												<span className="font-medium">Bulk Videos</span>
-												<span className="font-bold text-orange-600">
-													${selectedCreator.pricing.bulkVideos}
-												</span>
+												<div>
+													<span className="font-medium text-orange-600">
+														${selectedCreator.pricing.bulkVideos}
+													</span>
+													<Button className="bg-orange-500 hover:bg-orange-600 text-white ml-3 shadow-none">
+														Buy
+													</Button>
+												</div>
 											</div>
 											{selectedCreator.pricing.bulkVideosNote && (
 												<p className="text-xs text-gray-500 mt-2">
@@ -727,122 +743,9 @@ const CreatorMarketplace = () => {
 						{/* Portfolio Links Tab */}
 						<TabsContent value="portfolio" className="mt-6">
 							<div className="bg-white border border-[#FDE5D7] rounded-lg p-4 md:p-6">
-								<h3 className="text-lg md:text-xl font-semibold mb-4 flex items-center">
-									<svg
-										className="w-5 h-5 mr-2 text-orange-500"
-										fill="currentColor"
-										viewBox="0 0 20 20"
-									>
-										<path
-											fillRule="evenodd"
-											d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z"
-											clipRule="evenodd"
-										/>
-									</svg>
-									Portfolio & Social Links
-								</h3>
-
-								<div className="space-y-6">
-									{/* Social Media Links */}
-									<div>
-										<h4 className="font-semibold mb-3">Social Media</h4>
-										<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-											{selectedCreator.tiktokUrl && (
-												<a
-													href={selectedCreator.tiktokUrl}
-													target="_blank"
-													rel="noopener noreferrer"
-													className="flex items-center p-3 border rounded-lg hover:bg-gray-50 transition-colors"
-												>
-													<div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center mr-3">
-														<span className="text-white text-xs font-bold">
-															TT
-														</span>
-													</div>
-													<div>
-														<p className="font-medium">TikTok</p>
-														<p className="text-sm text-gray-500">
-															@
-															{selectedCreator.tiktokUrl.split("@")[1] ||
-																"View Profile"}
-														</p>
-													</div>
-												</a>
-											)}
-										</div>
-									</div>
-
-									{/* Content Links */}
-									{selectedCreator.contentLinks &&
-										selectedCreator.contentLinks.length > 0 && (
-											<div>
-												<h4 className="font-semibold mb-3">
-													Portfolio Content
-												</h4>
-												<div className="space-y-3">
-													{selectedCreator.contentLinks.map((link, index) => (
-														<a
-															key={index}
-															href={link}
-															target="_blank"
-															rel="noopener noreferrer"
-															className="flex items-center p-3 border rounded-lg hover:bg-gray-50 transition-colors"
-														>
-															<div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mr-3">
-																<svg
-																	className="w-4 h-4 text-orange-600"
-																	fill="currentColor"
-																	viewBox="0 0 20 20"
-																>
-																	<path
-																		fillRule="evenodd"
-																		d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A2 2 0 0011.172 3H8.828a2 2 0 00-1.414.586L6.293 4.707A1 1 0 015.586 5H4zm6 9a3 3 0 100-6 3 3 0 000 6z"
-																		clipRule="evenodd"
-																	/>
-																</svg>
-															</div>
-															<div>
-																<p className="font-medium">
-																	Portfolio Item {index + 1}
-																</p>
-																<p className="text-sm text-gray-500 truncate max-w-xs">
-																	{link}
-																</p>
-															</div>
-														</a>
-													))}
-												</div>
-											</div>
-										)}
-
-									{/* Empty state for portfolio */}
-									{(!selectedCreator.contentLinks ||
-										selectedCreator.contentLinks.length === 0) &&
-										!selectedCreator.socialMedia?.instagram && (
-											<div className="text-center py-8">
-												<svg
-													className="mx-auto h-12 w-12 text-gray-400 mb-4"
-													fill="none"
-													stroke="currentColor"
-													viewBox="0 0 24 24"
-												>
-													<path
-														strokeLinecap="round"
-														strokeLinejoin="round"
-														strokeWidth={2}
-														d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-													/>
-												</svg>
-												<p className="text-gray-500">
-													No portfolio links available
-												</p>
-												<p className="text-sm text-gray-400 mt-1">
-													The creator hasn&apos;t added any portfolio content
-													yet
-												</p>
-											</div>
-										)}
-								</div>
+								<PortfolioVideosTab
+									portfolioVideoUrls={selectedCreator.portfolioVideoUrls || []}
+								/>
 							</div>
 						</TabsContent>
 					</Tabs>
@@ -875,7 +778,7 @@ const CreatorMarketplace = () => {
 								<CardHeader className="pb-0">
 									<div className="flex justify-between items-start">
 										<div className="flex items-center">
-											<div className="w-12 h-12 md:w-16 md:h-16 rounded-full overflow-hidden mr-3 md:mr-4">
+											<div className="w-12 h-12 md:w-20 md:h-20 rounded-full overflow-hidden mr-3 md:mr-4">
 												<Image
 													src={
 														creator.creatorProfileData?.tiktokAvatarUrl ||
@@ -883,8 +786,8 @@ const CreatorMarketplace = () => {
 													}
 													alt={creator.name}
 													className="w-full h-full object-cover"
-													width={64}
-													height={64}
+													width={100}
+													height={100}
 												/>
 											</div>
 											<div>
@@ -911,57 +814,9 @@ const CreatorMarketplace = () => {
 										{creator.bio || "No bio available"}
 									</p>
 
-									<div className="space-y-2 md:space-y-3 mt-3 md:mt-4">
-										<div className="flex justify-between items-center bg-[#FFF4EE] py-1.5 md:py-2 px-2 md:px-3 rounded-lg">
-											<div className="flex items-center">
-												<span className="text-orange-500 mr-1 md:mr-2">$</span>
-												<span className="text-xs md:text-sm">
-													Total GMV{" "}
-													<span className="text-gray-500">(Last 30 days)</span>
-												</span>
-											</div>
-											<span className="font-medium text-sm md:text-base">
-												${creator.totalGMV || 0}
-											</span>
-										</div>
-
-										<div className="flex justify-between items-center bg-[#FFF4EE] py-1.5 md:py-2 px-2 md:px-3 rounded-lg">
-											<div className="flex items-center">
-												<span className="text-orange-500 mr-1 md:mr-2">$</span>
-												<span className="text-xs md:text-sm">
-													Avg. GMV per Video
-												</span>
-											</div>
-											<span className="font-medium text-sm md:text-base">
-												${creator.avgGMVPerVideo || 0}
-											</span>
-										</div>
-
-										<div className="flex justify-between items-center bg-[#FFF4EE] py-1.5 md:py-2 px-2 md:px-3 rounded-lg">
-											<div className="flex items-center">
-												<span className="text-orange-500 mr-1 md:mr-2">
-													<svg
-														className="w-4 h-4 md:w-5 md:h-5"
-														fill="currentColor"
-														viewBox="0 0 20 20"
-													>
-														<path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-														<path
-															fillRule="evenodd"
-															d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
-															clipRule="evenodd"
-														/>
-													</svg>
-												</span>
-												<span className="text-xs md:text-sm">
-													Avg. Impressions per Video
-												</span>
-											</div>
-											<span className="font-medium text-sm md:text-base">
-												{creator.avgImpressions || "0"}
-											</span>
-										</div>
-									</div>
+									<video src={creator.aboutMeVideoUrl} controls>
+										<p>Your browser doesn&apos;t support HTML video.</p>
+									</video>
 								</CardContent>
 
 								<CardFooter>
@@ -993,7 +848,7 @@ const CreatorMarketplace = () => {
 						className="w-full p-2 pl-8 pr-4 border border-gray-300 rounded-md text-sm md:text-base"
 					/>
 					<svg
-						className="absolute left-2 top-2.5 h-4 w-4 text-gray-500"
+						className="absolute left-2 top-3 h-4 w-4 text-gray-500"
 						fill="none"
 						stroke="currentColor"
 						viewBox="0 0 24 24"
@@ -1147,72 +1002,19 @@ const CreatorMarketplace = () => {
 								<p className="text-gray-600 line-clamp-2 h-10 md:h-12">
 									{creator.bio || "No bio available"}
 								</p>
-
-								<div className="space-y-2 md:space-y-3 mt-3 md:mt-4">
-									<div className="flex justify-between items-center bg-[#FFF4EE] py-1.5 md:py-2 px-2 md:px-3 rounded-lg">
-										<div className="flex items-center">
-											<span className="text-orange-500 mr-1 md:mr-2">$</span>
-											<span className="text-xs md:text-sm">
-												Total GMV{" "}
-												<span className="text-gray-500">(Last 30 days)</span>
-											</span>
-										</div>
-										<span className="font-medium text-sm md:text-base">
-											${creator.totalGMV || 0}
-										</span>
-									</div>
-
-									<div className="flex justify-between items-center bg-[#FFF4EE] py-1.5 md:py-2 px-2 md:px-3 rounded-lg">
-										<div className="flex items-center">
-											<span className="text-orange-500 mr-1 md:mr-2">$</span>
-											<span className="text-xs md:text-sm">
-												Avg. GMV per Video
-											</span>
-										</div>
-										<span className="font-medium text-sm md:text-base">
-											${creator.avgGMVPerVideo || 0}
-										</span>
-									</div>
-
-									<div className="flex justify-between items-center bg-[#FFF4EE] py-1.5 md:py-2 px-2 md:px-3 rounded-lg">
-										<div className="flex items-center">
-											<span className="text-orange-500 mr-1 md:mr-2">
-												<svg
-													className="w-4 h-4 md:w-5 md:h-5"
-													fill="currentColor"
-													viewBox="0 0 20 20"
-												>
-													<path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-													<path
-														fillRule="evenodd"
-														d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
-														clipRule="evenodd"
-													/>
-												</svg>
-											</span>
-											<span className="text-xs md:text-sm">
-												Avg. Impressions per Video
-											</span>
-										</div>
-										<span className="font-medium text-sm md:text-base">
-											{creator.avgImpressions || "0"}
-										</span>
-									</div>
-								</div>
+								<VideoComponent
+									videoId={creator.id}
+									currentPlayingVideo={currentPlayingVideo}
+									setCurrentPlayingVideo={setCurrentPlayingVideo}
+									creator={{
+										...creator,
+										aboutMeVideoUrl: creator.aboutMeVideoUrl || "",
+									}}
+								/>
 
 								<div className="mt-8 bg-[#FFF4EE] p-4 rounded-lg">
 									<div className="flex justify-center items-center mb-4 bg-white rounded-lg px-4 py-2">
-										<svg
-											className="w-5 h-5 mr-2 text-orange-500"
-											fill="currentColor"
-											viewBox="0 0 20 20"
-										>
-											<path
-												fillRule="evenodd"
-												d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A2 2 0 0011.172 3H8.828a2 2 0 00-1.414.586L6.293 4.707A1 1 0 015.586 5H4zm6 9a3 3 0 100-6 3 3 0 000 6z"
-												clipRule="evenodd"
-											/>
-										</svg>
+										<Video size={24} className="text-orange-500 mr-2" />
 										<span className="font-medium">Videos</span>
 									</div>
 

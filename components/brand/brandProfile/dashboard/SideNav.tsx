@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 import { useBrandProfile } from "@/hooks/useBrandProfile";
 import BrandProfileDropdown from "@/components/brand/brandProfile/BrandProfileDropdown";
 import { useNotifications } from "@/context/NotificationContext";
+import NotificationSystem from "@/components/notifications/NotificationSystem";
 
 interface MenuItemProps {
 	icon: React.ReactNode;
@@ -131,8 +132,9 @@ const SideNav: React.FC = () => {
 	const { totalUnreadCount } = useNotifications();
 
 	return (
-		<div className="min-w-64 max-w-screen-sm bg-[#1A1A1A] text-white min-h-screen flex flex-col justify-between font-satoshi">
-			<nav className="p-4 mt-9">
+		<div className="min-w-64 max-w-screen-sm bg-[#1A1A1A] text-white h-screen flex flex-col font-satoshi">
+			{/* Scrollable main navigation area */}
+			<nav className="flex-1 overflow-y-auto p-4 mt-9">
 				<div className="space-y-2">
 					<MenuItem
 						href="/brand/dashboard"
@@ -159,7 +161,7 @@ const SideNav: React.FC = () => {
 						}
 						text="Projects"
 					/>
-					<MenuItem
+					{/* <MenuItem
 						href="/brand/dashboard/contests"
 						icon={
 							<Image
@@ -170,7 +172,7 @@ const SideNav: React.FC = () => {
 							/>
 						}
 						text="Contests"
-					/>
+					/> */}
 					<MenuItem
 						href="/brand/dashboard/creators"
 						icon={
@@ -185,16 +187,16 @@ const SideNav: React.FC = () => {
 						subItems={[
 							{ href: "/brand/dashboard/creators/all", text: "All creators" },
 							{
-								href: "/brand/dashboard/creators/saved",
+								href: "/brand/dashboard/creators/videos",
 								text: "Saved creators",
 							},
 						]}
 					/>
 
 					<MenuItem
-						href="/brand/dashboard/videos/saved"
+						href="/brand/dashboard/videos/purchased"
 						icon={<VideoIcon size={20} />}
-						text="Saved Videos"
+						text="My Videos"
 					/>
 
 					<MenuItem
@@ -227,7 +229,8 @@ const SideNav: React.FC = () => {
 				</div>
 			</nav>
 
-			<div className="p-4 space-y-2">
+			{/* Fixed bottom section */}
+			<div className="flex-shrink-0 p-4 space-y-2 border-t border-gray-700">
 				<MenuItem
 					href="/brand/dashboard/settings"
 					icon={
@@ -252,15 +255,6 @@ const SideNav: React.FC = () => {
 					}
 					text="Help & Support"
 				/>
-				{/* <div className="flex items-center justify-between text-white pt-3">
-					{brandProfile ? (
-						<BrandProfileDropdown
-							brandProfile={brandProfile}
-							loading={loading}
-							dropdownPosition="sidenav"
-						/>
-					) : null}
-				</div> */}
 			</div>
 		</div>
 	);
@@ -279,7 +273,7 @@ const getPageTitle = (pathname: string): string => {
 		"/brand/dashboard/creators": "Creators",
 		"/brand/dashboard/creators/all": "All Creators",
 		"/brand/dashboard/creators/saved": "Saved Creators",
-		"/brand/dashboard/videos/saved": "Saved Videos",
+		"/brand/dashboard/videos/purchased": "My Videos",
 		"/brand/dashboard/messages": "Messages",
 		"/brand/dashboard/transactions": "Transactions",
 		"/brand/dashboard/settings": "Settings",
@@ -311,7 +305,7 @@ const getPageTitle = (pathname: string): string => {
 	}
 
 	if (pathname.startsWith("/brand/dashboard/videos/")) {
-		return "Saved Videos";
+		return "My Videos";
 	}
 
 	if (pathname.startsWith("/brand/dashboard/settings/")) {
@@ -340,21 +334,13 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 	const { brandProfile, loading } = useBrandProfile();
 
 	return (
-		<div className="flex min-h-screen">
+		<div className="h-screen flex">
 			<SideNav />
 			<div className="flex-1 flex flex-col items-center justify-center bg-[#FFF9F6] font-satoshi ">
 				<header className="bg-white p-4 w-full flex justify-between items-center border-b border-[#FD5C02]">
 					<h1 className="text-xl font-semibold">{pageTitle}</h1>
 					<div className="flex items-center">
-						<Link href="/brand/dashboard/notifications">
-							<Image
-								src="/icons/notification.svg"
-								alt="Notifications"
-								width={20}
-								height={20}
-								className="mr-4"
-							/>
-						</Link>
+						<NotificationSystem />
 						{brandProfile && (
 							<BrandProfileDropdown
 								brandProfile={brandProfile}
@@ -364,9 +350,12 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 						)}
 					</div>
 				</header>
-				<div className="flex-1 flex items-center justify-center w-full">
-					{children}
-				</div>
+
+				<main className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
+					<div className="container mx-auto h-screen">
+						{children}
+					</div>
+				</main>
 			</div>
 		</div>
 	);

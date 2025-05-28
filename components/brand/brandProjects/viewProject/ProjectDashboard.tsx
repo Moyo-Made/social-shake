@@ -22,7 +22,7 @@ import { getStatusStyle } from "@/utils/statusUtils";
 import { ProjectFormData } from "@/types/contestFormData";
 import { CreatorSubmission } from "@/types/submission";
 
-interface Project {
+export interface Project {
 	id: string;
 	status: ProjectStatus;
 	title: string;
@@ -344,9 +344,9 @@ const ProjectDashboard = () => {
 	};
 
 	return (
-		<div className="bg-gray-50 p-6 min-h-screen w-full">
+		<div className=" mx-auto p-6 ">
 			{/* Header with search and filters */}
-			<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+			<div className="flex flex-col flex-wrap md:flex-row justify-between items-start md:items-center gap-4 mb-6">
 				<div className="relative w-full md:w-auto">
 					<Input
 						type="text"
@@ -486,7 +486,7 @@ const ProjectDashboard = () => {
 				!error &&
 				filteredProjects.length > 0 &&
 				viewType === "grid" && (
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+					<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 						{filteredProjects.map((project) => (
 							<div
 								key={project.id}

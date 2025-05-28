@@ -66,12 +66,58 @@ export async function GET(request: NextRequest) {
 			const tiktokData = {
 				...(profileData.tiktokData || {}),
 				...(creatorProfileData?.tiktokData || {}),
-				tiktokHandle: profileData.tiktokHandle || creatorProfileData?.tiktokHandle || null,
-				tiktokFollowers: profileData.tiktokFollowers || creatorProfileData?.tiktokFollowers || null,
-				tiktokEngagementRate: profileData.tiktokEngagementRate || creatorProfileData?.tiktokEngagementRate || null,
-				tiktokContentCategory: profileData.tiktokContentCategory || creatorProfileData?.tiktokContentCategory || null,
-				tiktokAverageViews: profileData.tiktokAverageViews || creatorProfileData?.tiktokAverageViews || null,
+				tiktokHandle:
+					profileData.tiktokHandle || creatorProfileData?.tiktokHandle || null,
+				tiktokFollowers:
+					profileData.tiktokFollowers ||
+					creatorProfileData?.tiktokFollowers ||
+					null,
+				tiktokEngagementRate:
+					profileData.tiktokEngagementRate ||
+					creatorProfileData?.tiktokEngagementRate ||
+					null,
+				tiktokContentCategory:
+					profileData.tiktokContentCategory ||
+					creatorProfileData?.tiktokContentCategory ||
+					null,
+				tiktokAverageViews:
+					profileData.tiktokAverageViews ||
+					creatorProfileData?.tiktokAverageViews ||
+					null,
 			};
+
+			// Collect portfolio video URLs from multiple sources
+			const portfolioVideoUrls = [];
+			
+			// First, check for individual portfolio video URLs in the root level
+			const rootData = verificationData;
+			for (let i = 0; i < 10; i++) { // Check up to 10 portfolio videos
+				const portfolioVideoKey = `portfolioVideo-${i}Url`;
+				if (rootData && rootData[portfolioVideoKey]) {
+					portfolioVideoUrls.push(rootData[portfolioVideoKey]);
+				}
+			}
+			
+			// Also check in profileData for individual portfolio video URLs
+			for (let i = 0; i < 10; i++) {
+				const portfolioVideoKey = `portfolioVideo-${i}Url`;
+				if (profileData[portfolioVideoKey]) {
+					portfolioVideoUrls.push(profileData[portfolioVideoKey]);
+				}
+			}
+			
+			// Check for portfolioVideoUrls array in profileData
+			if (profileData.portfolioVideoUrls && Array.isArray(profileData.portfolioVideoUrls)) {
+				portfolioVideoUrls.push(...profileData.portfolioVideoUrls);
+			}
+			
+			// Check for portfolioVideoUrls array in creatorProfileData
+			if (creatorProfileData?.portfolioVideoUrls && Array.isArray(creatorProfileData.portfolioVideoUrls)) {
+				portfolioVideoUrls.push(...creatorProfileData.portfolioVideoUrls);
+			}
+			
+			// Remove duplicates and filter out empty/null values
+			const uniquePortfolioVideoUrls = [...new Set(portfolioVideoUrls)].filter(url => url && url.trim() !== '');
 
 			// Consolidate all data into a single object, including all creator profile fields
 			const consolidatedData = {
@@ -106,6 +152,15 @@ export async function GET(request: NextRequest) {
 					verificationData?.verificationVideoUrl ||
 					profileData.verificationVideoUrl ||
 					null,
+				aboutMeVideoUrl:
+					profileData.aboutMeVideoUrl ||
+					profileData.aboutMeVideo ||
+					creatorProfileData?.aboutMeVideoUrl ||
+					verificationData?.aboutMeVideoUrl ||
+					null,
+				portfolioVideoUrls: uniquePortfolioVideoUrls,
+				abnNumber:
+					profileData.abnNumber || creatorProfileData?.abnNumber || null,
 				bio: profileData.bio || creatorProfileData?.bio || null,
 				socialMedia,
 				tiktokData, // Include all TikTok-specific data
@@ -139,7 +194,8 @@ export async function GET(request: NextRequest) {
 				demographics: creatorProfileData?.demographics || null,
 				specialties: creatorProfileData?.specialties || null,
 				languages: creatorProfileData?.languages || null,
-				preferredContactMethod: creatorProfileData?.preferredContactMethod || null,
+				preferredContactMethod:
+					creatorProfileData?.preferredContactMethod || null,
 				availability: creatorProfileData?.availability || null,
 				portfolioItems: creatorProfileData?.portfolioItems || null,
 				businessInformation: creatorProfileData?.businessInformation || null,
@@ -331,12 +387,60 @@ export async function GET(request: NextRequest) {
 				const tiktokData = {
 					...(profileData.tiktokData || {}),
 					...(creatorProfileData?.tiktokData || {}),
-					tiktokHandle: profileData.tiktokHandle || creatorProfileData?.tiktokHandle || null,
-					tiktokFollowers: profileData.tiktokFollowers || creatorProfileData?.tiktokFollowers || null,
-					tiktokEngagementRate: profileData.tiktokEngagementRate || creatorProfileData?.tiktokEngagementRate || null,
-					tiktokContentCategory: profileData.tiktokContentCategory || creatorProfileData?.tiktokContentCategory || null,
-					tiktokAverageViews: profileData.tiktokAverageViews || creatorProfileData?.tiktokAverageViews || null,
+					tiktokHandle:
+						profileData.tiktokHandle ||
+						creatorProfileData?.tiktokHandle ||
+						null,
+					tiktokFollowers:
+						profileData.tiktokFollowers ||
+						creatorProfileData?.tiktokFollowers ||
+						null,
+					tiktokEngagementRate:
+						profileData.tiktokEngagementRate ||
+						creatorProfileData?.tiktokEngagementRate ||
+						null,
+					tiktokContentCategory:
+						profileData.tiktokContentCategory ||
+						creatorProfileData?.tiktokContentCategory ||
+						null,
+					tiktokAverageViews:
+						profileData.tiktokAverageViews ||
+						creatorProfileData?.tiktokAverageViews ||
+						null,
 				};
+
+				// Collect portfolio video URLs from multiple sources
+				const portfolioVideoUrls = [];
+				
+				// First, check for individual portfolio video URLs in the root level
+				const rootData = verificationData;
+				for (let i = 0; i < 10; i++) { // Check up to 10 portfolio videos
+					const portfolioVideoKey = `portfolioVideo-${i}Url`;
+					if (rootData[portfolioVideoKey]) {
+						portfolioVideoUrls.push(rootData[portfolioVideoKey]);
+					}
+				}
+				
+				// Also check in profileData for individual portfolio video URLs
+				for (let i = 0; i < 10; i++) {
+					const portfolioVideoKey = `portfolioVideo-${i}Url`;
+					if (profileData[portfolioVideoKey]) {
+						portfolioVideoUrls.push(profileData[portfolioVideoKey]);
+					}
+				}
+				
+				// Check for portfolioVideoUrls array in profileData
+				if (profileData.portfolioVideoUrls && Array.isArray(profileData.portfolioVideoUrls)) {
+					portfolioVideoUrls.push(...profileData.portfolioVideoUrls);
+				}
+				
+				// Check for portfolioVideoUrls array in creatorProfileData
+				if (creatorProfileData?.portfolioVideoUrls && Array.isArray(creatorProfileData.portfolioVideoUrls)) {
+					portfolioVideoUrls.push(...creatorProfileData.portfolioVideoUrls);
+				}
+				
+				// Remove duplicates and filter out empty/null values
+				const uniquePortfolioVideoUrls = [...new Set(portfolioVideoUrls)].filter(url => url && url.trim() !== '');
 
 				// Build complete creator object with consolidated data
 				return {
@@ -377,6 +481,15 @@ export async function GET(request: NextRequest) {
 						profileData.firstName || creatorProfileData?.firstName || null,
 					lastName:
 						profileData.lastName || creatorProfileData?.lastName || null,
+					aboutMeVideoUrl:
+						profileData.aboutMeVideoUrl ||
+						creatorProfileData?.aboutMeVideoUrl ||
+						verificationData?.aboutMeVideoUrl ||
+						null,
+					portfolioVideoUrls: uniquePortfolioVideoUrls,
+					abnNumber:
+						profileData.abnNumber || creatorProfileData?.abnNumber || null,
+						
 					email: email || null,
 					username:
 						profileData.displayUsername || creatorProfileData?.username || null,
@@ -408,7 +521,8 @@ export async function GET(request: NextRequest) {
 					demographics: creatorProfileData?.demographics || null,
 					specialties: creatorProfileData?.specialties || null,
 					languages: creatorProfileData?.languages || null,
-					preferredContactMethod: creatorProfileData?.preferredContactMethod || null,
+					preferredContactMethod:
+						creatorProfileData?.preferredContactMethod || null,
 					availability: creatorProfileData?.availability || null,
 					portfolioItems: creatorProfileData?.portfolioItems || null,
 					businessInformation: creatorProfileData?.businessInformation || null,
@@ -453,48 +567,48 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
 	try {
-	  const body = await request.json();
-	  const { verificationId, action, message } = body;
-	  
-	  if (!adminDb) {
-		throw new Error("Firebase admin database is not initialized");
-	  }
-	  
-	  // Handle different actions (approve, reject, request_info, suspend)
-	  const verificationRef = adminDb
-		.collection("creator_verifications")
-		.doc(verificationId);
-		
-	  let updateData = {};
-	  
-	  switch (action) {
-		case "approve":
-		  updateData = { status: "approved" };
-		  break;
-		case "reject":
-		  updateData = { status: "rejected", rejectionReason: message };
-		  break;
-		case "request_info":
-		  updateData = { status: "info_requested", infoRequest: message };
-		  break;
-		case "suspend":
-		  updateData = { status: "suspended", suspensionReason: message };
-		  break;
-		default:
-		  throw new Error("Invalid action type");
-	  }
-	  
-	  await verificationRef.update(updateData);
-	  
-	  return NextResponse.json({ success: true });
+		const body = await request.json();
+		const { verificationId, action, message } = body;
+
+		if (!adminDb) {
+			throw new Error("Firebase admin database is not initialized");
+		}
+
+		// Handle different actions (approve, reject, request_info, suspend)
+		const verificationRef = adminDb
+			.collection("creator_verifications")
+			.doc(verificationId);
+
+		let updateData = {};
+
+		switch (action) {
+			case "approve":
+				updateData = { status: "approved" };
+				break;
+			case "reject":
+				updateData = { status: "rejected", rejectionReason: message };
+				break;
+			case "request_info":
+				updateData = { status: "info_requested", infoRequest: message };
+				break;
+			case "suspend":
+				updateData = { status: "suspended", suspensionReason: message };
+				break;
+			default:
+				throw new Error("Invalid action type");
+		}
+
+		await verificationRef.update(updateData);
+
+		return NextResponse.json({ success: true });
 	} catch (error) {
-	  console.error("Error updating creator status:", error);
-	  return NextResponse.json(
-		{
-		  error: "Failed to update creator status",
-		  details: error instanceof Error ? error.message : String(error),
-		},
-		{ status: 500 }
-	  );
+		console.error("Error updating creator status:", error);
+		return NextResponse.json(
+			{
+				error: "Failed to update creator status",
+				details: error instanceof Error ? error.message : String(error),
+			},
+			{ status: 500 }
+		);
 	}
-  }
+}

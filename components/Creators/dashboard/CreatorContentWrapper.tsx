@@ -47,7 +47,7 @@ export default function CreatorContentWrapper({
 		if (status === "approved") {
 			setShowApprovedMessage(true);
 		}
-	// eslint-disable-next-line react-hooks/exhaustive-deps
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [creatorProfile]);
 
 	useEffect(() => {
@@ -92,7 +92,25 @@ export default function CreatorContentWrapper({
 	if (creatorStatus !== "approved") {
 		return (
 			<div className="w-fit">
-				<div className="bg-white border rounded-lg shadow-sm p-8 text-center">
+				<div className="mt-10 md:mt-20 bg-white border rounded-lg shadow-sm p-8 text-center">
+					{creatorStatus === "not_submitted" && (
+						<div className=" max-w-md mx-auto">
+							<div className="flex justify-center mb-4">
+								<FileQuestion className="h-16 w-16 text-orange-500" />
+							</div>
+							<h2 className="text-xl font-semibold mb-2">
+								Creator Profile Required
+							</h2>
+							<p className="text-gray-600 mb-6">
+								You need to create a creator profile before you can{" "}
+								{getPageTypeText()}.
+							</p>
+							<Link href="/creator/verify-identity">
+								<Button className="w-full">Complete Creator Profile</Button>
+							</Link>
+						</div>
+					)}
+
 					{creatorStatus === "missing" && (
 						<div className="max-w-md mx-auto">
 							<div className="flex justify-center mb-4">

@@ -14,18 +14,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log(`Fetching saved videos for userId: ${userId}`);
+   
      
-    // Query user's saved videos, ordered by save date (most recent first)
+    // Query user's purchased videos, ordered by save date (most recent first)
     const query = adminDb.collection("videoLibrary")
       .where("userId", "==", userId)
-      .orderBy("savedAt", "desc");
+      .orderBy("purchasedAt", "desc");
 
     const snapshot = await query.get();
     
     if (snapshot.empty) {
-      console.log(`No saved videos found for userId: ${userId}`);
-      return NextResponse.json({ savedVideos: [] });
+      console.log(`No purchased videos found for userId: ${userId}`);
+      return NextResponse.json({ purchasedVideos: [] });
     }
 
     // Get all unique video IDs for batch fetch
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Enrich saved videos with data from the videos collection
+    // Enrich purchased videos with data from the videos collection
     const enrichedVideos = snapshot.docs.map(doc => {
       const libraryData = doc.data();
       const videoData = videoDataMap.get(libraryData.videoId) || {};
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
         userId: libraryData.userId,
         creatorId: libraryData.creatorId,
         creatorName: libraryData.creatorName,
-        savedAt: libraryData.savedAt?.toDate().toISOString() || null,
+        purchasedAt: libraryData.purchasedAt?.toDate().toISOString() || null,
         // Video details from videos collection
         title: videoData.title || libraryData.title || "Untitled",
         description: videoData.description || "",
@@ -81,14 +81,14 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    console.log(`Found ${enrichedVideos.length} saved videos for userId: ${userId}`);
-    return NextResponse.json({ savedVideos: enrichedVideos });
+    console.log(`Found ${enrichedVideos.length} purchased videos for userId: ${userId}`);
+    return NextResponse.json({ purchasedVideos: enrichedVideos });
 
   } catch (error) {
-    console.error("Error fetching saved videos:", error);
+    console.error("Error fetching purchased videos:", error);
     return NextResponse.json(
       { 
-        error: "Failed to fetch saved videos",
+        error: "Failed to fetch purchased videos",
         details: error instanceof Error ? error.message : String(error)
       },
       { status: 500 }
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`Saving video to library - userId: ${userId}, videoId: ${videoId}`);
 
-    // Check if video is already saved by this user
+    // Check if video is already purchased by this user
     const existingQuery = adminDb.collection("videoLibrary")
       .where("userId", "==", userId)
       .where("videoId", "==", videoId);
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
     
     if (!existingSnapshot.empty) {
       return NextResponse.json(
-        { error: "Video is already saved to your library" },
+        { error: "Video is already purchased to your library" },
         { status: 409 }
       );
     }
@@ -145,24 +145,23 @@ export async function POST(request: NextRequest) {
       // Store basic info for fallback
       title: videoData?.title || "Untitled",
       thumbnailUrl: videoData?.thumbnailUrl || null,
-      savedAt: FieldValue.serverTimestamp()
+      purchasedAt: FieldValue.serverTimestamp()
     };
 
-    const docRef = await adminDb.collection("videoLibrary").add(libraryData);
+    const docRef = await adminDb.collection("videoPurchases").add(libraryData);
     
-    console.log(`Video saved to library successfully with ID: ${docRef.id}`);
     
     return NextResponse.json({
       success: true,
       libraryId: docRef.id,
-      message: "Video saved to library successfully"
+      message: "Video purchased successfully"
     });
 
   } catch (error) {
-    console.error("Error saving video to library:", error);
+    console.error("Error fetching purchased video:", error);
     return NextResponse.json(
       { 
-        error: "Failed to save video to library",
+        error: "Failed to add purchased video to library",
         details: error instanceof Error ? error.message : String(error)
       },
       { status: 500 }
@@ -185,7 +184,7 @@ export async function DELETE(request: NextRequest) {
 
     console.log(`Removing video from library - userId: ${userId}, videoId: ${videoId}`);
 
-    // Find and delete the saved video entry
+    // Find and delete the purchased video entry
     const query = adminDb.collection("videoLibrary")
       .where("userId", "==", userId)
       .where("videoId", "==", videoId);

@@ -18,22 +18,19 @@ import { useSavedCreators } from "@/hooks/useSavedCreators";
 export default function CreatorPricingTab() {
 	const { formData, updateCreatorPricing } = useProjectForm();
 	const { creatorPricing } = formData;
-	const {
-		savedCreators,
-		allCreators,
-		isLoading,
-		error,
-		searchCreators,
-	} = useSavedCreators();
+	const { savedCreators, allCreators, isLoading, error, searchCreators } =
+		useSavedCreators();
 
 	// Initialize state from context or use default values
 	const [selectionMethod, setSelectionMethod] = useState<
 		CreatorPricing["selectionMethod"]
 	>(creatorPricing.selectionMethod || "Invite Specific Creators");
 	const [budget, setBudget] = useState(creatorPricing.budgetPerVideo || 0);
-	const [budgetValue, setBudgetValue] = useState(budget ? budget.toString() : "");
+	const [budgetValue, setBudgetValue] = useState(
+		budget ? budget.toString() : ""
+	);
 	const [, setBudgetError] = useState("");
-	
+
 	const [publicCreatorsCount, setPublicCreatorsCount] = useState(
 		creatorPricing.selectionMethod === "Post Public Brief"
 			? creatorPricing.creatorCount || 1
@@ -66,7 +63,9 @@ export default function CreatorPricingTab() {
 	const [selectedCreatorIds, setSelectedCreatorIds] = useState<string[]>(
 		(creatorPricing.selectedCreators || []).map((creator) => creator.id)
 	);
-	const [invitedCreatorsCount, setInvitedCreatorsCount] = useState(selectedCreators.length || 2);
+	const [invitedCreatorsCount, setInvitedCreatorsCount] = useState(
+		selectedCreators.length || 2
+	);
 	const [searchQuery, setSearchQuery] = useState("");
 
 	useEffect(() => {
@@ -97,7 +96,7 @@ export default function CreatorPricingTab() {
 				setSelectedCreators(filteredCreators);
 			}
 		}
-	// eslint-disable-next-line react-hooks/exhaustive-deps
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
 	useEffect(() => {
@@ -181,14 +180,14 @@ export default function CreatorPricingTab() {
 		}
 	};
 
-// Calculate totals
-const totalVideos = selectionMethod === "Invite Specific Creators" 
-    ? invitedCreatorsCount * videosPerCreator 
-    : publicCreatorsCount * videosPerCreator;
+	// Calculate totals
+	const totalVideos =
+		selectionMethod === "Invite Specific Creators"
+			? invitedCreatorsCount * videosPerCreator
+			: publicCreatorsCount * videosPerCreator;
 
-const totalBudget = budget * totalVideos;
-const services = 0.1 * totalBudget;
-const totalAmount = totalBudget; // Total amount should equal total budget, not include service fee
+	const totalBudget = budget * totalVideos;
+	const totalAmount = totalBudget;
 
 	// Update context when values change
 	const updateContextValues = () => {
@@ -224,7 +223,7 @@ const totalAmount = totalBudget; // Total amount should equal total budget, not 
 				budgetPerVideo: budget,
 				totalBudget,
 				totalAmount,
-				serviceFee: services,
+
 				commissionPerSale: "",
 			},
 		});
@@ -386,7 +385,6 @@ const totalAmount = totalBudget; // Total amount should equal total budget, not 
 														width={24}
 														height={24}
 														className="w-6 h-6 rounded-full object-fill"
-													
 													/>
 													<span className="text-sm">{creator.name}</span>
 													<button
@@ -395,9 +393,7 @@ const totalAmount = totalBudget; // Total amount should equal total budget, not 
 															e.stopPropagation();
 															toggleCreatorSelection(creator.id);
 														}}
-													>
-													
-													</button>
+													></button>
 												</div>
 											))}
 										</div>
@@ -817,18 +813,6 @@ const totalAmount = totalBudget; // Total amount should equal total budget, not 
 							<div className="text-sm text-gray-500 mb-4">
 								(Based on ${budget.toLocaleString()} per video × {totalVideos}{" "}
 								videos)
-							</div>
-
-						
-
-							<div className="flex gap-1 mb-1">
-								<span>Service Fee:</span>
-								<span className="font-medium">
-									${services.toLocaleString()}
-								</span>
-							</div>
-							<div className="text-sm text-gray-500 mb-4">
-								<p>10% of the Total Amount - This is paid to Social Shake</p>
 							</div>
 
 							<div className="flex gap-1 text-lg font-bold">

@@ -1,5 +1,5 @@
-import type { Config } from "tailwindcss";
 
+// eslint-disable-next-line import/no-anonymous-default-export
 export default {
 	darkMode: ["class"],
 	content: [
@@ -43,7 +43,8 @@ export default {
     		}
     	},
     	plugins: [
-    		'require("tailwindcss-animate")'
+    		'require("tailwindcss-animate")',
+			'require("tailwind-scrollbar")',
     	]
     },
 };

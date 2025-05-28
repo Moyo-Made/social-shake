@@ -128,10 +128,11 @@ interface CostBreakdown {
 	totalBudget: number;
 	totalAmount: number;
 	commissionPerSale: string;
-	serviceFee: number;
 }
 
 export interface ProjectFormData {
+  paidfalse: boolean;
+  paymentAmount: null;
 	views: number;
 	participantsCount: number;
 	applicantsCount: number;

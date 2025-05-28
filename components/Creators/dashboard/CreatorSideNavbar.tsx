@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 import CreatorProfileDropdown from "../CreatorProfileDropdown";
 import { useCreatorProfile } from "@/hooks/useCreatorProfile";
 import { useNotifications } from "@/context/NotificationContext";
+import NotificationSystem from "@/components/notifications/NotificationSystem";
 
 interface MenuItemProps {
 	icon: React.ReactNode;
@@ -167,7 +168,7 @@ const SideNav: React.FC = () => {
 							},
 						]}
 					/>
-					<MenuItem
+					{/* <MenuItem
 						href="/creator/dashboard/contest"
 						icon={
 							<Image
@@ -188,13 +189,11 @@ const SideNav: React.FC = () => {
 								text: "My Contests",
 							},
 						]}
-					/>
+					/> */}
 
 					<MenuItem
 						href="/creator/dashboard/content-library"
-						icon={
-							<VideoIcon size={20}/>
-						}
+						icon={<VideoIcon size={20} />}
 						text="Content Library"
 					/>
 
@@ -310,8 +309,8 @@ const getPageTitle = (pathname: string): string => {
 	if (pathname.startsWith("/creator/dashboard/messages/")) {
 		return "Messages";
 	}
-	if (pathname.startsWith("/creator/dashboard/content-library")){
-		return "Content Library"
+	if (pathname.startsWith("/creator/dashboard/content-library")) {
+		return "Content Library";
 	}
 	if (pathname.startsWith("/creator/dashboard/transactions/")) {
 		return "Transactions";
@@ -333,21 +332,13 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 	const { creatorProfile } = useCreatorProfile();
 
 	return (
-		<div className="flex min-h-screen">
+		<div className="h-screen flex">
 			<SideNav />
 			<div className="flex-1 flex flex-col items-center justify-center bg-[#FFF9F6] font-satoshi ">
 				<header className="bg-white p-4 w-full flex justify-between items-center border-b border-[#FD5C02]">
 					<h1 className="text-xl font-semibold">{pageTitle}</h1>
 					<div className="flex items-center">
-						<Link href="/creator/dashboard/notifications">
-							<Image
-								src="/icons/notification.svg"
-								alt="Notifications"
-								width={20}
-								height={20}
-								className="mr-4"
-							/>
-						</Link>
+						<NotificationSystem />
 						{creatorProfile && (
 							<CreatorProfileDropdown
 								creatorProfile={creatorProfile}
@@ -356,9 +347,10 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 						)}
 					</div>
 				</header>
-				<div className="flex-1 flex items-center justify-center w-full">
-					{children}
-				</div>
+
+				<main className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
+					<div className="container mx-auto h-screen">{children}</div>
+				</main>
 			</div>
 		</div>
 	);

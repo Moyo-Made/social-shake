@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { CreatorProfile, useCreatorProfile } from "@/hooks/useCreatorProfile";
 import { toast } from "sonner";
+import { MdIncompleteCircle } from "react-icons/md";
 
 interface CreatorProfileDropdownProps {
 	dropdownPosition?: "header" | "sidenav";
@@ -157,6 +158,17 @@ const CreatorProfileDropdown: React.FC<CreatorProfileDropdownProps> = ({
 		}
 
 		return "Complete Your Profile" as string;
+	};
+
+	const needsProfileCompletion = () => {
+		const status = creatorProfile?.status || creatorProfile?.verificationStatus;
+
+		// If no status at all, definitely needs completion
+		if (!status) return true;
+
+		// If status exists but is not submitted/pending/approved, needs completion
+		const completedStatuses = ["submitted", "pending", "approved"];
+		return !completedStatuses.includes(status.toLowerCase());
 	};
 
 	// Handle click outside to close dropdown
@@ -321,7 +333,6 @@ const CreatorProfileDropdown: React.FC<CreatorProfileDropdownProps> = ({
 	const verificationStatus = getVerificationStatusInfo();
 	const isTikTokConnected = hasTikTokConnected();
 
-
 	return (
 		<div className="relative" ref={dropdownRef}>
 			<div
@@ -435,6 +446,21 @@ const CreatorProfileDropdown: React.FC<CreatorProfileDropdownProps> = ({
 							{getContentTypeLabel()}
 						</p>
 					</div>
+
+					{needsProfileCompletion() && (
+						<Link
+							href="/creator/verify-identity"
+							className={`flex items-center w-full px-4 py-2 text-sm font-medium ${
+								dropdownPosition === "header"
+									? "text-orange-600 hover:bg-orange-50 bg-orange-25"
+									: "text-orange-400 hover:bg-gray-700 bg-gray-800"
+							}`}
+							onClick={() => setIsOpen(false)}
+						>
+							<MdIncompleteCircle className="mr-2 h-4 w-4" />
+							Complete Your Profile
+						</Link>
+					)}
 
 					<div className="py-1">
 						{/* TikTok Connection Button */}

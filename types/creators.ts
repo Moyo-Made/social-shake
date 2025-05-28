@@ -181,4 +181,6 @@ export interface CreatorProfileData {
 	verificationVideoUrl: string | null;
 	tiktokConnected?: boolean;
 	tiktokId?: string;
+	abnNumber?: string | null;
+	aboutMeVideo?: File |  string | null;
 }
