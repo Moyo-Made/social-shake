@@ -59,7 +59,7 @@ interface CreatorVideoShowcaseProps {
 	userId: string;
 	creatorName: string;
 	showHeader?: boolean;
-}
+  }
 
 const CreatorVideoShowcase: React.FC<CreatorVideoShowcaseProps> = ({
 	userId,
@@ -89,6 +89,8 @@ const CreatorVideoShowcase: React.FC<CreatorVideoShowcaseProps> = ({
 	// Filters
 	const [selectedLicense, setSelectedLicense] = useState<string>("all");
 	const [sortBy, setSortBy] = useState<string>("newest");
+
+	
 
 
 	// Check for purchase success on component mount
