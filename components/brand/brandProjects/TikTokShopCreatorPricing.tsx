@@ -152,7 +152,6 @@ export default function TikTokShopCreatorPricingTab() {
 				totalBudget: totalPayment,
 				totalAmount,
 				commissionPerSale: affiliateCommission,
-				serviceFee: 0,
 			},
 		});
 	};

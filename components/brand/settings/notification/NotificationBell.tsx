@@ -6,7 +6,7 @@ import { BellIcon, XIcon } from 'lucide-react';
 
 export default function NotificationBell() {
   const router = useRouter();
-  const { notifications, unreadCount, loading, markAsRead, markAllAsRead, removeNotification } = useNotifications();
+  const { notifications, unreadCount, loading, markAsRead, markAllAsRead } = useNotifications();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -25,7 +25,7 @@ export default function NotificationBell() {
   }, []);
 
   interface Notification {
-    id: string;
+    id?: string;
     link?: string;
     title: string;
     message: string;
@@ -34,7 +34,9 @@ export default function NotificationBell() {
   }
 
   const handleNotificationClick = async (notification: Notification) => {
-    await markAsRead(notification.id);
+    if (notification.id) {
+      await markAsRead(notification.id);
+    }
     if (notification.link) {
       router.push(notification.link);
     }
@@ -95,7 +97,7 @@ export default function NotificationBell() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      removeNotification(notification.id);
+                      console.warn('removeNotification is not implemented');
                     }}
                     className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
                   >
