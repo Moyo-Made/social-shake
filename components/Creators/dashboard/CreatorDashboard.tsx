@@ -2,9 +2,9 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 import EmptyContest from "@/components/brand/brandProfile/dashboard/EmptyContest";
 import { OngoingProjectsSection } from "./OngoingProjectsSection";
-// import ContestsGrid from "./CreatorContestsGrid";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 
 interface UserDashboardProps {
 	userId: string;
@@ -58,11 +58,12 @@ interface EarningsData {
 }
 
 const LoadingState = () => (
-	<div className="flex flex-col justify-center items-center h-64">
+	<div className="flex flex-col justify-center items-center h-screen">
 		<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
 		<p>Loading dashboard..</p>
 	</div>
 );
+
 
 // Create the actual dashboard component separately
 const DashboardContent = ({ userId }: UserDashboardProps) => {
@@ -70,42 +71,40 @@ const DashboardContent = ({ userId }: UserDashboardProps) => {
 	const [userData, setUserData] = useState<UserData | null>(null);
 	const [earningsData, setEarningsData] = useState<EarningsData | null>(null);
 	const searchParams = useSearchParams();
+	const { currentUser } = useAuth();
 
 	// Add this useEffect to detect TikTok connection success
 	useEffect(() => {
 		const tiktokStatus = searchParams.get("tiktok");
 
 		if (tiktokStatus === "success") {
-			// Use the toast to show connection success
 			toast.success("TikTok account successfully connected!");
-
-			// Remove the parameters from URL to prevent multiple refreshes
 			const currentUrl = window.location.pathname;
 			window.history.replaceState({}, "", currentUrl);
 		}
 
 		if (tiktokStatus === "error") {
-			// Use the toast to show connection error
 			toast.error("Failed to connect TikTok account!");
-
-			// Remove the parameters from URL to prevent multiple refreshes
 			const currentUrl = window.location.pathname;
 			window.history.replaceState({}, "", currentUrl);
 		}
 	}, [searchParams]);
+
 
 	// Fetch User Data and Earnings Data
 	useEffect(() => {
 		const fetchData = async () => {
 			try {
 				setLoading(true);
-				
+
 				// Fetch basic user data
 				const userResponse = await fetch(`/api/creator-stats?userId=${userId}`);
 				const userData = await userResponse.json();
-				
+
 				// Fetch earnings data from our new endpoint
-				const earningsResponse = await fetch(`/api/creator-earnings?userId=${userId}`);
+				const earningsResponse = await fetch(
+					`/api/creator-earnings?userId=${userId}`
+				);
 				const earningsData = await earningsResponse.json();
 
 				if (userData.success) {
@@ -113,7 +112,7 @@ const DashboardContent = ({ userId }: UserDashboardProps) => {
 				} else {
 					console.error("Error fetching user data:", userData.error);
 				}
-				
+
 				if (earningsData.success) {
 					setEarningsData(earningsData.data);
 				} else {
@@ -127,7 +126,7 @@ const DashboardContent = ({ userId }: UserDashboardProps) => {
 		};
 
 		fetchData();
-	}, [userId]);
+	}, [userId, currentUser?.uid]);
 
 	if (loading) {
 		return <LoadingState />;
@@ -172,22 +171,6 @@ const DashboardContent = ({ userId }: UserDashboardProps) => {
 					</div>
 				</div>
 
-				{/* Active Contests Card */}
-				{/* <div className="bg-white rounded-lg shadow p-6 relative overflow-hidden">
-					<Image
-						src="/icons/total-contests.svg"
-						alt="Total Contests"
-						width={50}
-						height={50}
-					/>
-					<div className="mt-2">
-						<h3 className="text-gray-600 text-lg">Active Contests</h3>
-						<p className="text-3xl font-bold mt-2">
-							{userData.activeContests}
-						</p>
-					</div>
-				</div> */}
-
 				{/* Total Earning Card */}
 				<div className="bg-white rounded-lg shadow p-6 relative overflow-hidden">
 					<Image
@@ -222,9 +205,6 @@ const DashboardContent = ({ userId }: UserDashboardProps) => {
 					</div>
 				</div>
 			</div>
-
-			{/* Contests */}
-			{/* <ContestsGrid /> */}
 
 			{/* Ongoing Projects */}
 			<OngoingProjectsSection userId={userId} />

@@ -3,6 +3,17 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import ActionButton from "../contests/ActionButton";
 import CancelApplicationModal from "./CancelProjectApplicationModal";
+import { useRouter } from "next/navigation";
+
+
+// Brand profile interface
+export interface BrandProfile {
+	id?: string;
+	userId: string;
+	email?: string;
+	brandName: string;
+	logoUrl: string;
+}
 
 // Component to determine what action buttons to show based on status
 interface Project {
@@ -16,12 +27,63 @@ interface Project {
 const RenderActionButtons = ({
 	project,
 	refreshData,
+	brandProfile, // Add brandProfile as a prop
 }: {
 	project: Project;
 	refreshData: () => void;
+	brandProfile?: BrandProfile | null; // Make it optional
 }) => {
 	const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
 	const { currentUser } = useAuth();
+	const router = useRouter();
+	
+	const handleSendMessageToBrand = async () => {
+		if (!currentUser) {
+			alert("You need to be logged in to send messages");
+			return;
+		}
+	
+		// Make sure we have the brand profile data
+		if (!brandProfile) {
+			alert("Brand information is still loading. Please try again.");
+			return;
+		}
+	
+		try {
+			const response = await fetch("/api/createConversation", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					currentUserId: currentUser.uid,
+					brandId: brandProfile.userId,
+					userData: {
+						name: currentUser.displayName || "User",
+						avatar: currentUser.photoURL || "/icons/default-avatar.svg",
+						username: currentUser.email?.split("@")[0] || "",
+					},
+					brandData: {
+						name: brandProfile.brandName,
+						avatar: brandProfile.logoUrl,
+						username: brandProfile.email?.split("@")[0] || "",
+					},
+				}),
+			});
+	
+			const data = await response.json();
+	
+			if (!response.ok) {
+				throw new Error(data.error || "Failed to create conversation");
+			}
+	
+			// Navigate to chat page with this conversation
+			router.push(`/creator/dashboard/messages?conversation=${data.conversationId}`);
+		} catch (error) {
+			console.error("Error creating conversation:", error);
+			alert("Failed to start conversation. Please try again.");
+		}
+	};
 
 	// Function to handle removing interest (unsaving)
 	const handleRemoveInterest = async () => {
@@ -128,7 +190,6 @@ const RenderActionButtons = ({
 							fullWidth
 						/>
 					</Link>
-					
 				</>
 			);
 		case "approved":
@@ -145,18 +206,15 @@ const RenderActionButtons = ({
 							fullWidth
 						/>
 					</Link>
-					<Link
-						href={`/creator/dashboard/messages/${project.channelId || project.projectId}`}
-						className="flex-1"
-					>
+					<div className="flex-1">
 						<ActionButton
 							text="Message Brand"
 							icon="message"
 							secondary
-							onClick={handleRemoveInterest}
+							onClick={() => handleSendMessageToBrand()}
 							fullWidth
 						/>
-					</Link>
+					</div>
 				</>
 			);
 		default:

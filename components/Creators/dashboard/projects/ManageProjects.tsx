@@ -18,11 +18,7 @@ interface ProjectDetailPageProps {
 	applicationId: string;
 	contestId: string;
 }
-const ManageProjects = ({
-	projectId,
-	applicationId,
-	contestId
-}: ProjectDetailPageProps) => {
+const ManageProjects = ({ projectId, contestId }: ProjectDetailPageProps) => {
 	//   const router = useRouter();
 	const [project, setProject] = useState<ProjectFormData | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -429,7 +425,9 @@ const ManageProjects = ({
 					<div className="p-8 text-center text-gray-500">
 						<CreatorSubmissionTab
 							projectFormData={project}
-							projectId={projectId} contestId={contestId}						/>
+							projectId={projectId}
+							contestId={contestId}
+						/>
 					</div>
 				</TabsContent>
 
@@ -443,7 +441,7 @@ const ManageProjects = ({
 				{isPhysicalProduct && (
 					<TabsContent value="product-delivery">
 						<div className="p-8 text-gray-500">
-							<DeliveryTracking applicationId={applicationId} />
+							<DeliveryTracking projectId={projectId} project={project} />
 						</div>
 					</TabsContent>
 				)}

@@ -15,7 +15,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { countries } from "@/types/countries";
-import { Plus, Trash2, ArrowRight } from "lucide-react";
+import { Plus, Trash2, ArrowRight, Check, X } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -55,7 +55,6 @@ const CompleteCreatorProfile = () => {
 	const maxBioLength = 500;
 
 	const [contentTypes, setContentTypes] = useState<string[]>([]);
-	const [contentTypeInput, setContentTypeInput] = useState("");
 
 	const [tiktokUrl, setTiktokUrl] = useState("");
 	const [ethnicity, setEthnicity] = useState("");
@@ -81,7 +80,24 @@ const CompleteCreatorProfile = () => {
 		fiveVideos: "",
 		bulkVideos: "",
 		bulkVideosNote: "",
+		aiActorPricing: "",
 	});
+
+	const predefinedContentTypes = [
+		"Apps",
+		"Beauty",
+		"Makeup",
+		"Lifestyle",
+		"Fashion",
+		"Food",
+		"Technology",
+		"Health & Wellness",
+		"Pets",
+		"Automotive",
+		"Family",
+		"Home",
+		"Business",
+	];
 
 	// State to track submission attempts
 	const [isSubmitting, setIsSubmitting] = useState(false);
@@ -147,8 +163,14 @@ const CompleteCreatorProfile = () => {
 				bulkVideos: profileData.pricing?.bulkVideos
 					? String(profileData.pricing.bulkVideos)
 					: "",
-				bulkVideosNote: profileData.pricing?.bulkVideosNote || "",
+				bulkVideosNote: profileData.pricing?.bulkVideosNote
+					? String(profileData.pricing.bulkVideosNote)
+					: "",
+				aiActorPricing: profileData.pricing?.aiActorPricing
+					? String(profileData.pricing.aiActorPricing)
+					: "",
 			});
+
 			setAboutMeVideo(
 				typeof profileData.aboutMeVideo === "string"
 					? new File([], profileData.aboutMeVideo)
@@ -213,27 +235,16 @@ const CompleteCreatorProfile = () => {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [selectedFile]);
 
-	const handleContentTypeKeyDown = (
-		e: React.KeyboardEvent<HTMLInputElement>
-	) => {
-		// Check if user pressed Enter or comma
-		if (e.key === "Enter" || e.key === ",") {
-			e.preventDefault();
-			addContentType();
-		}
-	};
-
-	const addContentType = () => {
-		// Trim whitespace and check if input is not empty
-		const trimmedInput = contentTypeInput.trim();
-		if (trimmedInput && !contentTypes.includes(trimmedInput)) {
-			const newContentTypes = [...contentTypes, trimmedInput];
+	const addContentType = (contentType: string) => {
+		// Check if content type is not already selected
+		if (contentType && !contentTypes.includes(contentType)) {
+			const newContentTypes = [...contentTypes, contentType];
 			setContentTypes(newContentTypes);
-			setContentTypeInput("");
 			updateProfileData({ contentTypes: newContentTypes });
 		}
 	};
 
+	// removeContentType function remains the same
 	const removeContentType = (indexToRemove: number) => {
 		const newContentTypes = contentTypes.filter(
 			(_, index) => index !== indexToRemove
@@ -495,7 +506,8 @@ const CompleteCreatorProfile = () => {
 				threeVideos: parseFloat(updatedPricing.threeVideos) || 0,
 				fiveVideos: parseFloat(updatedPricing.fiveVideos) || 0,
 				bulkVideos: parseFloat(updatedPricing.bulkVideos) || 0,
-				bulkVideosNote: updatedPricing.bulkVideosNote, // Pass the note as is
+				bulkVideosNote: updatedPricing.bulkVideosNote,
+				aiActorPricing: parseFloat(updatedPricing.aiActorPricing) || 0,
 			},
 		});
 
@@ -620,7 +632,7 @@ const CompleteCreatorProfile = () => {
 								src={previewUrl}
 								alt="Thumbnail preview"
 								fill
-								className="object-cover"
+								className="object-contain"
 							/>
 						</div>
 						<p className="text-green-600">
@@ -732,42 +744,66 @@ const CompleteCreatorProfile = () => {
 			/>
 			{renderFieldError("gender")}
 
-			{/* What types of content do you specialize in? */}
-			<label className="block text-base font-medium text-gray-700 mt-4">
-				What types of content do you specialize in?
-			</label>
-			<div className="mt-1 border border-[#D0D5DD] rounded-md focus-within:ring-gray-500 focus-within:border-gray-500">
-				<div className="p-2 flex flex-wrap gap-2">
-					{contentTypes.map((type, index) => (
-						<div
-							key={index}
-							className="bg-white border border-[#D0D5DD] text-gray-600 px-2 py-1 rounded-md flex items-center"
-						>
-							{type}
-							<button
-								type="button"
-								onClick={() => removeContentType(index)}
-								className="ml-2 text-gray-600 hover:text-gray-800"
+			{/* Content Types */}
+			<div className="mt-4">
+				<label className="block text-base font-medium text-gray-700 mb-2">
+					What types of content do you specialize in?
+				</label>
+
+				{/* Display selected content types */}
+				{contentTypes.length > 0 && (
+					<div className="mb-3 flex flex-wrap gap-2">
+						{contentTypes.map((type, index) => (
+							<div
+								key={index}
+								className="bg-white border border-[#D0D5DD] text-gray-600 px-2 py-1 rounded-md flex items-center text-sm"
 							>
-								×
-							</button>
-						</div>
-					))}
-					<input
-						type="text"
-						className="flex-grow outline-none min-w-[200px] p-1"
-						placeholder="Type and press Enter or comma to add content types (e.g., Fashion, Travel, Tech Reviews)"
-						value={contentTypeInput}
-						onChange={(e) => setContentTypeInput(e.target.value)}
-						onKeyDown={handleContentTypeKeyDown}
-						onBlur={addContentType}
-					/>
-				</div>
+								{type}
+								<button
+									type="button"
+									onClick={() => removeContentType(index)}
+									className="ml-2 text-gray-600 hover:text-gray-800"
+								>
+									<X size={14} />
+								</button>
+							</div>
+						))}
+					</div>
+				)}
+
+				<Select
+					value=""
+					onValueChange={(value) => {
+						addContentType(value);
+					}}
+				>
+					<SelectTrigger className="w-full">
+						<SelectValue placeholder="Select content types to add..." />
+					</SelectTrigger>
+					<SelectContent className="bg-white">
+						{predefinedContentTypes.map((type) => (
+							<SelectItem
+								key={type}
+								value={type}
+								disabled={contentTypes.includes(type)}
+								className={contentTypes.includes(type) ? "opacity-50" : ""}
+							>
+								<div className="flex items-center justify-between w-full">
+									<span>{type}</span>
+									{contentTypes.includes(type) && (
+										<Check size={16} className="text-green-600 ml-2" />
+									)}
+								</div>
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+
+				<p className="text-sm text-[#475467] mt-1">
+					Select from the dropdown to add content types
+				</p>
+				{renderFieldError("contentTypes")}
 			</div>
-			<p className="text-sm text-[#475467] mt-1">
-				Press Enter or comma after each content type
-			</p>
-			{renderFieldError("contentTypes")}
 
 			{/* Social Media Handles */}
 			<div className="space-y-2 mt-4" id="socialMedia">
@@ -861,7 +897,7 @@ const CompleteCreatorProfile = () => {
 					>
 						<SelectValue placeholder="Select your country" />
 					</SelectTrigger>
-					<SelectContent className="bg-[#f7f7f7]">
+					<SelectContent className="bg-[#fff]">
 						{countries.map((country) => (
 							<SelectItem key={country.code} value={country.name}>
 								{country.name}
@@ -1029,6 +1065,24 @@ const CompleteCreatorProfile = () => {
 							<p className="text-xs text-gray-500 mt-1">
 								Optional: Add a note or starting price for bulk orders
 							</p>
+						</div>
+
+						<div>
+							<Label className="text-sm font-medium text-gray-700">
+								AI Actors (Price per usage)
+							</Label>
+							<div className="relative mt-1">
+								<span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+									$
+								</span>
+								<Input
+									name="aiActorPricing"
+									value={pricing.aiActorPricing}
+									onChange={handlePricingChange}
+									placeholder="29.99"
+									className="pl-7"
+								/>
+							</div>
 						</div>
 					</div>
 				</Card>

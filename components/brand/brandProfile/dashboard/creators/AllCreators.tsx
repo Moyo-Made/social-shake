@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Heart, Send, ArrowLeft, Video } from "lucide-react";
+import { Heart, Send, ArrowLeft, Video, X } from "lucide-react";
 import {
 	Card,
 	CardContent,
@@ -10,6 +10,12 @@ import {
 	CardHeader,
 } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -21,6 +27,8 @@ import VideoComponent from "./VideoComponent";
 import PortfolioVideosTab from "./PortfolioVideoTab";
 import PerformanceStatsCard from "./PerformanceStatsCard";
 import PricingCard from "./PricingCard";
+import { CONTENT_TYPES } from "@/types/contentTypes";
+import { NATIONALITIES } from "@/types/nationalities";
 
 // Define types
 export interface Creators {
@@ -39,6 +47,7 @@ export interface Creators {
 		fiveVideos: number;
 		bulkVideos: number;
 		bulkVideosNote?: string;
+		aiActorPricing?: number;
 	};
 	profilePictureUrl: string;
 	contentTypes: string[];
@@ -128,6 +137,18 @@ const CreatorMarketplace = () => {
 	const [currentPlayingVideo, setCurrentPlayingVideo] = useState<string | null>(
 		null
 	);
+	const [selectedVideo, setSelectedVideo] = useState<{
+		url: string;
+		index: number;
+		creatorName: string;
+	} | null>(null);
+	const [selectedContentTypes, setSelectedContentTypes] = useState<string[]>(
+		[]
+	);
+	const [selectedGenders, setSelectedGenders] = useState<string[]>([]);
+	const [selectedNationalities, setSelectedNationalities] = useState<string[]>(
+		[]
+	);
 
 	// Fetch creators from Firebase
 	useEffect(() => {
@@ -162,6 +183,7 @@ const CreatorMarketplace = () => {
 							fiveVideos?: number;
 							bulkVideos?: number;
 							bulkVideosNote?: string;
+							aiActorPricing?: number;
 						};
 						logoUrl?: string;
 						contentTypes?: string[];
@@ -197,6 +219,7 @@ const CreatorMarketplace = () => {
 							fiveVideos: creator.pricing?.fiveVideos || 0,
 							bulkVideos: creator.pricing?.bulkVideos || 0,
 							bulkVideosNote: creator.pricing?.bulkVideosNote || "",
+							aiActorPricing: creator.pricing?.aiActorPricing || 0,
 						},
 						profilePictureUrl: creator.logoUrl || defaultProfileImg,
 						creatorProfileData: {
@@ -271,6 +294,18 @@ const CreatorMarketplace = () => {
 			localStorage.setItem("savedCreators", JSON.stringify(savedCreators));
 		}
 	}, [savedCreators, isClient]);
+
+	const openVideoModal = (
+		videoUrl: string,
+		index: number,
+		creatorName: string
+	) => {
+		setSelectedVideo({ url: videoUrl, index, creatorName });
+	};
+
+	const closeVideoModal = () => {
+		setSelectedVideo(null);
+	};
 
 	const handleViewProfile = (creator: Creators): void => {
 		setSelectedCreator(creator);
@@ -365,6 +400,34 @@ const CreatorMarketplace = () => {
 		router.push("/brand/dashboard/creators/all");
 	};
 
+	// Filter creators based on selected content types
+	const filteredCreators = creators.filter((creator) => {
+		// Content type filter
+		if (selectedContentTypes.length > 0) {
+			const creatorContentTypes = Array.isArray(creator.contentTypes)
+				? creator.contentTypes
+				: [];
+
+			const matchesContentType = selectedContentTypes.some((selectedType) =>
+				creatorContentTypes.includes(selectedType)
+			);
+
+			if (!matchesContentType) return false;
+		}
+
+		// Gender filter
+		if (selectedGenders.length > 0) {
+			if (!selectedGenders.includes(creator.gender)) return false;
+		}
+
+		// Nationality filter
+		if (selectedNationalities.length > 0) {
+			if (!selectedNationalities.includes(creator.country)) return false;
+		}
+
+		return true;
+	});
+
 	// Empty state for saved creators or while loading
 	const EmptyState = ({ message }: { message: string }) => (
 		<div className="flex flex-col items-center justify-center py-8 md:py-16 h-screen">
@@ -423,7 +486,7 @@ const CreatorMarketplace = () => {
 	// Detail profile view
 	if (selectedCreator) {
 		return (
-			<div className="container mx-auto h-screen">
+			<div className="container mx-auto h-screen md:w-[65rem]">
 				{showAlert && <AlertNotification />}
 
 				{/* Back button */}
@@ -553,7 +616,7 @@ const CreatorMarketplace = () => {
 						<TabsContent value="profile" className="mt-6">
 							<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 								{/* Basic Info Card */}
-								<div className="bg-white border border-[#FDE5D7] rounded-lg p-4 md:p-6">
+								<div className="bg-white border border-[#FDE5D7] rounded-lg p-4 md:p-6 h-fit">
 									<h3 className="text-base md:text-lg font-semibold mb-4 flex items-center">
 										<svg
 											className="w-5 h-5 mr-2 text-orange-500"
@@ -745,10 +808,77 @@ const CreatorMarketplace = () => {
 									<p className="text-gray-600 line-clamp-2 h-10 md:h-12">
 										{creator.bio || "No bio available"}
 									</p>
+									<VideoComponent
+										videoId={creator.id}
+										currentPlayingVideo={currentPlayingVideo}
+										setCurrentPlayingVideo={setCurrentPlayingVideo}
+										creator={{
+											...creator,
+											aboutMeVideoUrl: creator.aboutMeVideoUrl || "",
+										}}
+										onClick={() =>
+											openVideoModal(
+												creator.aboutMeVideoUrl || "",
+												0,
+												creator.name
+											)
+										}
+									/>
 
-									<video src={creator.aboutMeVideoUrl} controls>
-										<p>Your browser doesn&apos;t support HTML video.</p>
-									</video>
+									<div className="mt-8 bg-[#FFF4EE] p-4 rounded-lg">
+										<div className="flex justify-center items-center mb-4 bg-white rounded-lg px-4 py-2">
+											<Video size={24} className="text-orange-500 mr-2" />
+											<span className="font-medium">Videos</span>
+										</div>
+
+										<div className="space-y-3">
+											<div className="flex justify-between">
+												<span>1 Video</span>
+												<span className="font-medium">
+													${creator.pricing.oneVideo}
+												</span>
+											</div>
+
+											<div className="flex justify-between">
+												<span>3 Videos</span>
+												<span className="font-medium">
+													${creator.pricing.threeVideos}
+												</span>
+											</div>
+
+											<div className="flex justify-between">
+												<span>5 Videos</span>
+												<span className="font-medium">
+													${creator.pricing.fiveVideos}
+												</span>
+											</div>
+
+											<div className="flex justify-between">
+												<span>Bulk Videos</span>
+												<span className="font-medium">
+													${creator.pricing.bulkVideos}
+												</span>
+											</div>
+										</div>
+									</div>
+
+									<div className="mt-8 bg-[#FFF4EE] p-4 rounded-lg">
+										<div className="flex gap-2 justify-center items-center mb-4 bg-white rounded-lg px-4 py-2">
+											<Image
+												src="/icons/ai-actor.svg"
+												alt="AI Actor"
+												width={24}
+												height={24}
+											/>
+											<span className="font-medium">AI Actor</span>
+										</div>
+										<div className="flex justify-between">
+											<span>Per Usage</span>
+											<span className="font-medium">
+												${creator.pricing.aiActorPricing || 0}
+											</span>
+										</div>
+									</div>
 								</CardContent>
 
 								<CardFooter>
@@ -761,6 +891,43 @@ const CreatorMarketplace = () => {
 								</CardFooter>
 							</Card>
 						))}
+					</div>
+				)}
+
+				{/* Video Modal */}
+				{selectedVideo && (
+					<div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
+						<div className="relative w-full max-w-3xl max-h-full">
+							{/* Close Button */}
+							<button
+								onClick={closeVideoModal}
+								className="absolute top-2 right-2 text-white hover:text-gray-300 transition-colors z-10"
+							>
+								<X className="w-6 h-6" />
+							</button>
+
+							{/* Video Player */}
+							<div className="bg-black rounded-lg overflow-hidden">
+								<video
+									className="w-full h-auto max-h-[80vh]"
+									controls
+									autoPlay
+									src={selectedVideo.url}
+								>
+									<source src={selectedVideo.url} type="video/mp4" />
+									<source src={selectedVideo.url} type="video/mov" />
+									<source src={selectedVideo.url} type="video/quicktime" />
+									Your browser does not support the video tag.
+								</video>
+							</div>
+
+							{/* Video Info */}
+							<div className="mt-4 text-center">
+								<h4 className="text-white text-lg font-medium">
+									{selectedVideo.creatorName}&apos;s Introduction Video
+								</h4>
+							</div>
+						</div>
 					</div>
 				)}
 			</div>
@@ -805,7 +972,7 @@ const CreatorMarketplace = () => {
 						{savedCreators.length > 0 && `(${savedCreators.length})`}
 					</button>
 
-					<div className="relative">
+					{/* <div className="relative">
 						<button className="px-3 py-1.5 md:px-4 md:py-2 border bg-white rounded-md flex items-center text-xs md:text-sm">
 							Rating
 							<svg
@@ -822,72 +989,233 @@ const CreatorMarketplace = () => {
 								/>
 							</svg>
 						</button>
-					</div>
+					</div> */}
 
-					<div className="relative">
-						<button className="px-3 py-1.5 md:px-4 md:py-2 border bg-white rounded-md flex items-center text-xs md:text-sm">
-							Nationality
-							<svg
-								className="ml-1 md:ml-2 h-3 w-3 md:h-4 md:w-4"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M19 9l-7 7-7-7"
-								/>
-							</svg>
-						</button>
-					</div>
+					<Popover>
+						<PopoverTrigger asChild>
+							<button className="px-3 py-1.5 md:px-4 md:py-2 border bg-white rounded-md flex items-center text-xs md:text-sm">
+								Content Type
+								{selectedContentTypes.length > 0 && (
+									<span className="ml-1 bg-orange-500 text-white rounded-full px-2 py-0.5 text-xs">
+										{selectedContentTypes.length}
+									</span>
+								)}
+								<svg
+									className="ml-1 md:ml-2 h-3 w-3 md:h-4 md:w-4"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										strokeWidth={2}
+										d="M19 9l-7 7-7-7"
+									/>
+								</svg>
+							</button>
+						</PopoverTrigger>
+						<PopoverContent className="w-64 bg-white">
+							<div className="space-y-3">
+								<div className="flex justify-between items-center">
+									<h4 className="font-medium text-sm">Content Types</h4>
+									{selectedContentTypes.length > 0 && (
+										<button
+											onClick={() => setSelectedContentTypes([])}
+											className="text-xs text-orange-500 hover:text-orange-600"
+										>
+											Clear All
+										</button>
+									)}
+								</div>
+								<div className="space-y-3 max-h-64 overflow-y-auto">
+									{CONTENT_TYPES.map((contentType) => (
+										<div
+											key={contentType}
+											className="flex items-center space-x-2"
+										>
+											<Checkbox
+												id={contentType}
+												checked={selectedContentTypes.includes(contentType)}
+												onCheckedChange={(checked) => {
+													if (checked) {
+														setSelectedContentTypes((prev) => [
+															...prev,
+															contentType,
+														]);
+													} else {
+														setSelectedContentTypes((prev) =>
+															prev.filter((type) => type !== contentType)
+														);
+													}
+												}}
+											/>
+											<label
+												htmlFor={contentType}
+												className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+											>
+												{contentType}
+											</label>
+										</div>
+									))}
+								</div>
+							</div>
+						</PopoverContent>
+					</Popover>
 
-					<div className="relative">
-						<button className="px-3 py-1.5 md:px-4 md:py-2 border bg-white rounded-md flex items-center text-xs md:text-sm">
-							Gender
-							<svg
-								className="ml-1 md:ml-2 h-3 w-3 md:h-4 md:w-4"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M19 9l-7 7-7-7"
-								/>
-							</svg>
-						</button>
-					</div>
+					<Popover>
+						<PopoverTrigger asChild>
+							<button className="px-3 py-1.5 md:px-4 md:py-2 border bg-white rounded-md flex items-center text-xs md:text-sm">
+								Gender
+								{selectedGenders.length > 0 && (
+									<span className="ml-1 bg-orange-500 text-white rounded-full px-2 py-0.5 text-xs">
+										{selectedGenders.length}
+									</span>
+								)}
+								<svg
+									className="ml-1 md:ml-2 h-3 w-3 md:h-4 md:w-4"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										strokeWidth={2}
+										d="M19 9l-7 7-7-7"
+									/>
+								</svg>
+							</button>
+						</PopoverTrigger>
+						<PopoverContent className="w-64 bg-white">
+							<div className="space-y-3">
+								<div className="flex justify-between items-center">
+									<h4 className="font-medium text-sm">Gender</h4>
+									{selectedGenders.length > 0 && (
+										<button
+											onClick={() => setSelectedGenders([])}
+											className="text-xs text-orange-500 hover:text-orange-600"
+										>
+											Clear All
+										</button>
+									)}
+								</div>
+								<div className="space-y-3">
+									{["Male", "Female"].map((gender) => (
+										<div key={gender} className="flex items-center space-x-2">
+											<Checkbox
+												id={gender}
+												checked={selectedGenders.includes(gender)}
+												onCheckedChange={(checked) => {
+													if (checked) {
+														setSelectedGenders((prev) => [...prev, gender]);
+													} else {
+														setSelectedGenders((prev) =>
+															prev.filter((g) => g !== gender)
+														);
+													}
+												}}
+											/>
+											<label
+												htmlFor={gender}
+												className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+											>
+												{gender}
+											</label>
+										</div>
+									))}
+								</div>
+							</div>
+						</PopoverContent>
+					</Popover>
 
-					<div className="relative">
-						<button className="px-3 py-1.5 md:px-4 md:py-2 border bg-white rounded-md flex items-center text-xs md:text-sm">
-							Budget Range
-							<svg
-								className="ml-1 md:ml-2 h-3 w-3 md:h-4 md:w-4"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M19 9l-7 7-7-7"
-								/>
-							</svg>
-						</button>
-					</div>
+					<Popover>
+						<PopoverTrigger asChild>
+							<button className="px-3 py-1.5 md:px-4 md:py-2 border bg-white rounded-md flex items-center text-xs md:text-sm">
+								Nationality
+								{selectedNationalities.length > 0 && (
+									<span className="ml-1 bg-orange-500 text-white rounded-full px-2 py-0.5 text-xs">
+										{selectedNationalities.length}
+									</span>
+								)}
+								<svg
+									className="ml-1 md:ml-2 h-3 w-3 md:h-4 md:w-4"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										strokeWidth={2}
+										d="M19 9l-7 7-7-7"
+									/>
+								</svg>
+							</button>
+						</PopoverTrigger>
+						<PopoverContent className="w-64 bg-white">
+							<div className="space-y-3">
+								<div className="flex justify-between items-center">
+									<h4 className="font-medium text-sm">Nationality</h4>
+									{selectedNationalities.length > 0 && (
+										<button
+											onClick={() => setSelectedNationalities([])}
+											className="text-xs text-orange-500 hover:text-orange-600"
+										>
+											Clear All
+										</button>
+									)}
+								</div>
+								<div className="space-y-3 max-h-64 overflow-y-auto">
+									{NATIONALITIES.map((nationality) => (
+										<div
+											key={nationality}
+											className="flex items-center space-x-2"
+										>
+											<Checkbox
+												id={nationality}
+												checked={selectedNationalities.includes(nationality)}
+												onCheckedChange={(checked) => {
+													if (checked) {
+														setSelectedNationalities((prev) => [
+															...prev,
+															nationality,
+														]);
+													} else {
+														setSelectedNationalities((prev) =>
+															prev.filter((n) => n !== nationality)
+														);
+													}
+												}}
+											/>
+											<label
+												htmlFor={nationality}
+												className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+											>
+												{nationality}
+											</label>
+										</div>
+									))}
+								</div>
+							</div>
+						</PopoverContent>
+					</Popover>
 				</div>
 			</div>
 
-			{creators.length === 0 ? (
-				<EmptyState message="No Creators Found" />
+			{filteredCreators.length === 0 ? (
+				<EmptyState
+					message={
+						selectedContentTypes.length > 0 ||
+						selectedGenders.length > 0 ||
+						selectedNationalities.length > 0
+							? "No creators found with selected filters"
+							: "No Creators Found"
+					}
+				/>
 			) : (
 				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-					{creators.map((creator) => (
+					{filteredCreators.map((creator) => (
 						<Card key={creator.id} className="overflow-hidden">
 							<CardHeader className="pb-0">
 								<div className="flex justify-between items-start">
@@ -942,6 +1270,13 @@ const CreatorMarketplace = () => {
 										...creator,
 										aboutMeVideoUrl: creator.aboutMeVideoUrl || "",
 									}}
+									onClick={() =>
+										openVideoModal(
+											creator.aboutMeVideoUrl || "",
+											0,
+											creator.name
+										)
+									}
 								/>
 
 								<div className="mt-8 bg-[#FFF4EE] p-4 rounded-lg">
@@ -980,6 +1315,24 @@ const CreatorMarketplace = () => {
 										</div>
 									</div>
 								</div>
+
+								<div className="mt-8 bg-[#FFF4EE] p-4 rounded-lg">
+									<div className="flex justify-center gap-2 items-center mb-4 bg-white rounded-lg px-4 py-2">
+										<Image
+											src="/icons/ai-actor.svg"
+											alt="AI Actor"
+											width={24}
+											height={24}
+										/>
+										<span className="font-medium">AI Actor</span>
+									</div>
+									<div className="flex justify-between">
+										<span>Per Usage</span>
+										<span className="font-medium">
+											${creator.pricing.aiActorPricing || 0}
+										</span>
+									</div>
+								</div>
 							</CardContent>
 
 							<CardFooter>
@@ -992,6 +1345,43 @@ const CreatorMarketplace = () => {
 							</CardFooter>
 						</Card>
 					))}
+				</div>
+			)}
+
+			{/* Video Modal */}
+			{selectedVideo && (
+				<div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
+					<div className="relative w-full max-w-3xl max-h-full">
+						{/* Close Button */}
+						<button
+							onClick={closeVideoModal}
+							className="absolute top-2 right-2 text-white hover:text-gray-300 transition-colors z-10"
+						>
+							<X className="w-6 h-6" />
+						</button>
+
+						{/* Video Player */}
+						<div className="bg-black rounded-lg overflow-hidden">
+							<video
+								className="w-full h-auto max-h-[80vh]"
+								controls
+								autoPlay
+								src={selectedVideo.url}
+							>
+								<source src={selectedVideo.url} type="video/mp4" />
+								<source src={selectedVideo.url} type="video/mov" />
+								<source src={selectedVideo.url} type="video/quicktime" />
+								Your browser does not support the video tag.
+							</video>
+						</div>
+
+						{/* Video Info */}
+						<div className="mt-4 text-center">
+							<h4 className="text-white text-lg font-medium">
+								{selectedVideo.creatorName}&apos;s Introduction Video
+							</h4>
+						</div>
+					</div>
 				</div>
 			)}
 		</div>

@@ -299,6 +299,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
 								interestId: project.interestId,
 								// channelId: contest.channelId,
 							}}
+							brandProfile={brandProfile}
 							refreshData={() => {
 								// Add actual refresh logic here
 								window.location.reload(); // Simple refresh option

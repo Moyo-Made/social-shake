@@ -358,7 +358,7 @@ const BrandManagement: React.FC = () => {
 	const renderBrandTable = () => {
 		if (loading) {
 			return (
-				<div className="flex justify-center items-center py-10">
+				<div className="flex justify-center items-center py-10 h-screen">
 					<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
 				</div>
 			);
@@ -450,10 +450,10 @@ const BrandManagement: React.FC = () => {
 	};
 
 	return (
-		<div className="flex flex-col md:flex-row bg-white p-4 ">
+		<div className="flex flex-col md:flex-row bg-white p-4">
 			{/* Left sidebar for tabs */}
-			<div className="w-full md:w-64 p-6">
-				<div className="flex flex-col space-y-2">
+			<div className=" p-6">
+				<div className="flex flex-col space-y-2 w-full md:w-60">
 					{tabs.map((tab) => (
 						<button
 							key={tab.id}
@@ -528,7 +528,7 @@ const BrandManagement: React.FC = () => {
 								className={`px-3 py-1 rounded-l border ${
 									pagination.page === 1
 										? "bg-gray-100 text-gray-400 cursor-not-allowed"
-										: "bg-white text-blue-600 hover:bg-blue-50"
+										: "bg-white text-orange-600 hover:bg-orange-50"
 								}`}
 							>
 								Previous
@@ -542,8 +542,8 @@ const BrandManagement: React.FC = () => {
 											onClick={() => handlePageChange(page)}
 											className={`px-3 py-1 border-t border-b ${
 												pagination.page === page
-													? "bg-blue-600 text-white"
-													: "bg-white text-blue-600 hover:bg-blue-50"
+													? "bg-orange-600 text-white"
+													: "bg-white text-orange-600 hover:bg-blue-50"
 											}`}
 										>
 											{page}
@@ -558,7 +558,7 @@ const BrandManagement: React.FC = () => {
 								className={`px-3 py-1 rounded-r border ${
 									pagination.page === pagination.pages
 										? "bg-gray-100 text-gray-400 cursor-not-allowed"
-										: "bg-white text-blue-600 hover:bg-blue-50"
+										: "bg-white text-orange-600 hover:bg-orange-50"
 								}`}
 							>
 								Next

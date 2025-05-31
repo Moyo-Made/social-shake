@@ -1,0 +1,23 @@
+export const NATIONALITIES = [
+	'Australian',
+	'American', 
+	'British',
+	'Canadian',
+	'New Zealand',
+	'Nigerian',
+	'South African',
+	'Indian',
+	'Chinese',
+	'Japanese',
+	'Korean',
+	'Filipino',
+	'Indonesian',
+	'Malaysian',
+	'Thai',
+	'Vietnamese',
+	'German',
+	'French',
+	'Italian',
+	'Spanish',
+	'Brazilian'
+];

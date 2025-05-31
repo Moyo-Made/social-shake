@@ -2,7 +2,15 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, Send, Smile, Paperclip, ChevronDown } from "lucide-react";
+import {
+	Search,
+	Send,
+	Smile,
+	Paperclip,
+	ChevronDown,
+	ImageIcon,
+	X,
+} from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
@@ -17,6 +25,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { commonEmojis } from "@/types/emojis";
 
 interface BrandProfile {
 	id: string;
@@ -70,6 +79,42 @@ const CreatorChatPage = () => {
 	const scrollAreaRef = useRef<HTMLDivElement>(null);
 	const { setTotalUnreadCount } = useNotifications();
 	const [sortOption, setSortOption] = useState("Newest");
+	const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+	const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+	const fileInputRef = useRef<HTMLInputElement>(null);
+	const emojiPickerRef = useRef<HTMLDivElement>(null);
+
+	// Handle emoji selection
+	const handleEmojiSelect = (emoji: string) => {
+		setMessageInput((prev) => prev + emoji);
+		setShowEmojiPicker(false);
+	};
+
+	// Handle file selection
+	const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+		const files = Array.from(event.target.files || []);
+		setSelectedFiles((prev) => [...prev, ...files]);
+	};
+
+	// Remove selected file
+	const removeFile = (index: number) => {
+		setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+	};
+
+	// Close emoji picker when clicking outside
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			if (
+				emojiPickerRef.current &&
+				!emojiPickerRef.current.contains(event.target as Node)
+			) {
+				setShowEmojiPicker(false);
+			}
+		};
+
+		document.addEventListener("mousedown", handleClickOutside);
+		return () => document.removeEventListener("mousedown", handleClickOutside);
+	}, []);
 
 	const handleSortChange = (option: "Newest" | "Oldest") => {
 		setSortOption(option);
@@ -577,7 +622,7 @@ const CreatorChatPage = () => {
 	// Handle sending a new message using the API endpoint
 	const handleSendMessage = async () => {
 		if (
-			!messageInput.trim() ||
+			(!messageInput.trim() && selectedFiles.length === 0) ||
 			!selectedConversation ||
 			!currentUser ||
 			sendingMessage
@@ -586,18 +631,28 @@ const CreatorChatPage = () => {
 
 		try {
 			setSendingMessage(true);
+
+			// If there are files, you'll need to upload them first
+			if (selectedFiles.length > 0) {
+				// Handle file upload logic here
+				// You'll need to implement file upload to your storage service
+				console.log("Files to upload:", selectedFiles);
+				// After upload, include file URLs in the message
+			}
+
+			// Send message via socket
+			socketSendMessage(selectedConversation, messageInput);
+
+			// Clear input and files
 			setMessageInput("");
+			setSelectedFiles([]);
 
 			// Scroll to bottom
 			setTimeout(() => {
 				if (scrollAreaRef.current) {
-					const scrollArea = scrollAreaRef.current;
-					scrollArea.scrollTop = scrollArea.scrollHeight;
+					scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
 				}
 			}, 100);
-
-			// Send message via socket instead of REST API
-			socketSendMessage(selectedConversation, messageInput);
 		} catch (error) {
 			console.error("Error sending message:", error);
 		} finally {
@@ -735,7 +790,9 @@ const CreatorChatPage = () => {
 												</span>
 											)}
 										</div>
-										<p className="text-xs text-gray-500 flex-shrink-0">{user.time}</p>
+										<p className="text-xs text-gray-500 flex-shrink-0">
+											{user.time}
+										</p>
 									</div>
 
 									<p className="text-sm text-gray-500 line-clamp-1 mt-0.5">
@@ -787,7 +844,7 @@ const CreatorChatPage = () => {
 
 				{/* Messages area */}
 				<div className="flex-1 p-4 overflow-auto" ref={scrollAreaRef}>
-					<div className="space-y-6">
+					<div className="space-y-6 pb-28">
 						{/* Welcome message for empty conversations */}
 						{messages.length === 0 && !loading && selectedUser && (
 							<div className="flex justify-center items-center text-center bg-orange-50 text-orange-800 px-4 py-3 rounded-lg text-base">
@@ -877,31 +934,114 @@ const CreatorChatPage = () => {
 				</div>
 
 				{/* Message input area */}
-				<div className="border-t p-4 flex items-center">
-					<Paperclip className="h-5 w-5 text-gray-400 mr-2 cursor-pointer hover:text-orange-500" />
-					<Input
-						placeholder="Type your message here..."
-						className="flex-1"
-						value={messageInput}
-						onChange={(e) => setMessageInput(e.target.value)}
-						onKeyDown={(e) => {
-							if (e.key === "Enter" && !e.shiftKey) {
-								e.preventDefault();
-								handleSendMessage();
-							}
-						}}
-						disabled={sendingMessage || !selectedUser}
-					/>
-					<div className="flex items-center ml-2">
-						<Smile className="h-5 w-5 text-gray-400 mx-2 cursor-pointer hover:text-orange-500" />
+				<div className="border-t bg-white flex-shrink-0 fixed bottom-0 left-64 right-0 lg:left-[34rem] z-40">
+					{/* File preview area */}
+					{selectedFiles.length > 0 && (
+						<div className="p-3 border-b bg-gray-50">
+							<div className="flex flex-wrap gap-2">
+								{selectedFiles.map((file, index) => (
+									<div
+										key={index}
+										className="relative bg-white border rounded-lg p-2 flex items-center space-x-2"
+									>
+										<ImageIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
+										<span className="text-sm text-gray-600 max-w-[80px] sm:max-w-[100px] truncate">
+											{file.name}
+										</span>
+										<button
+											onClick={() => removeFile(index)}
+											className="text-gray-400 hover:text-red-500 flex-shrink-0"
+										>
+											<X className="h-4 w-4" />
+										</button>
+									</div>
+								))}
+							</div>
+						</div>
+					)}
+
+					{/* Input area */}
+					<div className="p-3 sm:p-4 flex items-end space-x-2 relative">
+						{/* File input */}
+						<input
+							ref={fileInputRef}
+							type="file"
+							multiple
+							accept="image/*,video/*,.pdf,.doc,.docx"
+							onChange={handleFileSelect}
+							className="hidden"
+						/>
+
+						{/* Paperclip button */}
+						<button
+							onClick={() => fileInputRef.current?.click()}
+							className="text-gray-400 hover:text-orange-500 p-1 flex-shrink-0"
+							aria-label="Attach file"
+						>
+							<Paperclip className="h-5 w-5" />
+						</button>
+
+						{/* Message input */}
+						<div className="flex-1 relative min-w-0">
+							<Input
+								placeholder="Type your message here..."
+								className="pr-10 resize-none min-h-[40px] max-h-[120px] text-sm sm:text-base"
+								value={messageInput}
+								onChange={(e) => setMessageInput(e.target.value)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" && !e.shiftKey) {
+										e.preventDefault();
+										handleSendMessage();
+									}
+								}}
+								disabled={sendingMessage || !selectedUser}
+							/>
+						</div>
+
+						{/* Emoji picker */}
+						<div className="relative flex-shrink-0" ref={emojiPickerRef}>
+							<button
+								onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+								className="text-gray-400 hover:text-orange-500 p-1"
+								aria-label="Add emoji"
+							>
+								<Smile className="h-5 w-5" />
+							</button>
+
+							{/* Emoji picker dropdown */}
+							{showEmojiPicker && (
+								<div className="absolute bottom-full right-0 mb-2 bg-white border rounded-lg shadow-lg p-3 w-48 sm:w-64 max-h-48 overflow-y-auto z-50">
+									<div className="grid grid-cols-6 sm:grid-cols-8 gap-1">
+										{commonEmojis.map((emoji, index) => (
+											<button
+												key={index}
+												onClick={() => handleEmojiSelect(emoji)}
+												className="p-1 hover:bg-gray-100 rounded text-base sm:text-lg transition-colors"
+											>
+												{emoji}
+											</button>
+										))}
+									</div>
+								</div>
+							)}
+						</div>
+
+						{/* Send button */}
 						<button
 							className={`${
-								!selectedUser || sendingMessage || !messageInput.trim()
+								!selectedUser ||
+								sendingMessage ||
+								(!messageInput.trim() && selectedFiles.length === 0)
 									? "bg-gray-100 text-gray-400"
 									: "bg-orange-600 text-white hover:bg-orange-700"
-							} rounded-full p-2 transition-colors`}
+							} rounded-full p-2 transition-colors flex-shrink-0`}
 							onClick={handleSendMessage}
-							disabled={sendingMessage || !selectedUser || !messageInput.trim()}
+							disabled={
+								sendingMessage ||
+								!selectedUser ||
+								(!messageInput.trim() && selectedFiles.length === 0)
+							}
+							aria-label="Send message"
 						>
 							{sendingMessage ? (
 								<div className="h-5 w-5 animate-spin rounded-full border-2 border-t-transparent border-white"></div>

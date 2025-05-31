@@ -82,6 +82,7 @@ const defaultProfileData: CreatorProfileData = {
 		threeVideos: 0,
 		fiveVideos: 0,
 		bulkVideos: 0,
+		aiActorPricing: 0
 	},
 	id: "",
 	verificationId: "",

@@ -8,10 +8,13 @@ import { useParams } from "next/navigation";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Creator } from "@/types/creators";
+import { useSocket } from "@/context/SocketContext";
+import { toast } from "sonner";
 
 const CreatorDetailsPage: React.FC = () => {
 	const params = useParams();
 	const userId = params?.userId as string;
+	const { socket, isConnected, subscribeToVerification } = useSocket(); 
 
 	const [creator, setCreator] = useState<Creator | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -22,6 +25,40 @@ const CreatorDetailsPage: React.FC = () => {
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [actionType, setActionType] = useState<string>("");
 	const [actionMessage, setActionMessage] = useState<string>("");
+
+	// ADD: Subscribe to real-time verification updates
+	useEffect(() => {
+		if (!socket || !isConnected || !userId) return;
+
+		console.log('Admin: Setting up verification listener for userId:', userId);
+		
+		// Subscribe to verification updates for this specific creator
+		subscribeToVerification(userId);
+
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const handleVerificationUpdate = (data: any) => {
+			console.log('Admin: Received verification status update:', data);
+			
+			// Update creator status if this update is for the current creator
+			if (data.userId === userId) {
+				setCreator(prev => prev ? {
+					...prev,
+					status: data.status
+				} : null);
+
+				// Show notification
+				toast.success(`Creator verification status updated to: ${data.status}`);
+			}
+		};
+
+		// Listen for verification updates
+		socket.on('verification-status-update', handleVerificationUpdate);
+
+		// Cleanup
+		return () => {
+			socket.off('verification-status-update', handleVerificationUpdate);
+		};
+	}, [socket, isConnected, userId, subscribeToVerification]);
 
 	const getProfilePictureUrl = () => {
 		if (!creator) return null;
@@ -181,15 +218,22 @@ const CreatorDetailsPage: React.FC = () => {
 				status: newStatus,
 			});
 
+			// Show success notification
+			toast.success(`Creator ${actionType} action completed successfully`);
+
 			// Reset action state
 			setShowModal(false);
 			setActionType("");
 			setActionMessage("");
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "An error occurred");
+			toast.error("Failed to perform action");
 			console.error("Error performing creator action:", err);
 		}
 	};
+
+	// Rest of your component code remains the same...
+	// [All other functions and JSX remain unchanged]
 
 	// Render action modal
 	const renderActionModal = () => {
@@ -318,8 +362,8 @@ const CreatorDetailsPage: React.FC = () => {
 
 	if (loading) {
 		return (
-			<div className="flex justify-center items-center py-20">
-				<div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
+			<div className="flex justify-center items-center py-20 h-screen">
+				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
 			</div>
 		);
 	}
@@ -387,8 +431,14 @@ const CreatorDetailsPage: React.FC = () => {
 							</div>
 						)}
 						<div>
-							<h1 className="text-xl font-semibold ">{creator.creatorProfileData?.tiktokDisplayName || creator.creator}</h1>
-							<p className=" text-base">@{creator.creatorProfileData?.tiktokUsername || creator.username}</p>
+							<h1 className="text-xl font-semibold ">
+								{creator.creatorProfileData?.tiktokDisplayName ||
+									creator.creator}
+							</h1>
+							<p className=" text-base">
+								@
+								{creator.creatorProfileData?.tiktokUsername || creator.username}
+							</p>
 							<p className="text-gray-600 mt-px text-sm">{creator.email}</p>
 						</div>
 					</div>
@@ -402,7 +452,7 @@ const CreatorDetailsPage: React.FC = () => {
 							{/* Show Approve Creator button only when status is pending, rejected, or suspended */}
 							{(creator.status === "pending" ||
 								creator.status === "rejected" ||
-								creator.status === "suspended") && (
+								creator.status === "suspended" || creator.status === "info_requested") && (
 								<Button
 									className="px-5 bg-[#067647] text-white rounded-lg hover:bg-green-700 transition-colors duration-200"
 									onClick={() => {
@@ -417,7 +467,7 @@ const CreatorDetailsPage: React.FC = () => {
 							)}
 
 							{/* Show Reject Creator button only when status is pending */}
-							{creator.status === "pending" && (
+							{creator.status === "pending" || creator.status === "info_requested" && (
 								<Button
 									className="px-6 bg-[#E61A1A] text-white rounded-lg hover:bg-red-700 transition-colors duration-200"
 									onClick={() => {
@@ -461,7 +511,7 @@ const CreatorDetailsPage: React.FC = () => {
 
 				<div className="flex flex-col md:flex-row justify-between items-start mt-6 gap-6">
 					{/* Creator information section */}
-					<div className="w-fit rounded-xl border border-[#6670854D] p-6 mt-6">
+					<div className="w-full rounded-xl border border-[#6670854D] p-6 mt-6">
 						<h2 className="text-xl font-semibold mb-4">Creator Information</h2>
 
 						<div className="grid grid-cols-1 md:grid-cols-3 gap-y-6 gap-x-8">
@@ -480,7 +530,9 @@ const CreatorDetailsPage: React.FC = () => {
 							<div>
 								<p className="text-gray-500 mb-1">Username</p>
 								<p className="text-black">
-									@{creator.creatorProfileData?.tiktokUsername || creator.username }{" "}
+									@
+									{creator.creatorProfileData?.tiktokUsername ||
+										creator.username}{" "}
 								</p>
 							</div>
 
@@ -488,7 +540,7 @@ const CreatorDetailsPage: React.FC = () => {
 								<p className="text-gray-500 mb-1">Creator Bio</p>
 								<p className="text-black">{creator.bio}</p>
 							</div>
-							{/* //placeholder */}
+
 							<div>
 								<p className="text-gray-500 mb-1">Phone Number</p>
 								<p className="text-black">08100566962</p>
@@ -498,6 +550,13 @@ const CreatorDetailsPage: React.FC = () => {
 								<p className="text-gray-500 mb-1">Creator Country</p>
 								<p className="text-black">{creator.country}</p>
 							</div>
+
+							{creator.abnNumber && (
+								<div>
+									<p className="text-gray-500 mb-1">Australian Business No.</p>
+									<p className="text-black">{creator.abnNumber}</p>
+								</div>
+							)}
 
 							<div>
 								<p className="text-gray-500 mb-1">Date of Birth</p>
@@ -539,7 +598,7 @@ const CreatorDetailsPage: React.FC = () => {
 
 							<div className="md:col-span-2">
 								<p className="text-gray-500 mb-1">Types of content</p>
-								<p className="text-black">{creator.contentTypes}</p>
+								<p className="text-black">{creator.contentTypes?.join(", ")}</p>
 							</div>
 
 							<div className="md:col-span-3">
@@ -613,7 +672,7 @@ const CreatorDetailsPage: React.FC = () => {
 					</div>
 
 					{/* Content metrics section */}
-					<div className="w-1/2 flex flex-col rounded-xl border border-[#6670854D] p-6 mt-6">
+					<div className="w-[40%] flex flex-col rounded-xl border border-[#6670854D] p-6 mt-6">
 						<h2 className="text-xl font-semibold mb-5">Verification</h2>
 
 						<div>

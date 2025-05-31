@@ -526,7 +526,8 @@ export default function CreatorSubmissionTab({
 
 	if (isLoading) {
 		return (
-			<div className="flex items-center justify-center p-8">
+			<div className="flex flex-col items-center justify-center h-64">
+				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
 				<p>Loading submissions...</p>
 			</div>
 		);

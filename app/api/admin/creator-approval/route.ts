@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
 		const userId = searchParams.get("userId");
 		const email = searchParams.get("email");
 		const id = searchParams.get("id");
+		
 
 		// Handle direct ID lookup if provided
 		if (!adminDb) {
@@ -574,33 +575,97 @@ export async function POST(request: NextRequest) {
 			throw new Error("Firebase admin database is not initialized");
 		}
 
-		// Handle different actions (approve, reject, request_info, suspend)
+		// First get the verification document to extract userId
 		const verificationRef = adminDb
 			.collection("creator_verifications")
 			.doc(verificationId);
+		
+		const verificationDoc = await verificationRef.get();
+		if (!verificationDoc.exists) {
+			return NextResponse.json(
+				{ error: "Verification document not found" },
+				{ status: 404 }
+			);
+		}
 
+		const verificationData = verificationDoc.data();
+		const userId = verificationData?.userId;
+
+		if (!userId) {
+			return NextResponse.json(
+				{ error: "UserId not found in verification document" },
+				{ status: 400 }
+			);
+		}
+
+		// Handle different actions (approve, reject, request_info, suspend)
 		let updateData = {};
+		const broadcastData = {
+			userId,
+			status: 'pending' as 'pending' | 'approved' | 'rejected' | 'info_requested' | 'suspended',
+			rejectionReason: undefined as string | undefined,
+			infoRequest: undefined as string | undefined,
+			suspensionReason: undefined as string | undefined,
+		};
 
 		switch (action) {
 			case "approve":
 				updateData = { status: "approved" };
+				broadcastData.status = "approved";
 				break;
 			case "reject":
 				updateData = { status: "rejected", rejectionReason: message };
+				broadcastData.status = "rejected";
+				broadcastData.rejectionReason = message;
 				break;
 			case "request_info":
 				updateData = { status: "info_requested", infoRequest: message };
+				broadcastData.status = "info_requested";
+				broadcastData.infoRequest = message;
 				break;
 			case "suspend":
 				updateData = { status: "suspended", suspensionReason: message };
+				broadcastData.status = "suspended";
+				broadcastData.suspensionReason = message;
 				break;
 			default:
 				throw new Error("Invalid action type");
 		}
 
+		// Update the database
 		await verificationRef.update(updateData);
 
-		return NextResponse.json({ success: true });
+		// SIMPLIFIED: Use the global broadcast function directly
+		try {
+			// Check if the global broadcast function is available
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const globalBroadcast = (global as any).broadcastVerificationUpdate;
+			
+			if (globalBroadcast) {
+				console.log('Using global broadcast function');
+				const result = await globalBroadcast({
+					...broadcastData,
+					updatedAt: new Date().toISOString()
+				});
+				console.log('Broadcast result:', result);
+			} else {
+				console.log('Global broadcast function not available, update completed without real-time notification');
+			}
+		} catch (broadcastError) {
+			console.error('Error in direct broadcast:', broadcastError);
+			// Don't fail the whole request if broadcast fails
+		}
+
+		return NextResponse.json({ 
+			success: true,
+			data: {
+				verificationId,
+				userId,
+				action,
+				status: broadcastData.status,
+				message
+			}
+		});
 	} catch (error) {
 		console.error("Error updating creator status:", error);
 		return NextResponse.json(

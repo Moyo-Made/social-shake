@@ -306,8 +306,9 @@ const CreatorProjectDashboard: React.FC = () => {
 	function renderProjectList() {
 		if (loading && projects.length === 0) {
 			return (
-				<div className="flex justify-center py-12">
+				<div className="flex justify-center h-screen">
 					<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500" />
+					<p className="text-gray-500 mt-4">Loading projects...</p>
 				</div>
 			);
 		}

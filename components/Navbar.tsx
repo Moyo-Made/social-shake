@@ -14,12 +14,15 @@ const Navbar = () => {
 					height={80}
 				/>
 			</Link>
+			<Link href="/contact-us">
+
 			<Button
 				variant="outline"
-				className="bg-[#1A1A1A] text-sm md:text-base text-white rounded-lg px-4 md:px-7 py-5 hover:bg-black hover:text-white font-satoshi"
+				className="bg-[#1A1A1A] text-sm md:text-base text-white rounded-lg px-4 md:px-6 py-4 hover:bg-black hover:text-white font-satoshi"
 			>
 				Contact Us
 			</Button>
+			</Link>
 		</nav>
 	);
 };

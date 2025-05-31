@@ -526,7 +526,7 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 				{isPhysicalProduct && (
 					<TabsContent value="product-delivery">
 						<div className="p-8 text-gray-500">
-							<ProductDelivery />
+							<ProductDelivery projectId={projectId} />
 						</div>
 					</TabsContent>
 				)}

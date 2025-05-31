@@ -349,7 +349,7 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 				</header>
 
 				<main className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
-					<div className="container mx-auto h-screen">{children}</div>
+					<div className="md:w-[calc(100vw-16rem)] container mx-auto h-screen">{children}</div>
 				</main>
 			</div>
 		</div>

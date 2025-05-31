@@ -2,6 +2,7 @@ import { StaticImport } from "next/dist/shared/lib/get-img-props";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export interface Creator {
+	abnNumber: number;
 	tiktokLink: string;
 	fullName: string;
 	profileImage: string | StaticImport;
@@ -164,6 +165,7 @@ export interface CreatorProfileData {
 		fiveVideos: number;
 		bulkVideos: number;
 		bulkVideosNote?: string;
+		aiActorPricing?: number
 	};
 	id: string;
 	verificationId: string;

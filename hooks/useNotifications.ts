@@ -138,9 +138,9 @@ export function useNotifications(): UseNotificationsReturn {
     fetchNotifications();
 
     // Set up polling for real-time updates (every 30 seconds)
-    const interval = setInterval(fetchNotifications, 30000);
+    // const interval = setInterval(fetchNotifications, 30000);
 
-    return () => clearInterval(interval);
+    // return () => clearInterval(interval);
   }, [fetchNotifications]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
