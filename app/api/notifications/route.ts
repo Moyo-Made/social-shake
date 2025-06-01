@@ -6,7 +6,6 @@ export async function GET(request: NextRequest) {
 	try {
 		const { searchParams } = new URL(request.url);
 		const userId = searchParams.get("userId");
-		
 
 		if (!userId) {
 			return NextResponse.json(
@@ -24,43 +23,42 @@ export async function GET(request: NextRequest) {
 
 		// Get notifications for the current user
 		const notificationsRef = adminDb.collection("notifications");
-		
+
 		// Try without orderBy first to see if that's the issue
-    const query = notificationsRef
-    .where("userId", "==", userId)
-    .orderBy("createdAt", "desc")
-    .limit(50);
+		const query = notificationsRef
+			.where("userId", "==", userId)
+			.orderBy("createdAt", "desc")
+			.limit(50);
 
 		const snapshot = await query.get();
-		
 
 		const notifications: NotificationData[] = snapshot.docs.map((doc) => {
 			const data = doc.data();
-			
+
 			// Helper function to safely convert dates
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const convertToDate = (dateValue: any): Date | undefined => {
 				if (!dateValue) return undefined;
-				
+
 				// If it's a Firestore Timestamp
-				if (dateValue && typeof dateValue.toDate === 'function') {
+				if (dateValue && typeof dateValue.toDate === "function") {
 					return dateValue.toDate();
 				}
-				
+
 				// If it's already a Date object
 				if (dateValue instanceof Date) {
 					return dateValue;
 				}
-				
+
 				// If it's a string or number, try to parse it
-				if (typeof dateValue === 'string' || typeof dateValue === 'number') {
+				if (typeof dateValue === "string" || typeof dateValue === "number") {
 					const parsed = new Date(dateValue);
 					return isNaN(parsed.getTime()) ? undefined : parsed;
 				}
-				
+
 				return undefined;
 			};
-			
+
 			return {
 				id: doc.id,
 				...data,
@@ -72,19 +70,19 @@ export async function GET(request: NextRequest) {
 		return NextResponse.json({ notifications });
 	} catch (error) {
 		console.error("❌ Detailed error in notifications API:", {
-			message: error instanceof Error ? error.message : 'Unknown error',
+			message: error instanceof Error ? error.message : "Unknown error",
 			stack: error instanceof Error ? error.stack : undefined,
 			name: error instanceof Error ? error.name : undefined,
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			code: (error as any)?.code,
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			details: (error as any)?.details
+			details: (error as any)?.details,
 		});
-		
+
 		return NextResponse.json(
-			{ 
+			{
 				error: "Failed to fetch notifications",
-				details: error instanceof Error ? error.message : 'Unknown error'
+				details: error instanceof Error ? error.message : "Unknown error",
 			},
 			{ status: 500 }
 		);

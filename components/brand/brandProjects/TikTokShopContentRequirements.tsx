@@ -44,7 +44,6 @@ const TikTokShopContentRequirements = () => {
 		updateProjectRequirementsData({ contentType: e.target.value });
 	};
 
-
 	const updateDuration = (value: string) => {
 		updateProjectRequirementsData({ duration: value });
 	};
@@ -242,16 +241,19 @@ const TikTokShopContentRequirements = () => {
 					</div>
 				</RadioGroup>
 
-				<div className="mt-2">
-					<Label className="text-[15px]">Write your Script</Label>
-					<Textarea
-						className="mt-1 placeholder:text-[#667085] font-normal"
-						rows={5}
-						placeholder="We're looking for an energetic and engaging TikTok ad for XYZ Shoes. Highlight comfort and style, and encourage users to try them out!"
-						value={script}
-						onChange={updateScript}
-					/>
-				</div>
+				{videoType === "client-script" && (
+					<div className="mt-2">
+						<Label className="text-[15px]">Write your Script</Label>
+						<Textarea
+							className="mt-1 placeholder:text-[#667085] font-normal"
+							rows={5}
+							placeholder="We're looking for an energetic and engaging TikTok ad for XYZ Shoes. Highlight comfort and style, and encourage users to try them out!"
+							value={script}
+							onChange={updateScript}
+						/>
+						
+					</div>
+				)}
 			</div>
 
 			<div className="space-y-4">

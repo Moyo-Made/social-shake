@@ -101,6 +101,16 @@ export interface CreatorPricing {
 	totalAmount: number;
 	creator: CreatorSelection;
 	cost: CostBreakdown;
+	lockedPricing: {
+		[creatorId: string]: {
+		  pricePerVideo: number;
+		  totalPrice: number;
+		  pricingTier: string; // "per video", "3-video package", etc.
+		}
+	  };
+	  budgetPerVideoLocked: number; // For Post Public Brief
+	  paymentAmounts: Record<string, number>;
+
 }
 
 export interface Creator {
@@ -108,6 +118,12 @@ export interface Creator {
 	id: any;
 	name: string;
 	avatar: string;
+	pricing:{
+		oneVideo: number;
+		threeVideos: number;
+		fiveVideos: number;	
+		bulkVideos: number;
+	}
 }
 
 interface CreatorSelection {
@@ -131,6 +147,8 @@ interface CostBreakdown {
 }
 
 export interface ProjectFormData {
+	projectTitle: string;
+	brandEmail: string;
   paidfalse: boolean;
   paymentAmount: null;
 	views: number;

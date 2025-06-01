@@ -92,6 +92,8 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       socketInstance.emit('subscribe-user', currentUser.uid);
       // Also subscribe to verification updates
       socketInstance.emit('subscribe-verification', currentUser.uid);
+      // Subscribe to notifications
+      socketInstance.emit('subscribe-notifications', currentUser.uid);
       
       // Auto-refresh verification status when connected
       if (currentUser.uid) {
@@ -154,6 +156,9 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('Received conversation update:', update);
       // You can handle conversation updates here if needed
     });
+
+    // Notification-related socket listeners are now handled in useNotifications hook
+    // This keeps the context focused and prevents duplicate listeners
 
     setSocket(socketInstance);
 

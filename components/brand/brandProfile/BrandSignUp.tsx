@@ -43,35 +43,35 @@ const BusinessSignup = () => {
 	const testimonials = [
 		{
 			name: "London Walace",
-			date: "Jun 28, 2025",
+			date: "May 28, 2025",
 			rating: 5,
 			text: "As a fast-moving brand, we needed a reliable, organized, and scalable way to source authentic user-generated content. Social Shake made it effortless. From setting campaign requirements to reviewing submissions and managing payments—it's all in one place.",
 			avatar: "/icons/london.svg"
 		},
 		{
 			name: "Emma Carter",
-			date: "Jul 15, 2025",
+			date: "May 29, 2025",
 			rating: 5,
 			text: "We were on the hunt for a solution to streamline our influencer collaborations. Thanks to Social Shake, we can now connect with the right creators easily, track progress, and measure impact—all in real-time.",
 			avatar: "/icons/emma.svg"
 		},
 		{
 			name: "James Thompson",
-			date: "Aug 02, 2025",
+			date: "June 01, 2025",
 			rating: 5,
 			text: "Our marketing team was overwhelmed with content requests. Social Shake helped us automate the process, allowing us to focus on strategy rather than logistics, leading to more impactful campaigns.",
 			avatar: "/icons/james.svg"
 		},
 		{
 			name: "Sophia Chen",
-			date: "Sep 10, 2025",
+			date: "May 28, 2025",
 			rating: 5,
 			text: "The ability to curate and manage user-generated content from diverse platforms has transformed our brand strategy. Social Shake has been a game-changer in enhancing our authenticity.",
 			avatar: "/icons/sophia.svg"
 		},
 		{
 			name: "Oliver Smith",
-			date: "Oct 01, 2025",
+			date: "June 02, 2025",
 			rating: 5,
 			text: "Finding a platform that offers seamless integration with our existing tools was critical. Social Shake not only met our needs but exceeded them, driving exceptional engagement with our audience.",
 			avatar: "/icons/oliver.svg"

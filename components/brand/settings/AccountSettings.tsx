@@ -332,7 +332,7 @@ const AccountSettings: React.FC = () => {
 						<div className="mb-6">
 							<label className="block mb-2 font-medium">Brand Logo</label>
 							<div className="flex items-center space-x-4">
-								<div className="w-24 h-24 bg-gray-100 border border-gray-200 flex items-center justify-center">
+								<div className="w-24 h-24 bg-gray-100 border border-gray-200 flex items-center justify-center rounded-full">
 									{formData?.logoUrl || imagePreview ? (
 										// eslint-disable-next-line @next/next/no-img-element
 										<img

@@ -22,6 +22,7 @@ export interface Submission {
 }
 
 export interface CreatorSubmission {
+	creatorId: string;
 	tiktokLink: string;
 	creatorIcon: string;
 	creatorName: string;
@@ -57,6 +58,8 @@ export interface CreatorSubmission {
 	sparkCode?: string;
 	revisionsUsed?: number;
 	affiliateLink?: string;
+	brandFeedback?: string;
+	brandRating?: number;
 }
 
 export interface SubmissionReview {

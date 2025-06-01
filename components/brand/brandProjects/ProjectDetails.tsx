@@ -141,7 +141,7 @@ const ProjectDetails: React.FC = () => {
 	};
 
 	// Maximum file size in bytes (1MB = 1,048,576 bytes)
-	const MAX_FILE_SIZE = 1048576;
+	const MAX_FILE_SIZE = 5 * 1048576;
 
 	const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
 		e.preventDefault();
@@ -496,7 +496,7 @@ const ProjectDetails: React.FC = () => {
 
 			<div className="mt-4">
 				<label className="block text-base font-medium text-gray-700 mb-1">
-					Project Thumbnail {/* Optional - removed required asterisk */}
+					Project Thumbnail
 				</label>
 				<div
 					className={cn(
@@ -520,7 +520,7 @@ const ProjectDetails: React.FC = () => {
 									src={previewUrl}
 									alt="Thumbnail preview"
 									fill
-									className="object-cover"
+									className="object-contain"
 								/>
 							</div>
 							<p className="text-green-600">

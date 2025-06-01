@@ -311,7 +311,7 @@ export default function ProjectDetails({
 	const projectTitle =
 		projectData?.projectDetails.projectName || "Untitled Contest";
 	const projectStatus = projectData?.status || ProjectStatus.ACTIVE;
-	const paymentPerVideo = projectData?.creatorPricing.budgetPerVideo || 0;
+	// const paymentPerVideo = projectData?.creatorPricing.budgetPerVideo || 0;
 	const publishedDate = formatDate(projectData?.createdAt);
 	const projectType =
 		projectData?.projectDetails.projectType || "Not specified";
@@ -371,7 +371,7 @@ export default function ProjectDetails({
 	const statusDisplay = getStatusDisplay(projectStatus);
 
 	return (
-		<div className="px-3 sm:px-4 lg:px-5 py-4 sm:py-6 w-full md:w-[70rem] min-h-[70vh] bg-white border border-[#FFD9C3] rounded-lg mx-auto my-3 sm:my-5 relative">
+		<div className="px-3 sm:px-4 lg:px-5 py-4 sm:py-6 w-full md:w-[70rem] min-h-[80vh] bg-white border border-[#FFD9C3] rounded-lg mx-auto my-3 sm:my-5 relative">
 			{/* Back Navigation */}
 			<div className="mb-4 sm:mb-5">
 				<Link
@@ -487,7 +487,7 @@ export default function ProjectDetails({
 								</div>
 
 								{/* Payment Information */}
-								{(projectType === "UGC Content Only" ||
+								{/* {(projectType === "UGC Content Only" ||
 									projectType === "Creator-Posted UGC" ||
 									projectType === "Spark Ads") && (
 									<div className="flex gap-2 text-sm">
@@ -507,7 +507,7 @@ export default function ProjectDetails({
 											</span>
 										</div>
 									</div>
-								)}
+								)} */}
 
 								{projectType === "TikTok Shop" && (
 									<>
@@ -801,7 +801,7 @@ export default function ProjectDetails({
 									</div>
 								</div>
 
-								{(projectType === "UGC Content Only" ||
+								{/* {(projectType === "UGC Content Only" ||
 									projectType === "Creator-Posted UGC" ||
 									projectType === "Spark Ads") && (
 									<div className="flex gap-2 text-sm">
@@ -821,7 +821,7 @@ export default function ProjectDetails({
 											</span>
 										</div>
 									</div>
-								)}
+								)} */}
 
 								{projectType === "TikTok Shop" && (
 									<>

@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { FaMoneyCheck } from "react-icons/fa6";
+import Link from "next/link";
 
 interface PurchasedVideo { 
     id: string;
@@ -334,9 +335,12 @@ const [selectedVideo, setSelectedVideo] = useState<PurchasedVideo | null>(null);
 					<p className="text-gray-500 mb-6">
 						Start exploring and save videos you want to keep for later
 					</p>
+					<Link href="/brand/dahboard/creators/all">
+
 					<Button className="bg-orange-500 hover:bg-orange-600 text-white">
 						Browse Videos
 					</Button>
+					</Link>
 				</div>
 			) : (
 				<>

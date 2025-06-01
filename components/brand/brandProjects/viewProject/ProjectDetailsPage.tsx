@@ -15,6 +15,7 @@ import ProjectAnalytics from "./ProjectAnalytics";
 import AffiliatePayout from "./AffiliatePayout";
 import ProjectApplications from "./ProjectApplications";
 import { CreatorSubmission } from "@/types/submission";
+import { ProjectFormProvider } from "../ProjectFormContext";
 
 interface ProjectDetailPageProps {
 	projectId: string;
@@ -121,6 +122,7 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 		"w-40 data-[state=active]:bg-[#FFF4EE] data-[state=active]:border-b-2 data-[state=active]:border-[#FC52E4] data-[state=active]:text-[#FD5C02] data-[state=inactive]:text-[#667085] rounded-none py-3";
 
 	return (
+		<ProjectFormProvider>
 		<div className="flex flex-col bg-white border border-[#FFD9C3] rounded-lg py-5 px-6 mt-3">
 			{/* Header Banner */}
 			<div className="relative w-full h-64 p-6 flex flex-col justify-end rounded-lg">
@@ -548,6 +550,7 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 				)}
 			</Tabs>
 		</div>
+		</ProjectFormProvider>
 	);
 };
 

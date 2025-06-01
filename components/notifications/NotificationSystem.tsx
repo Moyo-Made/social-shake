@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import {
 	Bell,
 	X,
-	Check,
 	Eye,
 	Clock,
 	User,
@@ -33,7 +32,6 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
 		error,
 		markAsRead,
 		markAllAsRead,
-		handleInvitationResponse,
 	} = useNotifications();
 
 	// Get notification icon based on type
@@ -76,18 +74,6 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
 		router.push(`/creator/dashboard/project/${projectId}`);
 	};
 
-	const handleInvitationAction = async (
-		notificationId: string,
-		projectId: string,
-		response: "accepted" | "declined"
-	) => {
-		try {
-			await handleInvitationResponse(notificationId, projectId, response);
-		} catch (error) {
-			console.error(`Error ${response}ing invitation:`, error);
-			// You might want to show a toast notification here
-		}
-	};
 
 	// Render notification item
 	const renderNotification = (notification: NotificationData) => {
@@ -142,32 +128,6 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
 						{/* Action buttons for invitations */}
 						{isInvitation && !notification.responded && (
 							<div className="flex items-center gap-2 mt-3">
-								<button
-									onClick={() =>
-										handleInvitationAction(
-											notification.id!,
-											notification.projectId!,
-											"accepted"
-										)
-									}
-									className="flex items-center gap-1 px-3 py-1 bg-green-500 text-white text-xs rounded-md hover:bg-green-600 transition-colors"
-								>
-									<Check className="w-3 h-3" />
-									Accept
-								</button>
-								<button
-									onClick={() =>
-										handleInvitationAction(
-											notification.id!,
-											notification.projectId!,
-											"declined"
-										)
-									}
-									className="flex items-center gap-1 px-3 py-1 bg-red-500 text-white text-xs rounded-md hover:bg-red-600 transition-colors"
-								>
-									<X className="w-3 h-3" />
-									Decline
-								</button>
 								{notification.projectId && (
 									<button
 										onClick={() =>

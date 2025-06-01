@@ -53,7 +53,7 @@ export default function ApplyModal({
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState("");
 	const [, setSuccess] = useState(false);
-	const [showShippingForm, setShowShippingForm] = useState(true);
+	const [showShippingForm, setShowShippingForm] = useState(false);
 	const [canShip, setCanShip] = useState(true);
 	const [addressValidated, setAddressValidated] = useState(false);
 	const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -128,9 +128,9 @@ export default function ApplyModal({
 		if (isOpen) {
 			setReason("");
 			setCharCount(0);
-			setProductOwnership("need");
+			setProductOwnership("own");
 			setDeliveryTime("1-3 days");
-			setShowShippingForm(true);
+			setShowShippingForm(false);
 			setError("");
 			setSuccess(false);
 			setShowSuccessModal(false);

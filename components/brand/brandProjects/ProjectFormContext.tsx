@@ -15,6 +15,14 @@ import React, {
 	useEffect,
 	useCallback,
 } from "react";
+import { loadStripe } from "@stripe/stripe-js";
+import axios from "axios";
+import { useAuth } from "@/context/AuthContext";
+
+// Define stripePromise
+const stripePromise = loadStripe(
+	process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY || ""
+);
 
 // Add API response types
 type ApiResponse = {
@@ -83,6 +91,9 @@ const defaultFormData: ProjectFormData = {
 			totalAmount: 0,
 			commissionPerSale: "",
 		},
+		lockedPricing: {},
+		budgetPerVideoLocked: 0,
+		paymentAmounts: {},
 	},
 	userId: "",
 	status: ProjectStatus.PENDING,
@@ -93,7 +104,9 @@ const defaultFormData: ProjectFormData = {
 	applicantsCount: 0,
 	interestId: "",
 	paidfalse: false,
-	paymentAmount: null
+	paymentAmount: null,
+	projectTitle: "",
+	brandEmail: "",
 };
 
 interface ProjectFormContextType {
@@ -101,6 +114,10 @@ interface ProjectFormContextType {
 	updateProjectDetails: (data: Partial<ProjectDetails>) => void;
 	updateProjectRequirementsData: (data: Partial<ProjectRequirements>) => void;
 	updateCreatorPricing: (data: Partial<CreatorPricing>) => void;
+	triggerPaymentIntent: (
+		amount: number,
+		submission: Record<string, unknown>
+	) => Promise<void>;
 	saveDraft: () => Promise<ApiResponse>;
 	submitContest: () => Promise<ApiResponse>;
 	setIsLoading: (loading: boolean) => void;
@@ -148,8 +165,9 @@ export const ProjectFormProvider: React.FC<{
 	// Add validation state
 	const [validationFunctions, setValidationFunctions] =
 		useState<ValidationSteps>({});
-
-	
+	const [, setSubmissionError] = useState<string | null>(null);
+	const [, setValidationError] = useState<string | null>(null);
+	const { currentUser } = useAuth();
 
 	// Load saved data on first render
 	useEffect(() => {
@@ -376,7 +394,10 @@ export const ProjectFormProvider: React.FC<{
 			);
 
 			// Add the thumbnail file if it exists
-			if (formData.projectDetails.projectThumbnail !== null && formData.projectDetails.projectThumbnail instanceof File) {
+			if (
+				formData.projectDetails.projectThumbnail !== null &&
+				formData.projectDetails.projectThumbnail instanceof File
+			) {
 				formDataForSubmission.append(
 					"projectThumbnail",
 					formData.projectDetails.projectThumbnail
@@ -442,6 +463,157 @@ export const ProjectFormProvider: React.FC<{
 		}
 	};
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const triggerPaymentIntent = async (amount: number, submission: any) => {
+		console.log("Payment intent triggered");
+		try {
+			setIsLoading(true);
+			setSubmissionError(null);
+			setValidationError(null);
+	
+			// Validate required fields before making the request
+			const userId = formData.userId || submission.brandId || submission.userId;
+			const userEmail = currentUser?.email || "";
+	
+			if (!userId) {
+				setSubmissionError(
+					"User ID is required but not found in formData or submission"
+				);
+				setIsLoading(false);
+				return;
+			}
+	
+			if (!amount || amount <= 0) {
+				setSubmissionError("Valid payment amount is required");
+				setIsLoading(false);
+				return;
+			}
+	
+			if (!userEmail) {
+				setSubmissionError("User email is required but not found");
+				setIsLoading(false);
+				return;
+			}
+	
+			// Validate submission ID exists
+			if (!submission.id) {
+				setSubmissionError("Submission ID is required but not found");
+				setIsLoading(false);
+				return;
+			}
+	
+			console.log("Creating payment intent with:", {
+				userId,
+				amount,
+				userEmail,
+				submissionId: submission.id
+			});
+	
+			// Save current state before payment
+			saveCurrentState();
+	
+			// Save form data to sessionStorage for recovery after payment
+			const completeFormData = {
+				...formData,
+				userId: userId,
+				submission: submission,
+			};
+			sessionStorage.setItem(
+				"projectFormData",
+				JSON.stringify(completeFormData)
+			);
+	
+			// SIMPLIFIED: Create payment intent with minimal required data
+			// The endpoint will auto-fetch creatorId, projectId, etc. from the submission
+			const paymentFormData = new FormData();
+			paymentFormData.append("userId", userId);
+			paymentFormData.append("brandEmail", userEmail);
+			paymentFormData.append("amount", amount.toString());
+			paymentFormData.append("paymentType", "submission_approval");
+			paymentFormData.append("submissionId", submission.id); // This is the key field
+	
+			// Optional: You can still include these for fallback, but they're not required anymore
+			paymentFormData.append(
+				"projectTitle",
+				formData.projectDetails?.projectName ||
+					submission.projectName ||
+					submission.projectTitle ||
+					"Untitled Project"
+			);
+	
+			console.log("Simplified Payment FormData being sent:");
+			for (const [key, value] of paymentFormData.entries()) {
+				console.log(`${key}: ${value}`);
+			}
+	
+			const paymentResponse = await axios.post(
+				"/api/create-payment-intent",
+				paymentFormData
+			);
+	
+			if (!paymentResponse.data.success) {
+				throw new Error(
+					paymentResponse.data.error || "Failed to initiate payment"
+				);
+			}
+	
+			const { paymentId } = paymentResponse.data;
+	
+			// Step 2: Initialize Stripe checkout with the payment ID
+			const stripe = await stripePromise;
+			if (!stripe) {
+				setSubmissionError(
+					"Stripe is not initialized. Please try again later."
+				);
+				setIsLoading(false);
+				return;
+			}
+	
+			// Create a checkout session
+			const checkoutData = {
+				amount: amount,
+				paymentId: paymentId,
+				projectTitle:
+					formData.projectDetails?.projectName ||
+					submission.projectName ||
+					submission.projectTitle ||
+					"Untitled Project",
+				userEmail: userEmail,
+				userId: userId,
+				paymentType: "submission_approval",
+			};
+	
+			console.log("Checkout session data being sent:", checkoutData);
+	
+			const response = await axios.post(
+				"/api/create-checkout-session",
+				checkoutData
+			);
+	
+			const { sessionId } = response.data;
+	
+			// Redirect to Stripe checkout
+			const { error } = await stripe.redirectToCheckout({ sessionId });
+	
+			if (error) {
+				console.error("Error redirecting to checkout:", error);
+				setSubmissionError("Payment initiation failed. Please try again.");
+				setIsLoading(false);
+			}
+	
+			// On success, clear saved step (happens after redirect)
+			sessionStorage.removeItem("projectFormStep");
+		} catch (error) {
+			console.error("Payment intent error:", error);
+			setSubmissionError(
+				error instanceof Error
+					? error.message
+					: "An error occurred during payment processing"
+			);
+			setIsLoading(false);
+		}
+	};
+
 	const saveDraft = async (): Promise<ApiResponse> => {
 		setIsLoading(true);
 		setError(null);
@@ -452,7 +624,7 @@ export const ProjectFormProvider: React.FC<{
 			}
 
 			// Save to localStorage and sessionStorage first (for redundancy)
-		
+
 			const dataToSave = JSON.stringify(formData);
 			localStorage.setItem("projectFormDraft", dataToSave);
 			sessionStorage.setItem("projectFormSession", dataToSave);
@@ -543,29 +715,25 @@ export const ProjectFormProvider: React.FC<{
 		}
 	};
 
-	const loadDraftData = useCallback(
-		(data: ContestFormData) => {
-			try {
-				// Create a deep copy to avoid reference issues
-				const processedData = JSON.parse(JSON.stringify(data));
-				processFormData(processedData);
+	const loadDraftData = useCallback((data: ContestFormData) => {
+		try {
+			// Create a deep copy to avoid reference issues
+			const processedData = JSON.parse(JSON.stringify(data));
+			processFormData(processedData);
 
-				// Save to both localStorage and sessionStorage
-				const dataString = JSON.stringify(processedData);
-				localStorage.setItem("projectFormData", dataString);
-				sessionStorage.setItem("projectFormSession", dataString);
+			// Save to both localStorage and sessionStorage
+			const dataString = JSON.stringify(processedData);
+			localStorage.setItem("projectFormData", dataString);
+			sessionStorage.setItem("projectFormSession", dataString);
 
-				console.log("Loaded draft data:", processedData);
-			} catch (error) {
-				console.error("Error loading draft data:", error);
-			}
-		},
-		[]
-	);
+			console.log("Loaded draft data:", processedData);
+		} catch (error) {
+			console.error("Error loading draft data:", error);
+		}
+	}, []);
 
 	// Reset draft and storages
 	const resetDraft = useCallback(() => {
-		
 		localStorage.removeItem("projectFormDraft");
 		sessionStorage.removeItem("projectFormSession");
 		setFormData(defaultFormData);
@@ -580,6 +748,7 @@ export const ProjectFormProvider: React.FC<{
 				updateProjectDetails,
 				updateProjectRequirementsData,
 				updateCreatorPricing,
+				triggerPaymentIntent,
 				saveDraft,
 				submitContest,
 				resetDraft,

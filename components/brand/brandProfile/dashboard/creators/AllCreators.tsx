@@ -150,6 +150,18 @@ const CreatorMarketplace = () => {
 		[]
 	);
 
+	const [searchTerm, setSearchTerm] = useState("");
+
+	const handleSearchChange = (e: {
+		target: { value: React.SetStateAction<string> };
+	}) => {
+		setSearchTerm(e.target.value);
+	};
+
+	const clearSearch = () => {
+		setSearchTerm("");
+	};
+
 	// Fetch creators from Firebase
 	useEffect(() => {
 		const fetchCreators = async () => {
@@ -250,15 +262,8 @@ const CreatorMarketplace = () => {
 					})
 				);
 
-				// Filter out creators with undefined totalGMV
-				const filteredCreators = mappedCreators.filter(
-					(creator: { totalGMV: undefined } | null) =>
-						creator !== null &&
-						creator.totalGMV !== undefined &&
-						typeof creator.totalGMV === "number"
-				);
-
-				setCreators(filteredCreators);
+				// Use mappedCreators directly as the filtered and mapped data
+				setCreators(mappedCreators);
 			} catch (err) {
 				console.error("Error fetching creators:", err);
 				setError("Failed to load creators. Please try again later.");
@@ -402,6 +407,27 @@ const CreatorMarketplace = () => {
 
 	// Filter creators based on selected content types
 	const filteredCreators = creators.filter((creator) => {
+		// Search term filter - search across multiple fields
+		if (searchTerm.trim()) {
+			const searchLower = searchTerm.toLowerCase().trim();
+			const matchesSearch =
+				creator.name.toLowerCase().includes(searchLower) ||
+				creator.username.toLowerCase().includes(searchLower) ||
+				(creator.bio && creator.bio.toLowerCase().includes(searchLower)) ||
+				(creator.creatorProfileData?.tiktokDisplayName &&
+					creator.creatorProfileData.tiktokDisplayName
+						.toLowerCase()
+						.includes(searchLower)) ||
+				(creator.country &&
+					creator.country.toLowerCase().includes(searchLower)) ||
+				(Array.isArray(creator.contentTypes) &&
+					creator.contentTypes.some((type) =>
+						type.toLowerCase().includes(searchLower)
+					));
+
+			if (!matchesSearch) return false;
+		}
+
 		// Content type filter
 		if (selectedContentTypes.length > 0) {
 			const creatorContentTypes = Array.isArray(creator.contentTypes)
@@ -835,28 +861,40 @@ const CreatorMarketplace = () => {
 											<div className="flex justify-between">
 												<span>1 Video</span>
 												<span className="font-medium">
-													${creator.pricing.oneVideo}
+													{creator.pricing.oneVideo &&
+													creator.pricing.oneVideo > 0
+														? `$${creator.pricing.oneVideo}`
+														: "N/A"}
 												</span>
 											</div>
 
 											<div className="flex justify-between">
 												<span>3 Videos</span>
 												<span className="font-medium">
-													${creator.pricing.threeVideos}
+													{creator.pricing.threeVideos &&
+													creator.pricing.threeVideos > 0
+														? `$${creator.pricing.threeVideos}`
+														: "N/A"}
 												</span>
 											</div>
 
 											<div className="flex justify-between">
 												<span>5 Videos</span>
 												<span className="font-medium">
-													${creator.pricing.fiveVideos}
+													{creator.pricing.fiveVideos &&
+													creator.pricing.fiveVideos > 0
+														? `$${creator.pricing.fiveVideos}`
+														: "N/A"}
 												</span>
 											</div>
 
 											<div className="flex justify-between">
 												<span>Bulk Videos</span>
 												<span className="font-medium">
-													${creator.pricing.bulkVideos}
+													{creator.pricing.bulkVideos &&
+													creator.pricing.bulkVideos > 0
+														? `$${creator.pricing.bulkVideos}`
+														: "N/A"}
 												</span>
 											</div>
 										</div>
@@ -875,7 +913,10 @@ const CreatorMarketplace = () => {
 										<div className="flex justify-between">
 											<span>Per Usage</span>
 											<span className="font-medium">
-												${creator.pricing.aiActorPricing || 0}
+												{creator.pricing.aiActorPricing &&
+												creator.pricing.aiActorPricing > 0
+													? `$${creator.pricing.aiActorPricing}`
+													: "N/A"}
 											</span>
 										</div>
 									</div>
@@ -943,8 +984,10 @@ const CreatorMarketplace = () => {
 				<div className="relative w-full md:w-64">
 					<input
 						type="text"
-						placeholder="Search Creators"
-						className="w-full p-2 pl-8 pr-4 border border-gray-300 rounded-md text-sm md:text-base"
+						placeholder="Search creators..."
+						value={searchTerm}
+						onChange={handleSearchChange}
+						className="w-full p-2 pl-8 pr-10 border border-gray-300 rounded-md text-sm md:text-base"
 					/>
 					<svg
 						className="absolute left-2 top-3 h-4 w-4 text-gray-500"
@@ -960,6 +1003,14 @@ const CreatorMarketplace = () => {
 							d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
 						/>
 					</svg>
+					{searchTerm && (
+						<button
+							onClick={clearSearch}
+							className="absolute right-2 top-3 h-4 w-4 text-gray-500 hover:text-gray-700"
+						>
+							<X size={16} />
+						</button>
+					)}
 				</div>
 
 				<div className="flex flex-wrap justify-center gap-2">
@@ -1289,28 +1340,40 @@ const CreatorMarketplace = () => {
 										<div className="flex justify-between">
 											<span>1 Video</span>
 											<span className="font-medium">
-												${creator.pricing.oneVideo}
+												{creator.pricing.oneVideo &&
+												creator.pricing.oneVideo > 0
+													? `$${creator.pricing.oneVideo}`
+													: "N/A"}
 											</span>
 										</div>
 
 										<div className="flex justify-between">
 											<span>3 Videos</span>
 											<span className="font-medium">
-												${creator.pricing.threeVideos}
+												{creator.pricing.threeVideos &&
+												creator.pricing.threeVideos > 0
+													? `$${creator.pricing.threeVideos}`
+													: "N/A"}
 											</span>
 										</div>
 
 										<div className="flex justify-between">
 											<span>5 Videos</span>
 											<span className="font-medium">
-												${creator.pricing.fiveVideos}
+												{creator.pricing.fiveVideos &&
+												creator.pricing.fiveVideos > 0
+													? `$${creator.pricing.fiveVideos}`
+													: "N/A"}
 											</span>
 										</div>
 
 										<div className="flex justify-between">
 											<span>Bulk Videos</span>
 											<span className="font-medium">
-												${creator.pricing.bulkVideos}
+												{creator.pricing.bulkVideos &&
+												creator.pricing.bulkVideos > 0
+													? `$${creator.pricing.bulkVideos}`
+													: "N/A"}
 											</span>
 										</div>
 									</div>
@@ -1329,7 +1392,10 @@ const CreatorMarketplace = () => {
 									<div className="flex justify-between">
 										<span>Per Usage</span>
 										<span className="font-medium">
-											${creator.pricing.aiActorPricing || 0}
+											{creator.pricing.aiActorPricing &&
+											creator.pricing.aiActorPricing > 0
+												? `$${creator.pricing.aiActorPricing}`
+												: "N/A"}
 										</span>
 									</div>
 								</div>

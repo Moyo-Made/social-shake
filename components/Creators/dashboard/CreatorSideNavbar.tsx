@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, VideoIcon } from "lucide-react";
+import { Briefcase, ChevronDown, ChevronRight, VideoIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
 import CreatorProfileDropdown from "../CreatorProfileDropdown";
 import { useCreatorProfile } from "@/hooks/useCreatorProfile";
@@ -198,6 +198,12 @@ const SideNav: React.FC = () => {
 					/>
 
 					<MenuItem
+						href="/creator/dashboard/portfolio"
+						icon={<Briefcase size={20} />}
+						text="My Portfolio Page"
+					/>
+
+					<MenuItem
 						href="/creator/dashboard/messages"
 						icon={
 							<Image
@@ -270,6 +276,7 @@ const getPageTitle = (pathname: string): string => {
 		"/creator/dashboard/contest/applied": "My Contests",
 		"/creator/dashboard/messages": "Messages",
 		"/creator/dashboard/content-library": "Content Library",
+		"/creator/dashboard/portfolio": "My Portfolio Page",
 		"/creator/dashboard/transactions": "Transactions",
 		"/creator/dashboard/settings": "Settings",
 		"/creator/dashboard/help-support": "Help & Support",
@@ -312,6 +319,10 @@ const getPageTitle = (pathname: string): string => {
 	if (pathname.startsWith("/creator/dashboard/content-library")) {
 		return "Content Library";
 	}
+	if (pathname.startsWith("/creator/dashboard/portfolio")) {
+		return "My Portfolio Page";
+	}
+
 	if (pathname.startsWith("/creator/dashboard/transactions/")) {
 		return "Transactions";
 	}
@@ -349,7 +360,9 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 				</header>
 
 				<main className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
-					<div className="md:w-[calc(100vw-16rem)] container mx-auto h-screen">{children}</div>
+					<div className="md:w-[calc(100vw-16rem)] container mx-auto h-screen">
+						{children}
+					</div>
 				</main>
 			</div>
 		</div>

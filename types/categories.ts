@@ -1,0 +1,21 @@
+export const categories = [
+	{ value: "technology", label: "Technology" },
+	{ value: "fashion", label: "Fashion" },
+	{ value: "food", label: "Food & Beverage" },
+	{ value: "apps", label: "Apps" },
+	{ value: "medical", label: "Medical" },
+	{ value: "professional-services", label: "Professional Services" },
+	{ value: "automobile", label: "Automobile" },
+	{ value: "finance", label: "Finance" },
+	{ value: "real-estate", label: "Real Estate" },
+	{ value: "healthcare", label: "Healthcare" },
+	{ value: "beauty", label: "Beauty" },
+	{ value: "utilities", label: "Utilities" },
+	{ value: "crypto", label: "Crypto" },
+	{ value: "agriculture", label: "Agriculture" },
+	{ value: "arts-culture", label: "Arts & Culture" },
+	{ value: "education", label: "Education" },
+	{ value: "fitness-sport", label: "Fitness & Sport" },
+	{ value: "marketing-advertising", label: "Marketing & Advertising" },
+	{ value: "security", label: "Security" }
+  ].sort((a, b) => a.label.localeCompare(b.label));

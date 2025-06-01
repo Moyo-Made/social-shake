@@ -8,15 +8,15 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
 
 export async function POST(request: NextRequest) {
 	try {
-		const { 
-			amount, 
-			paymentId, 
-			contestTitle, 
+		const {
+			amount,
+			paymentId,
+			contestTitle,
 			projectTitle,
 			videoTitle,
-			userEmail, 
+			userEmail,
 			userId,
-			paymentType = "contest" // Default for backward compatibility
+			paymentType = "contest", // Default for backward compatibility
 		} = await request.json();
 
 		if (!amount || !paymentId || !userEmail) {
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 				{ status: 500 }
 			);
 		}
-		
+
 		const paymentDoc = await adminDb
 			.collection("payments")
 			.doc(paymentId)
@@ -55,6 +55,12 @@ export async function POST(request: NextRequest) {
 		let cancelUrl = "";
 
 		switch (paymentType) {
+			case "submission_approval":
+				productName = `Submission Approval - ${projectTitle || paymentData?.projectTitle || "Project"}`;
+				productDescription = `Payment for approved submission`;
+				successUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-success?payment_id=${paymentId}&session_id={CHECKOUT_SESSION_ID}&type=project`;
+				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/project/new?canceled=true`;
+				break;
 			case "video":
 				productName = videoTitle || paymentData?.videoTitle || "Video Purchase";
 				productDescription = `Purchase of video: ${productName}`;
@@ -62,22 +68,21 @@ export async function POST(request: NextRequest) {
 				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/videos?canceled=true`;
 				break;
 			case "project":
-				productName = projectTitle || paymentData?.projectTitle || "Project Payment";
+				productName =
+					projectTitle || paymentData?.projectTitle || "Project Payment";
 				productDescription = `Payment for project: ${productName}`;
 				successUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-success?payment_id=${paymentId}&session_id={CHECKOUT_SESSION_ID}&type=project`;
 				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/project/new?canceled=true`;
 				break;
 			case "contest":
 			default:
-				productName = contestTitle || paymentData?.contestName || "Contest Payment";
+				productName =
+					contestTitle || paymentData?.contestName || "Contest Payment";
 				productDescription = `Payment for contest: ${productName}`;
 				successUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-success?payment_id=${paymentId}&session_id={CHECKOUT_SESSION_ID}&type=contest`;
 				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/contest/new?canceled=true`;
 				break;
 		}
-
-		// For video purchases, we might want automatic capture instead of manual
-		const captureMethod = "manual";
 
 		// Create a Stripe checkout session
 		const session = await stripe.checkout.sessions.create({
@@ -97,20 +102,34 @@ export async function POST(request: NextRequest) {
 			],
 			mode: "payment",
 			payment_intent_data: {
-				capture_method: captureMethod,
-                metadata: {
-                    paymentId,
-                    userId,
-                    paymentType,
-                    paymentName: productName,
-                    description: productDescription,
-					// Add video-specific metadata if applicable
-					...(paymentType === "video" && paymentData && {
-						videoId: paymentData.videoId,
-						creatorId: paymentData.creatorId,
-						creatorEmail: paymentData.creatorEmail,
+				...(paymentType === "video" &&
+					paymentData?.creatorId && {
+						on_behalf_of: paymentData.creatorId, // Creator's Stripe Connect account ID
+						transfer_data: {
+							destination: paymentData.creatorId,
+						},
 					}),
-                }
+				metadata: {
+					paymentId,
+					userId,
+					paymentType,
+					paymentName: productName,
+					description: productDescription,
+					// Add video-specific metadata if applicable
+					...(paymentType === "video" &&
+						paymentData && {
+							videoId: paymentData.videoId,
+							creatorId: paymentData.creatorId,
+							creatorEmail: paymentData.creatorEmail,
+						}),
+					// Add submission-specific metadata
+					...(paymentType === "submission_approval" &&
+						paymentData && {
+							submissionId: paymentData.submissionId,
+							projectId: paymentData.projectId,
+							creatorId: paymentData.creatorId,
+						}),
+				},
 			},
 			success_url: successUrl,
 			cancel_url: cancelUrl,
@@ -120,13 +139,14 @@ export async function POST(request: NextRequest) {
 				userId,
 				paymentType,
 				paymentName: productName,
-                description: productDescription,
+				description: productDescription,
 				// Add video-specific metadata if applicable
-				...(paymentType === "video" && paymentData && {
-					videoId: paymentData.videoId,
-					creatorId: paymentData.creatorId,
-					creatorEmail: paymentData.creatorEmail,
-				}),
+				...(paymentType === "video" &&
+					paymentData && {
+						videoId: paymentData.videoId,
+						creatorId: paymentData.creatorId,
+						creatorEmail: paymentData.creatorEmail,
+					}),
 			},
 		});
 

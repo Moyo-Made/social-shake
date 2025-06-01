@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import { MdOutlinePayment } from "react-icons/md";
 import { ProjectFormProvider, useProjectForm } from "./ProjectFormContext";
 import { CheckCircle2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -15,13 +14,7 @@ import TikTokShopCreatorPricingTab from "./TikTokShopCreatorPricing";
 import CreatorProjectReview from "./ProjectReview";
 import TikTokShopProjectReview from "./TikTokShopReview";
 import ContentRequirements from "./ContentRequirements";
-import { loadStripe } from "@stripe/stripe-js";
-import axios from "axios";
-
-// Define stripePromise
-const stripePromise = loadStripe(
-	process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY || ""
-);
+import { useRouter } from "next/navigation";
 
 const ProjectFormContent = () => {
 	const [step, setStep] = useState(1);
@@ -45,7 +38,7 @@ const ProjectFormContent = () => {
 		projectDetails: { projectType = "UGC Content" },
 	} = formData;
 
-	const { creatorPricing } = formData;
+	const router = useRouter();
 
 	// Define validation rules for each step
 	useEffect(() => {
@@ -98,11 +91,7 @@ const ProjectFormContent = () => {
 			}
 
 			// Only validate platforms and aspect ratio for specific project types
-			if (
-				["UGC Content Only"].includes(
-					projectType
-				)
-			) {
+			if (["UGC Content Only"].includes(projectType)) {
 				if (
 					!platform ||
 					platform.length === 0 ||
@@ -124,8 +113,12 @@ const ProjectFormContent = () => {
 				return false;
 			}
 
-			if (!script || script.trim() === "") {
-				setValidationError("Project script is required");
+			// Validate script only when client-script is selected
+			const { videoType } = formData.projectRequirements;
+			if (videoType === "client-script" && (!script || script.trim() === "")) {
+				setValidationError(
+					"Project script is required when using client script"
+				);
 				return false;
 			}
 
@@ -251,11 +244,7 @@ const ProjectFormContent = () => {
 		}
 
 		// Validation for UGC Content Only, Creator-Posted UGC, and Spark Ads
-		if (
-			["UGC Content Only"].includes(
-				projectType
-			)
-		) {
+		if (["UGC Content Only"].includes(projectType)) {
 			if (!platform || platform.length === 0) {
 				setValidationError("At least one platform is required");
 				return false;
@@ -267,9 +256,10 @@ const ProjectFormContent = () => {
 			}
 		}
 
-		// Validate script for all project types
-		if (!script || script.trim() === "") {
-			setValidationError("Project script is required");
+		// Validate script only when client-script is selected
+		const { videoType } = formData.projectRequirements;
+		if (videoType === "client-script" && (!script || script.trim() === "")) {
+			setValidationError("Project script is required when using client script");
 			return false;
 		}
 
@@ -348,63 +338,65 @@ const ProjectFormContent = () => {
 			// Save current state before submission
 			saveCurrentState();
 
-			// Save form data to sessionStorage for recovery after payment
-			const completeFormData = {
-				...formData,
-				userId: currentUser.uid
-			};
-			sessionStorage.setItem("projectFormData", JSON.stringify(completeFormData));
+			// Prepare form data for project creation
+			const formDataToSubmit = new FormData();
 
-			// Create payment intent with just the necessary payment data
-			const paymentFormData = new FormData();
-			paymentFormData.append("userId", currentUser.uid);
-			paymentFormData.append("brandEmail", currentUser.email || "");
-			paymentFormData.append("amount", creatorPricing.totalAmount.toString());
-			paymentFormData.append("projectName", formData.projectDetails.projectName);
+			// Add basic fields
+			formDataToSubmit.append("userId", currentUser.uid);
+			formDataToSubmit.append(
+				"projectDetails",
+				JSON.stringify(formData.projectDetails)
+			);
+			formDataToSubmit.append(
+				"projectRequirements",
+				JSON.stringify(formData.projectRequirements)
+			);
+			formDataToSubmit.append(
+				"creatorPricing",
+				JSON.stringify(formData.creatorPricing)
+			);
+			formDataToSubmit.append("paid", "false");
 
-			const paymentResponse = await axios.post("/api/create-payment-intent", paymentFormData);
-
-			if (!paymentResponse.data.success) {
-				throw new Error(paymentResponse.data.error || "Failed to initiate payment");
+			// Handle project thumbnail if it exists
+			if (formData.projectDetails.projectThumbnail) {
+				if (formData.projectDetails.projectThumbnail instanceof File) {
+					// If it's a File object, append it directly
+					formDataToSubmit.append(
+						"projectThumbnail",
+						formData.projectDetails.projectThumbnail
+					);
+				}
+				// If it's a base64 string or URL, it will be handled by the API endpoint
 			}
 
-			const { paymentId } = paymentResponse.data;
+			console.log("Submitting project data to /api/projects");
 
-			// Step 2: Initialize Stripe checkout with the payment ID
-			const stripe = await stripePromise;
-
-			if (!stripe) {
-				setSubmissionError(
-					"Stripe is not initialized. Please try again later."
-				);
-				setIsLoading(false);
-				return;
-			}
-
-			// Create a checkout session
-			const response = await axios.post("/api/create-checkout-session", {
-				amount: creatorPricing.totalAmount,
-				paymentId: paymentId,
-				projectTitle: formData.projectDetails.projectName || "Project",
-				userEmail: currentUser.email,
-				userId: currentUser.uid,
-				// Add this to differentiate between project and contest
-				paymentType: "project"
+			// Submit to the projects API endpoint
+			const response = await fetch("/api/projects", {
+				method: "POST",
+				body: formDataToSubmit,
 			});
 
-			const { sessionId } = response.data;
+			const result = await response.json();
 
-			// Redirect to Stripe checkout
-			const { error } = await stripe.redirectToCheckout({ sessionId });
-
-			if (error) {
-				console.error("Error redirecting to checkout:", error);
-				setSubmissionError("Payment initiation failed. Please try again.");
-				setIsLoading(false);
+			if (!response.ok) {
+				throw new Error(
+					result.error || `HTTP error! status: ${response.status}`
+				);
 			}
 
-			// On success, clear saved step (happens after redirect)
+			if (!result.success) {
+				throw new Error(result.error || "Failed to create project");
+			}
+
+			console.log("Project created successfully:", result);
+
+			// Clear saved form state on success
 			sessionStorage.removeItem("projectFormStep");
+			sessionStorage.removeItem("projectFormData");
+
+			// Redirect to project dashboard
+			router.push("/brand/dashboard/projects");
 		} catch (error) {
 			console.error("Submission error:", error);
 			setSubmissionError(
@@ -412,6 +404,7 @@ const ProjectFormContent = () => {
 					? error.message
 					: "An error occurred during submission"
 			);
+		} finally {
 			setIsLoading(false);
 		}
 	};
@@ -550,7 +543,9 @@ const ProjectFormContent = () => {
 			{submissionError && (
 				<Alert variant="destructive" className="mb-4">
 					<AlertCircle className="h-4 w-4" />
-					<AlertDescription>{submissionError}</AlertDescription>
+					<AlertDescription className="pt-1">
+						{submissionError}
+					</AlertDescription>
 				</Alert>
 			)}
 
@@ -558,7 +553,9 @@ const ProjectFormContent = () => {
 			{validationError && (
 				<Alert variant="destructive" className="mb-4">
 					<AlertCircle className="h-4 w-4" />
-					<AlertDescription>{validationError}</AlertDescription>
+					<AlertDescription className="pt-1">
+						{validationError}
+					</AlertDescription>
 				</Alert>
 			)}
 
@@ -583,7 +580,7 @@ const ProjectFormContent = () => {
 			</div>
 
 			{/* Navigation Buttons */}
-			<div className="flex justify-between">
+			<div className="flex justify-between pb-5">
 				{/* Save Draft Button */}
 				<div className="relative">
 					<Button
@@ -621,14 +618,7 @@ const ProjectFormContent = () => {
 							className="mt-4 bg-[#FD5C02] hover:bg-orange-600 text-white text-base py-2 font-normal"
 							disabled={isLoading}
 						>
-							{isLoading ? (
-								"Processing..."
-							) : (
-								<>
-									<MdOutlinePayment size={30} /> Pay $
-									{creatorPricing.totalAmount.toLocaleString()}
-								</>
-							)}
+							{isLoading ? "Creating..." : <>Create Project</>}
 						</Button>
 					)}
 				</div>

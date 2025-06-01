@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { Edit } from "lucide-react";
 import Image from "next/image";
 import { useProjectForm } from "./ProjectFormContext";
+import { topLanguages } from "@/types/languages";
+import { categories } from "@/types/categories";
 
 const TikTokShopProjectReview = () => {
 	const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -29,6 +31,18 @@ const TikTokShopProjectReview = () => {
 		// Free memory when this component is unmounted
 		return () => URL.revokeObjectURL(objectUrl);
 	}, [formData.projectDetails.projectThumbnail]);
+
+	const getLanguageDisplayName = (languageCode: string | null) => {
+		if (!languageCode) return "Not specified";
+		const language = topLanguages.find((lang) => lang.code === languageCode);
+		return language ? language.name : languageCode;
+	};
+
+	const getIndustryDisplayName = (industryValue: string | undefined) => {
+		if (!industryValue) return "Not specified";
+		const category = categories.find((cat) => cat.value === industryValue);
+		return category ? category.label : industryValue;
+	};
 
 	return (
 		<div className="flex flex-col gap-6 max-w-4xl mx-auto border border-[#FFBF9B] rounded-xl p-6 bg-white">
@@ -79,7 +93,7 @@ const TikTokShopProjectReview = () => {
 										src={previewUrl}
 										alt="Project thumbnail preview"
 										fill
-										className="object-cover"
+										className="object-contain"
 									/>
 								) : (
 									<div className="flex flex-col items-center justify-center h-full bg-gray-100 rounded-lg">
@@ -298,14 +312,20 @@ const TikTokShopProjectReview = () => {
 									Type of Industry
 								</div>
 								<div className="col-span-2 capitalize">
-									{formData.creatorPricing.creator.industry || "Not specified"}
+									<div className="col-span-2">
+										{getIndustryDisplayName(
+											formData.creatorPricing.creator.industry
+										)}
+									</div>
 								</div>
 							</div>
 
 							<div className="grid grid-cols-3 gap-4">
 								<div className="font-medium text-gray-600">Language</div>
 								<div className="col-span-2 capitalize">
-									{formData.creatorPricing.creator.language || "Not specified"}
+									{getLanguageDisplayName(
+										formData.creatorPricing.creator.language ?? null
+									)}
 								</div>
 							</div>
 						</>
@@ -357,46 +377,83 @@ const TikTokShopProjectReview = () => {
 				</div>
 
 				<div className="space-y-4">
-					<div className="grid grid-cols-3 gap-4">
-						<div className="font-medium text-gray-600">Project Budget</div>
-						<div className="col-span-2">
-							<div className="font-medium">
-								${formData.creatorPricing.cost.totalBudget.toLocaleString()}
+					{formData.creatorPricing.selectionMethod ===
+					"Invite Specific Creators" ? (
+						<>
+							<div className="grid grid-cols-3 gap-4">
+								<div className="font-medium text-gray-600">
+									Commission per Sale
+								</div>
+								<div className="col-span-2">
+									<div className="font-medium">
+										{formData.creatorPricing.cost.commissionPerSale}%
+									</div>
+									<div className="text-sm text-gray-500">
+										It applies to each creator separately
+									</div>
+								</div>
 							</div>
-							<div className="text-sm text-gray-500">
-								(Based on $
-								{formData.creatorPricing.cost.budgetPerVideo.toLocaleString()}{" "}
-								per video × {formData.creatorPricing.creator.totalVideos}{" "}
-								videos)
-							</div>
-						</div>
-					</div>
 
-					<div className="grid grid-cols-3 gap-4">
-						<div className="font-medium text-gray-600">Commission per Sale</div>
-						<div className="col-span-2">
-							<div className="font-medium">
-								{formData.creatorPricing.cost.commissionPerSale}%
+							<div className="grid grid-cols-3 gap-4">
+								<div className="font-medium text-gray-600 text-lg">
+									Total Amount
+								</div>
+								<div className="col-span-2">
+									<div className="col-span-2 font-bold text-lg">
+										${formData.creatorPricing.cost.totalAmount.toLocaleString()}
+									</div>
+									<div className="text-sm text-gray-500">
+										* Affiliate commission is paid separately based on sales.
+									</div>
+								</div>
 							</div>
-							<div className="text-sm text-gray-500">
-								It applies to each creator separately
+						</>
+					) : (
+						<>
+							<div className="grid grid-cols-3 gap-4">
+								<div className="font-medium text-gray-600">Project Budget</div>
+								<div className="col-span-2">
+									<div className="font-medium">
+										${formData.creatorPricing.cost.totalBudget.toLocaleString()}
+									</div>
+									<div className="text-sm text-gray-500">
+										(Based on $
+										{formData.creatorPricing.cost.budgetPerVideo.toLocaleString()}{" "}
+										per video × {formData.creatorPricing.creator.totalVideos}{" "}
+										videos)
+									</div>
+								</div>
 							</div>
-						</div>
-					</div>
 
-					<div className="grid grid-cols-3 gap-4">
-						<div className="font-medium text-gray-600 text-lg">
-							Total Amount
-						</div>
-						<div className="col-span-2">
-							<div className="col-span-2 font-bold text-lg">
-								${formData.creatorPricing.cost.totalAmount.toLocaleString()}
+							<div className="grid grid-cols-3 gap-4">
+								<div className="font-medium text-gray-600">
+									Commission per Sale
+								</div>
+								<div className="col-span-2">
+									<div className="font-medium">
+										{formData.creatorPricing.cost.commissionPerSale}%
+									</div>
+									<div className="text-sm text-gray-500">
+										It applies to each creator separately
+									</div>
+								</div>
 							</div>
-							<div className="text-sm text-gray-500">
-								* Affiliate commission is paid separately based on sales.
+
+							<div className="grid grid-cols-3 gap-4">
+								<div className="font-medium text-gray-600 text-lg">
+									Total Amount
+								</div>
+								<div className="col-span-2">
+									<div className="col-span-2 font-bold text-lg">
+										${formData.creatorPricing.cost.totalAmount.toLocaleString()}
+									</div>
+									<div className="text-sm text-gray-500">
+										* Affiliate commission is paid separately based on sales.
+									</div>
+								</div>
 							</div>
-						</div>
-					</div>
+						</>
+					)}
 				</div>
 			</div>
 		</div>

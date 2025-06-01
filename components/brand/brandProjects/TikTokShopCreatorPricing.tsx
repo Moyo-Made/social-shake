@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
 	Select,
@@ -14,6 +14,9 @@ import Image from "next/image";
 import { useProjectForm } from "./ProjectFormContext";
 import { Creator, CreatorPricing } from "@/types/contestFormData";
 import { useSavedCreators } from "@/hooks/useSavedCreators";
+import { categories } from "@/types/categories";
+import { countries as allCountries } from "@/types/countries";
+import { topLanguages } from "@/types/languages";
 
 export default function TikTokShopCreatorPricingTab() {
 	const { formData, updateCreatorPricing } = useProjectForm();
@@ -67,6 +70,92 @@ export default function TikTokShopCreatorPricingTab() {
 		selectedCreators.length || 2
 	);
 	const [searchQuery, setSearchQuery] = useState("");
+	const dropdownRef = useRef<HTMLDivElement>(null);
+
+	const getBestPricing = (
+		creator: {
+			pricing?: {
+				oneVideo?: number;
+				threeVideos?: number;
+				fiveVideos?: number;
+				bulkVideos?: number;
+			};
+		},
+		videoCount: number
+	) => {
+		const pricing = creator.pricing || {};
+
+		// Handle exact matches first
+		if (videoCount === 1 && pricing.oneVideo) {
+			return {
+				pricePerVideo: pricing.oneVideo,
+				tier: "per video",
+				totalPrice: pricing.oneVideo,
+				available: true,
+			};
+		}
+
+		if (videoCount === 3 && pricing.threeVideos) {
+			return {
+				pricePerVideo: pricing.threeVideos / 3,
+				tier: "3-video package",
+				totalPrice: pricing.threeVideos,
+				available: true,
+			};
+		}
+
+		if (videoCount === 5 && pricing.fiveVideos) {
+			return {
+				pricePerVideo: pricing.fiveVideos / 5,
+				tier: "5-video package",
+				totalPrice: pricing.fiveVideos,
+				available: true,
+			};
+		}
+
+		// Bulk pricing for 10+ videos
+		if (videoCount >= 10 && pricing.bulkVideos) {
+			return {
+				pricePerVideo: pricing.bulkVideos,
+				tier: "bulk rate",
+				totalPrice: pricing.bulkVideos * videoCount,
+				available: true,
+			};
+		}
+
+		// No exact pricing available
+		return {
+			pricePerVideo: 0,
+			tier: "custom quote",
+			totalPrice: 0,
+			available: false,
+		};
+	};
+
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			if (
+				dropdownRef.current &&
+				!dropdownRef.current.contains(event.target as Node)
+			) {
+				setIsCountryDropdownOpen(false);
+			}
+		};
+
+		if (isCountryDropdownOpen) {
+			document.addEventListener("mousedown", handleClickOutside);
+		}
+
+		return () => {
+			document.removeEventListener("mousedown", handleClickOutside);
+		};
+	}, [isCountryDropdownOpen]);
+
+	const handleCountrySelect = (countryCode: string) => {
+		if (!countries.includes(countryCode)) {
+			setCountries([...countries, countryCode]);
+		}
+	};
 
 	useEffect(() => {
 		if (savedCreators && savedCreators.length > 0) {
@@ -80,9 +169,9 @@ export default function TikTokShopCreatorPricingTab() {
 					name: creator.name,
 					avatar: creator.profilePictureUrl,
 					id: creator.id,
-					price: creator.pricing?.oneVideo || 0, // Use oneVideo price if available
+					pricing: creator.pricing, // Include the pricing property
 				}));
-				setSelectedCreators(mappedCreators);
+				setSelectedCreators(mappedCreators as Creator[]);
 			} else if (creatorSelectionMode === "search") {
 				// In search mode, only include creators that are actually selected
 				const filteredCreators = savedCreators
@@ -91,7 +180,7 @@ export default function TikTokShopCreatorPricingTab() {
 						name: creator.name,
 						avatar: creator.profilePictureUrl,
 						id: creator.id,
-						price: creator.pricing?.oneVideo || "",
+						pricing: creator.pricing, // Include the pricing property
 					}));
 				setSelectedCreators(filteredCreators);
 			}
@@ -108,9 +197,14 @@ export default function TikTokShopCreatorPricingTab() {
 	// Calculate totals
 	const totalVideos = creators * videosPerCreator;
 
-	const totalPayment = creatorPayment * totalVideos;
-	const totalAmount = totalPayment ;
-	const serviceFee = 0.1 * totalAmount;
+	const totalPayment =
+		selectionMethod === "Invite Specific Creators"
+			? selectedCreators.reduce((total, creator) => {
+					return total + getBestPricing(creator, videosPerCreator).totalPrice;
+				}, 0)
+			: creatorPayment * totalVideos;
+
+	const totalAmount = totalPayment;
 
 	// Update context when values change
 	const updateContextValues = () => {
@@ -179,7 +273,7 @@ export default function TikTokShopCreatorPricingTab() {
 		setInvitedCreatorsCount(selectedCreators.length);
 	}, [selectedCreators]);
 
-  // Function to toggle selection of a creator
+	// Function to toggle selection of a creator
 	const toggleCreatorSelection = (creatorId: string) => {
 		if (selectedCreatorIds.includes(creatorId)) {
 			// Remove creator if already selected
@@ -203,21 +297,23 @@ export default function TikTokShopCreatorPricingTab() {
 					name: creator.name,
 					avatar: creator.profilePictureUrl,
 					id: creator.id,
-					price: creator.pricing?.oneVideo || "",
+					pricing: creator.pricing,
 				};
 
-				setSelectedCreators((prevCreators) => [...prevCreators, newCreator]);
+				setSelectedCreators((prevCreators) => [
+					...prevCreators,
+					newCreator as Creator,
+				]);
 			}
 		}
 	};
-	// Function to filter creators based on search query
+
 	// Function to get filtered creators based on search
 	const getFilteredCreators = () => {
 		// When in "all" mode, only show saved creators
 		// When in "search" mode, search all creators
 		return searchCreators(searchQuery, creatorSelectionMode === "search");
 	};
-
 
 	return (
 		<div className="flex flex-col lg:flex-row gap-4 p-4 max-w-6xl mx-auto">
@@ -472,9 +568,14 @@ export default function TikTokShopCreatorPricingTab() {
 												<SelectValue placeholder="Select Industry" />
 											</SelectTrigger>
 											<SelectContent className="bg-white">
-												<SelectItem value="technology">Technology</SelectItem>
-												<SelectItem value="fashion">Fashion</SelectItem>
-												<SelectItem value="food">Food & Beverage</SelectItem>
+												{categories.map((category) => (
+													<SelectItem
+														key={category.value}
+														value={category.value}
+													>
+														{category.label}
+													</SelectItem>
+												))}
 											</SelectContent>
 										</Select>
 									</div>
@@ -486,9 +587,11 @@ export default function TikTokShopCreatorPricingTab() {
 												<SelectValue placeholder="Select Language of Creator" />
 											</SelectTrigger>
 											<SelectContent className="bg-white">
-												<SelectItem value="english">English</SelectItem>
-												<SelectItem value="spanish">Spanish</SelectItem>
-												<SelectItem value="french">French</SelectItem>
+												{topLanguages.map((language) => (
+													<SelectItem key={language.code} value={language.code}>
+														{language.name}
+													</SelectItem>
+												))}
 											</SelectContent>
 										</Select>
 									</div>
@@ -538,81 +641,36 @@ export default function TikTokShopCreatorPricingTab() {
 												)}
 											</div>
 
-											{/* Custom dropdown */}
 											{isCountryDropdownOpen && (
-												<div className="absolute z-10 mt-1 w-full bg-white border rounded-md shadow-lg">
+												<div
+													ref={dropdownRef}
+													className="absolute z-10 mt-1 w-full bg-white border rounded-md shadow-lg"
+												>
 													<div className="py-1">
-														<div
-															className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-															onClick={() => {
-																if (!countries.includes("us")) {
-																	setCountries([...countries, "us"]);
+														{allCountries.map((country) => (
+															<div
+																key={country.code}
+																className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+																onClick={() =>
+																	handleCountrySelect(country.name)
 																}
-																// Uncomment below to close after selection
-																setIsCountryDropdownOpen(false);
-															}}
-														>
-															<div className="flex items-center gap-2">
-																<div
-																	className={`w-4 h-4 border rounded flex items-center justify-center ${
-																		countries.includes("us")
-																			? "bg-orange-500 border-orange-500"
-																			: "border-gray-400"
-																	}`}
-																>
-																	{countries.includes("us") && (
-																		<div className="w-2 h-2 rounded bg-white"></div>
-																	)}
+															>
+																<div className="flex items-center gap-2">
+																	<div
+																		className={`w-4 h-4 border rounded flex items-center justify-center ${
+																			countries.includes(country.name)
+																				? "bg-orange-500 border-orange-500"
+																				: "border-gray-400"
+																		}`}
+																	>
+																		{countries.includes(country.name) && (
+																			<div className="w-2 h-2 rounded bg-white"></div>
+																		)}
+																	</div>
+																	{country.name}
 																</div>
-																United States
 															</div>
-														</div>
-														<div
-															className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-															onClick={() => {
-																if (!countries.includes("ca")) {
-																	setCountries([...countries, "ca"]);
-																}
-															}}
-														>
-															<div className="flex items-center gap-2">
-																<div
-																	className={`w-4 h-4 border rounded flex items-center justify-center ${
-																		countries.includes("ca")
-																			? "bg-orange-500 border-orange-500"
-																			: "border-gray-400"
-																	}`}
-																>
-																	{countries.includes("ca") && (
-																		<div className="w-2 h-2 rounded bg-white"></div>
-																	)}
-																</div>
-																Canada
-															</div>
-														</div>
-														<div
-															className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-															onClick={() => {
-																if (!countries.includes("uk")) {
-																	setCountries([...countries, "uk"]);
-																}
-															}}
-														>
-															<div className="flex items-center gap-2">
-																<div
-																	className={`w-4 h-4 border rounded flex items-center justify-center ${
-																		countries.includes("uk")
-																			? "bg-orange-500 border-orange-500"
-																			: "border-gray-400"
-																	}`}
-																>
-																	{countries.includes("uk") && (
-																		<div className="w-2 h-2 rounded bg-white"></div>
-																	)}
-																</div>
-																United Kingdom
-															</div>
-														</div>
+														))}
 													</div>
 												</div>
 											)}
@@ -626,7 +684,7 @@ export default function TikTokShopCreatorPricingTab() {
 			</div>
 
 			{/* Right card - Budget and extras */}
-			<Card className="flex-1 max-w-72 border border-orange-500 rounded-xl">
+			<Card className="flex-1 max-w-96 border border-orange-500 rounded-xl h-fit">
 				<CardContent className="pt-6">
 					<div className="space-y-3">
 						<div>
@@ -646,7 +704,7 @@ export default function TikTokShopCreatorPricingTab() {
 								/>
 							</div>
 							<p className="text-sm text-gray-500 mt-1">
-								This is the total amount you intend to spend (Min. $1,500)
+								This is the total amount you intend to spend
 							</p>
 						</div>
 
@@ -668,8 +726,6 @@ export default function TikTokShopCreatorPricingTab() {
 								made through their video.
 							</p>
 						</div>
-
-						
 
 						<div className="border-t pt-4">
 							{selectionMethod === "Invite Specific Creators" ? (
@@ -785,34 +841,146 @@ export default function TikTokShopCreatorPricingTab() {
 							</div>
 						</div>
 
+						{selectionMethod === "Invite Specific Creators" &&
+							selectedCreators.length > 0 && (
+								<div className="mb-4 space-y-1">
+									<h3 className="text-sm font-medium mb-2">
+										Selected Creators:
+									</h3>
+									{selectedCreators.map((creator) => (
+										<div
+											key={creator.id}
+											className="border-b border-gray-100 pb-3 mb-3 last:border-b-0 last:pb-0 last:mb-0"
+										>
+											<div className="flex items-center gap-2 mb-2">
+												<Image
+													src={creator.avatar}
+													alt={creator.name}
+													width={20}
+													height={20}
+													className="w-5 h-5 rounded-full object-cover"
+												/>
+												<span className="font-medium text-sm">
+													{creator.name}
+												</span>
+											</div>
+
+											<div className="space-y-1 text-sm pl-7">
+												{/* Single Video */}
+												<div className="flex justify-between">
+													<span className="text-gray-600">1 video :</span>
+													<span>
+														{creator.pricing.oneVideo
+															? `$${creator.pricing.oneVideo}`
+															: "N/A"}
+													</span>
+												</div>
+
+												{/* 3 Video Package */}
+												<div className="flex justify-between">
+													<span className="text-gray-600">3 videos :</span>
+													<div className="text-right">
+														<span>
+															{creator.pricing.threeVideos
+																? `$${creator.pricing.threeVideos}`
+																: "N/A"}
+														</span>
+													</div>
+												</div>
+
+												{/* 5 Video Package */}
+												<div className="flex justify-between">
+													<span className="text-gray-600">5 videos :</span>
+													<div className="text-right">
+														<span>
+															{creator.pricing.fiveVideos
+																? `$${creator.pricing.fiveVideos}`
+																: "N/A"}
+														</span>
+													</div>
+												</div>
+
+												{/* Bulk video package */}
+												<div className="flex justify-between">
+													<span className="text-gray-600">Bulk videos :</span>
+													<div className="text-right">
+														<span>
+															{creator.pricing.bulkVideos
+																? `$${creator.pricing.bulkVideos}`
+																: "N/A"}
+														</span>
+													</div>
+												</div>
+
+												{/* Current Selection Highlight */}
+												{getBestPricing(creator, videosPerCreator).available ? (
+													<div
+														className={`flex justify-between border mt-2 p-2 rounded-md ${
+															getBestPricing(creator, videosPerCreator).tier ===
+															"per video"
+																? "border-orange-500 bg-orange-50"
+																: "border-green-500 bg-green-50"
+														}`}
+													>
+														<span>Your order ({videosPerCreator} videos):</span>
+														<span
+															className={
+																getBestPricing(creator, videosPerCreator)
+																	.tier === "per video"
+																	? "text-orange-600"
+																	: "text-green-600"
+															}
+														>
+															$
+															{
+																getBestPricing(creator, videosPerCreator)
+																	.totalPrice
+															}
+														</span>
+													</div>
+												) : (
+													<div className="flex justify-between border border-gray-300 mt-2 p-2 rounded-md bg-gray-50 text-sm">
+														<span>Your order ({videosPerCreator} videos):</span>
+														<span className="text-gray-600">
+															Contact for pricing
+														</span>
+													</div>
+												)}
+											</div>
+										</div>
+									))}
+								</div>
+							)}
+
 						<div className="border-t pt-4 bg-[#FFF4EE] -mx-6 px-6 pb-6">
-							<h2 className="text-base font-medium mb-4">Cost Breakdown</h2>
+							<h2 className="text-base font-medium mb-4">
+								{selectionMethod === "Invite Specific Creators"
+									? "Estimated Cost"
+									: "Budget Breakdown"}
+							</h2>
 
 							<div className="flex gap-1 mb-1">
-								<span>Fixed Fee Total:</span>
+								<span>
+									{selectionMethod === "Invite Specific Creators"
+										? "Estimated Total:"
+										: "Fixed Fee Total:"}
+								</span>
 								<span className="font-medium">
 									${totalPayment.toLocaleString()}
 								</span>
 							</div>
 							<div className="text-sm text-gray-500 mb-4">
-								(Based on ${creatorPayment.toLocaleString()} per video ×{" "}
-								{totalVideos} videos)
-							</div>
-
-						
-
-							<div className="flex gap-1 mb-1">
-								<span>Service Fee:</span>
-								<span className="font-medium">
-									${serviceFee.toLocaleString()}
-								</span>
-							</div>
-							<div className="text-sm text-gray-500 mb-4">
-								<p>10% of the Total Amount - This is paid to Social Shake</p>
+								{selectionMethod === "Invite Specific Creators"
+									? "*Payment made only for approved videos via secure escrow"
+									: `(Based on $${creatorPayment.toLocaleString()} per video × ${totalVideos} videos)`}
 							</div>
 
 							<div className="flex gap-1 text-lg font-bold">
-								<span>Total Amount:</span>
+								<span>
+									{selectionMethod === "Invite Specific Creators"
+										? "Estimated Amount:"
+										: "Total Amount:"}
+								</span>
 								<span>${totalAmount.toLocaleString()}</span>
 							</div>
 							<div className="text-sm text-gray-500 mb-4">

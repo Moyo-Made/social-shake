@@ -161,8 +161,8 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 		return (
 			<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
 				<div className="bg-white rounded-lg p-6 max-w-md mx-4">
-					<h3 className="text-lg font-medium mb-4">Confirm Approval</h3>
-					<p className="text-gray-600 mb-6">
+					<h3 className="text-black text-start text-xl font-medium mb-4">Confirm Approval</h3>
+					<p className="text-start text-gray-600 mb-6">
 						Are you sure you want to approve this application? Once approved,
 						the creator will be allowed to participate in the project.
 					</p>
@@ -810,21 +810,21 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 								</p>
 							</div>
 
-							<div>
+							{/* <div>
 								<p className="text-sm text-[#667085]">
 									Creator TikTok Following
 								</p>
 								<p className="font-medium text-[#101828] text-sm">
 									{creator.following?.toLocaleString() || "Unknown"}
 								</p>
-							</div>
+							</div> */}
 
-							<div>
+							{/* <div>
 								<p className="text-sm text-[#667085]">Total GMV</p>
 								<p className="font-medium text-[#101828] text-sm">
 									${creator.gmv?.toLocaleString() || "0"}
 								</p>
-							</div>
+							</div> */}
 
 							<div>
 								<p className="text-sm text-[#667085]">Status</p>

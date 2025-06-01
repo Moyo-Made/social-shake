@@ -99,6 +99,17 @@ const ChatPage = () => {
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const emojiPickerRef = useRef<HTMLDivElement>(null);
 	const [showSidebar, setShowSidebar] = useState(false);
+	const [imageLoadingStates, setImageLoadingStates] = useState<
+		Record<string, boolean>
+	>({});
+
+	const handleImageLoad = (userId: string) => {
+		setImageLoadingStates((prev) => ({ ...prev, [userId]: false }));
+	};
+
+	const handleImageLoadStart = (userId: string) => {
+		setImageLoadingStates((prev) => ({ ...prev, [userId]: true }));
+	};
 
 	// Handle emoji selection
 	const handleEmojiSelect = (emoji: string) => {
@@ -651,7 +662,6 @@ const ChatPage = () => {
 		);
 	}
 
-	
 	return (
 		<div className="flex h-screen bg-white">
 			{/* Mobile overlay backdrop */}
@@ -754,6 +764,11 @@ const ChatPage = () => {
 							>
 								<div className="relative">
 									<Avatar className="h-10 w-10 sm:h-12 sm:w-12">
+										{imageLoadingStates[user.id] && (
+											<div className="absolute inset-0 bg-gray-200 animate-pulse rounded-full flex items-center justify-center">
+												<div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+											</div>
+										)}
 										<Image
 											src={
 												user.creatorProfile?.avatarUrl ||
@@ -763,6 +778,13 @@ const ChatPage = () => {
 											alt="Profile"
 											width={60}
 											height={60}
+											onLoadStart={() => handleImageLoadStart(user.id)}
+											onLoad={() => handleImageLoad(user.id)}
+											className={
+												imageLoadingStates[user.id]
+													? "opacity-0"
+													: "opacity-100"
+											}
 										/>
 									</Avatar>
 									{user.isActive && (
@@ -813,6 +835,11 @@ const ChatPage = () => {
 						</button>
 
 						<Avatar className="h-10 w-10 sm:h-12 sm:w-12">
+							{imageLoadingStates[selectedUser.id] && (
+								<div className="absolute inset-0 bg-gray-200 animate-pulse rounded-full flex items-center justify-center">
+									<div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+								</div>
+							)}
 							<Image
 								src={
 									selectedUser.creatorProfile?.avatarUrl ||
@@ -822,6 +849,13 @@ const ChatPage = () => {
 								alt="Profile"
 								width={60}
 								height={60}
+								onLoadStart={() => handleImageLoadStart(selectedUser.id)}
+								onLoad={() => handleImageLoad(selectedUser.id)}
+								className={
+									imageLoadingStates[selectedUser.id]
+										? "opacity-0"
+										: "opacity-100"
+								}
 							/>
 						</Avatar>
 						<div className="ml-3 min-w-0 flex-1">
@@ -896,6 +930,13 @@ const ChatPage = () => {
 													{message.showAvatar &&
 														message.sender !== currentUser?.uid && (
 															<Avatar className="h-6 w-6 sm:h-8 sm:w-8 mt-1 mr-2 sm:mr-3 flex-shrink-0">
+																{imageLoadingStates[
+																	selectedUser?.id || "message"
+																] && (
+																	<div className="absolute inset-0 bg-gray-200 animate-pulse rounded-full flex items-center justify-center">
+																		<div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+																	</div>
+																)}
 																<Image
 																	src={
 																		selectedUser?.creatorProfile?.avatarUrl ||
@@ -905,6 +946,23 @@ const ChatPage = () => {
 																	alt="Profile"
 																	width={60}
 																	height={60}
+																	onLoadStart={() =>
+																		handleImageLoadStart(
+																			selectedUser?.id || "message"
+																		)
+																	}
+																	onLoad={() =>
+																		handleImageLoad(
+																			selectedUser?.id || "message"
+																		)
+																	}
+																	className={
+																		imageLoadingStates[
+																			selectedUser?.id || "message"
+																		]
+																			? "opacity-0"
+																			: "opacity-100"
+																	}
 																/>
 															</Avatar>
 														)}

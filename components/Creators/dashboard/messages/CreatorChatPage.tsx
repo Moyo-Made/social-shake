@@ -83,6 +83,9 @@ const CreatorChatPage = () => {
 	const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const emojiPickerRef = useRef<HTMLDivElement>(null);
+	const [brandProfilesLoading, setBrandProfilesLoading] = useState<
+		Record<string, boolean>
+	>({});
 
 	// Handle emoji selection
 	const handleEmojiSelect = (emoji: string) => {
@@ -165,6 +168,8 @@ const CreatorChatPage = () => {
 	// Fetch brand profiles for all conversations
 	const fetchBrandProfile = async (userId: string) => {
 		try {
+			setBrandProfilesLoading((prev) => ({ ...prev, [userId]: true }));
+
 			const response = await fetch(
 				`/api/admin/brand-approval?userId=${userId}`
 			);
@@ -182,6 +187,8 @@ const CreatorChatPage = () => {
 				`Error fetching brand profile for userId ${userId}:`,
 				error
 			);
+		} finally {
+			setBrandProfilesLoading((prev) => ({ ...prev, [userId]: false }));
 		}
 		return null;
 	};
@@ -759,18 +766,24 @@ const CreatorChatPage = () => {
 							>
 								<div className="relative">
 									<Avatar className="">
-										<Image
-											src={
-												brandProfiles[user.id]?.logoUrl ||
-												(user.avatar &&
-												user.avatar !== "/icons/default-avatar.svg"
-													? user.avatar
-													: "/icons/default-avatar.svg")
-											}
-											alt="Profile"
-											width={60}
-											height={60}
-										/>
+										{brandProfilesLoading[user.id] ? (
+											<div className="w-full h-full bg-gray-100 flex items-center justify-center">
+												<div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-orange-600"></div>
+											</div>
+										) : (
+											<Image
+												src={
+													brandProfiles[user.id]?.logoUrl ||
+													(user.avatar &&
+													user.avatar !== "/icons/default-avatar.svg"
+														? user.avatar
+														: "/icons/default-avatar.svg")
+												}
+												alt="Profile"
+												width={60}
+												height={60}
+											/>
+										)}
 									</Avatar>
 									{user.isActive && (
 										<div className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-white"></div>
@@ -780,7 +793,11 @@ const CreatorChatPage = () => {
 									<div className="flex justify-between items-center">
 										<div className="flex gap-2">
 											<p className="text-base font-medium truncate">
-												{user.name}
+												{brandProfilesLoading[user.id] ? (
+													<div className="h-4 bg-gray-200 rounded animate-pulse w-20"></div>
+												) : (
+													user.name
+												)}
 											</p>
 											{(user.unreadCount ?? 0) > 0 && (
 												<span className="bg-orange-500 text-white text-xs rounded-full h-4 w-4 mt-1 flex items-center justify-center">
@@ -812,26 +829,33 @@ const CreatorChatPage = () => {
 					<div className="py-3 px-4 border-b flex justify-between items-center">
 						<div className="flex items-center">
 							<Avatar className="">
-								<Image
-									src={
-										(selectedUser && brandProfiles[selectedUser.id]?.logoUrl) ||
-										(selectedUser?.avatar &&
-										selectedUser.avatar !== "/icons/default-avatar.svg"
-											? selectedUser.avatar
-											: "/icons/default-avatar.svg")
-									}
-									alt="Profile"
-									width={60}
-									height={60}
-								/>
+								{selectedUser && brandProfilesLoading[selectedUser.id] ? (
+									<div className="w-full h-full bg-gray-100 flex items-center justify-center">
+										<div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-orange-600"></div>
+									</div>
+								) : (
+									<Image
+										src={
+											(selectedUser &&
+												brandProfiles[selectedUser.id]?.logoUrl) ||
+											(selectedUser?.avatar &&
+											selectedUser.avatar !== "/icons/default-avatar.svg"
+												? selectedUser.avatar
+												: "/icons/default-avatar.svg")
+										}
+										alt="Profile"
+										width={60}
+										height={60}
+									/>
+								)}
 							</Avatar>
 
 							<div className="ml-3">
 								<p className="text-base font-medium">{selectedUser.name}</p>
-								{selectedUser.username && (
-									<p className="text-xs text-orange-600">
-										@{selectedUser.username}
-									</p>
+								{selectedUser && brandProfilesLoading[selectedUser.id] ? (
+									<div className="h-4 bg-gray-200 rounded animate-pulse w-24 mb-1"></div>
+								) : (
+									<p className="text-base font-medium">{selectedUser.name}</p>
 								)}
 							</div>
 						</div>

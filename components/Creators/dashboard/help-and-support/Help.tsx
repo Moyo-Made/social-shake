@@ -7,44 +7,10 @@ import {
 } from "@/components/ui/accordion";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
+import { faqData } from "@/types/faq";
 
 export default function FAQComponent() {
 	const [searchQuery, setSearchQuery] = useState("");
-
-	const faqData = [
-		{
-			id: "what-is-social-shake",
-			question: "What is Social Shake?",
-			answer:
-				"To join, you need to signup and upload requested Information and once approved, you will be able to upload your portfolio videos.",
-		},
-		{
-			id: "how-creators-get-paid",
-			question: "How do creators get paid?",
-			answer:
-				"To join, you need to signup and upload requested Information and once approved, you will be able to upload your portfolio videos.",
-		},
-		{
-			id: "types-of-collaborations",
-			question: "What types of collaborations are available on Social Shake?",
-			answer:
-				"To join, you need to signup and upload requested Information and once approved, you will be able to upload your portfolio videos.",
-		},
-		{
-			id: "join-as-creator",
-			question: "How do I join Social Shake as a creator?",
-			answer:
-				"To join, you need to signup and upload requested Information and once approved, you will be able to upload your portfolio videos.",
-			defaultOpen: true,
-		},
-		{
-			id: "start-campaign-as-brand",
-			question: "How do I start a campaign as a brand?",
-			answer:
-				"Brands can post a brief outlining their requirements, review creator applications, and choose collaborators. Once products are shipped, creators deliver the content within the required timeframe, ensuring seamless execution of your campaign.",
-			defaultOpen: true,
-		},
-	];
 
 	// Filter FAQs based on search query
 	const filteredFaqs = faqData.filter(
@@ -52,6 +18,7 @@ export default function FAQComponent() {
 			searchQuery === "" ||
 			faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
 			(faq.answer &&
+				typeof faq.answer === "string" &&
 				faq.answer.toLowerCase().includes(searchQuery.toLowerCase()))
 	);
 

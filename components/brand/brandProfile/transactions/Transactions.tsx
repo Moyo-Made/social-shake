@@ -295,7 +295,7 @@ const Transactions: React.FC = () => {
 	return (
 		<div>
 			{/* Affiliate Payout Cards */}
-			<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-6 mb-8">
+			<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-6 mb-8 mx-10">
 				<Card className="py-10 flex flex-col items-center justify-center border border-[#6670854D] shadow-none">
 					<p className="text-lg text-[#000] mb-1 mt-2">Total Spend</p>
 					<h2 className="text-2xl text-[#101828] font-semibold">
@@ -317,7 +317,7 @@ const Transactions: React.FC = () => {
 					</h2>
 				</Card>
 			</div>
-			<div className="w-[65rem] mx-auto">
+			<div className="mx-10 mx-auto">
 				{/* Filters Section - Only show if there are transactions */}
 				{hasTransactions && (
 					<div className="flex justify-between items-center mb-4">
@@ -480,7 +480,7 @@ const Transactions: React.FC = () => {
 
 			{/* Pagination Controls - Only show if there are transactions */}
 			{hasTransactions && (
-				<div className="flex justify-between items-center mt-4">
+				<div className="flex justify-between items-center mt-4 mx-10 mb-5">
 					<div className="text-sm text-gray-500">Page {currentPage}</div>
 					<div className="flex gap-2">
 						<Button

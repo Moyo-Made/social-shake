@@ -19,7 +19,7 @@ const ProjectApprovalModal: React.FC<ProjectApprovalModalProps> = ({
 	return (
 		<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
 			<div className="bg-white rounded-lg p-6 max-w-lg mx-4">
-				<h3 className="text-start text-black text-lg font-medium mb-4">Confirm Approval</h3>
+				<h3 className="text-start text-black text-xl font-medium mb-4">Confirm Approval</h3>
 				<p className="text-start text-[#667085] mb-6">
 					Are you sure you want to approve this Video? Once approved, no further
 					revisions can be requested.

@@ -75,26 +75,7 @@ async function processThumbnailSimple(
 	}
 }
 
-// Check brand approval status
-async function checkBrandApproval(userId: string): Promise<boolean> {
-	try {
-		const brandsSnapshot = await adminDb
-			.collection("brandProfiles")
-			.where("userId", "==", userId)
-			.limit(1)
-			.get();
-
-		if (brandsSnapshot.empty) return false;
-
-		const brandData = brandsSnapshot.docs[0].data();
-		return brandData?.status === "approved";
-	} catch (error) {
-		console.error("Brand approval check error:", error);
-		return false;
-	}
-}
-
-// New function to send creator invitations
+// Updated function to send creator invitations with real-time notifications
 async function sendCreatorInvitations(
 	projectId: string,
 	projectName: string,
@@ -106,7 +87,11 @@ async function sendCreatorInvitations(
 		console.log(`Sending invitations to creators:`, creatorIds);
 
 		const batch = adminDb.batch();
-		let successCount = 0;
+		const successfulNotifications: Array<{
+			userId: string;
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			notificationData: any;
+		}> = [];
 
 		for (const creatorId of creatorIds) {
 			try {
@@ -167,7 +152,16 @@ async function sendCreatorInvitations(
 				};
 
 				batch.set(notificationRef, notificationData);
-				successCount++;
+
+				// Store notification data for real-time emission
+				successfulNotifications.push({
+					userId: creatorId,
+					notificationData: {
+						id: notificationRef.id,
+						...notificationData,
+					},
+				});
+
 				console.log(`Prepared notification for creator ${creatorId}`);
 			} catch (creatorError) {
 				console.error(
@@ -178,11 +172,18 @@ async function sendCreatorInvitations(
 			}
 		}
 
-		if (successCount > 0) {
-			// Commit all notifications at once
+		if (successfulNotifications.length > 0) {
+			// Commit all notifications to database first
 			await batch.commit();
 			console.log(
-				`Successfully sent ${successCount} invitations for project ${projectId}`
+				`Successfully saved ${successfulNotifications.length} notifications to database`
+			);
+
+			// Now emit real-time notifications using Socket.IO
+			await emitNotificationsToCreators(successfulNotifications);
+
+			console.log(
+				`Successfully sent ${successfulNotifications.length} invitations for project ${projectId}`
 			);
 		} else {
 			console.warn(
@@ -195,7 +196,61 @@ async function sendCreatorInvitations(
 	}
 }
 
-// GET handler - simplified
+// New function to emit real-time notifications
+async function emitNotificationsToCreators(
+	notifications: Array<{
+		userId: string;
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		notificationData: any;
+	}>
+): Promise<void> {
+	try {
+		// Check if globalIO is available
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		if (!(globalThis as any).globalIO) {
+			console.warn("Socket.IO not available, skipping real-time notifications");
+			return;
+		}
+
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const io = (globalThis as any).globalIO;
+		let emittedCount = 0;
+
+		for (const { userId, notificationData } of notifications) {
+			try {
+				// Emit to user-specific room
+				io.to(`user-${userId}`).emit("new-notification", {
+					...notificationData,
+					timestamp: notificationData.createdAt.toISOString
+						? notificationData.createdAt.toISOString()
+						: new Date(notificationData.createdAt).toISOString(),
+				});
+
+				// Also emit a general notification event
+				io.to(`user-${userId}`).emit("notification-count-update", {
+					increment: 1,
+					type: "project_invitation",
+				});
+
+				emittedCount++;
+				console.log(`✅ Real-time notification sent to creator ${userId}`);
+			} catch (emitError) {
+				console.error(
+					`❌ Failed to emit notification to creator ${userId}:`,
+					emitError
+				);
+			}
+		}
+
+		console.log(
+			`📡 Successfully emitted ${emittedCount} real-time notifications`
+		);
+	} catch (error) {
+		console.error("❌ Error emitting real-time notifications:", error);
+		// Don't throw - this shouldn't break the main flow
+	}
+}
+
 export async function GET(request: NextRequest) {
 	try {
 		const url = new URL(request.url);
@@ -237,15 +292,32 @@ export async function GET(request: NextRequest) {
 			});
 		}
 
-		// Project listing with basic filtering
+		// Project listing with filtering for "post public brief" only
 		const status = url.searchParams.get("status") || "active";
 		const limit = parseInt(url.searchParams.get("limit") || "10");
 
-		let query = adminDb.collection("projects").where("status", "==", status);
-		query = query.orderBy("createdAt", "desc").limit(limit);
+		// First get all active projects, then filter in application code
+		const query = adminDb
+			.collection("projects")
+			.where("status", "==", status)
+			.orderBy("createdAt", "desc")
+			.limit(limit * 2); // Get more to account for filtering
 
 		const snapshot = await query.get();
-		const projects = snapshot.docs.map((doc) => doc.data());
+
+		// Filter projects to only include those with "Post Public Brief" selection method
+		const projects = snapshot.docs
+			.map((doc) => doc.data())
+			.filter((project) => {
+				const selectionMethod = project.creatorPricing?.selectionMethod;
+				// Handle both possible values - check your actual data format
+				return (
+					selectionMethod === "Post Public Brief" ||
+					selectionMethod === "post_public_brief" ||
+					selectionMethod === "Post public brief"
+				);
+			})
+			.slice(0, limit); // Limit to requested number
 
 		return NextResponse.json({
 			success: true,
@@ -357,21 +429,6 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		// Check brand approval for non-paid projects
-		if (!paid) {
-			const isApproved = await checkBrandApproval(userId);
-			if (!isApproved) {
-				return NextResponse.json(
-					{
-						error: "brand_not_approved",
-						message:
-							"Your brand profile must be approved before creating projects.",
-					},
-					{ status: 403 }
-				);
-			}
-		}
-
 		// Generate project ID
 		const projectId = generateProjectId();
 		console.log(`POST: Generated project ID: ${projectId}`);
@@ -467,8 +524,8 @@ export async function POST(request: NextRequest) {
 			},
 			projectRequirements,
 			creatorPricing,
-			status: paid ? ProjectStatus.ACTIVE : ProjectStatus.PENDING,
-			applicationStatus: paid ? "open" : "closed",
+			status: ProjectStatus.ACTIVE,
+			applicationStatus: "open",
 			metrics: {
 				views: 0,
 				applications: 0,
@@ -526,7 +583,7 @@ export async function POST(request: NextRequest) {
 			throw firestoreError; // Re-throw if we can't handle it specifically
 		}
 
-		// Send creator invitations if specific creators were selected
+		// 🚀 ENHANCED: Send creator invitations with real-time notifications
 		if (
 			selectedCreators &&
 			Array.isArray(selectedCreators) &&
@@ -539,6 +596,8 @@ export async function POST(request: NextRequest) {
 					.filter((id) => id);
 
 				if (creatorIds.length > 0) {
+					console.log("🎯 Sending invitations with real-time notifications...");
+
 					await sendCreatorInvitations(
 						projectId,
 						projectDetails.projectName,
@@ -546,29 +605,13 @@ export async function POST(request: NextRequest) {
 						userId,
 						creatorIds
 					);
-					console.log(`Sent invitations to ${creatorIds.length} creators`);
-				}
-				console.log("=== NOTIFICATION DEBUG ===");
-				console.log("Project ID:", projectId);
-				console.log("Creator IDs being invited:", creatorIds);
 
-				// Verify notifications were created
-				setTimeout(async () => {
-					const testQuery = await adminDb
-						.collection("notifications")
-						.where("projectId", "==", projectId)
-						.get();
 					console.log(
-						"Notifications created for this project:",
-						testQuery.size
+						`✅ Successfully sent invitations to ${creatorIds.length} creators`
 					);
-					testQuery.docs.forEach((doc) => {
-						console.log("Notification:", doc.data());
-					});
-				}, 2000);
-        
+				}
 			} catch (invitationError) {
-				console.error("Error sending creator invitations:", invitationError);
+				console.error("❌ Error sending creator invitations:", invitationError);
 				// Don't fail the entire request if invitations fail
 			}
 		}

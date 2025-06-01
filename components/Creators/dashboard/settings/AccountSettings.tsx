@@ -404,9 +404,9 @@ const AccountSettings: React.FC = () => {
 							<label className="block mb-2 font-medium">Profile Picture</label>
 							<div className="flex items-center space-x-4">
 								<div className="w-24 h-24 bg-gray-100 border border-gray-200 flex items-center justify-center rounded-full overflow-hidden">
-									{formData?.logoUrl || imagePreview ? (
+									{formData?.logoUrl || formData?.profilePictureUrl || imagePreview ? (
 										<Image
-											src={imagePreview || formData?.logoUrl || ""}
+											src={imagePreview || formData?.logoUrl || formData?.profilePictureUrl ||""}
 											alt="Creator Profile Picture"
 											className="w-full h-full object-cover"
 											width={96}

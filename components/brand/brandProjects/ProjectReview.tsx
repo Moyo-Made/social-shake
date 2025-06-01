@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { Edit } from "lucide-react";
 import Image from "next/image";
 import { useProjectForm } from "./ProjectFormContext";
+import { topLanguages } from "@/types/languages";
+import { categories } from "@/types/categories";
 
 const CreatorProjectReview = () => {
 	const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -29,6 +31,18 @@ const CreatorProjectReview = () => {
 		// Free memory when this component is unmounted
 		return () => URL.revokeObjectURL(objectUrl);
 	}, [formData.projectDetails.projectThumbnail]);
+
+	const getLanguageDisplayName = (languageCode: string | null) => {
+		if (!languageCode) return "Not specified";
+		const language = topLanguages.find((lang) => lang.code === languageCode);
+		return language ? language.name : languageCode;
+	};
+
+	const getIndustryDisplayName = (industryValue: string | undefined) => {
+		if (!industryValue) return "Not specified";
+		const category = categories.find((cat) => cat.value === industryValue);
+		return category ? category.label : industryValue;
+	};
 
 	return (
 		<div className="flex flex-col gap-6 max-w-4xl mx-auto border border-[#FFBF9B] rounded-xl p-6 bg-white">
@@ -79,7 +93,7 @@ const CreatorProjectReview = () => {
 										src={previewUrl}
 										alt="Project thumbnail preview"
 										fill
-										className="object-cover"
+										className="object-contain"
 									/>
 								) : (
 									<div className="flex flex-col items-center justify-center h-full bg-gray-100 rounded-lg">
@@ -335,40 +349,20 @@ const CreatorProjectReview = () => {
 									Type of Industry
 								</div>
 								<div className="col-span-2">
-									{(() => {
-										const industry = formData.creatorPricing.creator.industry;
-										if (!industry) return "Not specified";
-										// Map industry values to proper display names
-										const industryMap = {
-											technology: "Technology",
-											fashion: "Fashion",
-											food: "Food & Beverage",
-										};
-										return (
-											industryMap[industry as keyof typeof industryMap] ||
-											industry
-										);
-									})()}
+									<div className="col-span-2">
+										{getIndustryDisplayName(
+											formData.creatorPricing.creator.industry
+										)}
+									</div>
 								</div>
 							</div>
 
 							<div className="grid grid-cols-3 gap-4">
 								<div className="font-medium text-gray-600">Language</div>
 								<div className="col-span-2">
-									{(() => {
-										const language = formData.creatorPricing.creator.language;
-										if (!language) return "Not specified";
-										// Map language values to proper display names
-										const languageMap = {
-											english: "English",
-											spanish: "Spanish",
-											french: "French",
-										};
-										return (
-											languageMap[language as keyof typeof languageMap] ||
-											language
-										);
-									})()}
+									{getLanguageDisplayName(
+										formData.creatorPricing.creator.language ?? null
+									)}
 								</div>
 							</div>
 
@@ -392,8 +386,9 @@ const CreatorProjectReview = () => {
 
 												// Return the mapped country names joined with commas
 												return (
-													countryMap[countries as unknown as keyof typeof countryMap] ||
-													countries
+													countryMap[
+														countries as unknown as keyof typeof countryMap
+													] || countries
 												);
 											})()}
 										</div>
@@ -443,29 +438,45 @@ const CreatorProjectReview = () => {
 				</div>
 
 				<div className="space-y-4">
-					<div className="grid grid-cols-3 gap-4">
-						<div className="font-medium text-gray-600">Project Budget</div>
-						<div className="col-span-2">
-							<div className="font-medium">
-								${formData.creatorPricing.cost.totalBudget.toLocaleString()}
+					{formData.creatorPricing.selectionMethod ===
+					"Invite Specific Creators" ? (
+						// Only show estimated amount for invited creators
+						<div className="grid grid-cols-3 gap-4">
+							<div className="font-medium text-gray-600 text-lg">
+								Estimated Amount
 							</div>
-							<div className="text-sm text-gray-500">
-								(Based on $
-								{formData.creatorPricing.cost.budgetPerVideo.toLocaleString()}{" "}
-								per video × {formData.creatorPricing.creator.totalVideos}{" "}
-								videos)
+							<div className="col-span-2 font-bold text-lg">
+								${formData.creatorPricing.cost.totalAmount.toLocaleString()}
 							</div>
 						</div>
-					</div>
+					) : (
+						// Show both project budget and total amount for public brief
+						<>
+							<div className="grid grid-cols-3 gap-4">
+								<div className="font-medium text-gray-600">Project Budget</div>
+								<div className="col-span-2">
+									<div className="font-medium">
+										${formData.creatorPricing.cost.totalBudget.toLocaleString()}
+									</div>
+									<div className="text-sm text-gray-500">
+										(Based on $
+										{formData.creatorPricing.cost.budgetPerVideo.toLocaleString()}{" "}
+										per video × {formData.creatorPricing.creator.totalVideos}{" "}
+										videos)
+									</div>
+								</div>
+							</div>
 
-					<div className="grid grid-cols-3 gap-4">
-						<div className="font-medium text-gray-600 text-lg">
-							Total Amount
-						</div>
-						<div className="col-span-2 font-bold text-lg">
-							${formData.creatorPricing.cost.totalAmount.toLocaleString()}
-						</div>
-					</div>
+							<div className="grid grid-cols-3 gap-4">
+								<div className="font-medium text-gray-600 text-lg">
+									Total Amount
+								</div>
+								<div className="col-span-2 font-bold text-lg">
+									${formData.creatorPricing.cost.totalAmount.toLocaleString()}
+								</div>
+							</div>
+						</>
+					)}
 				</div>
 			</div>
 		</div>

@@ -22,7 +22,7 @@ interface ProjectSubmissionsProps {
 export default function CreatorSubmissionTab({
 	projectFormData,
 	projectId,
-	contestId
+	contestId,
 }: ProjectSubmissionsProps) {
 	const { currentUser } = useAuth();
 
@@ -398,7 +398,13 @@ export default function CreatorSubmissionTab({
 		setIsProjectModalOpen(false);
 	};
 
-	const handleSubmitSuccess = async (newParticipantCount: number) => {
+	// Enhanced function to handle successful submission with optimistic update
+
+	const handleSubmitSuccess = async (
+		newParticipantCount: number,
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		newSubmissionData?: any
+	) => {
 		// Update participant count
 		setCurrentParticipantCount(newParticipantCount);
 
@@ -410,8 +416,48 @@ export default function CreatorSubmissionTab({
 			});
 		}
 
-		// Refresh submissions after successful upload
-		fetchSubmissions();
+		// If we have new submission data, add it optimistically to the list
+		if (newSubmissionData) {
+			const optimisticSubmission: CreatorSubmission = {
+				id: newSubmissionData.id || `temp-${Date.now()}`,
+				videoNumber: submissionsList.length + 1,
+				status: "pending",
+				videoUrl: newSubmissionData.videoUrl || "",
+				note: newSubmissionData.note || "",
+				revisionNumber: 0,
+				createdAt: new Intl.DateTimeFormat("en-US", {
+					month: "short",
+					day: "numeric",
+					year: "numeric",
+				}).format(new Date()),
+				updatedAt: new Intl.DateTimeFormat("en-US", {
+					month: "short",
+					day: "numeric",
+					year: "numeric",
+				}).format(new Date()),
+				sparkCode: "",
+				tiktokLink: "",
+				creatorId: newSubmissionData.creatorId || "",
+				creatorIcon: newSubmissionData.creatorIcon || "",
+				creatorName: newSubmissionData.creatorName || "",
+				userId: newSubmissionData.userId || "",
+				affiliateLink: newSubmissionData.affiliateLink || "",
+				brandFeedback: newSubmissionData.brandFeedback || "",
+				brandRating: newSubmissionData.brandRating || 0,
+				projectId: "",
+				fileName: "",
+				fileSize: 0,
+				fileType: ""
+			};
+
+			// Add the new submission to the list immediately
+			setSubmissionsList((prev) => [...prev, optimisticSubmission]);
+		}
+
+		// Refresh submissions after a short delay to ensure backend consistency
+		setTimeout(() => {
+			fetchSubmissions();
+		}, 1000);
 	};
 
 	const handleCloseModals = () => {
@@ -586,11 +632,11 @@ export default function CreatorSubmissionTab({
 						</div>
 					</div>
 
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+					<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 						{submissionsList.map((submission) => (
 							<Card
 								key={`submission-${submission.id}`}
-								className="w-96 overflow-hidden border shadow-md"
+								className="w-full overflow-hidden border shadow-md"
 							>
 								<CardContent className="p-0">
 									<div>
