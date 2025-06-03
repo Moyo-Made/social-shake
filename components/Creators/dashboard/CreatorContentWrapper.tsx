@@ -46,12 +46,12 @@ export default function CreatorContentWrapper({
 	useEffect(() => {
 		if (!userId) return;
 
-		// Initialize socket connection (same as ToastHandler)
-		const socket = io({
-			path: "/socket.io",
+		 // Initialize socket connection to your Render server
+		 const socket = io(process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || "http://localhost:3001", {
 			transports: ["polling", "websocket"],
 		});
-
+	
+		socketRef.current = socket;
 		socketRef.current = socket;
 
 		socket.on("connect", () => {
