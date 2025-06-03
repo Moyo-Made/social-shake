@@ -46,8 +46,7 @@ export default function ToastHandler() {
     }
 
     // Initialize socket connection
-    const socket = io({
-      path: "/socket.io",
+    const socket = io(process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || "http://localhost:3001", {
       transports: ["polling", "websocket"]
     });
 
