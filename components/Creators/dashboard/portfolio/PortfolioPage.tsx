@@ -27,12 +27,6 @@ interface UploadState {
 	selectedFile: File | null;
 }
 
-interface VideoLoadingState {
-	isLoading: boolean;
-	hasError: boolean;
-	canPlay: boolean;
-}
-
 const CreatorPortfolio = () => {
 	const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(
 		null
@@ -44,19 +38,6 @@ const CreatorPortfolio = () => {
 	const [videoKeys, setVideoKeys] = useState({
 		about: 0,
 		portfolio: [0, 0, 0]
-	});
-
-	// Video loading states
-	const [videoLoadingStates, setVideoLoadingStates] = useState<{
-		about: VideoLoadingState;
-		portfolio: VideoLoadingState[];
-	}>({
-		about: { isLoading: true, hasError: false, canPlay: false },
-		portfolio: [
-			{ isLoading: true, hasError: false, canPlay: false },
-			{ isLoading: true, hasError: false, canPlay: false },
-			{ isLoading: true, hasError: false, canPlay: false }
-		]
 	});
 
 	const { currentUser } = useAuth();
@@ -83,55 +64,6 @@ const CreatorPortfolio = () => {
 		url: string;
 		title: string;
 	} | null>(null);
-
-	// Video loading handlers
-	const handleVideoLoadStart = (type: "about" | "portfolio", index?: number) => {
-		if (type === "about") {
-			setVideoLoadingStates(prev => ({
-				...prev,
-				about: { isLoading: true, hasError: false, canPlay: false }
-			}));
-		} else if (typeof index === "number") {
-			setVideoLoadingStates(prev => ({
-				...prev,
-				portfolio: prev.portfolio.map((state, i) => 
-					i === index ? { isLoading: true, hasError: false, canPlay: false } : state
-				)
-			}));
-		}
-	};
-
-	const handleVideoCanPlay = (type: "about" | "portfolio", index?: number) => {
-		if (type === "about") {
-			setVideoLoadingStates(prev => ({
-				...prev,
-				about: { isLoading: false, hasError: false, canPlay: true }
-			}));
-		} else if (typeof index === "number") {
-			setVideoLoadingStates(prev => ({
-				...prev,
-				portfolio: prev.portfolio.map((state, i) => 
-					i === index ? { isLoading: false, hasError: false, canPlay: true } : state
-				)
-			}));
-		}
-	};
-
-	const handleVideoError = (type: "about" | "portfolio", index?: number) => {
-		if (type === "about") {
-			setVideoLoadingStates(prev => ({
-				...prev,
-				about: { isLoading: false, hasError: true, canPlay: false }
-			}));
-		} else if (typeof index === "number") {
-			setVideoLoadingStates(prev => ({
-				...prev,
-				portfolio: prev.portfolio.map((state, i) => 
-					i === index ? { isLoading: false, hasError: true, canPlay: false } : state
-				)
-			}));
-		}
-	};
 
 	// Fetch portfolio data
 	useEffect(() => {
@@ -231,7 +163,7 @@ const CreatorPortfolio = () => {
 		}
 	};
 
-	// Upload video function
+	// Upload video function - UPDATED
 	const uploadVideo = async (
 		file: File,
 		type: "about" | "portfolio",
@@ -357,95 +289,12 @@ const CreatorPortfolio = () => {
 		}
 	};
 
-	// Video Player Component with Loading States
-	const VideoPlayer = ({ 
-		src, 
-		type, 
-		index, 
-		title, 
-		className = "" 
-	}: { 
-		src: string; 
-		type: "about" | "portfolio"; 
-		index?: number; 
-		title: string;
-		className?: string;
-	}) => {
-		const loadingState = type === "about" 
-			? videoLoadingStates.about 
-			: videoLoadingStates.portfolio[index!];
-
-		return (
-			<div className={`relative aspect-video rounded-lg overflow-hidden group cursor-pointer ${className}`}>
-				{/* Loading Skeleton */}
-				{loadingState.isLoading && (
-					<div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
-						<div className="flex flex-col items-center space-y-3">
-							<div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-							<p className="text-gray-500 text-sm">Loading video...</p>
-						</div>
-					</div>
-				)}
-
-				{/* Error State */}
-				{loadingState.hasError && (
-					<div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
-						<div className="text-center">
-							<AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
-							<p className="text-gray-600 text-sm">Failed to load video</p>
-							<button 
-								onClick={() => forceVideoRefresh(type, index)}
-								className="text-orange-500 text-xs hover:underline mt-1"
-							>
-								Try again
-							</button>
-						</div>
-					</div>
-				)}
-
-				{/* Video Element */}
-				<video
-					key={type === "about" ? `about-${videoKeys.about}` : `portfolio-${index}-${videoKeys.portfolio[index!]}`}
-					className={`w-full h-full object-cover bg-gray-900 ${loadingState.isLoading || loadingState.hasError ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
-					preload="metadata"
-					muted
-					onLoadStart={() => handleVideoLoadStart(type, index)}
-					onCanPlay={() => handleVideoCanPlay(type, index)}
-					onError={() => handleVideoError(type, index)}
-				>
-					<source src={src} type="video/mp4" />
-					<source src={src} type="video/mov" />
-				</video>
-
-				{/* Play Overlay - only show when video can play */}
-				{loadingState.canPlay && (
-					<div
-						className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-						onClick={() =>
-							setSelectedVideo({
-								url: src,
-								title: title,
-							})
-						}
-					>
-						<div className="w-12 h-12 bg-white bg-opacity-90 rounded-full flex items-center justify-center">
-							<Play
-								className="w-5 h-5 text-orange-500 ml-1"
-								fill="currentColor"
-							/>
-						</div>
-					</div>
-				)}
-			</div>
-		);
-	};
-
 	// Show loading state while auth is loading or data is loading
 	if (loading || !currentUser) {
 		return (
 			<div className="flex items-center justify-center min-h-screen bg-gray-50">
 				<div className="flex flex-col space-y-2 justify-center items-center">
-					<div className="w-8 h-8 border-t-2 border-b-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+				<div className="w-8 h-8 border-t-2 border-b-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
 					<p className="text-gray-600">
 						{!currentUser ? "" : "Loading your portfolio..."}
 					</p>
@@ -509,15 +358,43 @@ const CreatorPortfolio = () => {
 					</div>
 
 					<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-						{/* Current About Video */}
+						{/* Current About Video - UPDATED with key prop */}
 						<div>
 							<h3 className="font-medium text-gray-900 mb-3">Current Video</h3>
 							{portfolioData?.aboutMeVideoUrl ? (
-								<VideoPlayer 
-									src={portfolioData.aboutMeVideoUrl}
-									type="about"
-									title="About Me Video"
-								/>
+								<div className="relative aspect-video bg-gray-900 rounded-lg overflow-hidden group cursor-pointer">
+									<video
+										key={`about-${videoKeys.about}`} // Force re-render with key
+										className="w-full h-full object-cover"
+										preload="metadata"
+										muted
+									>
+										<source
+											src={portfolioData.aboutMeVideoUrl}
+											type="video/mp4"
+										/>
+										<source
+											src={portfolioData.aboutMeVideoUrl}
+											type="video/mov"
+										/>
+									</video>
+									<div
+										className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+										onClick={() =>
+											setSelectedVideo({
+												url: portfolioData.aboutMeVideoUrl,
+												title: "About Me Video",
+											})
+										}
+									>
+										<div className="w-12 h-12 bg-white bg-opacity-90 rounded-full flex items-center justify-center">
+											<Play
+												className="w-5 h-5 text-orange-500 ml-1"
+												fill="currentColor"
+											/>
+										</div>
+									</div>
+								</div>
 							) : (
 								<div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
 									<div className="text-center">
@@ -632,14 +509,41 @@ const CreatorPortfolio = () => {
 								<div key={index} className="space-y-4">
 									<h3 className="font-medium text-gray-900">Video {index + 1}</h3>
 
-									{/* Current Video */}
+									{/* Current Video - UPDATED with key prop */}
 									{hasVideo ? (
-										<VideoPlayer 
-											src={portfolioData.portfolioVideoUrls[index]}
-											type="portfolio"
-											index={index}
-											title={`Portfolio Video ${index + 1}`}
-										/>
+										<div className="relative aspect-video bg-gray-900 rounded-lg overflow-hidden group cursor-pointer">
+											<video
+												key={`portfolio-${index}-${videoKeys.portfolio[index]}`} // Force re-render with key
+												className="w-full h-full object-cover"
+												preload="metadata"
+												muted
+											>
+												<source
+													src={portfolioData.portfolioVideoUrls[index]}
+													type="video/mp4"
+												/>
+												<source
+													src={portfolioData.portfolioVideoUrls[index]}
+													type="video/mov"
+												/>
+											</video>
+											<div
+												className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+												onClick={() =>
+													setSelectedVideo({
+														url: portfolioData.portfolioVideoUrls[index],
+														title: `Portfolio Video ${index + 1}`,
+													})
+												}
+											>
+												<div className="w-12 h-12 bg-white bg-opacity-90 rounded-full flex items-center justify-center">
+													<Play
+														className="w-5 h-5 text-orange-500 ml-1"
+														fill="currentColor"
+													/>
+												</div>
+											</div>
+										</div>
 									) : (
 										<div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
 											<div className="text-center">
@@ -733,7 +637,7 @@ const CreatorPortfolio = () => {
 				</div>
 			</div>
 
-			{/* Full Screen Video Modal */}
+			{/* Full Screen Video Modal - UPDATED with key prop */}
 			{selectedVideo && (
 				<div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
 					<div className="relative w-full max-w-4xl max-h-full">
@@ -746,7 +650,7 @@ const CreatorPortfolio = () => {
 
 						<div className="bg-black rounded-lg overflow-hidden">
 							<video
-								key={`modal-${selectedVideo.url}`}
+								key={`modal-${selectedVideo.url}`} // Force re-render with key
 								className="w-full h-auto max-h-[80vh]"
 								controls
 								autoPlay
