@@ -143,6 +143,7 @@ export interface Creator {
 }
 
 export interface CreatorProfileData {
+	language: string;
 	picture: File | null;
 	bio: string;
 	tiktokUrl: string;

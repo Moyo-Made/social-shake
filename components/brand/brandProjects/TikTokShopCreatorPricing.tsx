@@ -85,7 +85,7 @@ export default function TikTokShopCreatorPricingTab() {
 	) => {
 		const pricing = creator.pricing || {};
 
-		// Handle exact matches first
+		// 1 video - use set price
 		if (videoCount === 1 && pricing.oneVideo) {
 			return {
 				pricePerVideo: pricing.oneVideo,
@@ -95,6 +95,17 @@ export default function TikTokShopCreatorPricingTab() {
 			};
 		}
 
+		// 2 videos - multiply price of 1 x 2
+		if (videoCount === 2 && pricing.oneVideo) {
+			return {
+				pricePerVideo: pricing.oneVideo,
+				tier: "per video",
+				totalPrice: pricing.oneVideo * 2,
+				available: true,
+			};
+		}
+
+		// 3 videos - use fixed price
 		if (videoCount === 3 && pricing.threeVideos) {
 			return {
 				pricePerVideo: pricing.threeVideos / 3,
@@ -104,6 +115,17 @@ export default function TikTokShopCreatorPricingTab() {
 			};
 		}
 
+		// 4 videos - multiply price of 1 x 4
+		if (videoCount === 4 && pricing.oneVideo) {
+			return {
+				pricePerVideo: pricing.oneVideo,
+				tier: "per video",
+				totalPrice: pricing.oneVideo * 4,
+				available: true,
+			};
+		}
+
+		// 5 videos - use fixed price
 		if (videoCount === 5 && pricing.fiveVideos) {
 			return {
 				pricePerVideo: pricing.fiveVideos / 5,
@@ -113,17 +135,17 @@ export default function TikTokShopCreatorPricingTab() {
 			};
 		}
 
-		// Bulk pricing for 10+ videos
-		if (videoCount >= 10 && pricing.bulkVideos) {
+		// 6 videos only - use bulk pricing
+		if (videoCount === 6 && pricing.bulkVideos) {
 			return {
 				pricePerVideo: pricing.bulkVideos,
 				tier: "bulk rate",
-				totalPrice: pricing.bulkVideos * videoCount,
+				totalPrice: pricing.bulkVideos * 6,
 				available: true,
 			};
 		}
 
-		// No exact pricing available
+		// No pricing available
 		return {
 			pricePerVideo: 0,
 			tier: "custom quote",
@@ -131,6 +153,7 @@ export default function TikTokShopCreatorPricingTab() {
 			available: false,
 		};
 	};
+
 
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {

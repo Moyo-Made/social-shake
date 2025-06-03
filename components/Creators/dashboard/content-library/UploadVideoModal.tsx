@@ -295,7 +295,7 @@ export default function UploadVideoModal({
 				}
 
 				setUploadProgress(chunkResponse.progress || 0);
-				setUploadStatus(chunkResponse.message || `Uploaded chunk ${chunkIndex + 1}/${totalChunks}`);
+				// setUploadStatus(chunkResponse.message || `Uploaded chunk ${chunkIndex + 1}/${totalChunks}`);
 
 				// If this was the last chunk and video is now uploaded
 				if (chunkResponse.status === "video_uploaded") {

@@ -32,6 +32,7 @@ import { NATIONALITIES } from "@/types/nationalities";
 
 // Define types
 export interface Creators {
+	language: string;
 	portfolioVideoUrls: string[] | undefined;
 	id: string;
 	name: string;
@@ -693,7 +694,7 @@ const CreatorMarketplace = () => {
 													<Label className="text-sm font-medium text-gray-500">
 														Australian Business Number
 													</Label>
-													<p className="mt-1 text-sm md:text-base">
+													<p className="mt-1 text-sm md:text-base max-w-sm break-words">
 														{selectedCreator.abnNumber}
 													</p>
 												</div>
@@ -731,12 +732,16 @@ const CreatorMarketplace = () => {
 											</p>
 										</div>
 
-										<div>
-											<Label className="text-sm font-medium text-gray-500">
-												Languages
-											</Label>
-											<p className="mt-1 text-sm md:text-base">English</p>
-										</div>
+										{selectedCreator.language && (
+											<div>
+												<Label className="text-sm font-medium text-gray-500">
+													Languages
+												</Label>
+												<p className="mt-1 text-sm md:text-base">
+													{selectedCreator.language}
+												</p>
+											</div>
+										)}
 									</div>
 								</div>
 
@@ -889,7 +894,7 @@ const CreatorMarketplace = () => {
 											</div>
 
 											<div className="flex justify-between">
-												<span>Bulk Videos</span>
+												<span>Bulk Rate (6 videos)</span>
 												<span className="font-medium">
 													{creator.pricing.bulkVideos &&
 													creator.pricing.bulkVideos > 0
@@ -1368,7 +1373,7 @@ const CreatorMarketplace = () => {
 										</div>
 
 										<div className="flex justify-between">
-											<span>Bulk Videos</span>
+											<span>Bulk Rate (6 videos)</span>
 											<span className="font-medium">
 												{creator.pricing.bulkVideos &&
 												creator.pricing.bulkVideos > 0

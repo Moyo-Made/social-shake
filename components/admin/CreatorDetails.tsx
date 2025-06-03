@@ -540,12 +540,7 @@ const CreatorDetailsPage: React.FC = () => {
 								<p className="text-gray-500 mb-1">Creator Bio</p>
 								<p className="text-black">{creator.bio}</p>
 							</div>
-
-							<div>
-								<p className="text-gray-500 mb-1">Phone Number</p>
-								<p className="text-black">08100566962</p>
-							</div>
-
+							
 							<div>
 								<p className="text-gray-500 mb-1">Creator Country</p>
 								<p className="text-black">{creator.country}</p>
@@ -554,7 +549,7 @@ const CreatorDetailsPage: React.FC = () => {
 							{creator.abnNumber && (
 								<div>
 									<p className="text-gray-500 mb-1">Australian Business No.</p>
-									<p className="text-black">{creator.abnNumber}</p>
+									<p className="mt-1 text-sm md:text-base max-w-sm break-words">{creator.abnNumber}</p>
 								</div>
 							)}
 
@@ -592,8 +587,8 @@ const CreatorDetailsPage: React.FC = () => {
 
 							<div>
 								<p className="text-gray-500 mb-1">Languages</p>
-								{/* Placeholder */}
-								<p className="text-black">English, Spanish </p>
+								
+								<p className="text-black">{creator.languages}</p>
 							</div>
 
 							<div className="md:col-span-2">

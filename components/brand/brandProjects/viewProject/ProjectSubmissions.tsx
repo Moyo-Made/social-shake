@@ -275,8 +275,19 @@ export default function ProjectSubmissions({
 			const creatorPaymentData =
 				projectFormData.creatorPricing.creatorPayments?.[submission.userId];
 
-			return creatorPaymentData?.totalAmount || 0;
+			if (!creatorPaymentData) {
+				return 0;
+			}
+
+			// For bulk pricing, return price per video instead of total amount
+			if (creatorPaymentData.pricingTier === "bulk rate") {
+				return creatorPaymentData.pricePerVideo || 0;
+			}
+
+			// For other pricing tiers (one video, three videos, five videos), return total amount
+			return creatorPaymentData.totalAmount || 0;
 		} else {
+			// For non-specific creator selection, return budget per video
 			return projectFormData.creatorPricing.budgetPerVideo || 0;
 		}
 	};
@@ -294,7 +305,7 @@ export default function ProjectSubmissions({
 					projectFormData.creatorPricing.creatorPayments?.[
 						currentSubmission.userId
 					];
-					
+
 				creatorPayments = creatorPaymentData?.totalAmount || 0;
 			} else {
 				creatorPayments = projectFormData.creatorPricing.budgetPerVideo || 0;
@@ -305,7 +316,7 @@ export default function ProjectSubmissions({
 				await triggerPaymentIntent(creatorPayments, {
 					...currentSubmission,
 					type: "submission_approval",
-					submissionId: currentSubmission.id 
+					submissionId: currentSubmission.id,
 				});
 
 				await updateSubmissionStatus(currentSubmission.id, "approved");
@@ -714,7 +725,6 @@ export default function ProjectSubmissions({
 							Download Video
 							<Download className="h-4 w-4 ml-2" />
 						</Button>
-						
 					</div>
 				);
 			case "awaiting_payment":
@@ -1197,7 +1207,6 @@ export default function ProjectSubmissions({
 							<SelectItem value="spark_received">Spark Received</SelectItem>
 							<SelectItem value="spark_verified">Spark Verified</SelectItem>
 							<SelectItem value="awaiting_payment">Awaiting Payment</SelectItem>
-							
 						</SelectContent>
 					</Select>
 

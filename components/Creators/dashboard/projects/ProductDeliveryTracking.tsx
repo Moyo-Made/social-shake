@@ -93,6 +93,43 @@ const formatDateRange = (
 
 // Updated API functions to match brand side implementation
 const deliveryApi = {
+	notifyBrandOfDelivery: async (creatorId: string, projectId: string) => {
+		try {
+			const auth = getAuth();
+			const currentUser = auth.currentUser;
+
+			if (!currentUser) {
+				throw new Error("User not authenticated");
+			}
+
+			const token = await currentUser.getIdToken();
+
+			const response = await fetch("/api/notify-brand", {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${token}`,
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					creatorId,
+					projectId,
+					status: "delivered",
+					message:
+						"Product has been received and delivery confirmed by creator",
+				}),
+			});
+
+			if (!response.ok) {
+				throw new Error(`API error: ${response.status}`);
+			}
+
+			return await response.json();
+		} catch (error) {
+			console.error("Error notifying brand:", error);
+			throw error;
+		}
+	},
+
 	getDeliveryStatus: async (creatorId: string, projectId: string) => {
 		try {
 			const auth = getAuth();
@@ -620,7 +657,6 @@ export default function DeliveryTracking({
 					}
 
 					setDeliveryData(processedData);
-
 				} else {
 					setError("No delivery information found");
 				}
@@ -653,42 +689,45 @@ export default function DeliveryTracking({
 		}
 	}, [effectiveCreatorId, projectId, authCreatorId, propCreatorId]);
 
-  const handleConfirmReceipt = async () => {
-    if (!effectiveCreatorId || !projectId || !deliveryData) return;
+	const handleConfirmReceipt = async () => {
+		if (!effectiveCreatorId || !projectId || !deliveryData) return;
 
-    setConfirmModalOpen(false);
-    setLoading(true);
+		setConfirmModalOpen(false);
+		setLoading(true);
 
-    try {
-        const result = await deliveryApi.confirmProductReceipt(
-            effectiveCreatorId,
-            projectId
-        );
-        if (result.success) {
-            // Emit socket event to notify brand side
-            if (socketRef.current?.connected) {
-                socketRef.current.emit("delivery-status-updated", {
-                    creatorId: effectiveCreatorId,
-                    projectId: projectId,
-                    status: "delivered",
-                    trackingNumber: deliveryData.trackingNumber,
-                    updatedAt: new Date().toISOString(),
-                });
-            }
+		try {
+			// First, confirm receipt in your existing system
+			const result = await deliveryApi.confirmProductReceipt(
+				effectiveCreatorId,
+				projectId
+			);
 
-          
+			if (result.success) {
+				// Then notify the brand about the delivery confirmation
+				await deliveryApi.notifyBrandOfDelivery(effectiveCreatorId, projectId);
 
-            // Your existing state updates...
-            setRealTimeStatuses((prev) => ({
-                ...prev,
-                [projectId]: {
-                    status: "delivered",
-                    trackingNumber: deliveryData.trackingNumber,
-                    updatedAt: new Date().toISOString(),
-                },
-            }));
+				// Emit socket event to notify brand side (your existing code)
+				if (socketRef.current?.connected) {
+					socketRef.current.emit("delivery-status-updated", {
+						creatorId: effectiveCreatorId,
+						projectId: projectId,
+						status: "delivered",
+						trackingNumber: deliveryData.trackingNumber,
+						updatedAt: new Date().toISOString(),
+					});
+				}
 
-				// Update delivery data with confirmed receipt
+				// Update real-time statuses (your existing code)
+				setRealTimeStatuses((prev) => ({
+					...prev,
+					[projectId]: {
+						status: "delivered",
+						trackingNumber: deliveryData.trackingNumber,
+						updatedAt: new Date().toISOString(),
+					},
+				}));
+
+				// Update delivery data with confirmed receipt (your existing code)
 				setDeliveryData((prev) => {
 					if (!prev) return null;
 
@@ -707,10 +746,14 @@ export default function DeliveryTracking({
 						],
 					};
 				});
+
+				// Show success message
+				toast.success("Receipt confirmed and brand notified!");
 			}
 		} catch (error) {
 			console.error("Error confirming receipt:", error);
 			setError("Failed to confirm receipt");
+			toast.error("Failed to confirm receipt. Please try again.");
 		} finally {
 			setLoading(false);
 		}
@@ -1334,7 +1377,7 @@ export default function DeliveryTracking({
 				<div className="mb-6">
 					<h3 className="text-base text-black font-medium mb-2">
 						Product Information
-					</h3> 
+					</h3>
 					<div className="border-t pt-2 text-black">
 						<p className="mt-1">
 							Please use all product features in your content

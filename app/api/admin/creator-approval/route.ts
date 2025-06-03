@@ -194,7 +194,7 @@ export async function GET(request: NextRequest) {
 				brandCollaborations: creatorProfileData?.brandCollaborations || null,
 				demographics: creatorProfileData?.demographics || null,
 				specialties: creatorProfileData?.specialties || null,
-				languages: creatorProfileData?.languages || null,
+				languages: creatorProfileData?.languages || profileData.languages || null,	
 				preferredContactMethod:
 					creatorProfileData?.preferredContactMethod || null,
 				availability: creatorProfileData?.availability || null,
@@ -521,7 +521,7 @@ export async function GET(request: NextRequest) {
 					brandCollaborations: creatorProfileData?.brandCollaborations || null,
 					demographics: creatorProfileData?.demographics || null,
 					specialties: creatorProfileData?.specialties || null,
-					languages: creatorProfileData?.languages || null,
+					languages: creatorProfileData?.languages || profileData.languages || null,
 					preferredContactMethod:
 						creatorProfileData?.preferredContactMethod || null,
 					availability: creatorProfileData?.availability || null,

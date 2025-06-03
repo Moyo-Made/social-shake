@@ -310,35 +310,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 		}
 	};
 
+	const checkIfUserExistsInDatabase = async (uid: string): Promise<boolean> => {
+		try {
+		  const userDoc = await getDoc(doc(db, 'users', uid));
+		  return userDoc.exists();
+		} catch (error) {
+		  console.error('Error checking user existence:', error);
+		  return false;
+		}
+	  };
+
 	const loginWithGoogle = async (): Promise<{ isExistingAccount: boolean }> => {
 		setError(null);
 		const provider = new GoogleAuthProvider();
-		let isNewUser = false;
-
+	  
 		try {
-			const result = await signInWithPopup(auth, provider);
-			const additionalInfo = getAdditionalUserInfo(result);
-			isNewUser = additionalInfo?.isNewUser ?? false;
-
-			if (result.user.email) {
-				await updateUserDocument(result.user.uid, result.user.email, isNewUser);
-			}
-
-			// Clear cache for fresh data on login
-			clearUserCache(result.user.uid);
-			await fetchUserData(result.user, true);
-
-			return { isExistingAccount: !isNewUser };
+		  const result = await signInWithPopup(auth, provider);
+		  
+		  // Check if user exists in YOUR database, not Firebase's isNewUser
+		  const existingUser = await checkIfUserExistsInDatabase(result.user.uid);
+		  const isExistingAccount = !!existingUser;
+	  
+		  if (result.user.email) {
+			await updateUserDocument(result.user.uid, result.user.email, !isExistingAccount);
+		  }
+	  
+		  clearUserCache(result.user.uid);
+		  await fetchUserData(result.user, true);
+	  
+		  return { isExistingAccount };
 		} catch (err) {
-			console.error("Google login error:", err);
-			if (err instanceof Error) {
-				setError(err.message || "Failed to login with Google");
-			} else {
-				setError("Failed to login with Google");
-			}
-			throw err;
+		  console.error("Google login error:", err);
+		  if (err instanceof Error) {
+			setError(err.message || "Failed to login with Google");
+		  } else {
+			setError("Failed to login with Google");
+		  }
+		  throw err;
 		}
-	};
+	  };
 
 	const loginWithFacebook = async (): Promise<void> => {
 		setError(null);

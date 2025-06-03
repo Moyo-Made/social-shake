@@ -60,6 +60,7 @@ const CompleteCreatorProfile = () => {
 	const [ethnicity, setEthnicity] = useState("");
 	const [dateOfBirth, setDateOfBirth] = useState("");
 	const [gender, setGender] = useState("");
+	const [language, setLanguage] = useState("");
 	const [selectedCountry, setSelectedCountry] = useState("");
 	const [contentLinks, setContentLinks] = useState<string[]>([""]);
 	const [aboutMeVideo, setAboutMeVideo] = useState<File | null>(null);
@@ -129,6 +130,7 @@ const CompleteCreatorProfile = () => {
 			setEthnicity(profileData.ethnicity || "");
 			setDateOfBirth(profileData.dateOfBirth || "");
 			setGender(profileData.gender || "");
+			setLanguage(profileData.language || "");
 			setSelectedCountry(profileData.country || "");
 
 			// Handle arrays and objects
@@ -908,6 +910,20 @@ const CompleteCreatorProfile = () => {
 			</div>
 			{renderFieldError("country")}
 
+			{/* Your Language? */}
+			<label className="block text-base font-medium text-gray-700 mt-4">
+				Your Language
+			</label>
+			<Input
+				className={`mt-1 placeholder:text-[#667085] ${fieldErrors.language ? "border-red-500" : ""}`}
+				placeholder="English"
+				value={language}
+				onChange={(e) => handleTextInputChange(e, "language")}
+				onBlur={() => handleBlur("language")}
+			/>
+			{renderFieldError("language")}
+
+
 			{/* ABN Field - Add this after the country selection */}
 			{selectedCountry === "Australia" && (
 				<div className="space-y-1 mt-4">
@@ -1040,7 +1056,7 @@ const CompleteCreatorProfile = () => {
 
 						<div>
 							<Label className="text-sm font-medium text-gray-700">
-								Bulk Rate (for Agencies)
+								6 Videos Bulk Rate (per video)
 							</Label>
 							<div className="relative mt-1">
 								<span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
@@ -1050,7 +1066,7 @@ const CompleteCreatorProfile = () => {
 									name="bulkVideos"
 									value={pricing.bulkVideos}
 									onChange={handlePricingChange}
-									placeholder="399.99"
+									placeholder="19.99"
 									className="pl-7"
 								/>
 							</div>
@@ -1063,7 +1079,8 @@ const CompleteCreatorProfile = () => {
 								/>
 							</div>
 							<p className="text-xs text-gray-500 mt-1">
-								Optional: Add a note or starting price for bulk orders
+								Price per video when ordering 6 videos (shows bulk discount to
+								brands)
 							</p>
 						</div>
 

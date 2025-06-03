@@ -537,6 +537,19 @@ const AccountSettings: React.FC = () => {
 						</div>
 
 						<div className="mb-6">
+							<label htmlFor="language" className="block mb-2 font-medium">
+								Your Language
+							</label>
+							<Input
+								id="language"
+								name="language"
+								value={formData?.language || ""}
+								onChange={handleInputChange}
+								className="w-full"
+							/>
+						</div>
+
+						<div className="mb-6">
 							<label htmlFor="tiktok" className="block mb-2 font-medium">
 								Your TikTok Profile URL
 							</label>
