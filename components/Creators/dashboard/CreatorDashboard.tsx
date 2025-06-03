@@ -1,10 +1,10 @@
 import Image from "next/image";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import EmptyContest from "@/components/brand/brandProfile/dashboard/EmptyContest";
 import { OngoingProjectsSection } from "./OngoingProjectsSection";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { useAuth } from "@/context/AuthContext";
+import { useQuery } from "@tanstack/react-query";
 
 interface UserDashboardProps {
 	userId: string;
@@ -44,18 +44,80 @@ interface EarningsData {
 	totalEarnings: number;
 	pendingPayout: number;
 	completedPayouts: Array<{
+		id: string;
 		payoutId: string;
 		amount: number;
 		date: string;
 		status: string;
+		contestId?: string;
+		projectId?: string;
+		position?: number;
+		paymentMethod?: string;
 	}>;
 	pendingPayouts: Array<{
-		payoutId: string;
+		id: string;
+		payoutId?: string;
 		amount: number;
 		date: string;
 		status: string;
+		contestId?: string;
+		projectId?: string;
+		position?: number;
+		failureReason?: string;
+		estimatedProcessingDate?: string;
+		note?: string;
 	}>;
+	stripeData?: {
+		availableBalance: number;
+		connectReserved: number;
+		recentCharges: Array<{
+			id: string;
+			amount: number;
+			date: string;
+			status: string;
+		}>;
+		recentPayouts: Array<{
+			id: string;
+			amount: number;
+			date: string;
+			status: string;
+		}>;
+		processingPayments?: number;
+		metrics?: {
+			totalTransactions: number;
+			averageEarningsPerTransaction: number;
+			thisMonthEarnings: number;
+			hasStripeAccount: boolean;
+			dataIncludesStripe: boolean;
+		};
+	};
+	lastUpdated: string;
 }
+
+// API functions
+const fetchUserData = async (userId: string): Promise<UserData> => {
+	const response = await fetch(`/api/creator-stats?userId=${userId}`);
+	const data = await response.json();
+
+	if (!data.success) {
+		throw new Error(data.error || "Failed to fetch user data");
+	}
+
+	return data.data;
+};
+
+const fetchEarningsData = async (userId: string): Promise<EarningsData> => {
+	const response = await fetch(
+		`/api/creator-earnings?userId=${userId}&includeStripe=true`
+	);
+	const data = await response.json();
+
+	if (!data.success) {
+		throw new Error(data.error || "Failed to fetch earnings data");
+	}
+
+	return data.data;
+};
 
 const LoadingState = () => (
 	<div className="flex flex-col justify-center items-center h-screen">
@@ -64,14 +126,41 @@ const LoadingState = () => (
 	</div>
 );
 
-
 // Create the actual dashboard component separately
 const DashboardContent = ({ userId }: UserDashboardProps) => {
-	const [loading, setLoading] = useState(true);
-	const [userData, setUserData] = useState<UserData | null>(null);
-	const [earningsData, setEarningsData] = useState<EarningsData | null>(null);
 	const searchParams = useSearchParams();
-	const { currentUser } = useAuth();
+
+	// Fetch user data with React Query
+	const {
+		data: userData,
+		isLoading: userDataLoading,
+		error: userDataError,
+		refetch: refetchUserData,
+	} = useQuery({
+		queryKey: ["user-dashboard", userId],
+		queryFn: () => fetchUserData(userId),
+		enabled: !!userId, // Only run if userId exists
+		staleTime: 5 * 60 * 1000, // 5 minutes
+		gcTime: 10 * 60 * 1000, // 10 minutes
+	});
+
+	// Fetch earnings data with React Query
+	const {
+		data: earningsData,
+		isLoading: earningsDataLoading,
+		error: earningsDataError,
+		refetch: refetchEarningsData,
+	} = useQuery({
+		queryKey: ["user-earnings", userId],
+		queryFn: () => fetchEarningsData(userId),
+		enabled: !!userId, // Only run if userId exists
+		staleTime: 5 * 60 * 1000, // 5 minutes
+		gcTime: 10 * 60 * 1000, // 10 minutes
+	});
+
+	// Combined loading state
+	const loading = userDataLoading || earningsDataLoading;
+	const error = userDataError || earningsDataError;
 
 	// Add this useEffect to detect TikTok connection success
 	useEffect(() => {
@@ -90,46 +179,35 @@ const DashboardContent = ({ userId }: UserDashboardProps) => {
 		}
 	}, [searchParams]);
 
-
-	// Fetch User Data and Earnings Data
-	useEffect(() => {
-		const fetchData = async () => {
-			try {
-				setLoading(true);
-
-				// Fetch basic user data
-				const userResponse = await fetch(`/api/creator-stats?userId=${userId}`);
-				const userData = await userResponse.json();
-
-				// Fetch earnings data from our new endpoint
-				const earningsResponse = await fetch(
-					`/api/creator-earnings?userId=${userId}`
-				);
-				const earningsData = await earningsResponse.json();
-
-				if (userData.success) {
-					setUserData(userData.data);
-				} else {
-					console.error("Error fetching user data:", userData.error);
-				}
-
-				if (earningsData.success) {
-					setEarningsData(earningsData.data);
-				} else {
-					console.error("Error fetching earnings data:", earningsData.error);
-				}
-			} catch (error) {
-				console.error("Failed to fetch dashboard data:", error);
-			} finally {
-				setLoading(false);
-			}
-		};
-
-		fetchData();
-	}, [userId, currentUser?.uid]);
+	// Handle refresh functionality
+	const handleRefresh = async () => {
+		try {
+			await Promise.all([refetchUserData(), refetchEarningsData()]);
+			toast.success("Dashboard data refreshed!");
+		} catch {
+			toast.error("Failed to refresh data");
+		}
+	};
 
 	if (loading) {
 		return <LoadingState />;
+	}
+
+	if (error) {
+		return (
+			<div className="text-center p-8">
+				<p className="text-red-500 mb-4">
+					Error:{" "}
+					{error instanceof Error ? error.message : "Something went wrong"}
+				</p>
+				<button
+					onClick={handleRefresh}
+					className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600"
+				>
+					Retry
+				</button>
+			</div>
+		);
 	}
 
 	if (!userData) {
@@ -200,7 +278,18 @@ const DashboardContent = ({ userId }: UserDashboardProps) => {
 					<div className="mt-2">
 						<h3 className="text-gray-600 text-lg">Pending Payouts</h3>
 						<p className="text-3xl font-bold mt-2">
-							{formatCurrency(earningsData ? earningsData.pendingPayout : 0)}
+							{formatCurrency(
+								earningsData
+									? earningsData.pendingPayout +
+											(earningsData.stripeData?.processingPayments
+												? parseFloat(
+														earningsData.stripeData.processingPayments
+															.toString()
+															.replace("$", "")
+													)
+												: 0)
+									: 0
+							)}
 						</p>
 					</div>
 				</div>

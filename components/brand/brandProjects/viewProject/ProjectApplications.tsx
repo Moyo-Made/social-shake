@@ -161,7 +161,9 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 		return (
 			<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
 				<div className="bg-white rounded-lg p-6 max-w-md mx-4">
-					<h3 className="text-black text-start text-xl font-medium mb-4">Confirm Approval</h3>
+					<h3 className="text-black text-start text-xl font-medium mb-4">
+						Confirm Approval
+					</h3>
 					<p className="text-start text-gray-600 mb-6">
 						Are you sure you want to approve this application? Once approved,
 						the creator will be allowed to participate in the project.
@@ -1002,6 +1004,8 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 												<Link
 													href={creator.socialMedia.tiktok}
 													className="text-orange-500 hover:underline"
+													target="_blank"
+													rel="noopener noreferrer"
 												>
 													View Profile
 												</Link>

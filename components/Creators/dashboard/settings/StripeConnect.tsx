@@ -100,8 +100,9 @@ const StripeConnect: React.FC<StripeConnectProps> = ({
         stripeAccountId,
         testMode: isTestMode // Pass the test mode flag
       });
-
-      window.location.href = response.data.url;
+  
+      // Open the Stripe dashboard URL in a new tab
+      window.open(response.data.url, "_blank", "noopener,noreferrer");
     } catch (err) {
       console.error("Error accessing Stripe dashboard:", err);
       setError("Failed to access Stripe dashboard. Please try again.");
@@ -110,6 +111,7 @@ const StripeConnect: React.FC<StripeConnectProps> = ({
       setLoading(false);
     }
   };
+  
 
   return (
     <div className="w-full max-w-md">

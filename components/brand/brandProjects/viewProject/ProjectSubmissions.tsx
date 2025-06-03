@@ -20,7 +20,7 @@ import VerifySparkCodeModal from "./VerifySparkCodeModal";
 import { CreatorSubmission } from "@/types/submission";
 import { ProjectFormData } from "@/types/contestFormData";
 import VerifyTikTokLinkModal from "./VerifyTikTokLinkModal";
-import {toast} from "react-hot-toast";
+import { toast } from "react-hot-toast";
 import Link from "next/link";
 import { useProjectForm } from "../ProjectFormContext";
 
@@ -59,7 +59,7 @@ export default function ProjectSubmissions({
 	const [statusFilter, setStatusFilter] = useState<string>("all");
 	const [sortBy, setSortBy] = useState<string>("newest");
 
-	const { formData, triggerPaymentIntent } = useProjectForm();
+	const { triggerPaymentIntent } = useProjectForm();
 
 	// Fetch submissions data
 	useEffect(() => {
@@ -265,35 +265,60 @@ export default function ProjectSubmissions({
 		setOpenApproveDialog(true);
 	};
 
+	// Helper function to get the payment amount for a creator
+	const getCreatorPaymentAmount = (submission: CreatorSubmission) => {
+		if (
+			projectFormData.creatorPricing.selectionMethod ===
+			"Invite Specific Creators"
+		) {
+			// Access creator payment data using creatorId as key
+			const creatorPaymentData =
+				projectFormData.creatorPricing.creatorPayments?.[submission.userId];
+
+			return creatorPaymentData?.totalAmount || 0;
+		} else {
+			return projectFormData.creatorPricing.budgetPerVideo || 0;
+		}
+	};
+
 	const handleApprove = async () => {
 		if (currentSubmission) {
-		  let paymentAmount = formData.creatorPricing.selectionMethod === "Invite Specific Creators" 
-			? formData.creatorPricing.paymentAmounts?.[currentSubmission.creatorId] || 0
-			: formData.creatorPricing.budgetPerVideo || 0;
-	  
-		  if (paymentAmount <= 0) {
-			console.warn("No payment amount found, using default for testing");
-			paymentAmount = 100;
-			toast("Using default payment amount - please update project pricing");
-		  }
-	  
-		  try {
-			// Only trigger payment - webhook handles the rest
-			await triggerPaymentIntent(paymentAmount, {
-			  ...currentSubmission,
-			  type: 'submission_approval'
-			});
-			
-			// Close dialog and show loading state
-			setOpenApproveDialog(false);
-			toast("Processing payment...");
-			
-		  } catch (error) {
-			console.error('Error initiating payment:', error);
-			toast.error('Failed to initiate payment');
-		  }
+			let creatorPayments = 0;
+
+			if (
+				projectFormData.creatorPricing.selectionMethod ===
+				"Invite Specific Creators"
+			) {
+				// Get the creator's payment data using their ID as the key
+				const creatorPaymentData =
+					projectFormData.creatorPricing.creatorPayments?.[
+						currentSubmission.userId
+					];
+					
+				creatorPayments = creatorPaymentData?.totalAmount || 0;
+			} else {
+				creatorPayments = projectFormData.creatorPricing.budgetPerVideo || 0;
+			}
+
+			try {
+				// Only trigger payment - webhook handles the rest
+				await triggerPaymentIntent(creatorPayments, {
+					...currentSubmission,
+					type: "submission_approval",
+					submissionId: currentSubmission.id 
+				});
+
+				await updateSubmissionStatus(currentSubmission.id, "approved");
+
+				// Close dialog and show loading state
+				setOpenApproveDialog(false);
+				toast("Processing payment...");
+			} catch (error) {
+				console.error("Error initiating payment:", error);
+				toast.error("Failed to initiate payment");
+			}
 		}
-	  };
+	};
 
 	const handleRequestSparkCode = async (submission: CreatorSubmission) => {
 		// First update the status to spark_requested and don't change it automatically
@@ -395,20 +420,6 @@ export default function ProjectSubmissions({
 	const handleVerifyTiktokLink = (submission: CreatorSubmission) => {
 		setCurrentSubmission(submission);
 		setOpenVerifyTiktokLinkDialog(true);
-	};
-
-	const handleConfirmPayment = async (submission: CreatorSubmission) => {
-		const success = await updateSubmissionStatus(
-			submission.id,
-			"awaiting_payment"
-		);
-
-		if (success) {
-			// Simulate payment confirmation after delay
-			setTimeout(async () => {
-				await updateSubmissionStatus(submission.id, "payment_confirmed");
-			}, 3000);
-		}
 	};
 
 	const confirmSparkCodeVerification = async () => {
@@ -589,7 +600,7 @@ export default function ProjectSubmissions({
 							className="flex-1 bg-[#067647] hover:bg-green-700 text-white"
 							onClick={() => handleApproveClick(submission)}
 						>
-							Approve
+							Approve (${getCreatorPaymentAmount(submission)})
 							<Check className="h-5 w-5 ml-1" />
 						</Button>
 					</>
@@ -703,14 +714,7 @@ export default function ProjectSubmissions({
 							Download Video
 							<Download className="h-4 w-4 ml-2" />
 						</Button>
-						<Button
-							variant="secondary"
-							className="bg-[#000] text-white w-full"
-							onClick={() => handleConfirmPayment(submission)}
-						>
-							Confirm Payment
-							<Check className="h-5 w-5 ml-1" />
-						</Button>
+						
 					</div>
 				);
 			case "awaiting_payment":
@@ -1193,9 +1197,7 @@ export default function ProjectSubmissions({
 							<SelectItem value="spark_received">Spark Received</SelectItem>
 							<SelectItem value="spark_verified">Spark Verified</SelectItem>
 							<SelectItem value="awaiting_payment">Awaiting Payment</SelectItem>
-							<SelectItem value="payment_confirmed">
-								Payment Confirmed
-							</SelectItem>
+							
 						</SelectContent>
 					</Select>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useRef } from "react";
 import {
 	onAuthStateChanged,
 	signInWithEmailAndPassword,
@@ -58,6 +58,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 	const [isLoading, setIsLoading] = useState<boolean>(true);
 	const [error, setError] = useState<string | null>(null);
 	const [hasProfile, setHasProfile] = useState<boolean>(false);
+	
+	// Add refs to track initialization and prevent unnecessary refetches
+	const isInitialized = useRef(false);
+	const userDataCache = useRef<Map<string, User>>(new Map());
+	const profileCache = useRef<Map<string, boolean>>(new Map());
 
 	// Helper function to update user document in Firestore
 	const updateUserDocument = async (
@@ -68,18 +73,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 		const userRef = doc(db, "users", uid);
 
 		if (isNewUser) {
-			// For new users, create a new document
 			await setDoc(userRef, {
 				email,
-				role: UserRole.USER, // Default role
+				role: UserRole.USER,
 				createdAt: new Date(),
 				updatedAt: new Date(),
 			});
 		} else {
-			// For existing users, check if the document exists
 			const userDoc = await getDoc(userRef);
 			if (!userDoc.exists()) {
-				// Create document if it doesn't exist
 				await setDoc(userRef, {
 					email,
 					role: UserRole.USER,
@@ -90,10 +92,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 		}
 	};
 
-	// Helper function to fetch and set user data
-	const fetchUserData = async (firebaseUser: FirebaseUser): Promise<void> => {
+	// Helper function to fetch and set user data with caching
+	const fetchUserData = async (firebaseUser: FirebaseUser, forceRefresh: boolean = false): Promise<void> => {
 		try {
-			// Make sure we have a valid user before proceeding
 			if (!firebaseUser) {
 				setCurrentUser(null);
 				setIsAdmin(false);
@@ -101,27 +102,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 				return;
 			}
 
-			// Force refresh to get latest claims - do this first to ensure we have fresh token
+			const uid = firebaseUser.uid;
+			const email = firebaseUser.email || "";
+
+			// Check cache first unless force refresh is requested
+			if (!forceRefresh && userDataCache.current.has(uid)) {
+				const cachedUser = userDataCache.current.get(uid)!;
+				setCurrentUser(cachedUser);
+				
+				// Set cached profile status
+				if (profileCache.current.has(email)) {
+					setHasProfile(profileCache.current.get(email)!);
+				}
+				
+				// Still need to check admin status as it might change
+				try {
+					const tokenResult = await firebaseUser.getIdTokenResult();
+					const isUserAdmin = tokenResult.claims.admin === true;
+					setIsAdmin(isUserAdmin);
+				} catch (adminError) {
+					console.error("Error checking admin status:", adminError);
+					setIsAdmin(false);
+				}
+				
+				return;
+			}
+
+			// Force refresh token to get latest claims
 			try {
 				await firebaseUser.getIdToken(true);
 			} catch (tokenError) {
 				console.error("Error refreshing token:", tokenError);
-				// Continue with possibly stale token
 			}
 
-			// Check if user has a brand profile - in try/catch to isolate potential errors
-			if (firebaseUser.email) {
+			// Check brand profile with caching
+			if (email && (!profileCache.current.has(email) || forceRefresh)) {
 				try {
-					const brandProfileDoc = await getDoc(
-						doc(db, "brandProfiles", firebaseUser.email)
-					);
-					setHasProfile(brandProfileDoc.exists());
+					const brandProfileDoc = await getDoc(doc(db, "brandProfiles", email));
+					const hasUserProfile = brandProfileDoc.exists();
+					profileCache.current.set(email, hasUserProfile);
+					setHasProfile(hasUserProfile);
 				} catch (profileError) {
 					console.warn("Could not check brand profile:", profileError);
 					setHasProfile(false);
 				}
-			} else {
-				setHasProfile(false);
+			} else if (email && profileCache.current.has(email)) {
+				setHasProfile(profileCache.current.get(email)!);
 			}
 
 			// Get admin status
@@ -134,57 +160,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 				setIsAdmin(false);
 			}
 
-			// Get user document from Firestore - wrap in try/catch to handle potential permission issues
+			// Get user document from Firestore
 			try {
-				const userRef = doc(db, "users", firebaseUser.uid);
+				const userRef = doc(db, "users", uid);
 				const userDoc = await getDoc(userRef);
 
 				if (userDoc.exists()) {
 					const userData = userDoc.data() as Omit<User, "uid">;
-					setCurrentUser({
-						uid: firebaseUser.uid,
+					const user: User = {
+						uid,
 						...userData,
-					});
+					};
+					
+					// Cache the user data
+					userDataCache.current.set(uid, user);
+					setCurrentUser(user);
 				} else {
 					// Document doesn't exist - create it
 					try {
 						await setDoc(userRef, {
-							email: firebaseUser.email || "",
+							email,
 							role: UserRole.USER,
 							createdAt: new Date(),
 							updatedAt: new Date(),
 						});
 
-						// Fetch the newly created document
 						const newUserDoc = await getDoc(userRef);
 						if (newUserDoc.exists()) {
 							const userData = newUserDoc.data() as Omit<User, "uid">;
-							setCurrentUser({
-								uid: firebaseUser.uid,
+							const user: User = {
+								uid,
 								...userData,
-							});
+							};
+							userDataCache.current.set(uid, user);
+							setCurrentUser(user);
 						} else {
 							console.error("Failed to fetch user after creation");
 							setCurrentUser(null);
 						}
 					} catch (createError) {
 						console.error("Error creating user document:", createError);
-						// Set minimal user data from Firebase Auth
-						setCurrentUser({
-							uid: firebaseUser.uid,
-							email: firebaseUser.email || "",
+						const user: User = {
+							uid,
+							email,
 							role: UserRole.USER,
-						} as User);
+						} as User;
+						userDataCache.current.set(uid, user);
+						setCurrentUser(user);
 					}
 				}
 			} catch (userDocError) {
 				console.error("Error fetching user document:", userDocError);
-				// Use minimal user data from Firebase Auth
-				setCurrentUser({
-					uid: firebaseUser.uid,
-					email: firebaseUser.email || "",
+				const user: User = {
+					uid,
+					email,
 					role: UserRole.USER,
-				} as User);
+				} as User;
+				userDataCache.current.set(uid, user);
+				setCurrentUser(user);
 			}
 		} catch (error) {
 			console.error("Error in fetchUserData:", error);
@@ -196,21 +229,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 	};
 
 	useEffect(() => {
-		setIsLoading(true);
 		const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+			// Only set loading to true on the initial load
+			if (!isInitialized.current) {
+				setIsLoading(true);
+			}
+
 			if (firebaseUser) {
 				try {
-					await fetchUserData(firebaseUser);
+					// Use cache for subsequent loads unless it's the first initialization
+					await fetchUserData(firebaseUser, !isInitialized.current);
 				} catch (error) {
 					console.error("Error in auth state change:", error);
-					// Errors are already set in fetchUserData
 				}
 			} else {
 				setCurrentUser(null);
 				setIsAdmin(false);
 				setHasProfile(false);
+				// Clear caches on logout
+				userDataCache.current.clear();
+				profileCache.current.clear();
 			}
+			
 			setIsLoading(false);
+			isInitialized.current = true;
 		});
 
 		return unsubscribe;
@@ -220,18 +262,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 		setError(null);
 	};
 
+	// Clear cache when user data might have changed
+	const clearUserCache = (uid?: string) => {
+		if (uid) {
+			userDataCache.current.delete(uid);
+		} else {
+			userDataCache.current.clear();
+		}
+	};
+
 	const login = async (email: string, password: string): Promise<void> => {
-		setIsLoading(true);
 		setError(null);
 		try {
-			const userCredential = await signInWithEmailAndPassword(
-				auth,
-				email,
-				password
-			);
-
-			// Wait for user data to be fetched explicitly before returning
-			await fetchUserData(userCredential.user);
+			const userCredential = await signInWithEmailAndPassword(auth, email, password);
+			// Clear any existing cache for this user to ensure fresh data
+			clearUserCache(userCredential.user.uid);
+			await fetchUserData(userCredential.user, true);
 		} catch (err) {
 			console.error("Login error:", err);
 			if (err instanceof Error) {
@@ -239,9 +285,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 			} else {
 				setError("Failed to login");
 			}
-			throw err; // Re-throw to handle in the component
-		} finally {
-			setIsLoading(false);
+			throw err;
 		}
 	};
 
@@ -249,23 +293,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 		email: string,
 		password: string
 	): Promise<{ user: FirebaseUser }> => {
-		setIsLoading(true);
 		setError(null);
 		try {
-			// Create the user
-			const result = await createUserWithEmailAndPassword(
-				auth,
-				email,
-				password
-			);
-
-			// Create user document in Firestore
+			const result = await createUserWithEmailAndPassword(auth, email, password);
 			await updateUserDocument(result.user.uid, email, true);
-
-			// Explicitly fetch user data to ensure it's loaded
-			await fetchUserData(result.user);
-
-			// Return the user information
+			await fetchUserData(result.user, true);
 			return { user: result.user };
 		} catch (err) {
 			console.error("Signup error:", err);
@@ -274,14 +306,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 			} else {
 				setError("Failed to create account");
 			}
-			throw err; // Re-throw to handle in the component
-		} finally {
-			setIsLoading(false);
+			throw err;
 		}
 	};
 
 	const loginWithGoogle = async (): Promise<{ isExistingAccount: boolean }> => {
-		setIsLoading(true);
 		setError(null);
 		const provider = new GoogleAuthProvider();
 		let isNewUser = false;
@@ -291,13 +320,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 			const additionalInfo = getAdditionalUserInfo(result);
 			isNewUser = additionalInfo?.isNewUser ?? false;
 
-			// Make sure to await this operation
 			if (result.user.email) {
 				await updateUserDocument(result.user.uid, result.user.email, isNewUser);
 			}
 
-			// Also await fetchUserData to ensure user data is loaded
-			await fetchUserData(result.user);
+			// Clear cache for fresh data on login
+			clearUserCache(result.user.uid);
+			await fetchUserData(result.user, true);
 
 			return { isExistingAccount: !isNewUser };
 		} catch (err) {
@@ -307,14 +336,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 			} else {
 				setError("Failed to login with Google");
 			}
-			throw err; // Make sure to throw the error to handle it in the component
-		} finally {
-			setIsLoading(false);
+			throw err;
 		}
 	};
 
 	const loginWithFacebook = async (): Promise<void> => {
-		setIsLoading(true);
 		setError(null);
 		try {
 			const provider = new FacebookAuthProvider();
@@ -322,13 +348,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 			const additionalInfo = getAdditionalUserInfo(result);
 			const isNewUser = additionalInfo?.isNewUser ?? false;
 
-			// Update user document in Firestore
 			if (result.user.email) {
 				await updateUserDocument(result.user.uid, result.user.email, isNewUser);
 			}
 
-			// Wait for user data to be fetched explicitly
-			await fetchUserData(result.user);
+			clearUserCache(result.user.uid);
+			await fetchUserData(result.user, true);
 		} catch (err) {
 			console.error("Facebook login error:", err);
 			if (err instanceof Error) {
@@ -336,21 +361,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 			} else {
 				setError("Failed to login with Facebook");
 			}
-			throw err; // Re-throw to handle in the component
-		} finally {
-			setIsLoading(false);
+			throw err;
 		}
 	};
 
 	const logout = async (): Promise<void> => {
-		setIsLoading(true);
 		setError(null);
 		try {
 			await signOut(auth);
-			// Clear user state immediately after logout
 			setCurrentUser(null);
 			setIsAdmin(false);
 			setHasProfile(false);
+			// Clear all caches on logout
+			userDataCache.current.clear();
+			profileCache.current.clear();
 		} catch (err) {
 			console.error("Logout error:", err);
 			if (err instanceof Error) {
@@ -358,14 +382,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 			} else {
 				setError("Failed to logout");
 			}
-			throw err; // Re-throw to handle in the component
-		} finally {
-			setIsLoading(false);
+			throw err;
 		}
 	};
 
 	const resetPassword = async (email: string): Promise<void> => {
-		setIsLoading(true);
 		setError(null);
 		try {
 			await sendPasswordResetEmail(auth, email);
@@ -376,9 +397,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 			} else {
 				setError("Failed to send password reset email");
 			}
-			throw err; // Re-throw to handle in the component
-		} finally {
-			setIsLoading(false);
+			throw err;
 		}
 	};
 

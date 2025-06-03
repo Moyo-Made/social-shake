@@ -6,6 +6,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "@/components/ui/sonner";
 import { SocketProvider } from "@/context/SocketContext";
 import { NotificationsProvider } from "@/context/NotificationContext";
+import { QueryProvider } from "./providers/QueryProvider";
 
 const inter = Inter({
 	subsets: ["latin"],
@@ -50,13 +51,16 @@ export default function RootLayout({
 	return (
 		<html lang="en">
 			<body className={`${inter.variable} ${satoshi.variable}`}>
-				<AuthProvider>
-					
-					<SocketProvider>
-						<NotificationsProvider>{children}</NotificationsProvider>
-						<Toaster />
-					</SocketProvider>
-				</AuthProvider>
+				<QueryProvider>
+					<AuthProvider>
+						<SocketProvider>
+							<NotificationsProvider>
+								{children}
+							</NotificationsProvider>
+							<Toaster />
+						</SocketProvider>
+					</AuthProvider>
+				</QueryProvider>
 			</body>
 		</html>
 	);

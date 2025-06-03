@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader } from "../../../ui/card";
 import { FaArrowRight } from "react-icons/fa6";
 
 interface PaymentSuccessfulCardProps {
-	type?: "project" | "contest";
+	type?: "project" | "contest" | "video" | "submission_approval";
 }
 
 const PaymentSuccessfulCard = ({ type = "contest" }: PaymentSuccessfulCardProps) => {

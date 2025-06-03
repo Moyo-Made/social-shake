@@ -560,7 +560,7 @@ const UserDashboard = dynamic(
 			return (
 				<div className="max-w-6xl px-4 py-8">
 					{/* Summary Cards */}
-					<div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+					<div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
 						{/* Active Projects Card */}
 						<div className="bg-white rounded-lg shadow p-6 relative overflow-hidden">
 							<Image
@@ -578,7 +578,7 @@ const UserDashboard = dynamic(
 						</div>
 
 						{/* Active Contests Card */}
-						<div className="bg-white rounded-lg shadow p-6 relative overflow-hidden">
+						{/* <div className="bg-white rounded-lg shadow p-6 relative overflow-hidden">
 							<Image
 								src="/icons/total-contests.svg"
 								alt="Total Contests"
@@ -591,7 +591,7 @@ const UserDashboard = dynamic(
 									{userData.summary.activeContests}
 								</p>
 							</div>
-						</div>
+						</div> */}
 
 						{/* Total Spend Card */}
 						<div className="bg-white rounded-lg shadow p-6 relative overflow-hidden">

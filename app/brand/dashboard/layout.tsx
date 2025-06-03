@@ -1,6 +1,4 @@
-import SideNavLayout from "@/components/Creators/dashboard/CreatorSideNavbar";
 import { MessagingProvider } from "@/context/MessagingContext";
-
 
 export default function RootLayout({
 	children,
@@ -9,9 +7,7 @@ export default function RootLayout({
 }>) {
 	return (
 		<div className="">
-				<MessagingProvider>
-					<SideNavLayout>{children}</SideNavLayout>
-				</MessagingProvider>
+			<MessagingProvider>{children}</MessagingProvider>
 		</div>
 	);
 }

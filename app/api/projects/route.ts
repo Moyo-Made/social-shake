@@ -310,11 +310,11 @@ export async function GET(request: NextRequest) {
 			.map((doc) => doc.data())
 			.filter((project) => {
 				const selectionMethod = project.creatorPricing?.selectionMethod;
-				// Handle both possible values - check your actual data format
+				// Show Post Public Brief projects (accepting pitches) and optionally Invite Specific (in progress)
 				return (
 					selectionMethod === "Post Public Brief" ||
-					selectionMethod === "post_public_brief" ||
-					selectionMethod === "Post public brief"
+					(url.searchParams.get("includeInvited") === "true" &&
+						selectionMethod === "Invite Specific Creators")
 				);
 			})
 			.slice(0, limit); // Limit to requested number
@@ -524,8 +524,14 @@ export async function POST(request: NextRequest) {
 			},
 			projectRequirements,
 			creatorPricing,
-			status: ProjectStatus.ACTIVE,
-			applicationStatus: "open",
+			status:
+				creatorPricing?.selectionMethod === "Post Public Brief"
+					? ProjectStatus.ACTIVE
+					: ProjectStatus.INVITE,
+			applicationStatus:
+				creatorPricing?.selectionMethod === "Post Public Brief"
+					? "accepting_pitches"
+					: "in_progress",
 			metrics: {
 				views: 0,
 				applications: 0,

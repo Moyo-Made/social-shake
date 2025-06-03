@@ -1,6 +1,6 @@
+import { useQuery } from "@tanstack/react-query";
 import { Eye } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
 
 interface UserProject {
 	projectId: string;
@@ -10,42 +10,33 @@ interface UserProject {
 	completionPercentage: number;
 }
 
-// This is the Ongoing Projects section that exactly matches the image provided
 export function OngoingProjectsSection({ userId }: { userId: string }) {
-	const [loading, setLoading] = useState(true);
-	const [userProjects, setUserProjects] = useState<UserProject[]>([]);
 
-	// Fetch User Projects
-	useEffect(() => {
-		const fetchUserProjects = async () => {
-			if (!userId) return;
+	const fetchUserProjects = async (userId: string): Promise<UserProject[]> => {
+		if (!userId) return [];
 
-			try {
-				setLoading(true);
-				const response = await fetch(`/api/user-project?userId=${userId}`);
+		const response = await fetch(`/api/user-project?userId=${userId}`);
 
-				if (!response.ok) {
-					throw new Error("Failed to fetch user projects");
-				}
+		if (!response.ok) {
+			throw new Error("Failed to fetch user projects");
+		}
 
-				const data = await response.json();
+		const data = await response.json();
 
-				if (data.success) {
-					setUserProjects(data.data);
-				} else {
-					console.error("Error fetching user projects:", data.error);
-				}
-			} catch (error) {
-				console.error("Failed to fetch user projects:", error);
-			} finally {
-				setLoading(false);
-			}
-		};
+		if (data.success) {
+			return data.projects || []; // Assuming the API returns projects in data.projects
+		} else {
+			throw new Error(data.error || "Failed to fetch user projects");
+		}
+	};
 
-		fetchUserProjects();
-	}, [userId]);
+	const { data: userProjects = [], isLoading } = useQuery({
+		queryKey: ['user-projects', userId],
+		queryFn: () => fetchUserProjects(userId),
+		enabled: !!userId, // Only run query if userId exists
+	});
 
-	if (loading) {
+	if (isLoading) {
 		return (
 			<div className="mb-12">
 				<div className="flex justify-between items-center mb-4">

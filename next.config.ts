@@ -4,7 +4,12 @@ const nextConfig: NextConfig = {
 	/* config options here */
 	reactStrictMode: true,
 	images: {
-		domains: ["p16-sign-va.tiktokcdn.com"],
+		domains: [
+			"storage.googleapis.com",
+			"firebasestorage.googleapis.com",
+			"lh3.googleusercontent.com", // if using Google auth
+			"p16-sign-va.tiktokcdn.com",
+		],
 		remotePatterns: [
 			{
 				protocol: "https",

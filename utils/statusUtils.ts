@@ -14,6 +14,11 @@ export const getStatusStyle = (status: ProjectStatus) => {
         color: "bg-yellow-100 text-[#1A1A1A] border border-[#FDD849]",
         text: "✓ Accepting Pitches"
       };
+      case "invite":
+      return {
+        color: "bg-[#FFF3CD] text-[#856404] border border-[#FFBF47]",
+        text: "• Invited Creators"
+      };
     case "rejected":
       return {
         color: "bg-red-100 text-[#F04438] border border-red-200",

@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
 		// Email content
 		const mailOptions = {
 			from: process.env.EMAIL_USER,
-			to: "akanjimoyomade@gmail.com",
+			to: "info@social-shake.com",
 			replyTo: email,
 			subject: `Contact Form: ${subject}`,
 			html: (() => {

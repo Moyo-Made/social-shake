@@ -48,6 +48,20 @@ export async function POST(request: NextRequest) {
 
 		const paymentData = paymentDoc.data();
 
+		// Check if creator has connected Stripe account for creator payment types
+		const creatorPaymentTypes = ["video", "project", "contest", "submission_approval"];
+		const requiresCreatorAccount = creatorPaymentTypes.includes(paymentType);
+		
+		if (requiresCreatorAccount && !paymentData?.stripeConnectId) {
+			return NextResponse.json(
+				{ 
+					error: "Creator hasn't connected their Stripe account yet. Please ask them to connect their account before proceeding with payment.",
+					errorCode: "CREATOR_ACCOUNT_NOT_CONNECTED"
+				},
+				{ status: 400 }
+			);
+		}
+
 		// Determine payment details based on type
 		let productName = "";
 		let productDescription = "";
@@ -84,6 +98,45 @@ export async function POST(request: NextRequest) {
 				break;
 		}
 
+		// Create payment intent data with direct creator payment for all creator payment types
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const paymentIntentData: any = {
+			metadata: {
+				paymentId,
+				userId,
+				paymentType,
+				paymentName: productName,
+				description: productDescription,
+				// Add specific metadata based on payment type
+				...(paymentType === "video" && paymentData && {
+					videoId: paymentData.videoId,
+					creatorId: paymentData.creatorId,
+					creatorEmail: paymentData.creatorEmail,
+				}),
+				...(paymentType === "submission_approval" && paymentData && {
+					submissionId: paymentData.submissionId,
+					projectId: paymentData.projectId,
+					creatorId: paymentData.creatorId,
+				}),
+				...(paymentType === "project" && paymentData && {
+					projectId: paymentData.projectId,
+					creatorId: paymentData.creatorId,
+				}),
+				...(paymentType === "contest" && paymentData && {
+					contestId: paymentData.contestId,
+					creatorId: paymentData.creatorId,
+				}),
+			},
+		};
+
+		// Add direct payment to creator for all creator payment types
+		if (requiresCreatorAccount && paymentData?.stripeConnectId) {
+			paymentIntentData.on_behalf_of = paymentData.stripeConnectId;
+			paymentIntentData.transfer_data = {
+				destination: paymentData.stripeConnectId,
+			};
+		}
+
 		// Create a Stripe checkout session
 		const session = await stripe.checkout.sessions.create({
 			payment_method_types: ["card"],
@@ -101,36 +154,7 @@ export async function POST(request: NextRequest) {
 				},
 			],
 			mode: "payment",
-			payment_intent_data: {
-				...(paymentType === "video" &&
-					paymentData?.creatorId && {
-						on_behalf_of: paymentData.creatorId, // Creator's Stripe Connect account ID
-						transfer_data: {
-							destination: paymentData.creatorId,
-						},
-					}),
-				metadata: {
-					paymentId,
-					userId,
-					paymentType,
-					paymentName: productName,
-					description: productDescription,
-					// Add video-specific metadata if applicable
-					...(paymentType === "video" &&
-						paymentData && {
-							videoId: paymentData.videoId,
-							creatorId: paymentData.creatorId,
-							creatorEmail: paymentData.creatorEmail,
-						}),
-					// Add submission-specific metadata
-					...(paymentType === "submission_approval" &&
-						paymentData && {
-							submissionId: paymentData.submissionId,
-							projectId: paymentData.projectId,
-							creatorId: paymentData.creatorId,
-						}),
-				},
-			},
+			payment_intent_data: paymentIntentData,
 			success_url: successUrl,
 			cancel_url: cancelUrl,
 			customer_email: userEmail,
@@ -140,13 +164,25 @@ export async function POST(request: NextRequest) {
 				paymentType,
 				paymentName: productName,
 				description: productDescription,
-				// Add video-specific metadata if applicable
-				...(paymentType === "video" &&
-					paymentData && {
-						videoId: paymentData.videoId,
-						creatorId: paymentData.creatorId,
-						creatorEmail: paymentData.creatorEmail,
-					}),
+				// Add specific metadata based on payment type
+				...(paymentType === "video" && paymentData && {
+					videoId: paymentData.videoId,
+					creatorId: paymentData.creatorId,
+					creatorEmail: paymentData.creatorEmail,
+				}),
+				...(paymentType === "submission_approval" && paymentData && {
+					submissionId: paymentData.submissionId,
+					projectId: paymentData.projectId,
+					creatorId: paymentData.creatorId,
+				}),
+				...(paymentType === "project" && paymentData && {
+					projectId: paymentData.projectId,
+					creatorId: paymentData.creatorId,
+				}),
+				...(paymentType === "contest" && paymentData && {
+					contestId: paymentData.contestId,
+					creatorId: paymentData.creatorId,
+				}),
 			},
 		});
 
@@ -161,19 +197,48 @@ export async function POST(request: NextRequest) {
 
 		await adminDb.collection("payments").doc(paymentId).update(updateData);
 
-		// For video purchases, also create a notification for the creator
-		if (paymentType === "video" && paymentData?.creatorId) {
+		// Create notifications for creators based on payment type
+		if (requiresCreatorAccount && paymentData?.stripeConnectId) {
+			let notificationMessage = "";
+			let notificationType = "";
+
+			switch (paymentType) {
+				case "video":
+					notificationType = "video_purchase_initiated";
+					notificationMessage = `A brand has initiated purchase of your video: ${productName}`;
+					break;
+				case "project":
+					notificationType = "project_payment_initiated";
+					notificationMessage = `A brand has initiated payment for your project: ${productName}`;
+					break;
+				case "contest":
+					notificationType = "contest_payment_initiated";
+					notificationMessage = `A brand has initiated payment for contest: ${productName}`;
+					break;
+				case "submission_approval":
+					notificationType = "submission_payment_initiated";
+					notificationMessage = `A brand has initiated payment for your approved submission: ${productName}`;
+					break;
+			}
+
 			const notificationData = {
-				type: "video_purchase_initiated",
+				type: notificationType,
 				creatorId: paymentData.creatorId,
 				brandId: userId,
-				videoId: paymentData.videoId,
 				amount: parseFloat(amount),
 				paymentId,
 				sessionId: session.id,
 				status: "pending_payment",
 				createdAt: new Date().toISOString(),
-				message: `A brand has initiated purchase of your video: ${productName}`,
+				message: notificationMessage,
+				// Add specific fields based on payment type
+				...(paymentType === "video" && { videoId: paymentData.videoId }),
+				...(paymentType === "project" && { projectId: paymentData.projectId }),
+				...(paymentType === "contest" && { contestId: paymentData.contestId }),
+				...(paymentType === "submission_approval" && { 
+					submissionId: paymentData.submissionId,
+					projectId: paymentData.projectId 
+				}),
 			};
 
 			await adminDb.collection("notifications").add(notificationData);
@@ -183,6 +248,8 @@ export async function POST(request: NextRequest) {
 			success: true,
 			sessionId: session.id,
 			paymentType,
+			directPayment: requiresCreatorAccount,
+			creatorConnected: !!paymentData?.stripeConnectId,
 		});
 	} catch (error) {
 		console.error("Error creating checkout session:", error);

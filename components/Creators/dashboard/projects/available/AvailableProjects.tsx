@@ -306,7 +306,7 @@ const CreatorProjectDashboard: React.FC = () => {
 	function renderProjectList() {
 		if (loading && projects.length === 0) {
 			return (
-				<div className="flex justify-center h-screen">
+				<div className="flex flex-col items-center justify-center h-64">
 					<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500" />
 					<p className="text-gray-500 mt-4">Loading projects...</p>
 				</div>
@@ -348,6 +348,29 @@ const CreatorProjectDashboard: React.FC = () => {
 						</Button>
 					)}
 				</div>
+			);
+		}
+
+		if (loading && projects.length > 0) {
+			return (
+				<>
+					<div className="relative">
+						<div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-lg">
+							<div className="flex flex-col items-center">
+								<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500" />
+								<p className="text-gray-500 mt-2">Updating projects...</p>
+							</div>
+						</div>
+						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mt-6 opacity-50">
+							{filteredProjects.map((project, index) => (
+								<ProjectCard
+									key={project.projectId || `project-${index}`}
+									project={project}
+								/>
+							))}
+						</div>
+					</div>
+				</>
 			);
 		}
 

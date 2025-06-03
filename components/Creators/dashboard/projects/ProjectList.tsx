@@ -94,7 +94,6 @@ export default function ProjectList() {
 						.toLowerCase()
 						.includes(searchQuery.toLowerCase()) ||
 					project.projectDetails.projectDescription
-						?.toLowerCase()
 						.includes(searchQuery.toLowerCase())
 			);
 		}

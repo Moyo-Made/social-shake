@@ -38,6 +38,7 @@ export interface User {
 
   
   export interface BrandProfile {
+	profilePictureUrl: string;
 	id: string;
 	userId: string;
 	email: string;

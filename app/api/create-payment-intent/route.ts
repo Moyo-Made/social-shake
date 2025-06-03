@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
 			// Extract video-specific fields
 			requestData.videoId = formData.get("videoId")?.toString();
-			requestData.creatorId = formData.get("creatorId")?.toString();
+			requestData.stripeConnectId = formData.get("stripeConnectId")?.toString();
 			requestData.videoTitle = formData.get("videoTitle")?.toString();
 			requestData.creatorEmail = formData.get("creatorEmail")?.toString();
 
@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
 					requestData.contestName = basic.contestName;
 					requestData.contestType = basic.contestType;
 					requestData.projectTitle = basic.projectTitle;
+					requestData.contestId = basic.contestId;
 				}
 			} catch (e) {
 				console.error("Error parsing basic info:", e);
@@ -60,16 +61,17 @@ export async function POST(request: NextRequest) {
 
 				// Video-specific fields
 				videoId: jsonData.videoId,
-				creatorId: jsonData.creatorId,
+				stripeConnectId: jsonData.stripeConnectId,
 				videoTitle: jsonData.videoTitle,
 				creatorEmail: jsonData.creatorEmail,
 
 				// Contest/Project fields
-				contestName: jsonData.basic?.contestName,
-				contestType: jsonData.basic?.contestType,
+				contestName: jsonData.basic?.contestName || jsonData.contestName,
+				contestType: jsonData.basic?.contestType || jsonData.contestType,
+				contestId: jsonData.basic?.contestId || jsonData.contestId,
 				projectTitle: jsonData.basic?.projectTitle || jsonData.projectTitle,
-				submissionId: jsonData.submissionId,
 				projectId: jsonData.projectId,
+				submissionId: jsonData.submissionId,
 			};
 		}
 
@@ -83,22 +85,123 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		// Additional validation for video purchases
+		// Additional specific validations
 		if (paymentType === "video") {
-			if (!requestData.videoId || !requestData.creatorId) {
+			if (!requestData.videoId) {
 				return NextResponse.json(
-					{ error: "Video ID and Creator ID are required for video purchases" },
+					{ error: "Video ID is required for video purchases" },
 					{ status: 400 }
 				);
 			}
 		}
 
+		// Auto-fetch submission data for submission_approval payments
 		if (paymentType === "submission_approval") {
-			if (!requestData.submissionId ) {
+			if (!requestData.submissionId) {
 				return NextResponse.json(
 					{
-						error:
-							"Submission ID is required for submission approvals",
+						error: "Submission ID is required for submission approvals",
+					},
+					{ status: 400 }
+				);
+			}
+			// AUTO-FETCH: Get submission data and creator's Stripe Connect ID
+			try {
+				const submissionDoc = await adminDb
+					.collection("project_submissions")
+					.doc(requestData.submissionId)
+					.get();
+				if (!submissionDoc.exists) {
+					return NextResponse.json(
+						{ error: "Submission not found" },
+						{ status: 404 }
+					);
+				}
+				const submissionData = submissionDoc.data();
+				
+				// Get creator ID from submission
+				const creatorId = submissionData?.userId;
+				
+				if (!creatorId) {
+					return NextResponse.json(
+						{ error: "Creator ID not found in submission" },
+						{ status: 400 }
+					);
+				}
+				// Fetch creator's Stripe Connect ID
+				const creatorDoc = await adminDb
+					.collection("creators")
+					.doc(creatorId)
+					.get();
+				if (!creatorDoc.exists) {
+					return NextResponse.json(
+						{ error: "Creator not found" },
+						{ status: 404 }
+					);
+				}
+				const creatorData = creatorDoc.data();
+				
+				// Auto-populate the missing fields
+				requestData.stripeConnectId = creatorData?.stripeAccountId;
+				requestData.creatorEmail = creatorData?.email;
+				requestData.projectId = submissionData?.projectId;
+				requestData.creatorId = creatorId; // Store the creator ID for checkout session
+				// Note: projectTitle will come from existing formData since it's not in submission
+				// Validate that creator has connected their Stripe account
+				if (!requestData.stripeConnectId) {
+					return NextResponse.json(
+						{ 
+							error: "Creator hasn't connected their Stripe account yet. Please ask them to connect their account before approving submission payment.",
+							errorCode: "CREATOR_ACCOUNT_NOT_CONNECTED",
+							paymentType,
+							creatorId: creatorId
+						},
+						{ status: 400 }
+					);
+				}
+				console.log("Auto-fetched data for submission_approval:", {
+					creatorId,
+					stripeConnectId: requestData.stripeConnectId,
+					projectId: requestData.projectId,
+					creatorEmail: requestData.creatorEmail
+				});
+			} catch (error) {
+				console.error("Error auto-fetching submission data:", error);
+				return NextResponse.json(
+					{ error: "Failed to fetch submission data" },
+					{ status: 500 }
+				);
+			}
+		}
+
+		// Define payment types that require creator accounts
+		const creatorPaymentTypes = ["video", "project", "contest", "submission_approval"];
+		const requiresCreatorAccount = creatorPaymentTypes.includes(paymentType);
+
+		// Additional validation for creator payment types
+		if (requiresCreatorAccount) {
+			if (!requestData.stripeConnectId) {
+				let errorMessage = "";
+				switch (paymentType) {
+					case "video":
+						errorMessage = "Creator hasn't connected their Stripe account yet. Please ask them to connect their account before purchasing videos.";
+						break;
+					case "project":
+						errorMessage = "Creator hasn't connected their Stripe account yet. Please ask them to connect their account before proceeding with project payment.";
+						break;
+					case "contest":
+						errorMessage = "Creator hasn't connected their Stripe account yet. Please ask them to connect their account before proceeding with contest payment.";
+						break;
+					case "submission_approval":
+						errorMessage = "Creator hasn't connected their Stripe account yet. Please ask them to connect their account before approving submission payment.";
+						break;
+				}
+				
+				return NextResponse.json(
+					{ 
+						error: errorMessage,
+						errorCode: "CREATOR_ACCOUNT_NOT_CONNECTED",
+						paymentType 
 					},
 					{ status: 400 }
 				);
@@ -117,12 +220,12 @@ export async function POST(request: NextRequest) {
 			case "project":
 				paymentName = requestData.projectTitle || "Project";
 				break;
-			case "contest":
-			default:
-				paymentName = requestData.contestName || "Contest";
 			case "submission_approval":
 				paymentName = `Submission Approval - ${requestData.projectTitle || "Project"}`;
 				break;
+			case "contest":
+			default:
+				paymentName = requestData.contestName || "Contest";
 				break;
 		}
 
@@ -136,26 +239,36 @@ export async function POST(request: NextRequest) {
 			paymentName,
 			status: "pending",
 			createdAt: new Date().toISOString(),
+			requiresCreatorAccount,
+			directPayment: requiresCreatorAccount,
 
-			// Video-specific fields (only included if it's a video purchase)
+			// Creator fields (for all creator payment types)
+			...(requiresCreatorAccount && {
+				stripeConnectId: requestData.stripeConnectId,
+				creatorEmail: requestData.creatorEmail || "",
+				creatorId: requestData.creatorId || "",
+			}),
+
+			// Video-specific fields
 			...(paymentType === "video" && {
 				videoId: requestData.videoId,
-				creatorId: requestData.creatorId,
 				videoTitle: requestData.videoTitle || "",
-				creatorEmail: requestData.creatorEmail || "",
 			}),
 
 			// Contest-specific fields
 			...(paymentType === "contest" && {
 				contestName: requestData.contestName,
 				contestType: requestData.contestType,
+				contestId: requestData.contestId,
 			}),
 
 			// Project-specific fields
 			...(paymentType === "project" && {
 				projectTitle: requestData.projectTitle,
+				projectId: requestData.projectId,
 			}),
 
+			// Submission approval specific fields
 			...(paymentType === "submission_approval" && {
 				submissionId: requestData.submissionId,
 				projectId: requestData.projectId,
@@ -168,18 +281,19 @@ export async function POST(request: NextRequest) {
 		}
 		await adminDb.collection("payments").doc(paymentId).set(paymentData);
 
-		// For video purchases, also create a purchase record for the creator
-		if (paymentType === "video" && requestData.creatorId) {
+		// Create purchase/payment records for different payment types
+		if (paymentType === "video" && requestData.stripeConnectId) {
 			const purchaseRecord = {
 				purchaseId: paymentId,
 				videoId: requestData.videoId,
-				creatorId: requestData.creatorId,
+				stripeConnectId: requestData.stripeConnectId,
 				brandId: userId,
 				amount: parseFloat(amount),
 				status: "pending_payment",
 				createdAt: new Date().toISOString(),
 				videoTitle: requestData.videoTitle || "",
 				brandEmail: requestData.brandEmail || "",
+				directPayment: true,
 			};
 
 			await adminDb
@@ -188,11 +302,75 @@ export async function POST(request: NextRequest) {
 				.set(purchaseRecord);
 		}
 
+		// Create similar records for other payment types if needed
+		if (paymentType === "project" && requestData.stripeConnectId) {
+			const projectPaymentRecord = {
+				paymentId: paymentId,
+				projectId: requestData.projectId,
+				stripeConnectId: requestData.stripeConnectId,
+				brandId: userId,
+				amount: parseFloat(amount),
+				status: "pending_payment",
+				createdAt: new Date().toISOString(),
+				projectTitle: requestData.projectTitle || "",
+				brandEmail: requestData.brandEmail || "",
+				directPayment: true,
+			};
+
+			await adminDb
+				.collection("project_payments")
+				.doc(paymentId)
+				.set(projectPaymentRecord);
+		}
+
+		if (paymentType === "contest" && requestData.stripeConnectId) {
+			const contestPaymentRecord = {
+				paymentId: paymentId,
+				contestId: requestData.contestId,
+				stripeConnectId: requestData.stripeConnectId,
+				brandId: userId,
+				amount: parseFloat(amount),
+				status: "pending_payment",
+				createdAt: new Date().toISOString(),
+				contestName: requestData.contestName || "",
+				brandEmail: requestData.brandEmail || "",
+				directPayment: true,
+			};
+
+			await adminDb
+				.collection("contest_payments")
+				.doc(paymentId)
+				.set(contestPaymentRecord);
+		}
+
+		if (paymentType === "submission_approval" && requestData.stripeConnectId) {
+			const submissionPaymentRecord = {
+				paymentId: paymentId,
+				submissionId: requestData.submissionId,
+				projectId: requestData.projectId,
+				stripeConnectId: requestData.stripeConnectId,
+				brandId: userId,
+				amount: parseFloat(amount),
+				status: "pending_payment",
+				createdAt: new Date().toISOString(),
+				projectTitle: requestData.projectTitle || "",
+				brandEmail: requestData.brandEmail || "",
+				directPayment: true,
+			};
+
+			await adminDb
+				.collection("submission_payments")
+				.doc(paymentId)
+				.set(submissionPaymentRecord);
+		}
+
 		return NextResponse.json({
 			success: true,
 			message: `Payment intent created for ${paymentType}`,
 			paymentId,
 			paymentType,
+			directPayment: requiresCreatorAccount,
+			creatorConnected: !!requestData.stripeConnectId,
 		});
 	} catch (error) {
 		console.error("Error creating payment intent:", error);

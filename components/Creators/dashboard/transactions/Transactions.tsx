@@ -38,7 +38,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 
 // Define Transaction type
-type TransactionStatus = "Withdrawn" | "Processing" | "Processed";
+type TransactionStatus = "Withdrawn" | "Processing" | "Processed" | "Failed";
 
 // Helper function to get status badge styling
 const getStatusBadgeStyle = (status: TransactionStatus): string => {
@@ -49,6 +49,8 @@ const getStatusBadgeStyle = (status: TransactionStatus): string => {
 			return "bg-[#FFF0C3] text-sm text-[#1A1A1A] border border-[#FDD849] rounded-full flex items-center justify-center px-3 py-1 w-1/2";
 		case "Processed":
 			return "bg-blue-50 text-sm text-blue-700 border border-blue-200 rounded-full flex items-center justify-center px-3 py-1 w-1/2";
+		case "Failed":
+			return "bg-red-50 text-sm text-red-700 border border-red-200 rounded-full flex items-center justify-center px-3 py-1 w-1/2";
 		default:
 			return "bg-gray-100 text-gray-700";
 	}
@@ -58,6 +60,7 @@ const getStatusBadgeStyle = (status: TransactionStatus): string => {
 const getStatusIcon = (status: TransactionStatus): React.ReactNode => {
 	switch (status) {
 		case "Withdrawn":
+		case "Processed":
 			return (
 				<svg
 					className="w-4 h-4 mr-1"
@@ -76,7 +79,7 @@ const getStatusIcon = (status: TransactionStatus): React.ReactNode => {
 			);
 		case "Processing":
 			return <div className="w-1.5 h-1.5 rounded-full bg-[#1A1A1A] mr-1"></div>;
-		case "Processed":
+		case "Failed":
 			return (
 				<svg
 					className="w-4 h-4 mr-1"
@@ -85,7 +88,7 @@ const getStatusIcon = (status: TransactionStatus): React.ReactNode => {
 					xmlns="http://www.w3.org/2000/svg"
 				>
 					<path
-						d="M5 12L10 17L20 7"
+						d="M6 18L18 6M6 6l12 12"
 						stroke="currentColor"
 						strokeWidth="2"
 						strokeLinecap="round"
@@ -97,9 +100,6 @@ const getStatusIcon = (status: TransactionStatus): React.ReactNode => {
 			return null;
 	}
 };
-
-// Configuration for API delays
-const API_DELAY_MS = 1500; // 1.5 second delay before making API calls
 
 const Transactions: React.FC = () => {
 	// Transaction state and modals
@@ -123,7 +123,7 @@ const Transactions: React.FC = () => {
 
 	// Loading states
 	const [isLoading, setIsLoading] = useState<boolean>(true);
-	const [isInitializing, setIsInitializing] = useState<boolean>(true); // New state for initial loading
+	const [isInitializing, setIsInitializing] = useState<boolean>(true);
 	const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 	const [loadingError, setLoadingError] = useState<string | null>(null);
 
@@ -135,39 +135,151 @@ const Transactions: React.FC = () => {
 	const [availableBalance, setAvailableBalance] = useState<string>("0");
 	const [processingPayments, setProcessingPayments] = useState<string>("0");
 	const [totalEarnings, setTotalEarnings] = useState<string>("0");
+	const [, setInstantAvailable] = useState<string>("0");
 	const [withdrawalDetailsModalOpen, setWithdrawalDetailsModalOpen] =
 		useState<boolean>(false);
+
 	// Transaction data
 	const [transactions, setTransactions] = useState<Transaction[]>([]);
 	const [transactionDetails, setTransactionDetails] = useState<any>(null);
-
 	const { currentUser } = useAuth();
+	const [stripeAccountId, setStripeAccountId] = useState<string | null>(null);
+	const [stripeConnected, setStripeConnected] = useState(false);
 
-	// Fetch transactions on component mount with delay
+	// Add this useEffect to fetch the stripeAccountId using the same API as StripeConnect
+	useEffect(() => {
+		const checkStripeStatus = async () => {
+			if (!currentUser?.uid) return;
+
+			try {
+				const response = await fetch(
+					`/api/creator/stripe-status?userId=${currentUser.uid}`
+				);
+				if (response.ok) {
+					const data = await response.json();
+					setStripeConnected(data.connected);
+					setStripeAccountId(data.stripeAccountId || null);
+				} else {
+					setLoadingError("Failed to load Stripe account information");
+				}
+			} catch (error) {
+				console.error("Error fetching Stripe account status:", error);
+				setLoadingError("Failed to load Stripe account information");
+			}
+		};
+
+		checkStripeStatus();
+	}, [currentUser]);
+
+	// Update the existing useEffect to depend on stripeAccountId and stripeConnected
 	useEffect(() => {
 		const initializeData = async () => {
+			if (!currentUser) {
+				setLoadingError("Please log in to view transactions");
+				setIsInitializing(false);
+				return;
+			}
+
+			if (!stripeConnected || !stripeAccountId) {
+				setLoadingError(
+					"Stripe account not connected. Please connect your Stripe account to view transactions."
+				);
+				setIsInitializing(false);
+				return;
+			}
+
 			setIsInitializing(true);
-			
-			// Add delay before fetching data to allow other components to load
-			await new Promise(resolve => setTimeout(resolve, API_DELAY_MS));
-			
+
 			try {
-				await fetchBalanceData();
-				await fetchTransactions();
+				await Promise.all([fetchBalanceData(), fetchTransactions()]);
 			} catch (error) {
 				console.error("Error initializing data:", error);
+				setLoadingError("Failed to load data. Please try again.");
 			} finally {
 				setIsInitializing(false);
 			}
 		};
-		
-		initializeData();
-	}, []);
 
-	// Fetch balance data
+		// Only initialize when we have currentUser and confirmed Stripe connection
+		if (currentUser && stripeConnected && stripeAccountId) {
+			initializeData();
+		} else if (currentUser && stripeConnected === false) {
+			// User is logged in but Stripe is not connected
+			setLoadingError(
+				"Stripe account not connected. Please connect your Stripe account to view transactions."
+			);
+			setIsInitializing(false);
+		}
+	}, [currentUser, stripeConnected, stripeAccountId]); // Add stripeConnected and stripeAccountId as dependencies
+
+	// Update the existing useEffect to depend on stripeAccountId
+	useEffect(() => {
+		const initializeData = async () => {
+			if (!currentUser) {
+				setLoadingError("Please log in to view transactions");
+				setIsInitializing(false);
+				return;
+			}
+
+			if (!stripeAccountId) {
+				setLoadingError("Stripe account not connected");
+				setIsInitializing(false);
+				return;
+			}
+
+			setIsInitializing(true);
+
+			try {
+				await Promise.all([fetchBalanceData(), fetchTransactions()]);
+			} catch (error) {
+				console.error("Error initializing data:", error);
+				setLoadingError("Failed to load data. Please try again.");
+			} finally {
+				setIsInitializing(false);
+			}
+		};
+
+		// Only initialize when we have both currentUser and stripeAccountId
+		if (currentUser && stripeAccountId) {
+			initializeData();
+		} else if (currentUser && stripeAccountId === null) {
+			// Still loading stripeAccountId
+			setIsInitializing(true);
+		}
+	}, [currentUser, stripeAccountId]);
+
+	// Fetch transactions on component mount
+	useEffect(() => {
+		const initializeData = async () => {
+			if (!stripeAccountId) {
+				setLoadingError("Stripe account not connected");
+				setIsInitializing(false);
+				return;
+			}
+
+			setIsInitializing(true);
+
+			try {
+				await Promise.all([fetchBalanceData(), fetchTransactions()]);
+			} catch (error) {
+				console.error("Error initializing data:", error);
+				setLoadingError("Failed to load data. Please try again.");
+			} finally {
+				setIsInitializing(false);
+			}
+		};
+
+		initializeData();
+	}, [stripeAccountId]);
+
+	// Fetch balance data from Stripe
 	const fetchBalanceData = async () => {
+		if (!stripeAccountId) return;
+
 		try {
-			const response = await fetch("/api/creator-transactions/balance?userId=" + currentUser?.uid);
+			const response = await fetch(
+				`/api/stripe/balance?accountId=${stripeAccountId}`
+			);
 
 			if (!response.ok) {
 				throw new Error("Failed to fetch balance data");
@@ -177,27 +289,37 @@ const Transactions: React.FC = () => {
 			setAvailableBalance(data.availableBalance);
 			setProcessingPayments(data.processingPayments);
 			setTotalEarnings(data.totalEarnings);
+			setInstantAvailable(data.instantAvailable || "0");
 		} catch (error) {
 			console.error("Error fetching balance:", error);
 			setLoadingError("Failed to load balance data. Please try again.");
 		}
 	};
 
-	// Fetch transactions
+	// Fetch transactions from Stripe
 	const fetchTransactions = async (resetList = true) => {
+		if (!stripeAccountId) return;
+
 		setIsLoading(true);
 		setLoadingError(null);
 
 		try {
-			let url = currentUser
-				? `/api/creator-transactions?userId=${currentUser.uid}`
-				: "/api/creator-transactions";
+			let url = `/api/stripe/transactions?accountId=${stripeAccountId}&limit=25`;
 
 			// Add pagination params if needed
 			if (!resetList && lastId) {
-				url += `&startAfter=${lastId}`;
-			} else if (!resetList) {
-				url += `?startAfter=${lastId}`;
+				url += `&startingAfter=${lastId}`;
+			}
+
+			// Add type filter
+			if (typeFilter && typeFilter !== "all-types") {
+				url += `&type=${typeFilter}`;
+			}
+
+			// Add date filter
+			if (date) {
+				const timestamp = Math.floor(date.getTime() / 1000);
+				url += `&created=${timestamp}`;
 			}
 
 			const response = await fetch(url);
@@ -224,14 +346,13 @@ const Transactions: React.FC = () => {
 		}
 	};
 
-	// Fetch transaction details with delay
+	// Fetch transaction details from Stripe
 	const fetchTransactionDetails = async (transactionId: string) => {
+		if (!stripeAccountId) return null;
+
 		try {
-			// Add a small delay before fetching transaction details
-			await new Promise(resolve => setTimeout(resolve, 500));
-			
 			const response = await fetch(
-				`/api/creator-transactions/${transactionId}`
+				`/api/stripe/transactions/${transactionId}?accountId=${stripeAccountId}`
 			);
 
 			if (!response.ok) {
@@ -247,6 +368,13 @@ const Transactions: React.FC = () => {
 		}
 	};
 
+	// Refresh data when filters change
+	useEffect(() => {
+		if (!isInitializing && stripeAccountId) {
+			fetchTransactions();
+		}
+	}, [typeFilter, date]);
+
 	const handleExportReport = () => {
 		// Generate the PDF with the current filtered transactions
 		generateTransactionReportPDF(filteredTransactions, {
@@ -261,7 +389,7 @@ const Transactions: React.FC = () => {
 	): Promise<void> => {
 		setSelectedTransaction(transaction);
 
-		// Get full transaction details
+		// Get full transaction details from Stripe
 		const details = await fetchTransactionDetails(transaction.id);
 		setTransactionDetails(details);
 
@@ -285,26 +413,30 @@ const Transactions: React.FC = () => {
 		setConfirmationModalOpen(true);
 	};
 
-	// Handle withdrawal confirmation with delay
+	// Handle withdrawal confirmation - create manual payout via Stripe
 	const handleConfirmWithdrawal = async () => {
-		// Close the confirmation modal
+		if (!stripeAccountId) return;
+
 		setConfirmationModalOpen(false);
 		setIsSubmitting(true);
 
 		try {
-			// Add delay before processing withdrawal
-			await new Promise(resolve => setTimeout(resolve, 800));
-			
-			const response = await fetch("/api/transactions", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					amount: parseFloat(withdrawalInfo.amount),
-					paymentMethod: withdrawalInfo.paymentMethod,
-				}),
-			});
+			const response = await fetch(
+				`/api/stripe/payouts?accountId=${stripeAccountId}`,
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({
+						amount: parseFloat(withdrawalInfo.amount),
+						method:
+							withdrawalInfo.paymentMethod === "instant"
+								? "instant"
+								: "standard",
+					}),
+				}
+			);
 
 			if (!response.ok) {
 				const errorData = await response.json();
@@ -313,17 +445,33 @@ const Transactions: React.FC = () => {
 
 			const data = await response.json();
 
-			// Add the new transaction to the list
-			setTransactions([data.transaction, ...transactions]);
-
-			// Refresh balance data
-			await fetchBalanceData();
+			// Refresh balance and transactions data
+			await Promise.all([fetchBalanceData(), fetchTransactions()]);
 
 			// Show success message
 			toast("Your withdrawal has been submitted successfully");
 
-			// Show the transaction details
-			setSelectedTransaction(data.transaction);
+			// Create a transaction object for the modal
+			const newTransaction: Transaction = {
+				id: data.payout.id,
+				description: "Payout to bank account",
+				date: new Date().toLocaleDateString("en-US", {
+					year: "numeric",
+					month: "short",
+					day: "numeric",
+				}),
+				status: data.payout.status === "paid" ? "Withdrawn" : "Processing",
+				amount: `$${data.payout.amount.toFixed(2)}`,
+				type: "payout",
+				transactionDate: "",
+				userId: "",
+				createdAt: "",
+				lastUpdated: "",
+				isDefault: false,
+			};
+
+			setSelectedTransaction(newTransaction);
+			setTransactionDetails(data.payout);
 			setTransactionModalOpen(true);
 		} catch (error) {
 			console.error("Error processing withdrawal:", error);
@@ -370,7 +518,7 @@ const Transactions: React.FC = () => {
 	}, [searchTerm, typeFilter, statusFilter, transactions]);
 
 	return (
-		<div className="px-4 w-[70rem] mx-auto font-satoshi">
+		<div className="px-4 w-[70rem] mx-auto font-satoshi pt-10">
 			{/* Header with Month Filter and Export/Settings buttons */}
 			<div className="flex justify-between items-center mb-6">
 				<Popover>
@@ -476,8 +624,8 @@ const Transactions: React.FC = () => {
 					disabled={isInitializing}
 				/>
 
-				<Select 
-					value={typeFilter} 
+				<Select
+					value={typeFilter}
 					onValueChange={setTypeFilter}
 					disabled={isInitializing}
 				>
@@ -492,8 +640,8 @@ const Transactions: React.FC = () => {
 					</SelectContent>
 				</Select>
 
-				<Select 
-					value={statusFilter} 
+				<Select
+					value={statusFilter}
 					onValueChange={setStatusFilter}
 					disabled={isInitializing}
 				>

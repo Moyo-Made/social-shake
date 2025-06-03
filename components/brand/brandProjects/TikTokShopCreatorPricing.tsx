@@ -42,7 +42,7 @@ export default function TikTokShopCreatorPricingTab() {
 	const [videosPerCreator, setVideosPerCreator] = useState(
 		creatorPricing.videosPerCreator || 2
 	);
-	const [creatorSelectionMode, setCreatorSelectionMode] = useState("all");
+	const [creatorSelectionMode, setCreatorSelectionMode] = useState("search");
 	const [ageGroup, setAgeGroup] = useState(creatorPricing.ageGroup || "25-34");
 	const [gender, setGender] = useState(creatorPricing.gender || "female");
 	const [industry, setIndustry] = useState(
@@ -213,6 +213,27 @@ export default function TikTokShopCreatorPricingTab() {
 				? selectedCreators.length || invitedCreatorsCount
 				: publicCreatorsCount;
 
+				const creatorPayments: Record<string, {
+					pricePerVideo: number;
+					totalAmount: number;
+					videosOrdered: number;
+					pricingTier: string;
+					needsCustomQuote: boolean;
+				  }> = {};
+				  
+				  if (selectionMethod === "Invite Specific Creators") {
+					selectedCreators.forEach((creator) => {
+					  const pricing = getBestPricing(creator, videosPerCreator);
+					  creatorPayments[creator.id] = {
+						pricePerVideo: pricing.pricePerVideo,
+						totalAmount: pricing.totalPrice, // ← This is your "Your order" amount
+						videosOrdered: videosPerCreator,
+						pricingTier: pricing.tier,
+						needsCustomQuote: !pricing.available
+					  };
+					});
+				  }
+
 		updateCreatorPricing({
 			selectionMethod,
 			selectedCreators,
@@ -247,6 +268,7 @@ export default function TikTokShopCreatorPricingTab() {
 				totalAmount,
 				commissionPerSale: affiliateCommission,
 			},
+			creatorPayments,
 		});
 	};
 

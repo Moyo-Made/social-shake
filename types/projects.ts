@@ -9,6 +9,7 @@ export enum ContestStatus {
 export enum ProjectStatus {
 	PENDING = "pending",
 	ACTIVE = "active",
+	INVITE = "invite",
 	COMPLETED = "completed",
 	REJECTED = "rejected",
 	REQUEST_EDIT = "request_edit",

@@ -329,6 +329,7 @@ const ProjectDashboard = () => {
 			"completed",
 			"pending",
 			"active",
+			"invite",
 			"rejected",
 			"request_edit",
 		];
@@ -338,7 +339,7 @@ const ProjectDashboard = () => {
 
 	const shouldShowSubmissions = (status: string) => {
 		// Only show submissions for active or completed projects
-		return ["active", "ongoing project", "completed"].includes(
+		return ["active", "invite", "ongoing project", "completed"].includes(
 			status.toLowerCase()
 		);
 	};
@@ -551,7 +552,7 @@ const ProjectDashboard = () => {
 									</p>
 								</div>
 
-								{/* Project Details Section - GRID VIEW - UPDATED TO 3 COLUMNS */}
+								{/* Project Details Section - GRID VIEW */}
 								<div className="border-t border-gray-200 pt-4">
 									<div className="grid grid-cols-3 gap-4 mb-6">
 										{/* Project Budget */}
@@ -567,21 +568,23 @@ const ProjectDashboard = () => {
 													Project Budget
 												</p>
 												<p className="text-sm font-normal">
-													${project.budget}/Creator
+													${project.rawData.creatorPricing.cost.totalBudget}
 												</p>
 											</div>
 										</div>
 
 										{/* Creators Required */}
-										<div>
-											<p className="text-sm text-orange-500 font-medium">
-												Creators Required
-											</p>
-											<p className="text-sm font-normal">
-												{project.creatorsRequired}{" "}
-												{project.creatorsRequired > 1 ? "Creators" : "Creator"}
-											</p>
-										</div>
+										{project.rawData?.creatorPricing.selectionMethod ===
+											"Post Public Brief" && (
+											<div>
+												<p className="text-sm text-orange-500 font-medium">
+													Creators Required
+												</p>
+												<p className="text-sm font-normal">
+													{project.creatorsRequired} Creators
+												</p>
+											</div>
+										)}
 
 										{/* Show Creators Applied conditionally */}
 										{shouldShowSubmissions(project.status) && (
@@ -965,21 +968,23 @@ const ProjectDashboard = () => {
 													Project Budget
 												</p>
 												<p className="text-sm font-normal">
-													${project.budget}/Creator
+													${project.rawData.creatorPricing.cost.totalBudget}
 												</p>
 											</div>
 										</div>
 
 										{/* Creators Required */}
-										<div>
-											<p className="text-sm text-orange-500 font-medium">
-												Creators Required
-											</p>
-											<p className="text-sm font-normal">
-												{project.creatorsRequired} Creators
-											</p>
-										</div>
-
+										{project.rawData?.creatorPricing.selectionMethod ===
+											"Post Public Brief" && (
+											<div>
+												<p className="text-sm text-orange-500 font-medium">
+													Creators Required
+												</p>
+												<p className="text-sm font-normal">
+													{project.creatorsRequired} Creators
+												</p>
+											</div>
+										)}
 										{/* Show Creators Applied conditionally */}
 										{shouldShowSubmissions(project.status) && (
 											<div className="flex items-center gap-2">

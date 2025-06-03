@@ -42,7 +42,7 @@ export default function CreatorPricingTab() {
 	const [videosPerCreator, setVideosPerCreator] = useState(
 		creatorPricing.videosPerCreator || 2
 	);
-	const [creatorSelectionMode, setCreatorSelectionMode] = useState("all");
+	const [creatorSelectionMode, setCreatorSelectionMode] = useState("search");
 	const [ageGroup, setAgeGroup] = useState(creatorPricing.ageGroup || "25-34");
 	const [gender, setGender] = useState(creatorPricing.gender || "female");
 	const [industry, setIndustry] = useState(
@@ -298,17 +298,26 @@ export default function CreatorPricingTab() {
 			{ pricePerVideo: number; totalPrice: number; pricingTier: string }
 		> = {};
 
-		const paymentAmounts: Record<string, number> = {};
-
-		if (selectionMethod === "Invite Specific Creators") {
+		const creatorPayments: Record<string, {
+			pricePerVideo: number;
+			totalAmount: number;
+			videosOrdered: number;
+			pricingTier: string;
+			needsCustomQuote: boolean;
+		  }> = {};
+		  
+		  if (selectionMethod === "Invite Specific Creators") {
 			selectedCreators.forEach((creator) => {
-				const pricing = getBestPricing(creator, videosPerCreator);
-				paymentAmounts[creator.id] = pricing.pricePerVideo;
+			  const pricing = getBestPricing(creator, videosPerCreator);
+			  creatorPayments[creator.id] = {
+				pricePerVideo: pricing.pricePerVideo,
+				totalAmount: pricing.totalPrice, // ← This is your "Your order" amount
+				videosOrdered: videosPerCreator,
+				pricingTier: pricing.tier,
+				needsCustomQuote: !pricing.available
+			  };
 			});
-		} else {
-			// For Post Public Brief, all creators get same amount
-			paymentAmounts.defaultAmount = budget;
-		}
+		  }
 
 		if (selectionMethod === "Invite Specific Creators") {
 			selectedCreators.forEach((creator) => {
@@ -350,7 +359,7 @@ export default function CreatorPricingTab() {
 				totalAmount,
 				commissionPerSale: "",
 			},
-			paymentAmounts,
+			creatorPayments,
 		});
 	};
 

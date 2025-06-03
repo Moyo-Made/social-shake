@@ -138,24 +138,9 @@ export default function ProjectDetails({
 					setBrandProfile(data);
 				} else {
 					console.error("Error fetching brand profile:", response.status);
-					// Set default brand profile with placeholders
-					setBrandProfile({
-						id: projectData.userId,
-						userId: projectData.userId,
-						email: "brand@example.com",
-						brandName: "Brand Name",
-						logoUrl: "",
-					});
 				}
 			} catch (error) {
 				console.error("Error in brand profile fetch:", error);
-				setBrandProfile({
-					id: projectData.userId,
-					userId: projectData.userId,
-					email: "brand@example.com",
-					brandName: "Brand Name",
-					logoUrl: "",
-				});
 			} finally {
 				setBrandLoading(false);
 			}
@@ -389,7 +374,7 @@ export default function ProjectDetails({
 						{projectTitle}
 					</h1>
 					<span
-						className={`px-2 py-0.5 rounded-full text-xs whitespace-nowrap ${statusDisplay.className}`}
+						className={`px-2 py-0.5 mt-1.5 rounded-full text-xs whitespace-nowrap ${statusDisplay.className}`}
 					>
 						{statusDisplay.text}
 					</span>
