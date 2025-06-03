@@ -106,6 +106,7 @@ export async function GET(request: NextRequest) {
         projectBatches.push(batch);
       }
       
+      
       const projectPromises = projectBatches.map(batch => 
         adminDb.collection("projects").where("__name__", "in", batch).get()
       );
