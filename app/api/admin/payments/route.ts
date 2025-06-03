@@ -1,20 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore, Timestamp, Query, CollectionReference } from "firebase-admin/firestore";
+import {  Timestamp, Query, CollectionReference } from "firebase-admin/firestore";
+import { adminDb } from "@/config/firebase-admin";
 
-// Initialize Firebase Admin if not already initialized
-if (!getApps().length) {
-  initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    }),
-  });
-}
 
-// Initialize Firestore
-const db = getFirestore();
 
 // TypeScript type definitions
 type Record = {
@@ -55,7 +43,7 @@ export async function GET(request: NextRequest) {
     const userId = url.searchParams.get("userId");
     
     // Set up the base query
-    const paymentsRef: CollectionReference = db.collection("payments");
+    const paymentsRef: CollectionReference = adminDb.collection("payments");
     let queryRef: Query = paymentsRef;
     
     // Filter by userId if provided
@@ -101,7 +89,7 @@ export async function GET(request: NextRequest) {
       }
       
       const contestPromises = contestBatches.map(batch => 
-        db.collection("contests").where("__name__", "in", batch).get()
+        adminDb.collection("contests").where("__name__", "in", batch).get()
       );
       promises.push(Promise.all(contestPromises));
     } else {
@@ -119,7 +107,7 @@ export async function GET(request: NextRequest) {
       }
       
       const projectPromises = projectBatches.map(batch => 
-        db.collection("projects").where("__name__", "in", batch).get()
+        adminDb.collection("projects").where("__name__", "in", batch).get()
       );
       promises.push(Promise.all(projectPromises));
     } else {
