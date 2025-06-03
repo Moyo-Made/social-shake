@@ -114,14 +114,6 @@ const ContestDetailsPage: React.FC = () => {
 						setBrandEmail(data.email);
 					}
 				} else {
-					// Handle 404 or other errors by setting a placeholder
-					setBrandProfile({
-						id: contest.userId,
-						userId: contest.userId,
-						email: "Unknown",
-						brandName: "Unknown Brand",
-						logoUrl: "",
-					});
 				}
 			} catch (error) {
 				console.error(
@@ -349,7 +341,9 @@ const ContestHeader = ({
 		{/* Action buttons */}
 		<div className="flex flex-wrap gap-2 mt-4 md:mt-0">
 			{/* Show Approve Contest button when status is pending or request_edit */}
-			{(contest.status === "pending" || contest.status === "request_edit" || contest.status === "rejected") && (
+			{(contest.status === "pending" ||
+				contest.status === "request_edit" ||
+				contest.status === "rejected") && (
 				<Button
 					onClick={() => initiateAction("activate")}
 					className="px-5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200"

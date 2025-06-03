@@ -190,16 +190,6 @@ const ContestManagement: React.FC = () => {
 					[userId]: data,
 				}));
 			} else {
-				// Handle 404 or other errors by setting a placeholder
-				setBrandProfiles((prev) => ({
-					...prev,
-					[userId]: {
-						id: userId,
-						userId,
-						email: "Unknown",
-						brandName: "Unknown Brand",
-					},
-				}));
 			}
 		} catch (error) {
 			console.error(
@@ -207,15 +197,6 @@ const ContestManagement: React.FC = () => {
 				error
 			);
 			// Set placeholder data on error
-			setBrandProfiles((prev) => ({
-				...prev,
-				[userId]: {
-					id: userId,
-					userId,
-					email: "Unknown",
-					brandName: "Unknown Brand",
-				},
-			}));
 		} finally {
 			setLoadingBrands((prev) => {
 				const updated = { ...prev };

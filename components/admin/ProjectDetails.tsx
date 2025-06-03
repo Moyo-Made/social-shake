@@ -90,14 +90,7 @@ const ProjectDetailsPage: React.FC = () => {
 						setBrandEmail(data.email);
 					}
 				} else {
-					// Handle 404 or other errors by setting a placeholder
-					setBrandProfile({
-						id: project.userId,
-						userId: project.userId,
-						email: "Unknown",
-						brandName: "Unknown Brand",
-						logoUrl: "",
-					});
+		
 				}
 
 			} catch (err) {

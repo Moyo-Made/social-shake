@@ -15,6 +15,8 @@ const VideoComponent = ({
 }: VideoComponentProps) => {
 	const videoRef = useRef<HTMLVideoElement | null>(null);
 	const [, setShowControls] = useState(true);
+	const [isLoading, setIsLoading] = useState(true);
+const [, setHasError] = useState(false);
 
 	const handleVideoClick = (e: {
 		preventDefault: () => void;
@@ -42,7 +44,14 @@ const VideoComponent = ({
 			className="relative cursor-pointer rounded-lg overflow-hidden mt-4"
 			onMouseEnter={handleMouseEnter}
 			onMouseLeave={handleMouseLeave}
+
 		>
+
+{isLoading && (
+  <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
+    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+  </div>
+)}
 			<video
 				ref={videoRef}
 				src={creator.aboutMeVideoUrl}
@@ -55,7 +64,11 @@ const VideoComponent = ({
 				onClick={handleVideoClick}
 				controls={false}
 				preload="metadata"
-				muted // Ensures it won't autoplay with sound
+				muted 
+				onError={() => {
+					setIsLoading(false);
+					setHasError(true);
+				  }}
 			>
 				<p>Your browser doesn&apos;t support HTML video.</p>
 			</video>
