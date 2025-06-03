@@ -100,6 +100,7 @@ const defaultProfileData: CreatorProfileData = {
 	profilePictureUrl: null,
 	aboutMeVideo: null,
 	abnNumber: "",
+	language: ""
 };
 
 const CreatorVerificationContext = createContext<
