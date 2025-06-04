@@ -115,9 +115,9 @@ export async function POST(request: NextRequest) {
 
 				if (submissionId && projectId) {
 					try {
-						// Update submission status to approved in payment_submissions collection
+						// Update submission status to approved in project_submissions collection
 						await adminDb
-							.collection("payment_submissions")
+							.collection("project_submissions")
 							.doc(submissionId)
 							.update({
 								status: "approved",

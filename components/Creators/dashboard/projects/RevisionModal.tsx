@@ -17,7 +17,7 @@ interface RevisionModalProps {
 	isOpen: boolean;
 	onClose: () => void;
 	submissionId: string;
-	onRevisionSubmit?: () => void; // Added callback to trigger refresh in parent
+	onRevisionSubmit?: (newSubmissionData: { id: string; status: string }) => void;
 }
 
 const RevisionModal: React.FC<RevisionModalProps> = ({
@@ -205,13 +205,11 @@ const RevisionModal: React.FC<RevisionModalProps> = ({
 
 			// Trigger refresh in parent component if callback exists
 			if (onRevisionSubmit) {
-				onRevisionSubmit();
+				onRevisionSubmit(data);
 			}
 
 			onClose();
 
-			// Refresh the page to reflect the changes
-			window.location.reload();
 		} catch (error) {
 			console.error("Error submitting revision:", error);
 			toast.error(

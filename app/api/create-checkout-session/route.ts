@@ -17,6 +17,9 @@ export async function POST(request: NextRequest) {
 			userEmail,
 			userId,
 			paymentType = "contest", // Default for backward compatibility
+			// Add these new parameters for proper pricing calculation
+			projectFormData,
+			submissionData,
 		} = await request.json();
 
 		if (!amount || !paymentId || !userEmail) {
@@ -62,7 +65,30 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		// Determine payment details based on type
+		// Calculate the correct payment amount based on the same logic as frontend
+		let calculatedAmount = parseFloat(amount);
+		
+		if (paymentType === "submission_approval" && projectFormData && submissionData) {
+			if (projectFormData.creatorPricing?.selectionMethod === "Invite Specific Creators") {
+				// Get the creator's payment data using their ID as the key
+				const creatorPaymentData = projectFormData.creatorPricing.creatorPayments?.[submissionData.userId];
+				
+				if (creatorPaymentData) {
+					// For bulk pricing, use price per video
+					if (creatorPaymentData.pricingTier === "bulk rate") {
+						calculatedAmount = creatorPaymentData.pricePerVideo || 0;
+					} else {
+						// For other pricing tiers, use total amount
+						calculatedAmount = creatorPaymentData.totalAmount || 0;
+					}
+				}
+			} else {
+				// For non-specific creator selection, use budget per video
+				calculatedAmount = projectFormData.creatorPricing?.budgetPerVideo || 0;
+			}
+		}
+
+		// Determine payment details based on type with better fallback logic
 		let productName = "";
 		let productDescription = "";
 		let successUrl = "";
@@ -70,8 +96,15 @@ export async function POST(request: NextRequest) {
 
 		switch (paymentType) {
 			case "submission_approval":
-				productName = `Submission Approval - ${projectTitle || paymentData?.projectTitle || "Project"}`;
-				productDescription = `Payment for approved submission`;
+				// Better fallback chain for project title
+				const submissionProjectTitle = submissionData?.projectTitle || 
+											   paymentData?.projectTitle || 
+											   projectFormData?.projectDetails?.projectName ||
+											   projectTitle || 
+											   "Project";
+				
+				productName = `Submission Approval - ${submissionProjectTitle}`;
+				productDescription = `Payment for approved submission in project: ${submissionProjectTitle}`;
 				successUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-success?payment_id=${paymentId}&session_id={CHECKOUT_SESSION_ID}&type=project`;
 				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/project/new?canceled=true`;
 				break;
@@ -82,17 +115,23 @@ export async function POST(request: NextRequest) {
 				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/videos?canceled=true`;
 				break;
 			case "project":
-				productName =
-					projectTitle || paymentData?.projectTitle || "Project Payment";
-				productDescription = `Payment for project: ${productName}`;
+				const projectName = projectTitle || 
+								   paymentData?.projectTitle || 
+								   projectFormData?.projectDetails?.projectName ||
+								   "Project Payment";
+				productName = projectName;
+				productDescription = `Payment for project: ${projectName}`;
 				successUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-success?payment_id=${paymentId}&session_id={CHECKOUT_SESSION_ID}&type=project`;
 				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/project/new?canceled=true`;
 				break;
 			case "contest":
 			default:
-				productName =
-					contestTitle || paymentData?.contestName || "Contest Payment";
-				productDescription = `Payment for contest: ${productName}`;
+				const contestName = contestTitle || 
+								   paymentData?.contestName || 
+								   paymentData?.contestTitle ||
+								   "Contest Payment";
+				productName = contestName;
+				productDescription = `Payment for contest: ${contestName}`;
 				successUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-success?payment_id=${paymentId}&session_id={CHECKOUT_SESSION_ID}&type=contest`;
 				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/contest/new?canceled=true`;
 				break;
@@ -107,6 +146,7 @@ export async function POST(request: NextRequest) {
 				paymentType,
 				paymentName: productName,
 				description: productDescription,
+				calculatedAmount: calculatedAmount.toString(), // Store the calculated amount
 				// Add specific metadata based on payment type
 				...(paymentType === "video" && paymentData && {
 					videoId: paymentData.videoId,
@@ -137,7 +177,7 @@ export async function POST(request: NextRequest) {
 			};
 		}
 
-		// Create a Stripe checkout session
+		// Create a Stripe checkout session with the calculated amount
 		const session = await stripe.checkout.sessions.create({
 			payment_method_types: ["card"],
 			line_items: [
@@ -148,7 +188,7 @@ export async function POST(request: NextRequest) {
 							name: productName,
 							description: productDescription,
 						},
-						unit_amount: Math.round(parseFloat(amount) * 100), // Convert to cents
+						unit_amount: Math.round(calculatedAmount * 100), // Use calculated amount and convert to cents
 					},
 					quantity: 1,
 				},
@@ -164,6 +204,7 @@ export async function POST(request: NextRequest) {
 				paymentType,
 				paymentName: productName,
 				description: productDescription,
+				calculatedAmount: calculatedAmount.toString(),
 				// Add specific metadata based on payment type
 				...(paymentType === "video" && paymentData && {
 					videoId: paymentData.videoId,
@@ -186,13 +227,14 @@ export async function POST(request: NextRequest) {
 			},
 		});
 
-		// Update payment record with sessionId
+		// Update payment record with sessionId and calculated amount
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const updateData: any = {
 			stripeSessionId: session.id,
 			updatedAt: new Date().toISOString(),
 			paymentType,
 			paymentName: productName,
+			calculatedAmount, // Store the calculated amount in the payment record
 		};
 
 		await adminDb.collection("payments").doc(paymentId).update(updateData);
@@ -225,7 +267,7 @@ export async function POST(request: NextRequest) {
 				type: notificationType,
 				creatorId: paymentData.creatorId,
 				brandId: userId,
-				amount: parseFloat(amount),
+				amount: calculatedAmount, // Use calculated amount
 				paymentId,
 				sessionId: session.id,
 				status: "pending_payment",
@@ -250,6 +292,7 @@ export async function POST(request: NextRequest) {
 			paymentType,
 			directPayment: requiresCreatorAccount,
 			creatorConnected: !!paymentData?.stripeConnectId,
+			calculatedAmount, // Return the calculated amount for debugging
 		});
 	} catch (error) {
 		console.error("Error creating checkout session:", error);

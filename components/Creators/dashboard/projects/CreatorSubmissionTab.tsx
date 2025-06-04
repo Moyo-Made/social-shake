@@ -64,6 +64,19 @@ export default function CreatorSubmissionTab({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [currentUser, projectId]);
 
+
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const handleRevisionSubmit = (newSubmissionData: any) => {
+    // Update your submissions state with the new data
+    setSubmissionsList(prevSubmissions => 
+        prevSubmissions.map(submission => 
+            submission.id === newSubmissionData.id 
+                ? newSubmissionData 
+                : submission
+        )
+    );
+};
+
 	// Fetch tiktok links for submissions that need them
 	useEffect(() => {
 		const fetchTiktokLink = async () => {
@@ -840,6 +853,7 @@ export default function CreatorSubmissionTab({
 						isOpen={isRevisionModalOpen}
 						onClose={() => setIsRevisionModalOpen(false)}
 						submissionId={selectedSubmissionId}
+						onRevisionSubmit={handleRevisionSubmit}
 					/>
 				</div>
 			)}

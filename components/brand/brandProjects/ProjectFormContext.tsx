@@ -18,6 +18,7 @@ import React, {
 import { loadStripe } from "@stripe/stripe-js";
 import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
 // Define stripePromise
 const stripePromise = loadStripe(
@@ -107,6 +108,7 @@ const defaultFormData: ProjectFormData = {
 	paymentAmount: null,
 	projectTitle: "",
 	brandEmail: "",
+	projectName: undefined
 };
 
 interface ProjectFormContextType {
@@ -465,16 +467,15 @@ export const ProjectFormProvider: React.FC<{
 
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const triggerPaymentIntent = async (amount: number, submission: any) => {
-		console.log("Payment intent triggered");
 		try {
 			setIsLoading(true);
 			setSubmissionError(null);
 			setValidationError(null);
-
+	
 			// Validate required fields before making the request
 			const userId = formData.userId || submission.brandId || submission.userId;
 			const userEmail = currentUser?.email || "";
-
+	
 			if (!userId) {
 				setSubmissionError(
 					"User ID is required but not found in formData or submission"
@@ -482,36 +483,36 @@ export const ProjectFormProvider: React.FC<{
 				setIsLoading(false);
 				return;
 			}
-
+	
 			if (!amount || amount <= 0) {
 				setSubmissionError("Valid payment amount is required");
 				setIsLoading(false);
 				return;
 			}
-
+	
 			if (!userEmail) {
 				setSubmissionError("User email is required but not found");
 				setIsLoading(false);
 				return;
 			}
-
+	
 			// Validate submission ID exists
 			if (!submission.id) {
 				setSubmissionError("Submission ID is required but not found");
 				setIsLoading(false);
 				return;
 			}
-
+	
 			console.log("Creating payment intent with:", {
 				userId,
 				amount,
 				userEmail,
 				submissionId: submission.id,
 			});
-
+	
 			// Save current state before payment
 			saveCurrentState();
-
+	
 			// Save form data to sessionStorage for recovery after payment
 			const completeFormData = {
 				...formData,
@@ -522,8 +523,38 @@ export const ProjectFormProvider: React.FC<{
 				"projectFormData",
 				JSON.stringify(completeFormData)
 			);
-
-			// SIMPLIFIED: Create payment intent with minimal required data
+	
+			// Enhanced project title extraction with more fallback options
+			const getProjectTitle = () => {
+				// Try multiple possible locations for the project title
+				const possibleTitles = [
+					// From submission data
+					submission.projectFormData?.projectDetails?.projectName,
+					submission.projectFormData?.projectTitle,
+					submission.projectName,
+					submission.projectTitle,
+					// From form data
+					formData.projectDetails?.projectName,
+					formData.projectTitle,
+					formData.projectName,
+					// From nested submission data
+					submission.submissionData?.projectTitle,
+					submission.submissionData?.projectFormData?.projectDetails?.projectName,
+				];
+	
+				// Return the first non-empty title found
+				for (const title of possibleTitles) {
+					if (title && typeof title === 'string' && title.trim() !== '') {
+						return title.trim();
+					}
+				}
+	
+				return "Untitled Project";
+			};
+	
+			const projectTitle = getProjectTitle();
+	
+			// Create payment intent with minimal required data
 			// The endpoint will auto-fetch creatorId, projectId, etc. from the submission
 			const paymentFormData = new FormData();
 			paymentFormData.append("userId", userId);
@@ -531,34 +562,38 @@ export const ProjectFormProvider: React.FC<{
 			paymentFormData.append("amount", amount.toString());
 			paymentFormData.append("paymentType", "submission_approval");
 			paymentFormData.append("submissionId", submission.id); // This is the key field
-
-			// Optional: You can still include these for fallback, but they're not required anymore
-			paymentFormData.append(
-				"projectTitle",
-				formData.projectDetails?.projectName ||
-					submission.projectName ||
-					submission.projectTitle ||
-					"Untitled Project"
-			);
-
+			paymentFormData.append("projectTitle", projectTitle);
+	
 			console.log("Simplified Payment FormData being sent:");
 			for (const [key, value] of paymentFormData.entries()) {
 				console.log(`${key}: ${value}`);
 			}
-
+	
+			const stripeAccountResponse = await axios.get(
+				`/api/creator/stripe-status?userId=${userId}`
+			);
+			if (!stripeAccountResponse.data.connected) {
+				// Add your toast message here
+				toast.error("Creator hasn't connected their Stripe account. Please ask them to connect it first.", {
+					duration: 5000
+				});
+				setIsLoading(false);
+				return;
+			}
+	
 			const paymentResponse = await axios.post(
 				"/api/create-payment-intent",
 				paymentFormData
 			);
-
+	
 			if (!paymentResponse.data.success) {
 				throw new Error(
 					paymentResponse.data.error || "Failed to initiate payment"
 				);
 			}
-
+	
 			const { paymentId } = paymentResponse.data;
-
+	
 			// Step 2: Initialize Stripe checkout with the payment ID
 			const stripe = await stripePromise;
 			if (!stripe) {
@@ -568,39 +603,42 @@ export const ProjectFormProvider: React.FC<{
 				setIsLoading(false);
 				return;
 			}
-
+	
 			// Create a checkout session
 			const checkoutData = {
 				amount: amount,
 				paymentId: paymentId,
-				projectTitle:
-					formData.projectDetails?.projectName || formData.projectTitle ||
-					submission.projectName ||
-					submission.projectTitle ||
-					"Untitled Project",
+				projectTitle: projectTitle, // Use the extracted project title
 				userEmail: userEmail,
 				userId: userId,
 				paymentType: "submission_approval",
+				// Include additional data for better context
+				projectFormData: submission.projectFormData || formData,
+				submissionData: {
+					userId: submission.userId,
+					projectTitle: projectTitle,
+					...submission
+				},
 			};
-
+	
 			console.log("Checkout session data being sent:", checkoutData);
-
+	
 			const response = await axios.post(
 				"/api/create-checkout-session",
 				checkoutData
 			);
-
+	
 			const { sessionId } = response.data;
-
+	
 			// Redirect to Stripe checkout
 			const { error } = await stripe.redirectToCheckout({ sessionId });
-
+	
 			if (error) {
 				console.error("Error redirecting to checkout:", error);
 				setSubmissionError("Payment initiation failed. Please try again.");
 				setIsLoading(false);
 			}
-
+	
 			// On success, clear saved step (happens after redirect)
 			sessionStorage.removeItem("projectFormStep");
 		} catch (error) {

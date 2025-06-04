@@ -292,44 +292,47 @@ export default function ProjectSubmissions({
 		}
 	};
 
-	const handleApprove = async () => {
-		if (currentSubmission) {
-			let creatorPayments = 0;
+	// Replace the handleApprove function in your ProjectSubmissions component with this:
 
-			if (
-				projectFormData.creatorPricing.selectionMethod ===
-				"Invite Specific Creators"
-			) {
-				// Get the creator's payment data using their ID as the key
-				const creatorPaymentData =
-					projectFormData.creatorPricing.creatorPayments?.[
-						currentSubmission.userId
-					];
+const handleApprove = async () => {
+	if (currentSubmission) {
+		let creatorPayments = 0;
 
-				creatorPayments = creatorPaymentData?.totalAmount || 0;
-			} else {
-				creatorPayments = projectFormData.creatorPricing.budgetPerVideo || 0;
-			}
+		if (
+			projectFormData.creatorPricing.selectionMethod ===
+			"Invite Specific Creators"
+		) {
+			// Get the creator's payment data using their ID as the key
+			const creatorPaymentData =
+				projectFormData.creatorPricing.creatorPayments?.[
+					currentSubmission.userId
+				];
 
-			try {
-				// Only trigger payment - webhook handles the rest
-				await triggerPaymentIntent(creatorPayments, {
-					...currentSubmission,
-					type: "submission_approval",
-					submissionId: currentSubmission.id,
-				});
-
-				await updateSubmissionStatus(currentSubmission.id, "approved");
-
-				// Close dialog and show loading state
-				setOpenApproveDialog(false);
-				toast("Processing payment...");
-			} catch (error) {
-				console.error("Error initiating payment:", error);
-				toast.error("Failed to initiate payment");
-			}
+			creatorPayments = creatorPaymentData?.totalAmount || 0;
+		} else {
+			creatorPayments = projectFormData.creatorPricing.budgetPerVideo || 0;
 		}
-	};
+
+		try {
+			// Pass the projectFormData and submission data to the payment intent
+			await triggerPaymentIntent(creatorPayments, {
+				...currentSubmission,
+				type: "submission_approval",
+				submissionId: currentSubmission.id,
+				// Add the project form data and submission data
+				projectFormData: projectFormData,
+				submissionData: currentSubmission,
+			});
+
+			// Close dialog and show loading state
+			setOpenApproveDialog(false);
+			toast("Processing payment...");
+		} catch (error) {
+			console.error("Error initiating payment:", error);
+			toast.error("Failed to initiate payment");
+		}
+	}
+};
 
 	const handleRequestSparkCode = async (submission: CreatorSubmission) => {
 		// First update the status to spark_requested and don't change it automatically

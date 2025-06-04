@@ -10,7 +10,7 @@ export async function GET() {
       throw new Error("Firebase admin database is not initialized");
     }
 
-    // Get total users count (brands + creators)
+    // Get total brands count
     const brandProfilesSnapshot = await adminDb.collection("brandProfiles").count().get();
     const totalBrands = brandProfilesSnapshot.data().count;
 
@@ -21,10 +21,26 @@ export async function GET() {
       .get();
     const pendingBrands = pendingBrandsSnapshot.data().count;
 
-    // Get creator count and pending creators
-    const creatorVerificationsSnapshot = await adminDb.collection("creator_verifications").count().get();
-    const totalCreators = creatorVerificationsSnapshot.data().count;
+    // Get total creators count using the same logic as the creators endpoint
+    // This ensures consistency between admin stats and creator listing
+    const allVerificationsSnapshot = await adminDb.collection("creator_verifications").get();
+    
+    // Group by email/userId to get unique creators (same logic as creators endpoint)
+    const creatorGroups = new Map();
+    allVerificationsSnapshot.docs.forEach(doc => {
+      const verificationData = doc.data();
+      const userId = verificationData.userId;
+      const email = verificationData.profileData?.email || verificationData.email;
+      const groupKey = email || userId;
+      
+      if (groupKey && !creatorGroups.has(groupKey)) {
+        creatorGroups.set(groupKey, true);
+      }
+    });
+    
+    const totalCreators = creatorGroups.size;
 
+    // Get pending creators count
     const pendingCreatorsSnapshot = await adminDb.collection("creator_verifications")
       .where("status", "==", "pending")
       .count()
@@ -232,9 +248,11 @@ export async function GET() {
       };
     });
 
-    // Build the response
+    // Build the response with separate brand and creator counts
     const stats = {
       totalUsers: totalBrands + totalCreators,
+      totalBrands,
+      totalCreators,
       pendingBrands,
       pendingCreators,
       activeProjects,
