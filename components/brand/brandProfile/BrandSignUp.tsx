@@ -211,11 +211,11 @@ const BusinessSignup = () => {
 						{/* Terms and Privacy */}
 						<p className="text-sm text-center text-gray-600 mt-6">
 							By signing up, you confirm that you have read and agree to our{" "}
-							<Link href="#" className="text-[#FD5C02] hover:underline">
+							<Link href="/privacy-policy" className="text-[#FD5C02] hover:underline">
 								Privacy Policy
 							</Link>{" "}
 							and{" "}
-							<Link href="#" className="text-[#FD5C02] hover:underline">
+							<Link href="/terms-of-use" className="text-[#FD5C02] hover:underline">
 								Terms of Use
 							</Link>
 						</p>

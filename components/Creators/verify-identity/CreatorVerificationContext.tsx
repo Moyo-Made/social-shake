@@ -759,6 +759,7 @@ export const CreatorVerificationProvider = ({
 				socialMedia: updatedData.socialMedia,
 				pricing: updatedData.pricing,
 				abnNumber: updatedData.abnNumber || null,
+				language: updatedData.language,
 			};
 
 			// Save to local storage

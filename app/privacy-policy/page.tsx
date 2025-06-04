@@ -24,7 +24,7 @@ const PrivacyPolicyPage = () => {
           </p>
           
           <div className="bg-orange-50 p-6 rounded-lg mb-8">
-            <h2 className="text-xl font-semibold text-orange-600 mb-4">Key Summary</h2>
+            <h2 className="text-lg font-semibold text-orange-600 mb-2">Key Summary</h2>
             <p className="text-gray-700 mb-4">
               This Privacy Policy outlines how Social Shake collects, uses, and protects your personal information. 
               By using our app, you agree to the following key points:
@@ -41,11 +41,11 @@ const PrivacyPolicyPage = () => {
             <p className="text-gray-700 mt-4">For detailed information, please review the full Privacy Policy below.</p>
           </div>
           
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-orange-600 mb-4">1. Information We Collect</h2>
+          <section className="mb-5">
+            <h2 className="text-lg font-bold text-orange-600 mb-2">1. Information We Collect</h2>
             <p className="text-gray-700 mb-4">We collect two types of information:</p>
             
-            <h3 className="text-xl font-semibold text-gray-800 mb-3">Personal Information</h3>
+            <h3 className="text-base font-semibold text-gray-800 mb-2">Personal Information</h3>
             <p className="text-gray-700 mb-3">
               Personal information refers to information that can identify you as an individual. This may include:
             </p>
@@ -55,7 +55,7 @@ const PrivacyPolicyPage = () => {
               <li><span className="font-medium">Social Media Account Information:</span> If you link your Social Shake account with your social media profiles (e.g., Facebook, Instagram), we may collect information from those accounts such as your social media handle, followers, posts, or shared content.</li>
             </ul>
             
-            <h3 className="text-xl font-semibold text-gray-800 mb-3">Usage and Device Information</h3>
+            <h3 className="text-base font-semibold text-gray-800 mb-2">Usage and Device Information</h3>
             <p className="text-gray-700 mb-3">
               We also collect non-personal information related to your use of the app, such as:
             </p>
@@ -66,8 +66,8 @@ const PrivacyPolicyPage = () => {
             </ul>
           </section>
           
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-orange-600 mb-4">2. How We Use Your Information</h2>
+          <section className="mb-5">
+            <h2 className="text-lg font-bold text-orange-600 mb-2">2. How We Use Your Information</h2>
             <p className="text-gray-700 mb-3">
               We use the information we collect for the following purposes:
             </p>
@@ -81,8 +81,8 @@ const PrivacyPolicyPage = () => {
             </ul>
           </section>
           
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-orange-600 mb-4">3. Sharing Your Information</h2>
+          <section className="mb-5">
+            <h2 className="text-lg font-bold text-orange-600 mb-2">3. Sharing Your Information</h2>
             <p className="text-gray-700 mb-3">
               We may share your information in the following ways:
             </p>
@@ -94,8 +94,8 @@ const PrivacyPolicyPage = () => {
             </ul>
           </section>
           
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-orange-600 mb-4">4. Your Data Rights and Choices</h2>
+          <section className="mb-5">
+            <h2 className="text-lg font-bold text-orange-600 mb-2">4. Your Data Rights and Choices</h2>
             <p className="text-gray-700 mb-3">
               You have certain rights regarding your personal information:
             </p>
@@ -107,8 +107,8 @@ const PrivacyPolicyPage = () => {
             </ul>
           </section>
           
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-orange-600 mb-4">5. Data Security</h2>
+          <section className="mb-5">
+            <h2 className="text-lg font-bold text-orange-600 mb-2">5. Data Security</h2>
             <p className="text-gray-700">
               We take reasonable measures to protect your information from unauthorized access, alteration, or disclosure. 
               However, no method of transmission over the internet or method of electronic storage is 100% secure. 
@@ -116,16 +116,16 @@ const PrivacyPolicyPage = () => {
             </p>
           </section>
           
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-orange-600 mb-4">6. International Data Transfers</h2>
+          <section className="mb-5">
+            <h2 className="text-lg font-bold text-orange-600 mb-2">6. International Data Transfers</h2>
             <p className="text-gray-700">
               Your information may be transferred to and maintained on servers located outside of your country of residence. 
               By using our app, you consent to the transfer of your information to locations outside of your country, which may have different data protection laws than your home country.
             </p>
           </section>
           
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-orange-600 mb-4">7. Children&apos;s Privacy</h2>
+          <section className="mb-5">
+            <h2 className="text-lg font-bold text-orange-600 mb-2">7. Children&apos;s Privacy</h2>
             <p className="text-gray-700">
               Social Shake is not intended for children under the age of 13. We do not knowingly collect or solicit personal 
               information from children under 13. If we learn that we have inadvertently collected personal information from a child under 13, 
@@ -133,14 +133,14 @@ const PrivacyPolicyPage = () => {
             </p>
           </section>
           
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-orange-600 mb-4">8. GDPR Rights (For Users in the European Union)</h2>
+          <section className="mb-5">
+            <h2 className="text-lg font-bold text-orange-600 mb-2">8. GDPR Rights (For Users in the European Union)</h2>
             <p className="text-gray-700 mb-4">
               If you are located in the European Union (EU), your personal data is protected under the General Data Protection Regulation (GDPR). 
               The GDPR provides you with several rights regarding your personal data, including the following:
             </p>
             
-            <h3 className="text-xl font-semibold text-gray-800 mb-3">Your Rights Under the GDPR</h3>
+            <h3 className="text-base font-semibold text-gray-800 mb-2">Your Rights Under the GDPR</h3>
             <ul className="list-disc pl-6 text-gray-700 space-y-2 mb-4">
               <li><span className="font-medium">Right to Access:</span> You have the right to request access to the personal data we hold about you. This includes information about how we use your data, who we share it with, and how long we retain it.</li>
               <li><span className="font-medium">Right to Rectification:</span> If your personal data is inaccurate or incomplete, you have the right to request that we correct or update it.</li>
@@ -151,7 +151,7 @@ const PrivacyPolicyPage = () => {
               <li><span className="font-medium">Right to Withdraw Consent:</span> If we rely on your consent to process your personal data, you have the right to withdraw that consent at any time. This will not affect the lawfulness of processing based on consent before its withdrawal.</li>
             </ul>
             
-            <h3 className="text-xl font-semibold text-gray-800 mb-3">How to Exercise Your GDPR Rights</h3>
+            <h3 className="text-base font-semibold text-gray-800 mb-2">How to Exercise Your GDPR Rights</h3>
             <p className="text-gray-700 mb-4">
               To exercise any of the rights listed above, please contact us at:
             </p>
@@ -165,7 +165,7 @@ const PrivacyPolicyPage = () => {
               Please note that some rights may be limited in certain circumstances, such as when we need to retain data for legal or contractual reasons.
             </p>
             
-            <h3 className="text-xl font-semibold text-gray-800 mb-3">Right to Lodge a Complaint</h3>
+            <h3 className="text-base font-semibold text-gray-800 mb-2">Right to Lodge a Complaint</h3>
             <p className="text-gray-700">
               If you believe that we have not adequately addressed your concerns or complied with the GDPR, 
               you have the right to lodge a complaint with a supervisory authority in your country of residence. 
@@ -173,8 +173,8 @@ const PrivacyPolicyPage = () => {
             </p>
           </section>
           
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold text-orange-600 mb-4">9. Changes to This Privacy Policy</h2>
+          <section className="mb-5">
+            <h2 className="text-lg font-bold text-orange-600 mb-2">9. Changes to This Privacy Policy</h2>
             <p className="text-gray-700">
               We may update this Privacy Policy from time to time. Any changes will be posted on this page with an updated &quot;Effective Date&quot; at the top. 
               We encourage you to review this Privacy Policy periodically to stay informed about how we are protecting your information.
@@ -182,7 +182,7 @@ const PrivacyPolicyPage = () => {
           </section>
           
           <section>
-            <h2 className="text-2xl font-bold text-orange-600 mb-4">10. Contact Us</h2>
+            <h2 className="text-lg font-bold text-orange-600 mb-2">10. Contact Us</h2>
             <p className="text-gray-700">
               If you have any questions or concerns about this Privacy Policy or how we handle your personal data, please contact us at:
             </p>

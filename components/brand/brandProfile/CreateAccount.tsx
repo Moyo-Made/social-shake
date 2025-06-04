@@ -541,11 +541,11 @@ const CreateAccount: React.FC = () => {
 
 							<p className="text-sm text-center text-[#000] pt-3">
 								By signing up, you confirm that you have read and agree to our{" "}
-								<Link href="#" className="text-[#FD5C02] underline">
+								<Link href="/privacy-policy" className="text-[#FD5C02] underline">
 									Privacy Policy
 								</Link>{" "}
 								and{" "}
-								<Link href="#" className="text-[#FD5C02] underline">
+								<Link href="terms-of-use" className="text-[#FD5C02] underline">
 									Terms of Use
 								</Link>
 								.

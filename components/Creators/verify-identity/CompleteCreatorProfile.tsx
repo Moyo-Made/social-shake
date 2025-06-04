@@ -434,15 +434,15 @@ const CompleteCreatorProfile = () => {
 	};
 
 	const handleCountryChange = (value: string) => {
-		setSelectedCountry(value);
-		clearFieldError("country");
-		updateProfileData({ country: value });
-
-		// Clear ABN when country changes from Australia
+		// Clear ABN when changing away from Australia
 		if (selectedCountry === "Australia" && value !== "Australia") {
 			setAbnNumber("");
 			updateProfileData({ abnNumber: "" });
 		}
+		
+		setSelectedCountry(value);
+		clearFieldError("country");
+		updateProfileData({ country: value });
 	};
 
 	const handleAbnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -910,20 +910,6 @@ const CompleteCreatorProfile = () => {
 			</div>
 			{renderFieldError("country")}
 
-			{/* Your Language? */}
-			<label className="block text-base font-medium text-gray-700 mt-4">
-				Your Language
-			</label>
-			<Input
-				className={`mt-1 placeholder:text-[#667085] ${fieldErrors.language ? "border-red-500" : ""}`}
-				placeholder="English"
-				value={language}
-				onChange={(e) => handleTextInputChange(e, "language")}
-				onBlur={() => handleBlur("language")}
-			/>
-			{renderFieldError("language")}
-
-
 			{/* ABN Field - Add this after the country selection */}
 			{selectedCountry === "Australia" && (
 				<div className="space-y-1 mt-4">
@@ -943,6 +929,20 @@ const CompleteCreatorProfile = () => {
 					</p>
 				</div>
 			)}
+
+			{/* Your Language? */}
+			<label className="block text-base font-medium text-gray-700 mt-4">
+				Your Language
+			</label>
+			<Input
+				className={`mt-1 placeholder:text-[#667085] ${fieldErrors.language ? "border-red-500" : ""}`}
+				placeholder="English"
+				value={language}
+				onChange={(e) => handleTextInputChange(e, "language")}
+				onBlur={() => handleBlur("language")}
+			/>
+			{renderFieldError("language")}
+
 
 			{/* Best Tiktok Links */}
 			<div className="space-y-1 mt-4">
