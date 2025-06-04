@@ -317,7 +317,7 @@ const Transactions: React.FC = () => {
 					</h2>
 				</Card>
 			</div>
-			<div className="mx-10 mx-auto">
+			<div className="mx-10">
 				{/* Filters Section - Only show if there are transactions */}
 				{hasTransactions && (
 					<div className="flex justify-between items-center mb-4">
@@ -480,7 +480,7 @@ const Transactions: React.FC = () => {
 
 			{/* Pagination Controls - Only show if there are transactions */}
 			{hasTransactions && (
-				<div className="flex justify-between items-center mt-4 mx-10 mb-5">
+				<div className="flex justify-between items-center mt-4 mx-10 pb-5">
 					<div className="text-sm text-gray-500">Page {currentPage}</div>
 					<div className="flex gap-2">
 						<Button

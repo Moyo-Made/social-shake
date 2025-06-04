@@ -11,31 +11,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { db } from "@/config/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/context/AuthContext";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-import TicketConfirmation from "./TicketConfirmation";
+import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 
 export default function ContactSupportForm() {
-  const [issueType, setIssueType] = useState("");
-  const [subject, setSubject] = useState("");
-  const [description, setDescription] = useState("");
+  const [formData, setFormData] = useState({
+	issueType: "",
+	subject: "",
+	description: "",
+	fullName: "",
+	email: ""
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
-  const [submittedTicketId, setSubmittedTicketId] = useState<string | null>(null);
+  const [submitStatus, setSubmitStatus] = useState<'success' | 'error' | null>(null);
+  const [charCount, setCharCount] = useState(0);
 
   const { currentUser } = useAuth();
-  const userId = currentUser?.uid;
-
-  useEffect(() => {
-	if (!userId) {
-	  console.error("User not authenticated");
-	}
-  }, [userId]);
 
   // Create a preview URL when a file is selected
   useEffect(() => {
@@ -49,6 +46,28 @@ export default function ContactSupportForm() {
 	// Free memory when this component is unmounted
 	return () => URL.revokeObjectURL(objectUrl);
   }, [selectedFile]);
+
+  // Pre-fill user email if available
+  useEffect(() => {
+	if (currentUser?.email) {
+	  setFormData(prev => ({
+		...prev,
+		email: currentUser.email,
+		fullName: currentUser.displayName || ""
+	  }));
+	}
+  }, [currentUser]);
+
+  const handleInputChange = (field: string, value: string) => {
+	setFormData(prev => ({
+	  ...prev,
+	  [field]: value
+	}));
+
+	if (field === 'description') {
+	  setCharCount(value.length);
+	}
+  };
 
   const handleDrag = (e: {
 	preventDefault: () => void;
@@ -81,48 +100,68 @@ export default function ContactSupportForm() {
 	}
   };
 
+  const validateForm = () => {
+	const { fullName, email, issueType, subject, description } = formData;
+	
+	if (!fullName.trim()) return "Full name is required";
+	if (!email.trim()) return "Email address is required";
+	if (!email.includes('@')) return "Please enter a valid email address";
+	if (!issueType) return "Please select an issue type";
+	if (!subject.trim()) return "Subject is required";
+	if (!description.trim()) return "Description is required";
+	if (description.length > 500) return "Description must be less than 500 characters";
+	
+	return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
 	e.preventDefault();
+	
+	const validationError = validateForm();
+	if (validationError) {
+	  setSubmitStatus('error');
+	  return;
+	}
+
 	setIsSubmitting(true);
+	setSubmitStatus(null);
 
 	try {
-	  // Create ticket in Firestore
-	  const ticketRef = await addDoc(collection(db, "tickets"), {
-		userId: userId,
-		issueType,
-		subject,
-		description,
-		selectedFile: null,
-		createdBy: userId,
-		status: "open",
-		createdAt: serverTimestamp(),
-		lastUpdated: serverTimestamp(),
-		messages: [
-		  {
-			sender: "user",
-			content: description,
-		  },
-		],
-		timestamp: serverTimestamp(),
+	  const response = await fetch('/api/support', {
+		method: 'POST',
+		headers: {
+		  'Content-Type': 'application/json',
+		},
+		body: JSON.stringify({
+		  ...formData,
+		  userId: currentUser?.uid || ''
+		}),
 	  });
 
-	  // Set the submitted ticket ID to show confirmation
-	  setSubmittedTicketId(ticketRef.id);
+	  if (response.ok) {
+		setSubmitStatus('success');
+		// Reset form
+		setFormData({
+		  issueType: "",
+		  subject: "",
+		  description: "",
+		  fullName: currentUser?.displayName || "",
+		  email: currentUser?.email || ""
+		});
+		setSelectedFile(null);
+		setPreviewUrl(null);
+		setCharCount(0);
+	  } else {
+		const errorData = await response.json();
+		console.error('Support request failed:', errorData);
+		setSubmitStatus('error');
+	  }
 	} catch (error) {
-	  console.error("Error submitting ticket:", error);
+	  console.error("Error submitting support request:", error);
+	  setSubmitStatus('error');
 	} finally {
 	  setIsSubmitting(false);
 	}
-  };
-
-  // Reset form and go back to form view
-  const handleSubmitAnother = () => {
-	setIssueType("");
-	setSubject("");
-	setDescription("");
-	setSelectedFile(null);
-	setPreviewUrl(null);
-	setSubmittedTicketId(null);
   };
 
   return (
@@ -135,131 +174,188 @@ export default function ContactSupportForm() {
 		</p>
 	  </div>
 
-	  {submittedTicketId ? (
-		<TicketConfirmation 
-		  ticketId={submittedTicketId} 
-		  onSubmitAnother={handleSubmitAnother}
-		/>
-	  ) : (
-		<form onSubmit={handleSubmit} className="space-y-4">
-		  <div>
-			<label className="block mb-2">Issue Type</label>
-			<Select value={issueType} onValueChange={setIssueType} required>
-			  <SelectTrigger>
-				<SelectValue placeholder="Select Issue Type" />
-			  </SelectTrigger>
-			  <SelectContent className="bg-[#f7f7f7]">
-				<SelectItem value="payment">Payment Issue</SelectItem>
-				<SelectItem value="campaign">
-				  Campaign/Contest Question
-				</SelectItem>
-				<SelectItem value="security">Account Security</SelectItem>
-				<SelectItem value="technical">Technical Bug</SelectItem>
-				<SelectItem value="other">Other</SelectItem>
-			  </SelectContent>
-			</Select>
-		  </div>
-
-		  <div>
-			<label className="block mb-2">Subject</label>
-			<Input
-			  value={subject}
-			  onChange={(e) => setSubject(e.target.value)}
-			  placeholder="Brief Description of your Issue"
-			  required
-			/>
-		  </div>
-
-		  <div>
-			<label className="block mb-2">Description</label>
-			<Textarea
-			  value={description}
-			  onChange={(e) => setDescription(e.target.value)}
-			  placeholder="Please provide as much detail as possible"
-			  rows={6}
-			  maxLength={500}
-			  required
-			/>
-			<p className="text-xs text-gray-500 mt-1">(Max: 500 characters)</p>
-		  </div>
-
-		  <div>
-			<label className="block mb-2">Attachments (Optional)</label>
-			<div
-			  className={cn(
-				"border-2 border-dashed rounded-lg p-6 text-center cursor-pointer",
-				dragActive ? "border-[#FD5C02] bg-orange-50" : "border-gray-300",
-				selectedFile && "border-green-500 bg-green-50"
-			  )}
-			  onDragEnter={handleDrag}
-			  onDragLeave={handleDrag}
-			  onDragOver={handleDrag}
-			  onDrop={handleDrop}
-			  onClick={() => document.getElementById("file-upload")?.click()}
-			>
-			  {previewUrl ? (
-				<div className="space-y-3">
-				  <div className="relative w-full max-w-md mx-auto h-48 rounded-lg overflow-hidden">
-					<Image
-					  src={previewUrl}
-					  alt="Thumbnail preview"
-					  fill
-					  className="object-cover"
-					/>
-				  </div>
-				  <p className="text-green-600">
-					{selectedFile?.name || "Uploaded image"} - Click or drop to
-					change
-				  </p>
-				</div>
-			  ) : (
-				<>
-				  <div className="bg-white border border-gray-200 rounded-lg py-1 px-2 w-12 mx-auto mb-2">
-					<Image
-					  src="/icons/upload.svg"
-					  alt="Upload"
-					  width={40}
-					  height={40}
-					/>
-				  </div>
-				  <p className="text-gray-600 text-sm md:text-base">
-					<span className="text-[#FD5C02]">Click to upload</span> or
-					drag and drop
-				  </p>
-				  <p className="text-sm text-gray-500 mt-1">
-					PNG or JPG (800x400px)
-				  </p>
-				</>
-			  )}
-			  <input
-				id="file-upload"
-				type="file"
-				className="hidden"
-				accept="image/png, image/jpeg"
-				onChange={handleFileChange}
-			  />
-			</div>
-		  </div>
-
-		  <div className="bg-[#FDEFE7] rounded-lg px-4 py-3 flex items-start w-fit">
-			<span className="text-[#BE4501] mr-2">ⓘ</span>
-			<p className="text-sm text-[#BE4501]">
-			  For urgent issues related to content removal or security concerns,
-			  please note this in your subject line.
-			</p>
-		  </div>
-
-		  <div className="text-right">
-			<Button
-			  type="submit"
-			  className="bg-orange-500 hover:bg-orange-600 text-white"
-			  disabled={isSubmitting}
-			>
-			  {isSubmitting ? "Submitting..." : "Submit Support Request"}
-			</Button>
-		  </div>
-		</form>
+	  {/* Status Alerts */}
+	  {submitStatus === 'success' && (
+		<Alert className="border-green-200 bg-green-50">
+		  <CheckCircle className="h-4 w-4 text-green-600" />
+		  <AlertDescription className="text-green-800">
+			Thank you for your support request! We&apos;ll get back to you within 24 hours. Check your email for a confirmation.
+		  </AlertDescription>
+		</Alert>
 	  )}
+
+	  {submitStatus === 'error' && (
+		<Alert variant="destructive">
+		  <XCircle className="h-4 w-4" />
+		  <AlertDescription>
+			There was an error submitting your request. Please try again or contact us directly at support@yourcompany.com
+		  </AlertDescription>
+		</Alert>
+	  )}
+
+	  <form onSubmit={handleSubmit} className="space-y-4">
+		{/* Full Name */}
+		<div>
+		  <label className="block mb-2">Full Name</label>
+		  <Input
+			value={formData.fullName}
+			onChange={(e) => handleInputChange('fullName', e.target.value)}
+			placeholder="Enter your full name"
+			required
+		  />
+		</div>
+
+		{/* Email */}
+		<div>
+		  <label className="block mb-2">Email Address</label>
+		  <Input
+			type="email"
+			value={formData.email}
+			onChange={(e) => handleInputChange('email', e.target.value)}
+			placeholder="Enter your email address"
+			required
+		  />
+		</div>
+
+		{/* Issue Type */}
+		<div>
+		  <label className="block mb-2">Issue Type</label>
+		  <Select 
+			value={formData.issueType} 
+			onValueChange={(value) => handleInputChange('issueType', value)} 
+			required
+		  >
+			<SelectTrigger>
+			  <SelectValue placeholder="Select Issue Type" />
+			</SelectTrigger>
+			<SelectContent className="bg-[#f7f7f7]">
+			  <SelectItem value="payment">Payment Issue</SelectItem>
+			  <SelectItem value="campaign">
+				Campaign/Contest Question
+			  </SelectItem>
+			  <SelectItem value="security">Account Security</SelectItem>
+			  <SelectItem value="technical">Technical Bug</SelectItem>
+			  <SelectItem value="other">Other</SelectItem>
+			</SelectContent>
+		  </Select>
+		</div>
+
+		{/* Subject */}
+		<div>
+		  <label className="block mb-2">Subject</label>
+		  <Input
+			value={formData.subject}
+			onChange={(e) => handleInputChange('subject', e.target.value)}
+			placeholder="Brief Description of your Issue"
+			required
+		  />
+		</div>
+
+		{/* Description */}
+		<div>
+		  <label className="block mb-2">Description</label>
+		  <Textarea
+			value={formData.description}
+			onChange={(e) => handleInputChange('description', e.target.value)}
+			placeholder="Please provide as much detail as possible"
+			rows={6}
+			maxLength={500}
+			required
+		  />
+		  <div className="flex justify-between items-center mt-1">
+			<p className="text-xs text-gray-500">(Max: 500 characters)</p>
+			<span className={`text-sm ${charCount > 450 ? 'text-red-600' : 'text-gray-500'}`}>
+			  {charCount}/500
+			</span>
+		  </div>
+		</div>
+
+		{/* File Upload */}
+		<div>
+		  <label className="block mb-2">Attachments (Optional)</label>
+		  <div
+			className={cn(
+			  "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer",
+			  dragActive ? "border-[#FD5C02] bg-orange-50" : "border-gray-300",
+			  selectedFile && "border-green-500 bg-green-50"
+			)}
+			onDragEnter={handleDrag}
+			onDragLeave={handleDrag}
+			onDragOver={handleDrag}
+			onDrop={handleDrop}
+			onClick={() => document.getElementById("file-upload")?.click()}
+		  >
+			{previewUrl ? (
+			  <div className="space-y-3">
+				<div className="relative w-full max-w-md mx-auto h-48 rounded-lg overflow-hidden">
+				  <Image
+					src={previewUrl}
+					alt="Thumbnail preview"
+					fill
+					className="object-cover"
+				  />
+				</div>
+				<p className="text-green-600">
+				  {selectedFile?.name || "Uploaded image"} - Click or drop to
+				  change
+				</p>
+			  </div>
+			) : (
+			  <>
+				<div className="bg-white border border-gray-200 rounded-lg py-1 px-2 w-12 mx-auto mb-2">
+				  <Image
+					src="/icons/upload.svg"
+					alt="Upload"
+					width={40}
+					height={40}
+				  />
+				</div>
+				<p className="text-gray-600 text-sm md:text-base">
+				  <span className="text-[#FD5C02]">Click to upload</span> or
+				  drag and drop
+				</p>
+				<p className="text-sm text-gray-500 mt-1">
+				  PNG or JPG (800x400px)
+				</p>
+			  </>
+			)}
+			<input
+			  id="file-upload"
+			  type="file"
+			  className="hidden"
+			  accept="image/png, image/jpeg"
+			  onChange={handleFileChange}
+			/>
+		  </div>
+		</div>
+
+		{/* Info Alert */}
+		<div className="bg-[#FDEFE7] rounded-lg px-4 py-3 flex items-start w-fit">
+		  <span className="text-[#BE4501] mr-2">ⓘ</span>
+		  <p className="text-sm text-[#BE4501]">
+			For urgent issues related to content removal or security concerns,
+			please note this in your subject line.
+		  </p>
+		</div>
+
+		{/* Submit Button */}
+		<div className="text-right">
+		  <Button
+			type="submit"
+			className="bg-orange-500 hover:bg-orange-600 text-white"
+			disabled={isSubmitting}
+		  >
+			{isSubmitting ? (
+			  <>
+				<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+				Submitting...
+			  </>
+			) : (
+			  "Submit Support Request"
+			)}
+		  </Button>
+		</div>
+	  </form>
 	</div>
   );
 }
