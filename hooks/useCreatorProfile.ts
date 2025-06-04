@@ -52,6 +52,8 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 	const timestamp = Date.now(); // Current timestamp to prevent caching
 	const profileApiUrl = constructProfileApiUrl(currentUser, timestamp);
 
+	// In your useCreatorProfile hook, update the fetchCreatorProfile function:
+
 	const fetchCreatorProfile = async () => {
 		if (!currentUser?.uid) {
 			setLoading(false);
@@ -63,7 +65,6 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 
 		try {
 			// First fetch basic profile data
-			// Add timestamp to prevent caching
 			const profileResponse = await fetch(profileApiUrl);
 
 			if (!profileResponse.ok) {
@@ -74,38 +75,36 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 			}
 
 			const profileData = await profileResponse.json();
-			
-			// Fetch verification data if we have an ID
-			const verificationId = profileData.verificationId || null;
-			console.log("Verification ID:", verificationId);
 
+			// Fetch verification data using the auth user ID
 			let verificationData: Partial<CreatorProfile> = {};
 
-			// If we still don't have verification data, try by userId as fallback
-			if (Object.keys(verificationData).length === 0) {
-				try {
-					const verificationResponse = await fetch(
-						`/api/verification?userId=${currentUser.uid}`
-					);
+			try {
+				const verificationResponse = await fetch(
+					`/api/verification?userId=${currentUser.uid}`
+				);
 
-					if (verificationResponse.ok) {
-						verificationData = await verificationResponse.json();
-						
-					} else {
-						console.warn(
-							"Failed to fetch verification by userId, status:",
-							verificationResponse.status
-						);
-					}
-				} catch (err) {
-					console.error("Error fetching verification by userId:", err);
+				if (verificationResponse.ok) {
+					verificationData = await verificationResponse.json();
+					console.log("Verification data received:", verificationData);
+				} else {
+					console.warn(
+						"Failed to fetch verification by userId, status:",
+						verificationResponse.status
+					);
 				}
+			} catch (err) {
+				console.error("Error fetching verification by userId:", err);
 			}
 
-			// Merge the data with clear priorities
+			// Merge the data with clear priorities and ID consistency
 			const combinedProfileData: CreatorProfile = {
 				...profileData,
 				...verificationData,
+				// CRITICAL: Use the auth user ID as the primary identifier
+				id: currentUser.uid, // This is what gets used as creator.id
+				userId: currentUser.uid, // Keep consistent
+				verificationId: verificationData.verificationId || currentUser.uid, // Keep the verification ID for reference
 				// Make sure specific properties are properly merged with priorities
 				profilePictureUrl:
 					verificationData.profilePictureUrl ||
@@ -128,11 +127,19 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 				profileData: {
 					...(verificationData.profileData || {}),
 					...(profileData.profileData || {}),
+					// Maintain ID consistency in nested data
+					id: currentUser.uid,
+					userId: currentUser.uid,
 				},
 			};
 
+			console.log("=== CREATOR PROFILE DEBUG ===");
+			console.log("Auth User ID:", currentUser.uid);
+			console.log("Profile ID (creator.id):", combinedProfileData.id);
+			console.log("User ID:", combinedProfileData.userId);
+			console.log("Verification ID:", combinedProfileData.verificationId);
+
 			setCreatorProfile(combinedProfileData);
-			
 		} catch (err) {
 			console.error("Error fetching creator profile:", err);
 			setError("Failed to fetch creator profile");
@@ -251,7 +258,6 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 			const result = await response.json();
 
 			if (response.ok) {
-
 				// Immediately update local state to reflect the disconnection
 				if (creatorProfile) {
 					const updatedProfile = { ...creatorProfile };
@@ -310,13 +316,11 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 				return { success: false, error: "User not authenticated" };
 			}
 
-
 			// Upload files in parallel
 			const uploadFile = async (file: File | undefined, uploadType: string) => {
 				if (!file) {
 					return null;
 				}
-
 
 				const formData = new FormData();
 				formData.append("userId", currentUser.uid);
@@ -350,7 +354,11 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 			// Submit verification with URLs
 			const requestBody = {
 				userId: currentUser.uid,
-				profileData: verificationData.profileData,
+				creatorId: currentUser.uid, // Make sure creator ID matches user ID
+				profileData: {
+					...verificationData.profileData,
+					creatorId: currentUser.uid, // Ensure consistency
+				},
 				verificationVideoUrl,
 				verifiableIDUrl,
 				profilePictureUrl,

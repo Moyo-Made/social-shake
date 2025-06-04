@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {  FieldValue } from 'firebase-admin/firestore';
-import { adminDb } from '@/config/firebase-admin';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
+const db = getFirestore();
 
 interface SendMessageRequest {
   conversationId: string;
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if conversation exists
-    const conversationRef = adminDb.collection('conversations').doc(conversationId);
+    const conversationRef = db.collection('conversations').doc(conversationId);
     const conversationDoc = await conversationRef.get();
     
     if (!conversationDoc.exists) {
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
     }
   
     // Check if conversation exists
-    const conversationRef = adminDb.collection('conversations').doc(conversationId);
+    const conversationRef = db.collection('conversations').doc(conversationId);
     const conversationDoc = await conversationRef.get();
     
     if (!conversationDoc.exists) {

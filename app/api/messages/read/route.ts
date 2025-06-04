@@ -1,7 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getFirestore } from 'firebase-admin/firestore';
-
-const db = getFirestore();
+import { adminDb } from '@/config/firebase-admin';
+import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +11,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 1. Update the conversation document to reset unread count for this user
-    const conversationRef = db.collection('conversations').doc(conversationId);
+    const conversationRef = adminDb.collection('conversations').doc(conversationId);
     await conversationRef.update({
       [`unreadCounts.${userId}`]: 0
     });
@@ -23,7 +21,7 @@ export async function POST(request: NextRequest) {
     const unreadMessages = await messagesRef.where(`readStatus.${userId}`, '==', false).get();
     
     // Batch update all unread messages
-    const batch = db.batch();
+    const batch = adminDb.batch();
     unreadMessages.docs.forEach(doc => {
       batch.update(doc.ref, {
         [`readStatus.${userId}`]: true

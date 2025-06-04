@@ -109,6 +109,12 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 
 		try {
 			console.log("Starting conversation with creator:", creator.id);
+			console.log("Current user ID:", currentUser.uid);
+
+			// Debug: Check if we have the creator profile with verification ID
+			const effectiveUserId = currentUser.uid; // Use the auth user ID directly
+
+			console.log("Using effective user ID:", effectiveUserId);
 
 			const response = await fetch("/api/createConversation", {
 				method: "POST",
@@ -116,12 +122,14 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
-					currentUserId: currentUser.uid,
-					creatorId: creator.id,
+					currentUserId: effectiveUserId, // Use the consistent ID
+					creatorId: creator.userId || creator.id,
 					userData: {
 						name: currentUser.displayName || "User",
 						avatar: currentUser.photoURL || "/icons/default-avatar.svg",
 						username: currentUser.email?.split("@")[0] || "",
+						// Add the auth user ID for reference
+						authUserId: currentUser.uid,
 					},
 					creatorData: {
 						name:
@@ -136,13 +144,17 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 			const data = await response.json();
 
 			if (!response.ok) {
+				console.error("Conversation creation failed:", data);
 				throw new Error(data.error || "Failed to handle conversation");
 			}
 
-			// The endpoint returns conversationId for both new and existing conversations
+			// Log success details
 			console.log(
-				`Conversation ${response.status === 201 ? "created" : "found"}`
+				`Conversation ${response.status === 201 ? "created" : "found"}`,
+				"ID:",
+				data.conversationId
 			);
+
 			router.push(
 				`/brand/dashboard/messages?conversation=${data.conversationId}`
 			);
