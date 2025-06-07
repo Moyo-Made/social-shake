@@ -1,10 +1,10 @@
-import PaymentCancelled from "@/components/brand/brandProjects/PaymentCancelled";
+import PaymentCancelHandler from "@/components/brand/brandProfile/dashboard/PaymentCancelHandler";
 import React, { Suspense } from "react";
 
 const page = () => {
 	return (
 		<Suspense>
-			<PaymentCancelled />
+			<PaymentCancelHandler />
 		</Suspense>
 	);
 };

@@ -12,7 +12,7 @@ interface VideoComponentProps {
 const VideoComponent = ({ creator, onClick }: VideoComponentProps) => {
 	const videoRef = useRef<HTMLVideoElement | null>(null);
 	const [, setShowControls] = useState(true);
-	const [, setIsLoading] = useState(true);
+	const [isLoading, setIsLoading] = useState(true);
 	const [, setHasError] = useState(false);
 
 	const handleVideoClick = (e: {
@@ -49,12 +49,14 @@ const VideoComponent = ({ creator, onClick }: VideoComponentProps) => {
 					width: "350px",
 					height: "250px",
 					objectFit: "cover",
+					backgroundColor: "transparent", // Explicitly remove any background
 				}}
 				className="rounded-lg"
 				onClick={handleVideoClick}
 				controls={false}
 				preload="metadata"
 				muted
+				onLoadedData={() => setIsLoading(false)}
 				onError={() => {
 					setIsLoading(false);
 					setHasError(true);
@@ -63,25 +65,32 @@ const VideoComponent = ({ creator, onClick }: VideoComponentProps) => {
 				<p>Your browser doesn&apos;t support HTML video.</p>
 			</video>
 
-			{/* Custom Play Button Overlay - Always visible as thumbnail */}
-			<div
-				className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 transition-opacity duration-300 hover:bg-opacity-30"
-				onClick={handleVideoClick}
-			>
-				<button
-					className="bg-orange-500 bg-opacity-90 hover:bg-opacity-100 rounded-full p-3 shadow-lg transition-all duration-200 hover:scale-110"
-					onClick={(e) => {
-						e.stopPropagation();
-						e.preventDefault();
-						// Only open modal, don't play video
-						if (onClick) {
-							onClick();
-						}
-					}}
+			{/* Loading pulse animation */}
+			{isLoading && (
+				<div className="absolute inset-0 rounded-lg animate-pulse bg-gradient-to-r from-gray-100 to-gray-200" />
+			)}
+
+			{/* Custom Play Button Overlay - Only show when not loading */}
+			{!isLoading && (
+				<div
+					className="absolute inset-0 flex items-center justify-center transition-all duration-300 hover:bg-black hover:bg-opacity-10 rounded-lg"
+					onClick={handleVideoClick}
 				>
-					<Play className="w-5 h-5 fill-white ml-1 text-white" />
-				</button>
-			</div>
+					<button
+						className="bg-orange-500 bg-opacity-90 hover:bg-opacity-100 rounded-full p-3 shadow-lg transition-all duration-200 hover:scale-110"
+						onClick={(e) => {
+							e.stopPropagation();
+							e.preventDefault();
+							// Only open modal, don't play video
+							if (onClick) {
+								onClick();
+							}
+						}}
+					>
+						<Play className="w-5 h-5 fill-white ml-1 text-white" />
+					</button>
+				</div>
+			)}
 		</div>
 	);
 };

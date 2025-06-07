@@ -53,9 +53,7 @@ interface ExtendedMessagingContextType extends MessagingContextType {
 	imageLoadingStates: Record<string, boolean>;
 	sortOption: string;
 	searchQuery: string;
-	
-	// Actions
-	fetchAllBrandProfiles: (userIds: string[]) => Promise<void>;
+
 	setUsers: React.Dispatch<React.SetStateAction<User[]>>;
 	setConversations: React.Dispatch<React.SetStateAction<Conversation[]>>;
 	setBrandProfiles: React.Dispatch<React.SetStateAction<Record<string, BrandProfile>>>;
@@ -89,7 +87,7 @@ const MessagingContext = createContext<ExtendedMessagingContextType>({
 	error: null,
 	startConversation: async () => null,
 	getConversation: async () => null,
-	fetchAllBrandProfiles: async () => {},
+	
 	setUsers: () => {},
 	setConversations: () => {},
 	setBrandProfiles: () => {},
@@ -215,35 +213,35 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 		}
 	}, [currentUser]);
 
-	const fetchAllBrandProfiles = useCallback(async (userIds: string[]) => {
-		try {
-			const promises = userIds.map(async (userId) => {
-				const response = await fetch(
-					`/api/admin/brand-approval?userId=${userId}`
-				);
-				if (response.ok) {
-					const data = await response.json();
-					return { userId, data };
-				}
-				return { userId, data: null };
-			});
+	// const fetchAllBrandProfiles = useCallback(async (userIds: string[]) => {
+	// 	try {
+	// 		const promises = userIds.map(async (userId) => {
+	// 			const response = await fetch(
+	// 				`/api/admin/brand-approval?userId=${userId}`
+	// 			);
+	// 			if (response.ok) {
+	// 				const data = await response.json();
+	// 				return { userId, data };
+	// 			}
+	// 			return { userId, data: null };
+	// 		});
 
-			const results = await Promise.all(promises);
-			const newBrandProfiles: Record<string, BrandProfile> = {};
+	// 		const results = await Promise.all(promises);
+	// 		const newBrandProfiles: Record<string, BrandProfile> = {};
 			
-			results.forEach(({ userId, data }) => {
-				if (data) {
-					newBrandProfiles[userId] = data;
-				}
-			});
+	// 		results.forEach(({ userId, data }) => {
+	// 			if (data) {
+	// 				newBrandProfiles[userId] = data;
+	// 			}
+	// 		});
 
-			if (Object.keys(newBrandProfiles).length > 0) {
-				setBrandProfiles((prev) => ({ ...prev, ...newBrandProfiles }));
-			}
-		} catch (error) {
-			console.error("Error fetching brand profiles:", error);
-		}
-	}, []);
+	// 		if (Object.keys(newBrandProfiles).length > 0) {
+	// 			setBrandProfiles((prev) => ({ ...prev, ...newBrandProfiles }));
+	// 		}
+	// 	} catch (error) {
+	// 		console.error("Error fetching brand profiles:", error);
+	// 	}
+	// }, []);
 
 	const fetchBrandProfile = useCallback(async (userId: string) => {
 		try {
@@ -339,21 +337,13 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
 			setUsers(processedUsers.filter((user: User) => user.id !== undefined));
 
-			// Fetch brand profiles for new users
-			const userIds = processedUsers
-				.map((user: { id: string }) => user.id)
-				.filter((id: string) => id && !brandProfiles[id]);
-			
-			if (userIds.length > 0) {
-				fetchAllBrandProfiles(userIds);
-			}
 
 			setLoading(false);
 		} catch (error) {
 			console.error("Error fetching conversations:", error);
 			setLoading(false);
 		}
-	}, [currentUser, brandProfiles, fetchBrandProfile, fetchAllBrandProfiles]);
+	}, [currentUser, brandProfiles, fetchBrandProfile]);
 
 	// Initial fetch on mount
 	useEffect(() => {
@@ -391,7 +381,6 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 		error,
 		startConversation,
 		getConversation,
-		fetchAllBrandProfiles,
 		setUsers,
 		setConversations,
 		setBrandProfiles,

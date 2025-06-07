@@ -3,7 +3,13 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Briefcase, ChevronDown, ChevronRight, VideoIcon } from "lucide-react";
+import {
+	Briefcase,
+	ChevronDown,
+	ChevronRight,
+	VideoIcon,
+	WandIcon,
+} from "lucide-react";
 import { usePathname } from "next/navigation";
 import CreatorProfileDropdown from "../CreatorProfileDropdown";
 import { useCreatorProfile } from "@/hooks/useCreatorProfile";
@@ -198,6 +204,12 @@ const SideNav: React.FC = () => {
 					/>
 
 					<MenuItem
+						href="/creator/dashboard/video-order"
+						icon={<VideoIcon size={20} />}
+						text="Video Order"
+					/>
+
+					<MenuItem
 						href="/creator/dashboard/portfolio"
 						icon={<Briefcase size={20} />}
 						text="My Portfolio Page"
@@ -229,6 +241,12 @@ const SideNav: React.FC = () => {
 							/>
 						}
 						text="Transactions"
+					/>
+
+					<MenuItem
+						href="/creator/dashboard/ai-actor"
+						icon={<WandIcon />}
+						text="AI Actor"
 					/>
 				</div>
 			</nav>
@@ -276,8 +294,10 @@ const getPageTitle = (pathname: string): string => {
 		"/creator/dashboard/contest/applied": "My Contests",
 		"/creator/dashboard/messages": "Messages",
 		"/creator/dashboard/content-library": "Content Library",
+		"/creator/dashboard/video-order": "Video Order",
 		"/creator/dashboard/portfolio": "My Portfolio Page",
 		"/creator/dashboard/transactions": "Transactions",
+		"/creator/dashboard/ai-actor": "AI Actor",
 		"/creator/dashboard/settings": "Settings",
 		"/creator/dashboard/help-support": "Help & Support",
 	};
@@ -319,12 +339,19 @@ const getPageTitle = (pathname: string): string => {
 	if (pathname.startsWith("/creator/dashboard/content-library")) {
 		return "Content Library";
 	}
+	if (pathname.startsWith("/creator/dashboard/video-order")) {
+		return "Video Order";
+	}
 	if (pathname.startsWith("/creator/dashboard/portfolio")) {
 		return "My Portfolio Page";
 	}
 
 	if (pathname.startsWith("/creator/dashboard/transactions/")) {
 		return "Transactions";
+	}
+
+	if (pathname.startsWith("/creator/dashboard/ai-actor/")) {
+		return "AI Actor";
 	}
 
 	if (pathname.startsWith("/creator/dashboard/help-support/")) {

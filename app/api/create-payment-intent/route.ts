@@ -37,6 +37,10 @@ export async function POST(request: NextRequest) {
 			requestData.videoTitle = formData.get("videoTitle")?.toString();
 			requestData.creatorEmail = formData.get("creatorEmail")?.toString();
 
+			requestData.orderId = formData.get("orderId")?.toString();
+			requestData.packageType = formData.get("packageType")?.toString();
+			requestData.videoCount = formData.get("videoCount")?.toString();
+
 			// Extract contest/project info
 			try {
 				const basicJson = formData.get("basic")?.toString();
@@ -72,6 +76,10 @@ export async function POST(request: NextRequest) {
 				projectTitle: jsonData.basic?.projectTitle || jsonData.projectTitle,
 				projectId: jsonData.projectId,
 				submissionId: jsonData.submissionId,
+
+				orderId: jsonData.orderId,
+				packageType: jsonData.packageType,
+				videoCount: jsonData.videoCount,
 			};
 		}
 
@@ -118,10 +126,10 @@ export async function POST(request: NextRequest) {
 					);
 				}
 				const submissionData = submissionDoc.data();
-				
+
 				// Get creator ID from submission
 				const creatorId = submissionData?.userId;
-				
+
 				if (!creatorId) {
 					return NextResponse.json(
 						{ error: "Creator ID not found in submission" },
@@ -140,7 +148,7 @@ export async function POST(request: NextRequest) {
 					);
 				}
 				const creatorData = creatorDoc.data();
-				
+
 				// Auto-populate the missing fields
 				requestData.stripeConnectId = creatorData?.stripeAccountId;
 				requestData.creatorEmail = creatorData?.email;
@@ -150,11 +158,12 @@ export async function POST(request: NextRequest) {
 				// Validate that creator has connected their Stripe account
 				if (!requestData.stripeConnectId) {
 					return NextResponse.json(
-						{ 
-							error: "Creator hasn't connected their Stripe account yet. Please ask them to connect their account before approving submission payment.",
+						{
+							error:
+								"Creator hasn't connected their Stripe account yet. Please ask them to connect their account before approving submission payment.",
 							errorCode: "CREATOR_ACCOUNT_NOT_CONNECTED",
 							paymentType,
-							creatorId: creatorId
+							creatorId: creatorId,
 						},
 						{ status: 400 }
 					);
@@ -163,7 +172,7 @@ export async function POST(request: NextRequest) {
 					creatorId,
 					stripeConnectId: requestData.stripeConnectId,
 					projectId: requestData.projectId,
-					creatorEmail: requestData.creatorEmail
+					creatorEmail: requestData.creatorEmail,
 				});
 			} catch (error) {
 				console.error("Error auto-fetching submission data:", error);
@@ -175,7 +184,12 @@ export async function POST(request: NextRequest) {
 		}
 
 		// Define payment types that require creator accounts
-		const creatorPaymentTypes = ["video", "project", "contest", "submission_approval"];
+		const creatorPaymentTypes = [
+			"video",
+			"project",
+			"contest",
+			"submission_approval",
+		];
 		const requiresCreatorAccount = creatorPaymentTypes.includes(paymentType);
 
 		// Additional validation for creator payment types
@@ -184,24 +198,28 @@ export async function POST(request: NextRequest) {
 				let errorMessage = "";
 				switch (paymentType) {
 					case "video":
-						errorMessage = "Creator hasn't connected their Stripe account yet. Please ask them to connect their account before purchasing videos.";
+						errorMessage =
+							"Creator hasn't connected their Stripe account yet. Please ask them to connect their account before purchasing videos.";
 						break;
 					case "project":
-						errorMessage = "Creator hasn't connected their Stripe account yet. Please ask them to connect their account before proceeding with project payment.";
+						errorMessage =
+							"Creator hasn't connected their Stripe account yet. Please ask them to connect their account before proceeding with project payment.";
 						break;
 					case "contest":
-						errorMessage = "Creator hasn't connected their Stripe account yet. Please ask them to connect their account before proceeding with contest payment.";
+						errorMessage =
+							"Creator hasn't connected their Stripe account yet. Please ask them to connect their account before proceeding with contest payment.";
 						break;
 					case "submission_approval":
-						errorMessage = "Creator hasn't connected their Stripe account yet. Please ask them to connect their account before approving submission payment.";
+						errorMessage =
+							"Creator hasn't connected their Stripe account yet. Please ask them to connect their account before approving submission payment.";
 						break;
 				}
-				
+
 				return NextResponse.json(
-					{ 
+					{
 						error: errorMessage,
 						errorCode: "CREATOR_ACCOUNT_NOT_CONNECTED",
-						paymentType 
+						paymentType,
 					},
 					{ status: 400 }
 				);
@@ -273,6 +291,13 @@ export async function POST(request: NextRequest) {
 				submissionId: requestData.submissionId,
 				projectId: requestData.projectId,
 				projectTitle: requestData.projectTitle,
+			}),
+
+			// Order-specific fields
+			...((paymentType === "order" || paymentType === "order_escrow") && {
+				orderId: requestData.orderId,
+				packageType: requestData.packageType,
+				videoCount: requestData.videoCount,
 			}),
 		});
 

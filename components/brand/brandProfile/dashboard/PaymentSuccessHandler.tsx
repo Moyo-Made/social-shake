@@ -94,39 +94,108 @@ export default function PaymentSuccessHandler() {
 
 				setProgress(80);
 
-				// Step 4: Update submission status to approved
-				const submissionId =
-					paymentRecord.metadata?.submissionId || paymentRecord.submissionId;
+				// Step 4: Update specific payment type records and related data
 				console.log("Payment type:", type);
-				console.log("Submission ID:", submissionId);
+				console.log("Payment record:", paymentRecord);
 
-				// Check if this payment involves a submission
-				if (submissionId) {
+				// Handle different payment types with their specific update logic
+				if (type === "submission_approval") {
+					const submissionId = paymentRecord.submissionId;
+					if (submissionId) {
+						try {
+							console.log("Updating submission status for:", submissionId);
+							const updateResponse = await axios.post(
+								"/api/project-submissions/update-status",
+								{
+									submissionId,
+									status: "approved",
+								},
+								authConfig
+							);
+							console.log("Submission status updated successfully:", updateResponse.data);
+
+							// Update submission payment record
+							await axios.post(
+								"/api/update-submission-payment",
+								{
+									paymentId,
+									status: "completed",
+									completedAt: new Date().toISOString(),
+								},
+								authConfig
+							);
+						} catch (updateError) {
+							console.error("Failed to update submission:", updateError);
+							// Don't throw error here - payment was successful, just log the issue
+						}
+					}
+				} else if (type === "video") {
 					try {
-						console.log("Updating submission status for:", submissionId);
-						const updateResponse = await axios.post(
+						// Update video purchase record
+						await axios.post(
+							"/api/update-video-purchase",
+							{
+								paymentId,
+								status: "completed",
+								completedAt: new Date().toISOString(),
+							},
+							authConfig
+						);
+						console.log("Video purchase updated successfully");
+					} catch (updateError) {
+						console.error("Failed to update video purchase:", updateError);
+					}
+				} else if (type === "project") {
+					try {
+						// Update project payment record
+						await axios.post(
+							"/api/update-project-payment",
+							{
+								paymentId,
+								status: "completed",
+								completedAt: new Date().toISOString(),
+							},
+							authConfig
+						);
+						console.log("Project payment updated successfully");
+					} catch (updateError) {
+						console.error("Failed to update project payment:", updateError);
+					}
+				} else if (type === "contest") {
+					try {
+						// Update contest payment record
+						await axios.post(
+							"/api/update-contest-payment",
+							{
+								paymentId,
+								status: "completed",
+								completedAt: new Date().toISOString(),
+							},
+							authConfig
+						);
+						console.log("Contest payment updated successfully");
+					} catch (updateError) {
+						console.error("Failed to update contest payment:", updateError);
+					}
+				}
+
+				// Legacy support: Handle old submission approval logic
+				const legacySubmissionId = paymentRecord.metadata?.submissionId;
+				if (legacySubmissionId && type !== "submission_approval") {
+					try {
+						console.log("Updating legacy submission status for:", legacySubmissionId);
+						await axios.post(
 							"/api/project-submissions/update-status",
 							{
-								submissionId,
+								submissionId: legacySubmissionId,
 								status: "approved",
 							},
 							authConfig
 						);
-
-						console.log(
-							"Submission status updated successfully:",
-							updateResponse.data
-						);
+						console.log("Legacy submission status updated successfully");
 					} catch (updateError) {
-						console.error("Failed to update submission status:", updateError);
-						if (axios.isAxiosError(updateError)) {
-							console.error("API Error:", updateError.response?.data);
-							console.error("Status:", updateError.response?.status);
-						}
-						// Don't throw error here - payment was successful, just log the issue
+						console.error("Failed to update legacy submission status:", updateError);
 					}
-				} else {
-					console.log("No submission ID found, skipping submission update");
 				}
 
 				setProgress(100);
@@ -186,9 +255,8 @@ export default function PaymentSuccessHandler() {
 		if (status === "verifying" && currentUser && getIdToken) {
 			processPayment();
 		}
-	}, [searchParams, router, getIdToken, currentUser, status]); // Add dependencies
+	}, [searchParams, router, getIdToken, currentUser, status]);
 
-	// ... rest of your component code remains the same
 	const getItemTypeDisplay = () => {
 		switch (paymentType) {
 			case "project":
@@ -207,9 +275,9 @@ export default function PaymentSuccessHandler() {
 	const getProcessingMessage = () => {
 		switch (paymentType) {
 			case "project":
-				return "We're verifying your payment and setting up your project.";
+				return "We're verifying your payment and processing your project.";
 			case "contest":
-				return "We're verifying your payment and setting up your contest.";
+				return "We're verifying your payment and processing your contest.";
 			case "video":
 				return "We're verifying your payment and processing your video purchase.";
 			case "submission_approval":
@@ -223,11 +291,10 @@ export default function PaymentSuccessHandler() {
 		if (progress <= 20) return "Retrieving payment details...";
 		if (progress <= 40) return "Verifying payment with Stripe...";
 		if (progress <= 60) return "Updating payment records...";
-		if (progress <= 80) return "Cleaning up temporary data...";
+		if (progress <= 80) return "Processing payment type specific updates...";
 		return "Finalizing your order...";
 	};
 
-	// ... rest of your render code remains the same
 	if (status === "verifying") {
 		return (
 			<div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-blue-50 flex items-center justify-center p-4">
@@ -394,17 +461,17 @@ export default function PaymentSuccessHandler() {
 
 						<p className="text-gray-600 mb-6">
 							Your {getItemTypeDisplay()} has been{" "}
-							{paymentType === "video" ? "purchased" : "created"} successfully.
+							{paymentType === "video" ? "purchased" : "processed"} successfully.
 						</p>
 
 						<div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
 							<p className="text-sm text-green-700">
 								{paymentType === "project" &&
-									"The submission has been approved and payment has been processed."}
+									"Your project payment has been processed successfully."}
 								{paymentType === "contest" &&
-									"Your contest is now live and ready for creators to participate."}
+									"Your contest payment has been processed successfully."}
 								{paymentType === "video" &&
-									"Your video purchase has been completed and is now available in your library."}
+									"Your video purchase has been completed and is now available."}
 								{paymentType === "submission_approval" &&
 									"The submission has been approved and payment has been processed."}
 								{!paymentType &&
@@ -413,7 +480,7 @@ export default function PaymentSuccessHandler() {
 						</div>
 
 						<div className="space-y-3">
-							<button
+							{/* <button
 								onClick={() => {
 									let redirectPath = "/brand/dashboard";
 
@@ -440,13 +507,13 @@ export default function PaymentSuccessHandler() {
 							>
 								View{" "}
 								{paymentType === "project"
-									? "Project"
+									? "Projects"
 									: paymentType === "contest"
-										? "Contest"
+										? "Contests"
 										: paymentType === "video"
 											? "Videos"
 											: "Dashboard"}
-							</button>
+							</button> */}
 
 							<button
 								onClick={() => router.push("/brand/dashboard")}

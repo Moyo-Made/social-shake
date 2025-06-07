@@ -18,6 +18,7 @@ interface Creator {
 	id: string;
 	name: string;
 	pricing: CreatorPricing;
+	email: string;
 }
 
 interface PricingCardProps {
@@ -25,7 +26,7 @@ interface PricingCardProps {
 	onPackageSelect?: (
 		packageType: string,
 		videoCount: number,
-		totalPrice: number
+		totalPrice: number 
 	) => void;
 	isProcessing?: boolean;
 }
@@ -478,35 +479,36 @@ const PricingCard: React.FC<PricingCardProps> = ({
 				onBriefComplete={handleProjectBriefComplete}
 			/>
 
-			<OrderSummaryModal
-				isOpen={isOrderSummaryModalOpen}
-				onClose={handleOrderSummaryClose}
-				onBack={handleOrderSummaryBack}
-				onOrderConfirm={handleOrderConfirm}
-				packageType={modalPackageDetails?.type || ""}
-				videoCount={modalPackageDetails?.videoCount || 0}
-				totalPrice={modalPackageDetails?.price || 0}
-				creatorName={selectedCreator.name}
-				scriptChoice={selectedScriptChoice || "brand-written"}
-				scriptFormData={
-					scriptsData || {
-						scripts: [],
-						generalRequirements: {},
-						videoSpecs: {},
-					}
-				}
-				projectBriefData={
-					projectBriefData || {
-						projectOverview: {},
-						contentRequirements: {},
-						brandGuidelines: {},
-						videoSpecs: {},
-						examples: {},
-						timeline: {},
-					}
-				}
-			/>
-
+<OrderSummaryModal
+    isOpen={isOrderSummaryModalOpen}
+    onClose={handleOrderSummaryClose}
+    onBack={handleOrderSummaryBack}
+    onOrderConfirm={handleOrderConfirm}
+    packageType={modalPackageDetails?.type || ""}
+    videoCount={modalPackageDetails?.videoCount || 0}
+    totalPrice={modalPackageDetails?.price || 0}
+    creatorName={selectedCreator.name}
+    selectedCreator={selectedCreator}
+    selectedPackage={modalPackageDetails} 
+    scriptChoice={selectedScriptChoice || "brand-written"}
+    scriptFormData={
+        scriptsData || {
+            scripts: [],
+            generalRequirements: {},
+            videoSpecs: {},
+        }
+    }
+    projectBriefData={
+        projectBriefData || {
+            projectOverview: {},
+            contentRequirements: {},
+            brandGuidelines: {},
+            videoSpecs: {},
+            examples: {},
+            timeline: {},
+        }
+    }
+/>
 			{/* AI Actor Pricing Section */}
 			<div className="mt-8">
 				<h3 className="text-base md:text-lg font-semibold mb-4 flex items-center">

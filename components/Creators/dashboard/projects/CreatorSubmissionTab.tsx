@@ -234,7 +234,7 @@ export default function CreatorSubmissionTab({
 		};
 
 		fetchAffiliateLink();
-	}, [submissionsList, fetchingAffiliateLink]);
+	}, [submissionsList.length, fetchingAffiliateLink]);
 
 	// Fetch spark codes for submissions that need them
 	useEffect(() => {
@@ -314,7 +314,7 @@ export default function CreatorSubmissionTab({
 		};
 
 		fetchSparkCodes();
-	}, [submissionsList, fetchingSparkCodes]);
+	}, [submissionsList.length, fetchingSparkCodes]);
 
 	const fetchSubmissions = async () => {
 		try {

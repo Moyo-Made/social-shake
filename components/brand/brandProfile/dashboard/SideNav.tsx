@@ -226,6 +226,8 @@ const SideNav: React.FC = () => {
 						}
 						text="Transactions"
 					/>
+
+					
 				</div>
 			</nav>
 
@@ -316,6 +318,9 @@ const getPageTitle = (pathname: string): string => {
 	}
 	if (pathname.startsWith("/brand/dashboard/transactions/")) {
 		return "Transactions";
+	}
+	if (pathname.startsWith("/brand/dashboard/ai-actor/")) {
+		return "AI Actor";
 	}
 
 	if (pathname.startsWith("/brand/dashboard/help-support/")) {
