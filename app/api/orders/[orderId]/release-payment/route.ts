@@ -16,7 +16,8 @@ const sendNotification = async (userId: string, notification: any) => {
 
 export async function POST(
 	request: NextRequest,
-	{ params }: { params: { orderId: string } }
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	{ params }: any
 ) {
 	try {
 		const { orderId } = params;
