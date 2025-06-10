@@ -10,6 +10,8 @@ import {
 	Briefcase,
 	CheckCircle,
 	XCircle,
+	Check,
+	Package,
 } from "lucide-react";
 import { useNotifications } from "@/hooks/useNotifications";
 import { NotificationData } from "@/types/notifications";
@@ -23,6 +25,8 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
 	className = "",
 }) => {
 	const [showModal, setShowModal] = useState(false);
+	const [processingAction, setProcessingAction] = useState<string | null>(null);
+	const [orderStates, setOrderStates] = useState<{ [key: string]: 'approved' | 'rejected' | null }>({});
 	const router = useRouter();
 
 	const {
@@ -47,6 +51,9 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
 				return <Clock className="w-5 h-5 text-orange-500" />;
 			case "new_application":
 				return <User className="w-5 h-5 text-purple-500" />;
+			case "order_finalized":
+			case "order_ready_for_payment":
+				return <Package className="w-5 h-5 text-blue-500" />;
 			default:
 				return <Bell className="w-5 h-5 text-gray-500" />;
 		}
@@ -74,10 +81,70 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
 		router.push(`/creator/dashboard/project/${projectId}`);
 	};
 
+	// Handle order actions
+	const handleOrderAction = async (
+		action: 'approve' | 'reject' | 'view',
+		orderId: string,
+		notificationId: string
+	) => {
+		setProcessingAction(`${action}-${notificationId}`);
+		
+		try {
+			// Mark notification as read first
+			await markAsRead(notificationId);
+
+			if (action === 'view') {
+				// Navigate to order details page
+				router.push(`/creator/dashboard/video-order/${orderId}`);
+			} else if (action === 'approve') {
+				// Call your order approval API
+				const response = await fetch(`/api/orders/${orderId}/approve`, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+					},
+				});
+
+				if (response.ok) {
+					// Update the order state to approved
+					setOrderStates(prev => ({ ...prev, [orderId]: 'approved' }));
+					console.log('Order approved successfully');
+				} else {
+					throw new Error('Failed to approve order');
+				}
+			} else if (action === 'reject') {
+				// Call your order rejection API
+				const response = await fetch(`/api/orders/${orderId}/reject`, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+					},
+				});
+
+				if (response.ok) {
+					// Update the order state to rejected
+					setOrderStates(prev => ({ ...prev, [orderId]: 'rejected' }));
+					console.log('Order rejected successfully');
+				} else {
+					throw new Error('Failed to reject order');
+				}
+			}
+		} catch (error) {
+			console.error(`Error ${action}ing order:`, error);
+			// You might want to show an error toast here
+		} finally {
+			setProcessingAction(null);
+		}
+	};
 
 	// Render notification item
 	const renderNotification = (notification: NotificationData) => {
 		const isInvitation = notification.type === "project_invitation";
+		const isOrder = notification.type === "order_finalized";
+		
+		// Extract orderId from notification - you might need to adjust this based on your NotificationData structure
+		const orderId = notification.orderId || notification.relatedId;
+		const orderState = orderId ? orderStates[orderId] : null;
 
 		return (
 			<div
@@ -125,7 +192,7 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
 							</span>
 						</div>
 
-						{/* Action buttons for invitations */}
+						{/* Action buttons for project invitations */}
 						{isInvitation && !notification.responded && (
 							<div className="flex items-center gap-2 mt-3">
 								{notification.projectId && (
@@ -145,8 +212,87 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
 							</div>
 						)}
 
+						{/* Action buttons for order notifications */}
+						{isOrder && orderId && !notification.responded && (
+							<div className="flex items-center gap-2 mt-3">
+								<button
+									onClick={() => handleOrderAction('approve', orderId, notification.id!)}
+									disabled={processingAction === `approve-${notification.id}` || orderState === 'rejected'}
+									className={`flex items-center gap-1 px-3 py-1 text-xs rounded-md transition-colors disabled:cursor-not-allowed ${
+										orderState === 'approved'
+											? 'bg-green-600 text-white'
+											: orderState === 'rejected'
+											? 'bg-gray-300 text-gray-500'
+											: 'bg-green-500 text-white hover:bg-green-600 disabled:opacity-50'
+									}`}
+								>
+									{processingAction === `approve-${notification.id}` ? (
+										<div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
+									) : (
+										<Check className="w-3 h-3" />
+									)}
+									{orderState === 'approved' ? 'Accepted' : 'Accept'}
+								</button>
+								
+								<button
+									onClick={() => handleOrderAction('reject', orderId, notification.id!)}
+									disabled={processingAction === `reject-${notification.id}` || orderState === 'approved'}
+									className={`flex items-center gap-1 px-3 py-1 text-xs rounded-md transition-colors disabled:cursor-not-allowed ${
+										orderState === 'rejected'
+											? 'bg-red-600 text-white'
+											: orderState === 'approved'
+											? 'bg-gray-300 text-gray-500'
+											: 'bg-red-500 text-white hover:bg-red-600 disabled:opacity-50'
+									}`}
+								>
+									{processingAction === `reject-${notification.id}` ? (
+										<div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
+									) : (
+										<XCircle className="w-3 h-3" />
+									)}
+									{orderState === 'rejected' ? 'Rejected' : 'Reject'}
+								</button>
+
+								<button
+									onClick={() => handleOrderAction('view', orderId, notification.id!)}
+									disabled={processingAction === `view-${notification.id}`}
+									className="flex items-center gap-1 px-3 py-1 bg-orange-500 text-white text-xs rounded-md hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+								>
+									{processingAction === `view-${notification.id}` ? (
+										<div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
+									) : (
+										<Eye className="w-3 h-3" />
+									)}
+									View
+								</button>
+							</div>
+						)}
+
+						{/* Show order status if it has been acted upon */}
+						{isOrder && orderId && orderState && (
+							<div className="mt-2">
+								<span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
+									orderState === 'approved' 
+										? 'bg-green-100 text-green-800'
+										: 'bg-red-100 text-red-800'
+								}`}>
+									{orderState === 'approved' ? (
+										<>
+											<CheckCircle className="w-3 h-3" />
+											Order Accepted
+										</>
+									) : (
+										<>
+											<XCircle className="w-3 h-3" />
+											Order Rejected
+										</>
+									)}
+								</span>
+							</div>
+						)}
+
 						{/* View project button for other notification types */}
-						{!isInvitation && notification.projectId && (
+						{!isInvitation && !isOrder && notification.projectId && (
 							<div className="mt-3">
 								<button
 									onClick={() =>
@@ -244,7 +390,7 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
 									</p>
 									<p className="text-sm">
 										You&apos;ll see notifications here when brands invite you to
-										projects or update project status.
+										projects or send you orders.
 									</p>
 								</div>
 							) : (

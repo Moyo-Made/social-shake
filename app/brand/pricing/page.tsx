@@ -1,10 +1,10 @@
-import PricingCard from '@/components/brand/brandProfile/BrandPricing'
+import PricingPage from '@/components/brand/subscription/Subscription'
 import React from 'react'
 
 const page = () => {
   return (
 	<div>
-	  <PricingCard />
+	  <PricingPage />
 	</div>
   )
 }

@@ -255,7 +255,7 @@ const CreateAccount: React.FC = () => {
       }
       
       // Redirect to complete profile
-      router.push("/brand/complete-profile");
+      router.push("/brand/account-created");
     } catch (err) {
       console.error("Signup error:", err);
       setFormError(

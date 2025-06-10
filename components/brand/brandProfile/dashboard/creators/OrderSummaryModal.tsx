@@ -166,30 +166,72 @@ const OrderSummaryModal: React.FC<OrderSummaryModalProps> = ({
 
 			const projectBrief = projectBriefData;
 
+			// Step 1: Create draft order (basic info only)
 			const orderResponse = await fetch("/api/orders", {
 				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
+				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					userId: currentUser?.uid,
 					creatorId: selectedCreator?.id,
 					packageType: packageType,
 					videoCount: videoCount,
 					totalPrice: actualTotalPrice,
-					scriptChoice: scriptChoice,
-					requirements: orderRequirements,
-					projectBrief: projectBrief,
+					paymentType: "escrow", // Add this
+					// Remove: requirements, projectBrief
 				}),
 			});
 
 			const orderResult = await orderResponse.json();
-
-			if (!orderResult.success) {
-				throw new Error(orderResult.error || "Failed to create order");
-			}
-
 			const newOrderId = orderResult.orderId;
+
+			// Step 2: Update scripts section
+			await fetch("/api/orders", {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					orderId: newOrderId,
+					userId: currentUser?.uid,
+					section: "scripts",
+					data: { scripts: scriptFormData.scripts },
+				}),
+			});
+
+			// Step 3: Update requirements section
+			await fetch("/api/orders", {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					orderId: newOrderId,
+					userId: currentUser?.uid,
+					section: "requirements",
+					data: {
+						generalRequirements: scriptFormData.generalRequirements,
+						videoSpecs: scriptFormData.videoSpecs,
+					},
+				}),
+			});
+
+			// Step 4: Update project brief section
+			await fetch("/api/orders", {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					orderId: newOrderId,
+					userId: currentUser?.uid,
+					section: "project_brief",
+					data: projectBriefData,
+				}),
+			});
+
+			// Step 5: Finalize order
+			await fetch("/api/orders", {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					orderId: newOrderId,
+					userId: currentUser?.uid,
+				}),
+			});
 
 			// Step 2: Check creator's Stripe connection
 			const stripeStatusResponse = await fetch(

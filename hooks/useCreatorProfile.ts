@@ -86,7 +86,7 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 
 				if (verificationResponse.ok) {
 					verificationData = await verificationResponse.json();
-					console.log("Verification data received:", verificationData);
+					
 				} else {
 					console.warn(
 						"Failed to fetch verification by userId, status:",
@@ -132,12 +132,6 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 					userId: currentUser.uid,
 				},
 			};
-
-			console.log("=== CREATOR PROFILE DEBUG ===");
-			console.log("Auth User ID:", currentUser.uid);
-			console.log("Profile ID (creator.id):", combinedProfileData.id);
-			console.log("User ID:", combinedProfileData.userId);
-			console.log("Verification ID:", combinedProfileData.verificationId);
 
 			setCreatorProfile(combinedProfileData);
 		} catch (err) {

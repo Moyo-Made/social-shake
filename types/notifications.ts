@@ -5,7 +5,9 @@ export interface NotificationData {
 		| "application_accepted"
 		| "application_rejected"
 		| "project_deadline_approaching"
-		| "new_application";
+		| "new_application"
+		| "order_finalized"
+		| "order_ready_for_payment";
 	title: string;
 	message: string;
 	userId: string;
@@ -23,6 +25,11 @@ export interface NotificationData {
 	invitationStatus?: "pending" | "accepted" | "declined";
 	invitedAt?: Date;
 	respondedAt?: Date;
+
+	// Order-related fields
+	orderId?: string;
+	relatedId?: string; 
+	relatedTo?: "order" | "project";
 }
 
 export interface InvitationResponse {

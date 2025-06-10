@@ -60,15 +60,17 @@ export async function POST(request: NextRequest) {
 			"contest",
 			"submission_approval",
 			"order",
+			"order_escrow", // Add order_escrow to creator payment types
 		];
-		const requiresCreatorAccount = creatorPaymentTypes.includes(paymentType);
 
-		// For order_escrow, creator account is not required upfront
-		if (
-			requiresCreatorAccount &&
-			paymentType !== "order_escrow" &&
-			!paymentData?.stripeConnectId
-		) {
+		// Define payment types that use escrow (held until approval)
+		const escrowPaymentTypes = ["order_escrow", "submission_approval"];
+
+		const requiresCreatorAccount = creatorPaymentTypes.includes(paymentType);
+		const isEscrowPayment = escrowPaymentTypes.includes(paymentType);
+
+		// For escrow payments, creator account is still required for the transfer
+		if (requiresCreatorAccount && !paymentData?.stripeConnectId) {
 			return NextResponse.json(
 				{
 					error:
@@ -124,11 +126,13 @@ export async function POST(request: NextRequest) {
 				// Use order data for naming
 				const packageType = paymentData?.packageType || "Package";
 				const videoCount = paymentData?.videoCount || 1;
-				productName = `${packageType} Package (${videoCount} videos)`;
+				const videoText = videoCount === 1 ? "video" : "videos";
+
+				productName = `${packageType} package (${videoCount} ${videoText})`;
 				productDescription =
 					paymentType === "order_escrow"
-						? `Escrow payment for ${packageType} package with ${videoCount} videos`
-						: `Direct payment for ${packageType} package with ${videoCount} videos`;
+						? `Escrow payment for ${packageType} package with ${videoCount} ${videoText}`
+						: `Direct payment for ${packageType} package with ${videoCount} ${videoText}`;
 				successUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-success?payment_id=${paymentId}&session_id={CHECKOUT_SESSION_ID}&order_id=${orderId || paymentData?.orderId}`;
 				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-cancelled?canceled=true`;
 				break;
@@ -177,6 +181,15 @@ export async function POST(request: NextRequest) {
 				break;
 		}
 
+		// Check if a PaymentIntent already exists for escrow payments
+		let existingPaymentIntentId = null;
+		if (isEscrowPayment && paymentData?.stripePaymentIntentId) {
+			existingPaymentIntentId = paymentData.stripePaymentIntentId;
+			console.log(
+				`Using existing PaymentIntent for escrow: ${existingPaymentIntentId}`
+			);
+		}
+
 		// Create payment intent data with direct creator payment for all creator payment types
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const paymentIntentData: any = {
@@ -222,16 +235,17 @@ export async function POST(request: NextRequest) {
 			},
 		};
 
-		// Add direct payment to creator for creator payment types (excluding order_escrow)
-		if (
-			requiresCreatorAccount &&
-			paymentType !== "order_escrow" &&
-			paymentData?.stripeConnectId
-		) {
+		// Add direct payment to creator for creator payment types
+		if (requiresCreatorAccount && paymentData?.stripeConnectId) {
 			paymentIntentData.on_behalf_of = paymentData.stripeConnectId;
 			paymentIntentData.transfer_data = {
 				destination: paymentData.stripeConnectId,
 			};
+
+			// For escrow payments, add capture_method: 'manual' to match the PaymentIntent
+			if (isEscrowPayment) {
+				paymentIntentData.capture_method = "manual";
+			}
 		}
 
 		// For order payments, add application fee if specified
@@ -244,9 +258,12 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		// Create a Stripe checkout session with the calculated amount
-		const session = await stripe.checkout.sessions.create({
-			payment_method_types: ["card"],
+		// Create Stripe checkout session
+		// Create Stripe checkout session
+		const sessionData = {
+			payment_method_types: [
+				"card",
+			] as Stripe.Checkout.SessionCreateParams.PaymentMethodType[],
 			line_items: [
 				{
 					price_data: {
@@ -260,7 +277,10 @@ export async function POST(request: NextRequest) {
 					quantity: 1,
 				},
 			],
-			mode: "payment",
+			mode: "payment" as Stripe.Checkout.SessionCreateParams.Mode,
+			// FIXED: For existing PaymentIntents, you need to handle this differently
+			// Stripe Checkout doesn't support reusing existing PaymentIntents directly
+			// Instead, always create new payment_intent_data
 			payment_intent_data: paymentIntentData,
 			success_url: successUrl,
 			cancel_url: cancelUrl,
@@ -272,6 +292,7 @@ export async function POST(request: NextRequest) {
 				paymentName: productName,
 				description: productDescription,
 				calculatedAmount: calculatedAmount.toString(),
+				escrowPayment: isEscrowPayment.toString(),
 				// Add specific metadata based on payment type
 				...(paymentType === "video" &&
 					paymentData && {
@@ -295,7 +316,7 @@ export async function POST(request: NextRequest) {
 						contestId: paymentData.contestId,
 						creatorId: paymentData.creatorId,
 					}),
-				// NEW: Order-specific metadata
+				// Order-specific metadata
 				...((paymentType === "order" || paymentType === "order_escrow") &&
 					paymentData && {
 						orderId: paymentData.orderId,
@@ -305,22 +326,26 @@ export async function POST(request: NextRequest) {
 						applicationFeeAmount: paymentData.applicationFeeAmount?.toString(),
 					}),
 			},
-		});
+		};
+
+		const session = await stripe.checkout.sessions.create(sessionData);
 
 		// Update payment record with sessionId and calculated amount
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const updateData: any = {
 			stripeSessionId: session.id,
-			stripePaymentIntentId: session.payment_intent, // Store the payment intent ID from session
+			stripePaymentIntentId: existingPaymentIntentId || session.payment_intent, // Use existing or new payment intent ID
 			updatedAt: new Date().toISOString(),
 			paymentType,
 			paymentName: productName,
 			calculatedAmount, // Store the calculated amount in the payment record
+			// Update status based on payment type
+			status: isEscrowPayment ? "pending_capture" : "pending",
 		};
 
 		await adminDb.collection("payments").doc(paymentId).update(updateData);
 
-		// NEW: For order payments, also update the order record and order_payments collection
+		// For order payments, also update the order record and order_payments collection
 		if (paymentType === "order" || paymentType === "order_escrow") {
 			const orderIdToUpdate = orderId || paymentData?.orderId;
 
@@ -331,7 +356,8 @@ export async function POST(request: NextRequest) {
 					.doc(orderIdToUpdate)
 					.update({
 						stripe_session_id: session.id,
-						stripe_payment_intent_id: session.payment_intent,
+						stripe_payment_intent_id:
+							existingPaymentIntentId || session.payment_intent,
 						payment_id: paymentId,
 						status: "payment_pending",
 						payment_type: paymentType === "order_escrow" ? "escrow" : "direct",
@@ -350,14 +376,33 @@ export async function POST(request: NextRequest) {
 						.doc(paymentId)
 						.update({
 							stripeSessionId: session.id,
-							stripePaymentIntentId: session.payment_intent,
-							status:
-								paymentType === "order_escrow"
-									? "pending_escrow"
-									: "pending_payment",
+							stripePaymentIntentId:
+								existingPaymentIntentId || session.payment_intent,
+							status: isEscrowPayment ? "pending_capture" : "pending_payment",
 							updatedAt: new Date().toISOString(),
 						});
 				}
+			}
+		}
+
+		// Update submission_payments for submission_approval escrow
+		if (paymentType === "submission_approval" && paymentData?.submissionId) {
+			const submissionPaymentDoc = await adminDb
+				.collection("submission_payments")
+				.doc(paymentId)
+				.get();
+
+			if (submissionPaymentDoc.exists) {
+				await adminDb
+					.collection("submission_payments")
+					.doc(paymentId)
+					.update({
+						stripeSessionId: session.id,
+						stripePaymentIntentId:
+							existingPaymentIntentId || session.payment_intent,
+						status: "pending_capture", // Escrow status
+						updatedAt: new Date().toISOString(),
+					});
 			}
 		}
 
@@ -389,7 +434,7 @@ export async function POST(request: NextRequest) {
 					break;
 				case "submission_approval":
 					notificationType = "submission_payment_initiated";
-					notificationMessage = `A brand has initiated payment for your approved submission: ${productName}`;
+					notificationMessage = `A brand has initiated escrow payment for your approved submission: ${productName}. Funds will be held until project completion.`;
 					break;
 			}
 
@@ -400,10 +445,10 @@ export async function POST(request: NextRequest) {
 				amount: calculatedAmount, // Use calculated amount
 				paymentId,
 				sessionId: session.id,
-				status:
-					paymentType === "order_escrow" ? "pending_escrow" : "pending_payment",
+				status: isEscrowPayment ? "pending_capture" : "pending_payment",
 				createdAt: new Date().toISOString(),
 				message: notificationMessage,
+				escrowPayment: isEscrowPayment,
 				// Add specific fields based on payment type
 				...(paymentType === "video" && { videoId: paymentData.videoId }),
 				...(paymentType === "project" && { projectId: paymentData.projectId }),
@@ -425,12 +470,13 @@ export async function POST(request: NextRequest) {
 		return NextResponse.json({
 			success: true,
 			sessionId: session.id,
-			paymentIntentId: session.payment_intent, // Return payment intent ID
+			paymentIntentId: existingPaymentIntentId || session.payment_intent, // Return payment intent ID
 			paymentType,
-			directPayment: requiresCreatorAccount && paymentType !== "order_escrow",
+			directPayment: requiresCreatorAccount,
 			creatorConnected: !!paymentData?.stripeConnectId,
 			calculatedAmount, // Return the calculated amount for debugging
-			isEscrow: paymentType === "order_escrow",
+			isEscrow: isEscrowPayment,
+			escrowStatus: isEscrowPayment ? "pending_capture" : null,
 			...(paymentType === "order" || paymentType === "order_escrow"
 				? {
 						orderId: orderId || paymentData?.orderId,

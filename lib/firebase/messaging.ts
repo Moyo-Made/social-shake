@@ -13,7 +13,6 @@ import {
   onSnapshot,
   limit,
   Timestamp,
-
 } from "firebase/firestore";
 import { Message, Conversation, User } from "@/types/messaging";
 
@@ -24,18 +23,25 @@ export const getOrCreateConversation = async (
   userId1: string,
   userId2: string
 ): Promise<string> => {
-  // Sort IDs to ensure consistency when querying
-  const participants = [userId1, userId2].sort();
+  // Create participants object instead of array
+  const participants = {
+    [userId1]: true,
+    [userId2]: true
+  };
 
-  // Check if conversation already exists
+  // Check if conversation already exists - need to check both combinations
   const conversationsRef = collection(db, "conversations");
-  const q = query(conversationsRef, where("participants", "==", participants));
-
-  const querySnapshot = await getDocs(q);
-
-  // Return existing conversation if found
-  if (!querySnapshot.empty) {
-    return querySnapshot.docs[0].id;
+  
+  // Since we can't easily query object keys, we'll get all user conversations and filter
+  const q1 = query(conversationsRef, where(`participants.${userId1}`, "==", true));
+  const querySnapshot = await getDocs(q1);
+  
+  // Check if any of these conversations also contain userId2
+  for (const docSnap of querySnapshot.docs) {
+    const data = docSnap.data();
+    if (data.participants[userId2] === true) {
+      return docSnap.id;
+    }
   }
 
   // Create new conversation if not found
@@ -51,26 +57,100 @@ export const getOrCreateConversation = async (
 };
 
 /**
- * Get a specific conversation by ID
+ * Get all conversations for a user - Updated to work with object-based participants
  */
-export const getConversation = async (conversationId: string): Promise<Conversation | null> => {
+export const getUserConversations = async (userId: string): Promise<Conversation[]> => {
   try {
-    const conversationRef = doc(db, "conversations", conversationId);
-    const conversationSnapshot = await getDoc(conversationRef);
-    
-    if (!conversationSnapshot.exists()) {
-      return null;
-    }
-    
-    return {
-      id: conversationSnapshot.id,
-      ...conversationSnapshot.data() as Omit<Conversation, 'id'>
-    };
+    const conversationsRef = collection(db, "conversations");
+    // Query where the user is a participant (object key exists and is true)
+    const q = query(
+      conversationsRef,
+      where(`participants.${userId}`, "==", true),
+      orderBy("lastMessageTimestamp", "desc")
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    } as Conversation));
   } catch (error) {
-    console.error("Error fetching conversation:", error);
-    return null;
+    console.error("Error getting user conversations:", error);
+    return [];
   }
 };
+
+/**
+ * Subscribe to user conversations - Updated for object-based participants
+ */
+export const subscribeToUserConversations = (
+  userId: string,
+  callback: (conversations: Conversation[]) => void
+): (() => void) => {
+  if (!userId) {
+    console.error("Cannot subscribe to conversations without a user ID");
+    return () => {};
+  }
+
+  const conversationsRef = collection(db, "conversations");
+  const q = query(
+    conversationsRef,
+    where(`participants.${userId}`, "==", true),
+    orderBy("lastMessageTimestamp", "desc")
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const conversations = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    } as Conversation));
+    callback(conversations);
+  }, error => {
+    console.error("Error subscribing to conversations:", error);
+  });
+};
+
+/**
+ * Get user details for conversations - Updated to work with object-based participants
+ */
+export const getConversationUsers = async (
+  participants: Record<string, boolean>
+): Promise<Record<string, User>> => {
+  try {
+    const users: Record<string, User> = {};
+    const userIds = Object.keys(participants);
+    
+    for (const userId of userIds) {
+      const userRef = doc(db, "users", userId);
+      const userDoc = await getDoc(userRef);
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        users[userId] = {
+          id: userId,
+          displayName: userData.displayName || "User",
+          photoURL: userData.photoURL || "/default-avatar.png",
+          isActive: userData.isActive || false,
+        };
+      } else {
+        users[userId] = {
+          id: userId,
+          displayName: "Unknown User",
+          photoURL: "/default-avatar.png",
+          isActive: false,
+        };
+      }
+    }
+    
+    return users;
+  } catch (error) {
+    console.error("Error fetching user details:", error);
+    return {};
+  }
+};
+
+// Keep all other functions the same (sendMessage, getMessages, etc.)
+// as they don't directly interact with the participants field structure
 
 /**
  * Send a message in a conversation
@@ -83,21 +163,19 @@ export const sendMessage = async (
   attachmentUrl: string | null = null
 ): Promise<string> => {
   try {
-    // Add message to the messages subcollection
     const messagesRef = collection(db, "conversations", conversationId, "messages");
     const messageData: Omit<Message, "id"> = {
-		text,
-		senderId,
-		receiverId,
-		timestamp: serverTimestamp() as Timestamp,
-		isRead: false,
-		...(attachmentUrl && { attachmentUrl }),
-		content: ""
-	};
+      text,
+      senderId,
+      receiverId,
+      timestamp: serverTimestamp() as Timestamp,
+      isRead: false,
+      ...(attachmentUrl && { attachmentUrl }),
+      content: ""
+    };
 
     const newMessageRef = await addDoc(messagesRef, messageData);
 
-    // Update conversation with last message info
     const conversationRef = doc(db, "conversations", conversationId);
     await updateDoc(conversationRef, {
       lastMessage: text,
@@ -133,7 +211,7 @@ export const getMessages = async (
         id: doc.id,
         ...doc.data(),
       } as Message))
-      .reverse(); // Reverse to get chronological order
+      .reverse();
   } catch (error) {
     console.error("Error getting messages:", error);
     return [];
@@ -141,7 +219,7 @@ export const getMessages = async (
 };
 
 /**
- * Listen to new messages in a conversation
+ * Subscribe to new messages in a conversation
  */
 export const subscribeToMessages = (
   conversationId: string,
@@ -204,94 +282,24 @@ export const markMessagesAsRead = async (
 };
 
 /**
- * Get all conversations for a user
+ * Get a specific conversation by ID
  */
-export const getUserConversations = async (userId: string): Promise<Conversation[]> => {
+export const getConversation = async (conversationId: string): Promise<Conversation | null> => {
   try {
-    const conversationsRef = collection(db, "conversations");
-    const q = query(
-      conversationsRef,
-      where("participants", "array-contains", userId),
-      orderBy("lastMessageTimestamp", "desc")
-    );
-
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    } as Conversation));
-  } catch (error) {
-    console.error("Error getting user conversations:", error);
-    return [];
-  }
-};
-
-/**
- * Subscribe to user conversations to get real-time updates
- */
-export const subscribeToUserConversations = (
-  userId: string,
-  callback: (conversations: Conversation[]) => void
-): (() => void) => {
-  if (!userId) {
-    console.error("Cannot subscribe to conversations without a user ID");
-    return () => {};
-  }
-
-  const conversationsRef = collection(db, "conversations");
-  const q = query(
-    conversationsRef,
-    where("participants", "array-contains", userId),
-    orderBy("lastMessageTimestamp", "desc")
-  );
-
-  return onSnapshot(q, (snapshot) => {
-    const conversations = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    } as Conversation));
-    callback(conversations);
-  }, error => {
-    console.error("Error subscribing to conversations:", error);
-  });
-};
-
-/**
- * Get user details for conversations
- */
-export const getConversationUsers = async (
-  userIds: string[]
-): Promise<Record<string, User>> => {
-  try {
-    const users: Record<string, User> = {};
+    const conversationRef = doc(db, "conversations", conversationId);
+    const conversationSnapshot = await getDoc(conversationRef);
     
-    for (const userId of userIds) {
-      const userRef = doc(db, "users", userId);
-      const userDoc = await getDoc(userRef);
-      
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        users[userId] = {
-          id: userId,
-          displayName: userData.displayName || "User",
-          photoURL: userData.photoURL || "/default-avatar.png",
-          isActive: userData.isActive || false,
-        };
-      } else {
-        // Add default user if not found
-        users[userId] = {
-          id: userId,
-          displayName: "Unknown User",
-          photoURL: "/default-avatar.png",
-          isActive: false,
-        };
-      }
+    if (!conversationSnapshot.exists()) {
+      return null;
     }
     
-    return users;
+    return {
+      id: conversationSnapshot.id,
+      ...conversationSnapshot.data() as Omit<Conversation, 'id'>
+    };
   } catch (error) {
-    console.error("Error fetching user details:", error);
-    return {};
+    console.error("Error fetching conversation:", error);
+    return null;
   }
 };
 

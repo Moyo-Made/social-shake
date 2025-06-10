@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import {
 	User,
@@ -11,6 +13,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "../../ui/button";
+import Link from "next/link";
 
 const PricingPage = () => {
 	return (
@@ -26,7 +29,13 @@ const PricingPage = () => {
 							Create custom AI avatars, manage creator campaigns, and scale your
 							brand — all from one platform.
 						</p>
-						<Button className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-lg font-medium inline-flex items-center gap-2">
+						<Button
+							onClick={() =>
+								document.getElementById("compare-plans")
+									?.scrollIntoView({ behavior: "smooth" })
+							}
+							className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-lg font-medium inline-flex items-center gap-2"
+						>
 							Learn More
 							<span>→</span>
 						</Button>
@@ -102,9 +111,11 @@ const PricingPage = () => {
 								</div>
 							</div>
 
-							<Button className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-medium">
-								Start Free Trial
-							</Button>
+							<Link href="/brand/signup-complete">
+								<Button className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-medium">
+									Start Free Trial
+								</Button>
+							</Link>
 						</div>
 
 						{/* Starter Plan - Most Popular */}
@@ -183,9 +194,11 @@ const PricingPage = () => {
 									</div>
 								</div>
 
-								<Button className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-medium">
-									Buy Now
-								</Button>
+								<Link href="/brand/signup-complete">
+									<Button className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-medium">
+										Buy Now
+									</Button>
+								</Link>
 							</div>
 						</div>
 
@@ -260,9 +273,11 @@ const PricingPage = () => {
 								</div>
 							</div>
 
-							<Button className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-medium">
-								Buy Now
-							</Button>
+							<Link href="/brand/signup-complete">
+								<Button className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg font-medium">
+									Buy Now
+								</Button>
+							</Link>
 						</div>
 					</div>
 				</div>
@@ -288,9 +303,11 @@ const PricingPage = () => {
 								Built for agencies and content-heavy brands with high demand.
 							</p>
 
-							<Button className="w-full bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-md font-medium">
-								Contact Us
-							</Button>
+							<Link href="/contact-us">
+								<Button className="w-full bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-md font-medium">
+									Contact Us
+								</Button>
+							</Link>
 						</div>
 
 						<div className="space-y-4">
@@ -336,7 +353,7 @@ const PricingPage = () => {
 			</div>
 
 			{/* Section 3: Compare Plans & Features */}
-			<div className="py-16 px-4 bg-white">
+			<div id="compare-plans" className="py-16 px-4 bg-white">
 				<div className="max-w-7xl mx-auto">
 					<div className="text-center mb-12">
 						<h2 className="text-2xl font-medium text-gray-900 mb-1">
@@ -585,24 +602,32 @@ const PricingPage = () => {
 								<tr>
 									<td className="p-4"></td>
 									<td className="p-4 text-center">
-										<Button className="w-full bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg font-medium">
-											Start Free Trial
-										</Button>
+										<Link href="/brand/signup-complete">
+											<Button className="w-full bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg font-medium">
+												Start Free Trial
+											</Button>
+										</Link>
 									</td>
 									<td className="p-4 text-center">
-										<Button className="w-full bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg font-medium">
-											Buy Now
-										</Button>
+										<Link href="/brand/signup-complete">
+											<Button className="w-full bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg font-medium">
+												Buy Now
+											</Button>
+										</Link>
 									</td>
 									<td className="p-4 text-center">
-										<Button className="w-full bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg font-medium">
-											Buy Now
-										</Button>
+										<Link href="/brand/signup-complete">
+											<Button className="w-full bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg font-medium">
+												Buy Now
+											</Button>
+										</Link>
 									</td>
 									<td className="p-4 text-center">
-										<Button className="w-full bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg font-medium">
-											Contact Us
-										</Button>
+										<Link href="/brand/signup-complete">
+											<Button className="w-full bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg font-medium">
+												Contact Us
+											</Button>
+										</Link>
 									</td>
 								</tr>
 							</tbody>

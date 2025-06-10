@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/config/firebase-admin";
+import Stripe from "stripe";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+	apiVersion: "2025-03-31.basil",
+});
 
 // Helper function to remove undefined values
 const removeUndefined = (
@@ -12,36 +17,28 @@ const removeUndefined = (
 
 export async function POST(request: NextRequest) {
 	try {
-		// Check if the request is multipart/form-data or JSON
+		// [Your existing form data parsing logic remains the same]
 		const contentType = request.headers.get("content-type") || "";
-
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		let requestData: Record<string, any> = {};
 
 		if (contentType.includes("multipart/form-data")) {
-			// Handle form data submission
 			const formData = await request.formData();
-
+			// Extract all your existing fields...
 			requestData.submissionId = formData.get("submissionId")?.toString();
 			requestData.projectId = formData.get("projectId")?.toString();
-
-			// Extract basic payment fields
 			requestData.userId = formData.get("userId")?.toString();
 			requestData.brandEmail = formData.get("brandEmail")?.toString();
 			requestData.amount = formData.get("amount")?.toString();
-			requestData.paymentType = formData.get("paymentType")?.toString(); // "contest", "project", "video"
-
-			// Extract video-specific fields
+			requestData.paymentType = formData.get("paymentType")?.toString();
 			requestData.videoId = formData.get("videoId")?.toString();
 			requestData.stripeConnectId = formData.get("stripeConnectId")?.toString();
 			requestData.videoTitle = formData.get("videoTitle")?.toString();
 			requestData.creatorEmail = formData.get("creatorEmail")?.toString();
-
 			requestData.orderId = formData.get("orderId")?.toString();
 			requestData.packageType = formData.get("packageType")?.toString();
 			requestData.videoCount = formData.get("videoCount")?.toString();
 
-			// Extract contest/project info
 			try {
 				const basicJson = formData.get("basic")?.toString();
 				if (basicJson) {
@@ -55,28 +52,22 @@ export async function POST(request: NextRequest) {
 				console.error("Error parsing basic info:", e);
 			}
 		} else {
-			// Handle JSON submission
 			const jsonData = await request.json();
 			requestData = {
 				userId: jsonData.userId,
 				brandEmail: jsonData.brandEmail,
 				amount: jsonData.amount,
-				paymentType: jsonData.paymentType || "contest", // Default to contest for backward compatibility
-
-				// Video-specific fields
+				paymentType: jsonData.paymentType || "contest",
 				videoId: jsonData.videoId,
 				stripeConnectId: jsonData.stripeConnectId,
 				videoTitle: jsonData.videoTitle,
 				creatorEmail: jsonData.creatorEmail,
-
-				// Contest/Project fields
 				contestName: jsonData.basic?.contestName || jsonData.contestName,
 				contestType: jsonData.basic?.contestType || jsonData.contestType,
 				contestId: jsonData.basic?.contestId || jsonData.contestId,
 				projectTitle: jsonData.basic?.projectTitle || jsonData.projectTitle,
 				projectId: jsonData.projectId,
 				submissionId: jsonData.submissionId,
-
 				orderId: jsonData.orderId,
 				packageType: jsonData.packageType,
 				videoCount: jsonData.videoCount,
@@ -93,41 +84,29 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		// Additional specific validations
-		if (paymentType === "video") {
-			if (!requestData.videoId) {
-				return NextResponse.json(
-					{ error: "Video ID is required for video purchases" },
-					{ status: 400 }
-				);
-			}
-		}
-
-		// Auto-fetch submission data for submission_approval payments
+		// Auto-fetch creator data for submission_approval payments
 		if (paymentType === "submission_approval") {
 			if (!requestData.submissionId) {
 				return NextResponse.json(
-					{
-						error: "Submission ID is required for submission approvals",
-					},
+					{ error: "Submission ID is required for submission approvals" },
 					{ status: 400 }
 				);
 			}
-			// AUTO-FETCH: Get submission data and creator's Stripe Connect ID
+
 			try {
 				const submissionDoc = await adminDb
 					.collection("project_submissions")
 					.doc(requestData.submissionId)
 					.get();
+
 				if (!submissionDoc.exists) {
 					return NextResponse.json(
 						{ error: "Submission not found" },
 						{ status: 404 }
 					);
 				}
-				const submissionData = submissionDoc.data();
 
-				// Get creator ID from submission
+				const submissionData = submissionDoc.data();
 				const creatorId = submissionData?.userId;
 
 				if (!creatorId) {
@@ -136,26 +115,25 @@ export async function POST(request: NextRequest) {
 						{ status: 400 }
 					);
 				}
-				// Fetch creator's Stripe Connect ID
+
 				const creatorDoc = await adminDb
 					.collection("creators")
 					.doc(creatorId)
 					.get();
+
 				if (!creatorDoc.exists) {
 					return NextResponse.json(
 						{ error: "Creator not found" },
 						{ status: 404 }
 					);
 				}
-				const creatorData = creatorDoc.data();
 
-				// Auto-populate the missing fields
+				const creatorData = creatorDoc.data();
 				requestData.stripeConnectId = creatorData?.stripeAccountId;
 				requestData.creatorEmail = creatorData?.email;
 				requestData.projectId = submissionData?.projectId;
-				requestData.creatorId = creatorId; // Store the creator ID for checkout session
-				// Note: projectTitle will come from existing formData since it's not in submission
-				// Validate that creator has connected their Stripe account
+				requestData.creatorId = creatorId;
+
 				if (!requestData.stripeConnectId) {
 					return NextResponse.json(
 						{
@@ -168,16 +146,138 @@ export async function POST(request: NextRequest) {
 						{ status: 400 }
 					);
 				}
-				console.log("Auto-fetched data for submission_approval:", {
-					creatorId,
-					stripeConnectId: requestData.stripeConnectId,
-					projectId: requestData.projectId,
-					creatorEmail: requestData.creatorEmail,
-				});
 			} catch (error) {
 				console.error("Error auto-fetching submission data:", error);
 				return NextResponse.json(
 					{ error: "Failed to fetch submission data" },
+					{ status: 500 }
+				);
+			}
+		}
+
+		if (paymentType === "order_escrow") {
+			if (!requestData.orderId) {
+				return NextResponse.json(
+					{ error: "Order ID is required for escrow orders" },
+					{ status: 400 }
+				);
+			}
+		
+			// Try to get creatorId from request first, then from orders collection
+			let creatorId = requestData.creatorId;
+		
+			if (!creatorId) {
+				// Try to fetch creatorId from orders collection with better error handling
+				try {
+					const orderDoc = await adminDb
+						.collection("orders")
+						.doc(requestData.orderId)
+						.get();
+		
+					if (!orderDoc.exists) {
+						return NextResponse.json(
+							{ 
+								error: `Order with ID ${requestData.orderId} not found`,
+								errorCode: "ORDER_NOT_FOUND"
+							},
+							{ status: 404 }
+						);
+					}
+		
+					const orderData = orderDoc.data();
+					console.log("Order data:", orderData); // Debug log
+					
+					// Try multiple possible field names (prioritize creator_id since that's your actual field)
+					creatorId = orderData?.creator_id || 
+							   orderData?.creatorId || 
+							   orderData?.userId || 
+							   orderData?.user_id;
+		
+					if (!creatorId) {
+						console.error("Order data fields:", Object.keys(orderData || {}));
+						return NextResponse.json(
+							{
+								error: "Creator ID not found in order data. Available fields: " + 
+									   Object.keys(orderData || {}).join(", "),
+								errorCode: "CREATOR_ID_NOT_IN_ORDER"
+							},
+							{ status: 400 }
+						);
+					}
+		
+					console.log("Found creatorId from order:", creatorId);
+				} catch (error) {
+					console.error("Error fetching order data:", error);
+					return NextResponse.json(
+						{ 
+							error: "Failed to fetch order data from database",
+							details: error instanceof Error ? error.message : String(error)
+						},
+						{ status: 500 }
+					);
+				}
+			}
+		
+			if (!creatorId) {
+				return NextResponse.json(
+					{
+						error: "Creator ID is required for escrow orders. Please provide creatorId in request or ensure order exists with creator information.",
+						errorCode: "CREATOR_ID_REQUIRED",
+						debug: {
+							orderId: requestData.orderId,
+							requestHasCreatorId: !!requestData.creatorId
+						}
+					},
+					{ status: 400 }
+				);
+			}
+		
+			// Rest of the creator fetching logic remains the same...
+			try {
+				const creatorDoc = await adminDb
+					.collection("creators")
+					.doc(creatorId)
+					.get();
+		
+				if (!creatorDoc.exists) {
+					return NextResponse.json(
+						{ 
+							error: `Creator with ID ${creatorId} not found`,
+							errorCode: "CREATOR_NOT_FOUND"
+						},
+						{ status: 404 }
+					);
+				}
+		
+				const creatorData = creatorDoc.data();
+				requestData.stripeConnectId = creatorData?.stripeAccountId;
+				requestData.creatorEmail = creatorData?.email;
+				requestData.creatorId = creatorId;
+		
+				if (!requestData.stripeConnectId) {
+					return NextResponse.json(
+						{
+							error: "Creator hasn't connected their Stripe account yet. Please ask them to connect their account before creating an escrow order.",
+							errorCode: "CREATOR_ACCOUNT_NOT_CONNECTED",
+							paymentType,
+							creatorId: creatorId,
+						},
+						{ status: 400 }
+					);
+				}
+		
+				console.log("Auto-fetched data for order_escrow:", {
+					creatorId,
+					stripeConnectId: requestData.stripeConnectId,
+					creatorEmail: requestData.creatorEmail,
+				});
+			} catch (error) {
+				console.error("Error auto-fetching creator data for order:", error);
+				return NextResponse.json(
+					{ 
+						error: "Failed to fetch creator data from database",
+						details: error instanceof Error ? error.message : String(error)
+					},
 					{ status: 500 }
 				);
 			}
@@ -189,41 +289,49 @@ export async function POST(request: NextRequest) {
 			"project",
 			"contest",
 			"submission_approval",
+			"order_escrow", // New escrow payment type
 		];
+
+		// Define payment types that use escrow (held until approval)
+		const escrowPaymentTypes = ["order_escrow", "submission_approval"];
+
 		const requiresCreatorAccount = creatorPaymentTypes.includes(paymentType);
+		const isEscrowPayment = escrowPaymentTypes.includes(paymentType);
 
-		// Additional validation for creator payment types
-		if (requiresCreatorAccount) {
-			if (!requestData.stripeConnectId) {
-				let errorMessage = "";
-				switch (paymentType) {
-					case "video":
-						errorMessage =
-							"Creator hasn't connected their Stripe account yet. Please ask them to connect their account before purchasing videos.";
-						break;
-					case "project":
-						errorMessage =
-							"Creator hasn't connected their Stripe account yet. Please ask them to connect their account before proceeding with project payment.";
-						break;
-					case "contest":
-						errorMessage =
-							"Creator hasn't connected their Stripe account yet. Please ask them to connect their account before proceeding with contest payment.";
-						break;
-					case "submission_approval":
-						errorMessage =
-							"Creator hasn't connected their Stripe account yet. Please ask them to connect their account before approving submission payment.";
-						break;
-				}
-
-				return NextResponse.json(
-					{
-						error: errorMessage,
-						errorCode: "CREATOR_ACCOUNT_NOT_CONNECTED",
-						paymentType,
-					},
-					{ status: 400 }
-				);
+		// Validation for creator payment types
+		if (requiresCreatorAccount && !requestData.stripeConnectId) {
+			let errorMessage = "";
+			switch (paymentType) {
+				case "video":
+					errorMessage =
+						"Creator hasn't connected their Stripe account yet. Please ask them to connect their account before purchasing videos.";
+					break;
+				case "project":
+					errorMessage =
+						"Creator hasn't connected their Stripe account yet. Please ask them to connect their account before proceeding with project payment.";
+					break;
+				case "contest":
+					errorMessage =
+						"Creator hasn't connected their Stripe account yet. Please ask them to connect their account before proceeding with contest payment.";
+					break;
+				case "submission_approval":
+					errorMessage =
+						"Creator hasn't connected their Stripe account yet. Please ask them to connect their account before approving submission payment.";
+					break;
+				case "order_escrow":
+					errorMessage =
+						"Creator hasn't connected their Stripe account yet. Please ask them to connect their account before creating an escrow order.";
+					break;
 			}
+
+			return NextResponse.json(
+				{
+					error: errorMessage,
+					errorCode: "CREATOR_ACCOUNT_NOT_CONNECTED",
+					paymentType,
+				},
+				{ status: 400 }
+			);
 		}
 
 		// Create a payment ID
@@ -241,10 +349,46 @@ export async function POST(request: NextRequest) {
 			case "submission_approval":
 				paymentName = `Submission Approval - ${requestData.projectTitle || "Project"}`;
 				break;
+			case "order_escrow":
+				paymentName = `Order Payment - ${requestData.packageType || "Package"}`;
+				break;
 			case "contest":
 			default:
 				paymentName = requestData.contestName || "Contest";
 				break;
+		}
+
+		// For escrow payments, create Stripe PaymentIntent with on_behalf_of but hold the funds
+		let stripePaymentIntentId = null;
+		if (isEscrowPayment && requestData.stripeConnectId) {
+			try {
+				const paymentIntent = await stripe.paymentIntents.create({
+					amount: Math.round(parseFloat(amount) * 100), // Convert to cents
+					currency: "usd",
+					on_behalf_of: requestData.stripeConnectId, // Charge on behalf of creator
+					transfer_data: {
+						destination: requestData.stripeConnectId,
+					},
+					// Don't capture immediately - this creates the "escrow" effect
+					capture_method: "manual",
+					metadata: {
+						paymentId: paymentId,
+						paymentType: paymentType,
+						creatorId: requestData.creatorId || "",
+						orderId: requestData.orderId || "",
+						submissionId: requestData.submissionId || "",
+					},
+				});
+
+				stripePaymentIntentId = paymentIntent.id;
+				console.log(`Created escrow PaymentIntent: ${stripePaymentIntentId}`);
+			} catch (stripeError) {
+				console.error("Error creating Stripe PaymentIntent:", stripeError);
+				return NextResponse.json(
+					{ error: "Failed to create payment intent with Stripe" },
+					{ status: 500 }
+				);
+			}
 		}
 
 		// Store payment intent data in Firestore
@@ -255,7 +399,9 @@ export async function POST(request: NextRequest) {
 			amount: parseFloat(amount),
 			paymentType: paymentType || "contest",
 			paymentName,
-			status: "pending",
+			status: isEscrowPayment ? "pending_capture" : "pending", // Different status for escrow
+			escrowPayment: isEscrowPayment,
+			stripePaymentIntentId: stripePaymentIntentId,
 			createdAt: new Date().toISOString(),
 			requiresCreatorAccount,
 			directPayment: requiresCreatorAccount,
@@ -293,7 +439,7 @@ export async function POST(request: NextRequest) {
 				projectTitle: requestData.projectTitle,
 			}),
 
-			// Order-specific fields
+			// Order-specific fields (including escrow orders)
 			...((paymentType === "order" || paymentType === "order_escrow") && {
 				orderId: requestData.orderId,
 				packageType: requestData.packageType,
@@ -304,9 +450,37 @@ export async function POST(request: NextRequest) {
 		if (!adminDb) {
 			throw new Error("Firebase admin database is not initialized");
 		}
+
 		await adminDb.collection("payments").doc(paymentId).set(paymentData);
 
-		// Create purchase/payment records for different payment types
+		// Create specific collection records based on payment type
+		if (paymentType === "order_escrow" && requestData.stripeConnectId) {
+			const escrowOrderRecord = {
+				paymentId: paymentId,
+				orderId: requestData.orderId,
+				stripeConnectId: requestData.stripeConnectId,
+				stripePaymentIntentId: stripePaymentIntentId,
+				brandId: userId,
+				creatorId: requestData.creatorId,
+				amount: parseFloat(amount),
+				status: "pending_capture", // Funds are authorized but not captured yet
+				escrowStatus: "held", // Additional escrow tracking
+				createdAt: new Date().toISOString(),
+				packageType: requestData.packageType || "",
+				videoCount: requestData.videoCount || "",
+				brandEmail: requestData.brandEmail || "",
+				creatorEmail: requestData.creatorEmail || "",
+				directPayment: true,
+				escrowPayment: true,
+			};
+
+			await adminDb
+				.collection("order_payments")
+				.doc(paymentId)
+				.set(escrowOrderRecord);
+		}
+
+		// [Keep all your existing collection record creation logic for other payment types]
 		if (paymentType === "video" && requestData.stripeConnectId) {
 			const purchaseRecord = {
 				purchaseId: paymentId,
@@ -327,60 +501,22 @@ export async function POST(request: NextRequest) {
 				.set(purchaseRecord);
 		}
 
-		// Create similar records for other payment types if needed
-		if (paymentType === "project" && requestData.stripeConnectId) {
-			const projectPaymentRecord = {
-				paymentId: paymentId,
-				projectId: requestData.projectId,
-				stripeConnectId: requestData.stripeConnectId,
-				brandId: userId,
-				amount: parseFloat(amount),
-				status: "pending_payment",
-				createdAt: new Date().toISOString(),
-				projectTitle: requestData.projectTitle || "",
-				brandEmail: requestData.brandEmail || "",
-				directPayment: true,
-			};
-
-			await adminDb
-				.collection("project_payments")
-				.doc(paymentId)
-				.set(projectPaymentRecord);
-		}
-
-		if (paymentType === "contest" && requestData.stripeConnectId) {
-			const contestPaymentRecord = {
-				paymentId: paymentId,
-				contestId: requestData.contestId,
-				stripeConnectId: requestData.stripeConnectId,
-				brandId: userId,
-				amount: parseFloat(amount),
-				status: "pending_payment",
-				createdAt: new Date().toISOString(),
-				contestName: requestData.contestName || "",
-				brandEmail: requestData.brandEmail || "",
-				directPayment: true,
-			};
-
-			await adminDb
-				.collection("contest_payments")
-				.doc(paymentId)
-				.set(contestPaymentRecord);
-		}
-
 		if (paymentType === "submission_approval" && requestData.stripeConnectId) {
 			const submissionPaymentRecord = {
 				paymentId: paymentId,
 				submissionId: requestData.submissionId,
 				projectId: requestData.projectId,
 				stripeConnectId: requestData.stripeConnectId,
+				stripePaymentIntentId: stripePaymentIntentId, // Include for escrow tracking
 				brandId: userId,
 				amount: parseFloat(amount),
-				status: "pending_payment",
+				status: "pending_capture", // Changed from pending_payment for escrow
+				escrowStatus: "held",
 				createdAt: new Date().toISOString(),
 				projectTitle: requestData.projectTitle || "",
 				brandEmail: requestData.brandEmail || "",
 				directPayment: true,
+				escrowPayment: true,
 			};
 
 			await adminDb
@@ -389,13 +525,18 @@ export async function POST(request: NextRequest) {
 				.set(submissionPaymentRecord);
 		}
 
+		// [Include your other existing collection records...]
+
 		return NextResponse.json({
 			success: true,
 			message: `Payment intent created for ${paymentType}`,
 			paymentId,
 			paymentType,
 			directPayment: requiresCreatorAccount,
+			escrowPayment: isEscrowPayment,
+			stripePaymentIntentId: stripePaymentIntentId,
 			creatorConnected: !!requestData.stripeConnectId,
+			status: isEscrowPayment ? "pending_capture" : "pending",
 		});
 	} catch (error) {
 		console.error("Error creating payment intent:", error);

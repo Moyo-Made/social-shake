@@ -49,7 +49,8 @@ export async function POST(request: NextRequest) {
 		if (!creatorId || !packageType || !videoCount || !totalPrice) {
 			return NextResponse.json(
 				{
-					error: "Missing required fields: creatorId, packageType, videoCount, or totalPrice",
+					error:
+						"Missing required fields: creatorId, packageType, videoCount, or totalPrice",
 				},
 				{ status: 400 }
 			);
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
 			.collection("creators")
 			.doc(creatorId)
 			.get();
-		
+
 		if (!creatorDoc.exists) {
 			return NextResponse.json({ error: "Creator not found" }, { status: 404 });
 		}
@@ -94,7 +95,8 @@ export async function POST(request: NextRequest) {
 		if (paymentType === "direct" && !stripeAccountId) {
 			return NextResponse.json(
 				{
-					error: "Creator hasn't connected their Stripe account yet. Please ask them to connect their account before creating a direct payment order.",
+					error:
+						"Creator hasn't connected their Stripe account yet. Please ask them to connect their account before creating a direct payment order.",
 					errorCode: "CREATOR_ACCOUNT_NOT_CONNECTED",
 					creatorId: creatorId,
 					paymentType: "direct",
@@ -105,7 +107,8 @@ export async function POST(request: NextRequest) {
 
 		let creatorAccountWarning = null;
 		if (paymentType === "escrow" && !stripeAccountId) {
-			creatorAccountWarning = "Creator hasn't connected their Stripe account yet. They'll need to connect it before funds can be released from escrow.";
+			creatorAccountWarning =
+				"Creator hasn't connected their Stripe account yet. They'll need to connect it before funds can be released from escrow.";
 		}
 
 		// Generate order ID
@@ -125,7 +128,9 @@ export async function POST(request: NextRequest) {
 			payment_type: paymentType,
 			creator_connect_account_id: stripeAccountId || null,
 			transfer_id: null,
-			application_fee_amount: applicationFeeAmount ? parseFloat(applicationFeeAmount.toString()) : null,
+			application_fee_amount: applicationFeeAmount
+				? parseFloat(applicationFeeAmount.toString())
+				: null,
 			escrow_status: paymentType === "escrow" ? "pending" : null,
 			created_at: FieldValue.serverTimestamp(),
 			updated_at: FieldValue.serverTimestamp(),
@@ -185,6 +190,7 @@ export async function PATCH(request: NextRequest) {
 			userId,
 			section, // 'scripts', 'requirements', 'project_brief', 'basic_info'
 			data,
+			action
 		} = body;
 
 		console.log("Updating order section:", {
@@ -204,6 +210,11 @@ export async function PATCH(request: NextRequest) {
 		if (!adminDb) {
 			throw new Error("Firebase admin database is not initialized");
 		}
+
+		// Handle brand acceptance
+		if (action === 'accept_project') {
+			return await handleBrandAcceptProject(orderId, userId);
+		  }
 
 		// Get and verify order exists
 		const orderRef = adminDb.collection("orders").doc(orderId);
@@ -225,22 +236,22 @@ export async function PATCH(request: NextRequest) {
 
 		// Handle different section updates
 		switch (section) {
-			case 'scripts':
+			case "scripts":
 				await updateOrderScripts(orderRef, orderId, data);
 				break;
-			
-			case 'requirements':
+
+			case "requirements":
 				await updateOrderRequirements(orderRef, orderId, data);
 				break;
-			
-			case 'project_brief':
+
+			case "project_brief":
 				await updateProjectBrief(orderRef, orderId, data);
 				break;
-			
-			case 'basic_info':
+
+			case "basic_info":
 				await updateBasicOrderInfo(orderRef, data);
 				break;
-			
+
 			default:
 				return NextResponse.json(
 					{ error: `Invalid section: ${section}` },
@@ -270,7 +281,6 @@ export async function PATCH(request: NextRequest) {
 			orderId,
 			section,
 		});
-
 	} catch (error) {
 		console.error("Error updating order section:", error);
 		return NextResponse.json(
@@ -285,51 +295,70 @@ export async function PATCH(request: NextRequest) {
 
 // Helper function to update order scripts
 async function updateOrderScripts(
-	orderRef: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>, 
-	orderId: string, 
-	scriptData: { scripts: { title?: string; script?: string; content?: string; notes?: string }[] }
+	orderRef: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>,
+	orderId: string,
+	scriptData: {
+		scripts: {
+			title?: string;
+			script?: string;
+			content?: string;
+			notes?: string;
+		}[];
+	}
 ) {
 	if (!scriptData.scripts || !Array.isArray(scriptData.scripts)) {
 		throw new Error("Invalid script data format");
 	}
 
 	const batch = adminDb!.batch();
-	
+
 	// Clear existing scripts first
-	const existingScripts = await orderRef
-		.collection("order_scripts")
-		.get();
-	
-	existingScripts.docs.forEach((doc: FirebaseFirestore.QueryDocumentSnapshot<FirebaseFirestore.DocumentData>) => {
-		batch.delete(doc.ref);
-	});
+	const existingScripts = await orderRef.collection("order_scripts").get();
+
+	existingScripts.docs.forEach(
+		(
+			doc: FirebaseFirestore.QueryDocumentSnapshot<FirebaseFirestore.DocumentData>
+		) => {
+			batch.delete(doc.ref);
+		}
+	);
 
 	// Add new scripts
-	scriptData.scripts.forEach((script: { title?: string; script?: string; content?: string; notes?: string }, index: number) => {
-		const scriptRef = orderRef
-			.collection("order_scripts")
-			.doc(`script_${index + 1}`);
-		
-		const scriptDocData = {
-			order_id: orderId,
-			script_number: index + 1,
-			title: script.title || `Script ${index + 1}`,
-			content: script.script || script.content || "",
-			notes: script.notes || "",
-			status: "pending",
-			created_at: FieldValue.serverTimestamp(),
-		};
-		
-		batch.set(scriptRef, scriptDocData);
-	});
+	scriptData.scripts.forEach(
+		(
+			script: {
+				title?: string;
+				script?: string;
+				content?: string;
+				notes?: string;
+			},
+			index: number
+		) => {
+			const scriptRef = orderRef
+				.collection("order_scripts")
+				.doc(`script_${index + 1}`);
+
+			const scriptDocData = {
+				order_id: orderId,
+				script_number: index + 1,
+				title: script.title || `Script ${index + 1}`,
+				content: script.script || script.content || "",
+				notes: script.notes || "",
+				status: "pending",
+				created_at: FieldValue.serverTimestamp(),
+			};
+
+			batch.set(scriptRef, scriptDocData);
+		}
+	);
 
 	await batch.commit();
 }
 
 // Helper function to update order requirements
 async function updateOrderRequirements(
-	orderRef: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>, 
-	orderId: string, 
+	orderRef: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>,
+	orderId: string,
 	requirementsData: {
 		generalRequirements?: {
 			targetAudience?: string;
@@ -349,18 +378,23 @@ async function updateOrderRequirements(
 	const requirementsDocData = {
 		order_id: orderId,
 		generalRequirements: {
-			targetAudience: requirementsData.generalRequirements?.targetAudience || "",
+			targetAudience:
+				requirementsData.generalRequirements?.targetAudience || "",
 			brandVoice: requirementsData.generalRequirements?.brandVoice || "",
 			callToAction: requirementsData.generalRequirements?.callToAction || "",
 			keyMessages: requirementsData.generalRequirements?.keyMessages || "",
-			stylePreferences: requirementsData.generalRequirements?.stylePreferences || "",
-			additionalNotes: requirementsData.generalRequirements?.additionalNotes || "",
+			stylePreferences:
+				requirementsData.generalRequirements?.stylePreferences || "",
+			additionalNotes:
+				requirementsData.generalRequirements?.additionalNotes || "",
 		},
-		videoSpecs: requirementsData.videoSpecs ? {
-			duration: requirementsData.videoSpecs.duration || "",
-			format: requirementsData.videoSpecs.format || "",
-			deliveryFormat: requirementsData.videoSpecs.deliveryFormat || "",
-		} : {},
+		videoSpecs: requirementsData.videoSpecs
+			? {
+					duration: requirementsData.videoSpecs.duration || "",
+					format: requirementsData.videoSpecs.format || "",
+					deliveryFormat: requirementsData.videoSpecs.deliveryFormat || "",
+				}
+			: {},
 		updated_at: FieldValue.serverTimestamp(),
 	};
 
@@ -371,8 +405,11 @@ async function updateOrderRequirements(
 }
 
 // Helper function to update project brief
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function updateProjectBrief(orderRef: any, orderId: string, projectBriefData: any) {
+async function updateProjectBrief(
+	orderRef: any,
+	orderId: string,
+	projectBriefData: any
+) {
 	const projectBriefDocData = {
 		order_id: orderId,
 		brief: {
@@ -380,7 +417,8 @@ async function updateProjectBrief(orderRef: any, orderId: string, projectBriefDa
 				projectGoal: projectBriefData.projectOverview?.projectGoal || "",
 				targetAudience: projectBriefData.projectOverview?.targetAudience || "",
 				keyMessages: projectBriefData.projectOverview?.keyMessages || "",
-				brandBackground: projectBriefData.projectOverview?.brandBackground || "",
+				brandBackground:
+					projectBriefData.projectOverview?.brandBackground || "",
 			},
 			contentRequirements: {
 				contentType: projectBriefData.contentRequirements?.contentType || "",
@@ -388,14 +426,16 @@ async function updateProjectBrief(orderRef: any, orderId: string, projectBriefDa
 				callToAction: projectBriefData.contentRequirements?.callToAction || "",
 				mustInclude: projectBriefData.contentRequirements?.mustInclude || "",
 				mustAvoid: projectBriefData.contentRequirements?.mustAvoid || "",
-				competitorExamples: projectBriefData.contentRequirements?.competitorExamples || "",
+				competitorExamples:
+					projectBriefData.contentRequirements?.competitorExamples || "",
 			},
 			brandGuidelines: {
 				brandVoice: projectBriefData.brandGuidelines?.brandVoice || "",
 				visualStyle: projectBriefData.brandGuidelines?.visualStyle || "",
 				brandAssets: projectBriefData.brandGuidelines?.brandAssets || "",
 				logoUsage: projectBriefData.brandGuidelines?.logoUsage || "",
-				colorPreferences: projectBriefData.brandGuidelines?.colorPreferences || "",
+				colorPreferences:
+					projectBriefData.brandGuidelines?.colorPreferences || "",
 			},
 			videoSpecs: {
 				duration: projectBriefData.videoSpecs?.duration || "",
@@ -425,18 +465,116 @@ async function updateProjectBrief(orderRef: any, orderId: string, projectBriefDa
 }
 
 // Helper function to update basic order info
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function updateBasicOrderInfo(orderRef: any, basicInfoData: any) {
 	const updateData = removeUndefined({
 		script_choice: basicInfoData.scriptChoice,
 		package_type: basicInfoData.packageType,
-		video_count: basicInfoData.videoCount ? parseInt(basicInfoData.videoCount.toString()) : undefined,
-		total_price: basicInfoData.totalPrice ? parseFloat(basicInfoData.totalPrice.toString()) : undefined,
+		video_count: basicInfoData.videoCount
+			? parseInt(basicInfoData.videoCount.toString())
+			: undefined,
+		total_price: basicInfoData.totalPrice
+			? parseFloat(basicInfoData.totalPrice.toString())
+			: undefined,
 		updated_at: FieldValue.serverTimestamp(),
 	});
 
 	await orderRef.update(updateData);
 }
+
+async function handleBrandAcceptProject(orderId: string, userId: string) {
+	try {
+	  if (!adminDb) {
+		throw new Error("Firebase admin database is not initialized");
+	  }
+  
+	  // Get and verify order exists
+	  const orderRef = adminDb.collection("orders").doc(orderId);
+	  const orderDoc = await orderRef.get();
+  
+	  if (!orderDoc.exists) {
+		return NextResponse.json({ error: "Order not found" }, { status: 404 });
+	  }
+  
+	  const orderData = orderDoc.data();
+  
+	  // Verify user is the brand (order owner)
+	  if (orderData?.user_id !== userId) {
+		return NextResponse.json(
+		  { error: "Only the brand can accept this project" },
+		  { status: 403 }
+		);
+	  }
+  
+	  // Verify order is in the right state to be accepted
+	  const acceptableStatuses = ['payment_confirmed', 'pending'];
+	  if (!acceptableStatuses.includes(orderData?.status)) {
+		return NextResponse.json(
+		  { error: `Cannot accept project in status: ${orderData?.status}` },
+		  { status: 400 }
+		);
+	  }
+  
+	  // Update order status to active/in-progress
+	  await orderRef.update({
+		status: "in_progress", // or "active" - choose your preferred status
+		accepted_at: FieldValue.serverTimestamp(),
+		updated_at: FieldValue.serverTimestamp(),
+	  });
+  
+	  // Create milestone for project acceptance
+	  const milestoneData = {
+		order_id: orderId,
+		milestone_type: "project_accepted",
+		status: "completed",
+		description: "Project accepted by brand and moved to active status",
+		completed_at: FieldValue.serverTimestamp(),
+		created_at: FieldValue.serverTimestamp(),
+	  };
+	  await adminDb.collection("project_milestones").add(milestoneData);
+  
+	  // Create notifications for both brand and creator
+	  await Promise.all([
+		// Notification for brand
+		adminDb.collection("notifications").add({
+		  userId: orderData?.user_id,
+		  message: `You have successfully accepted project #${orderId}. The creator will now begin working on your videos.`,
+		  status: "unread",
+		  type: "project_accepted",
+		  createdAt: FieldValue.serverTimestamp(),
+		  relatedTo: "order",
+		  orderId,
+		}),
+		// Notification for creator
+		adminDb.collection("notifications").add({
+		  userId: orderData?.creator_id,
+		  message: `Great news! Your project #${orderId} has been accepted by the brand. You can now start working on the videos.`,
+		  status: "unread",
+		  type: "project_accepted_creator",
+		  createdAt: FieldValue.serverTimestamp(),
+		  relatedTo: "order",
+		  orderId,
+		})
+	  ]);
+  
+	  return NextResponse.json({
+		success: true,
+		message: "Project accepted successfully",
+		orderId,
+		status: "in_progress",
+		acceptedAt: new Date().toISOString(),
+	  });
+  
+	} catch (error) {
+	  console.error("Error accepting project:", error);
+	  return NextResponse.json(
+		{
+		  error: "Failed to accept project",
+		  details: error instanceof Error ? error.message : String(error),
+		},
+		{ status: 500 }
+	  );
+	}
+  }
 
 // PUT endpoint - Finalize Order (move from draft to ready for payment)
 export async function PUT(request: NextRequest) {
@@ -492,17 +630,15 @@ export async function PUT(request: NextRequest) {
 		};
 		await adminDb.collection("project_milestones").add(milestoneData);
 
-		// Create notifications
-		// const creatorDoc = await adminDb.collection("creators").doc(orderData?.creator_id).get();
-		// const creatorData = creatorDoc.data();
+		const userMessage =
+			orderData?.paymentType === "escrow"
+				? `Your order #${orderId} has been sent and your payment is held securely in escrow until delivery is confirmed.`
+				: `Your order #${orderId} is ready for payment. Please proceed to confirm the order.`;
 
-		const userMessage = orderData?.payment_type === "escrow"
-			? `Your order #${orderId} is ready for payment with escrow protection. Please proceed with payment to secure your funds.`
-			: `Your order #${orderId} is ready for payment. Please proceed to confirm the order.`;
-
-		const creatorMessage = orderData?.payment_type === "escrow"
-			? `Order #${orderId} has been finalized with escrow protection. Waiting for payment.`
-			: `Order #${orderId} has been finalized. Waiting for payment.`;
+		const creatorMessage =
+			orderData?.paymentType === "escrow"
+				? `You have a new order! Payment is held in escrow and will be released upon completion of the order.`
+				: `Order #${orderId} received from ${orderData?.user_name || "customer"}. Waiting for payment.`;
 
 		await Promise.all([
 			adminDb.collection("notifications").add({
@@ -531,7 +667,6 @@ export async function PUT(request: NextRequest) {
 			orderId,
 			status: "payment_pending",
 		});
-
 	} catch (error) {
 		console.error("Error finalizing order:", error);
 		return NextResponse.json(
@@ -648,7 +783,6 @@ export async function GET(request: NextRequest) {
 		// Process scripts data
 		const scripts = scriptsSnap.docs.map((doc) => ({
 			id: doc.id,
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			...(doc.data() as any),
 		}));
 
@@ -678,7 +812,6 @@ export async function GET(request: NextRequest) {
 		}
 
 		// Build response data matching expected interface structure
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const responseData: any = {
 			// Main order data
 			id: orderData?.id,
@@ -777,8 +910,12 @@ async function getCreatorOrders(creatorId: string) {
 		const orders = [];
 
 		// Helper function to transform order data to frontend format
-		
-		const transformOrderForFrontend = (orderData: any,  projectBrief: any, scripts: any[], requirements: any
+
+		const transformOrderForFrontend = (
+			orderData: any,
+			projectBrief: any,
+			scripts: any[],
+			requirements: any
 		) => {
 			// Handle Firestore timestamp
 			const createdAtDate = orderData.created_at?._seconds
@@ -825,17 +962,29 @@ async function getCreatorOrders(creatorId: string) {
 						notes: script.notes || "",
 					})),
 					generalRequirements: {
-						targetAudience: requirements?.generalRequirements?.targetAudience || "",
+						targetAudience:
+							requirements?.generalRequirements?.targetAudience || "",
 						brandVoice: requirements?.generalRequirements?.brandVoice || "",
 						callToAction: requirements?.generalRequirements?.callToAction || "",
 						keyMessages: requirements?.generalRequirements?.keyMessages || "",
-						stylePreferences: requirements?.generalRequirements?.stylePreferences || "",
-						additionalNotes: requirements?.generalRequirements?.additionalNotes || "",
+						stylePreferences:
+							requirements?.generalRequirements?.stylePreferences || "",
+						additionalNotes:
+							requirements?.generalRequirements?.additionalNotes || "",
 					},
 					videoSpecs: {
-						duration: requirements?.videoSpecs?.duration || projectBrief?.videoSpecs?.duration || "",
-						format: requirements?.videoSpecs?.format || projectBrief?.videoSpecs?.format || "",
-						deliveryFormat: requirements?.videoSpecs?.deliveryFormat || projectBrief?.videoSpecs?.deliveryFormat || "",
+						duration:
+							requirements?.videoSpecs?.duration ||
+							projectBrief?.videoSpecs?.duration ||
+							"",
+						format:
+							requirements?.videoSpecs?.format ||
+							projectBrief?.videoSpecs?.format ||
+							"",
+						deliveryFormat:
+							requirements?.videoSpecs?.deliveryFormat ||
+							projectBrief?.videoSpecs?.deliveryFormat ||
+							"",
 					},
 				};
 			}
@@ -852,35 +1001,45 @@ async function getCreatorOrders(creatorId: string) {
 			const orderData = orderDoc.data();
 
 			// Get subcollections for each order
-			const [requirementsSnap, projectBriefSnap, scriptsSnap] = await Promise.all([
-				orderDoc.ref
-					.collection("order_requirements")
-					.get()
-					.catch(() => ({ docs: [] })),
-				orderDoc.ref
-					.collection("order_project_brief")
-					.get()
-					.catch(() => ({ docs: [] })),
-				orderDoc.ref
-					.collection("order_scripts")
-					.orderBy("script_number", "asc")
-					.get()
-					.catch(() => ({ docs: [] })),
-			]);
+			const [requirementsSnap, projectBriefSnap, scriptsSnap] =
+				await Promise.all([
+					orderDoc.ref
+						.collection("order_requirements")
+						.get()
+						.catch(() => ({ docs: [] })),
+					orderDoc.ref
+						.collection("order_project_brief")
+						.get()
+						.catch(() => ({ docs: [] })),
+					orderDoc.ref
+						.collection("order_scripts")
+						.orderBy("script_number", "asc")
+						.get()
+						.catch(() => ({ docs: [] })),
+				]);
 
-			const requirements = requirementsSnap.docs.length > 0 
-				? requirementsSnap.docs[0].data() 
-				: null;
-			const projectBrief = projectBriefSnap.docs.length > 0
-				? projectBriefSnap.docs[0].data()?.brief
-				: null;
+			const requirements =
+				requirementsSnap.docs.length > 0
+					? requirementsSnap.docs[0].data()
+					: null;
+			const projectBrief =
+				projectBriefSnap.docs.length > 0
+					? projectBriefSnap.docs[0].data()?.brief
+					: null;
 			const scripts = scriptsSnap.docs.map((doc) => ({
 				id: doc.id,
 				...doc.data(),
 			}));
 
 			// Transform and add to orders array
-			orders.push(transformOrderForFrontend(orderData, projectBrief, scripts, requirements));
+			orders.push(
+				transformOrderForFrontend(
+					orderData,
+					projectBrief,
+					scripts,
+					requirements
+				)
+			);
 		}
 
 		return NextResponse.json({

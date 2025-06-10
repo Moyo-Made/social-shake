@@ -48,8 +48,14 @@ const MenuItem: React.FC<MenuItemProps> = ({
 			pathname.startsWith("/creator/dashboard/project/")) ||
 		(href === "/creator/dashboard/messages" &&
 			pathname.startsWith("/creator/dashboard/messages/")) ||
+		(href === "/creator/dashboard/content-library" &&
+			pathname.startsWith("/creator/dashboard/content-library/")) ||
+		(href === "/creator/dashboard/video-order" &&
+			pathname.startsWith("/creator/dashboard/video-order/")) ||
 		(href === "/creator/dashboard/transactions" &&
 			pathname.startsWith("/creator/dashboard/transactions/")) ||
+		(href === "/creator/dashboard/ai-actor" &&
+			pathname.startsWith("/creator/dashboard/ai-actor/")) ||
 		(href === "/creator/dashboard/settings" &&
 			pathname.startsWith("/creator/dashboard/settings/")) ||
 		(href === "/creator/dashboard/help-support" &&
@@ -206,7 +212,7 @@ const SideNav: React.FC = () => {
 					<MenuItem
 						href="/creator/dashboard/video-order"
 						icon={<VideoIcon size={20} />}
-						text="Video Order"
+						text="My Orders"
 					/>
 
 					<MenuItem
@@ -294,7 +300,7 @@ const getPageTitle = (pathname: string): string => {
 		"/creator/dashboard/contest/applied": "My Contests",
 		"/creator/dashboard/messages": "Messages",
 		"/creator/dashboard/content-library": "Content Library",
-		"/creator/dashboard/video-order": "Video Order",
+		"/creator/dashboard/video-order": "Video Orders",
 		"/creator/dashboard/portfolio": "My Portfolio Page",
 		"/creator/dashboard/transactions": "Transactions",
 		"/creator/dashboard/ai-actor": "AI Actor",
