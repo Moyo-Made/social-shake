@@ -181,7 +181,11 @@ export const useConversations = (userId: string | null | undefined) => {
         
         // Fetch user details for all participants
         if (userIds.size > 0) {
-          const users = await getConversationUsers(Array.from(userIds));
+          const userRecord: Record<string, boolean> = Array.from(userIds).reduce((acc, userId) => {
+            acc[userId] = true;
+            return acc;
+          }, {} as Record<string, boolean>);
+          const users = await getConversationUsers(userRecord);
           setUserDetails(users);
         }
         

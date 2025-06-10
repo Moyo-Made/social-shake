@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 // PATCH endpoint - Mark order as delivered
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { orderId: string } }
+  { params }: any
 ) {
   try {
     // Await params if it's a Promise (Next.js 15+)
