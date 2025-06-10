@@ -88,30 +88,78 @@ export default function OrderDetailsPage() {
 		return [];
 	};
 
-	// Save deliverable to database
+	// Save deliverable to database with chunked upload
 	const saveDeliverable = async (
 		orderId: string,
 		videoId: number,
 		file: File,
-		notes: string = ""
+		notes: string = "",
+		creatorId?: string
 	) => {
-		const formData = new FormData();
-		formData.append("video_file", file);
-		formData.append("video_id", videoId.toString());
-		formData.append("notes", notes);
-		formData.append("status", "content_submitted");
+		const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+		const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+		// Generate a unique file ID for this upload
+		const fileId = `deliverable_${Date.now()}_${Math.random().toString(36).substring(2)}`;
 
 		try {
-			const response = await fetch(`/api/orders/${orderId}/deliverables`, {
-				method: "POST",
-				body: formData,
-			});
+			// Upload each chunk
+			for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+				const start = chunkIndex * CHUNK_SIZE;
+				const end = Math.min(start + CHUNK_SIZE, file.size);
+				const chunk = file.slice(start, end);
 
-			if (response.ok) {
-				const data = await response.json();
-				return data.deliverable;
-			} else {
-				throw new Error("Failed to save deliverable");
+				// Convert chunk to base64
+				const chunkBase64 = await new Promise<string>((resolve, reject) => {
+					const reader = new FileReader();
+					reader.onload = () => {
+						const result = reader.result as string;
+						// Remove data URL prefix (data:application/octet-stream;base64,)
+						const base64Data = result.split(",")[1];
+						resolve(base64Data);
+					};
+					reader.onerror = reject;
+					reader.readAsDataURL(chunk);
+				});
+
+				const chunkData = {
+					chunkData: chunkBase64,
+					fileName: file.name,
+					fileContentType: file.type,
+					chunkIndex,
+					totalChunks,
+					fileId,
+					videoId,
+					notes,
+					status: "content_submitted",
+					creatorId,
+					fileSize: file.size,
+				};
+
+				const response = await fetch(`/api/orders/${orderId}/deliverables`, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify(chunkData),
+				});
+
+				if (!response.ok) {
+					const errorData = await response.json();
+					throw new Error(errorData.error || "Failed to upload chunk");
+				}
+
+				const result = await response.json();
+
+				// If this is the last chunk, return the complete deliverable
+				if (chunkIndex === totalChunks - 1) {
+					return result.deliverable;
+				}
+
+				// Optional: Report progress for intermediate chunks
+				console.log(
+					`Uploaded chunk ${chunkIndex + 1}/${totalChunks} (${result.progress}%)`
+				);
 			}
 		} catch (error) {
 			console.error("Error saving deliverable:", error);
@@ -1018,7 +1066,8 @@ export default function OrderDetailsPage() {
 											>
 												<div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
 													<h4 className="font-semibold text-gray-900">
-														Script {(typeof index === "number" ? index + 1 : 1)}: {script.title || "Untitled"}
+														Script {typeof index === "number" ? index + 1 : 1}:{" "}
+														{script.title || "Untitled"}
 													</h4>
 												</div>
 												<div className="p-6">
@@ -1333,7 +1382,7 @@ export default function OrderDetailsPage() {
 								{workStarted && (
 									<div className="flex items-center gap-4">
 										<div className="text-right">
-											<div className="text-2xl font-bold text-blue-600">
+											<div className="text-lg font-bold text-blue-600">
 												{Math.round(
 													(videoProgress.filter(
 														(v) => v.status === "content_submitted"
@@ -1437,8 +1486,7 @@ export default function OrderDetailsPage() {
 											)}
 
 											{/* Upload section */}
-											{video.status !== "content_submitted" ||
-											video.needsRevision ? (
+											{selectedOrder.status !== "delivered" ? (
 												<div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
 													<Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
 													<p className="text-sm text-gray-600 mb-3">
@@ -1617,7 +1665,7 @@ export default function OrderDetailsPage() {
 							<Button
 								onClick={handleRejectOrder}
 								disabled={!rejectReason.trim()}
-								className="bg-red-600 hover:bg-red-700"
+								className="bg-red-600 hover:bg-red-700 text-white"
 							>
 								Reject Order
 							</Button>
@@ -1666,7 +1714,7 @@ export default function OrderDetailsPage() {
 						<div className="flex gap-3">
 							<Button
 								onClick={confirmStartWork}
-								className="bg-blue-600 hover:bg-blue-700"
+								className="bg-blue-600 hover:bg-blue-700 text-white"
 							>
 								Start Project
 							</Button>
