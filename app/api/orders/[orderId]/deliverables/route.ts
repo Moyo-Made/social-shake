@@ -508,3 +508,160 @@ async function sendNotifications(
 		throw error;
 	}
 }
+
+// GET endpoint - Retrieve deliverables for an order OR check processing status
+export async function GET(
+  request: NextRequest,
+  { params }: any
+) {
+  try {
+    // Await params if it's a Promise (Next.js 15+)
+    const resolvedParams = await Promise.resolve(params);
+    const { orderId } = resolvedParams;
+
+    const { searchParams } = new URL(request.url);
+    const processingId = searchParams.get('processingId');
+    const checkStatus = searchParams.get('status');
+
+    // If requesting processing status
+    if (checkStatus === 'true' && processingId) {
+      const processingDoc = await adminDb
+        .collection("deliverable_processing")
+        .doc(processingId)
+        .get();
+      
+      if (!processingDoc.exists) {
+        return NextResponse.json(
+          { error: "Processing record not found" },
+          { status: 404 }
+        );
+      }
+      
+      return NextResponse.json({
+        success: true,
+        processing: processingDoc.data()
+      });
+    }
+
+    // Enhanced validation for orderId
+    if (!orderId || typeof orderId !== "string" || orderId.trim() === "") {
+      return NextResponse.json(
+        { error: "Order ID is required" },
+        { status: 400 }
+      );
+    }
+
+    console.log("Fetching deliverables for order ID:", orderId);
+
+    if (!adminDb) {
+      throw new Error("Firebase admin database is not initialized");
+    }
+
+    // Verify order exists first (same logic as before)
+    let orderDoc: any = null;
+    let orderData: any = null;
+
+    // Try internal ID first
+    if (orderId.startsWith('order_')) {
+      const ordersQuery = await adminDb
+        .collection("orders")
+        .where("id", "==", orderId)
+        .limit(1)
+        .get();
+
+      if (!ordersQuery.empty) {
+        orderDoc = ordersQuery.docs[0];
+        orderData = orderDoc.data();
+      }
+    } else {
+      // Try document ID
+      orderDoc = await adminDb.collection("orders").doc(orderId).get();
+      if (orderDoc.exists) {
+        orderData = orderDoc.data();
+      }
+    }
+
+    // If still not found, try the other method
+    if (!orderDoc || !orderDoc.exists) {
+      if (orderId.startsWith('order_')) {
+        orderDoc = await adminDb.collection("orders").doc(orderId).get();
+        if (orderDoc.exists) {
+          orderData = orderDoc.data();
+        }
+      } else {
+        const ordersQuery = await adminDb
+          .collection("orders")
+          .where("id", "==", orderId)
+          .limit(1)
+          .get();
+
+        if (!ordersQuery.empty) {
+          orderDoc = ordersQuery.docs[0];
+          orderData = orderDoc.data();
+        }
+      }
+    }
+
+    if (!orderDoc || !orderDoc.exists || !orderData) {
+      return NextResponse.json(
+        { error: "Order not found" },
+        { status: 404 }
+      );
+    }
+
+    // Get deliverables for this order
+    const deliverableOrderId = orderData.id || orderDoc.id;
+    const deliverablesQuery = await adminDb
+      .collection("deliverables")
+      .where("order_id", "==", deliverableOrderId)
+      .orderBy("created_at", "desc")
+      .get();
+
+    const deliverables = deliverablesQuery.docs.map(doc => ({
+      firestore_id: doc.id,
+      ...doc.data()
+    }));
+
+    // Also get any ongoing processing records for this order
+    const processingQuery = await adminDb
+      .collection("deliverable_processing")
+      .where("orderId", "==", deliverableOrderId)
+      .where("status", "in", ["uploading", "processing"])
+      .get();
+
+    const ongoingUploads = processingQuery.docs.map(doc => ({
+      processing_id: doc.id,
+      ...doc.data()
+    }));
+
+    return NextResponse.json({
+      success: true,
+      deliverables: deliverables,
+      ongoingUploads: ongoingUploads,
+      count: deliverables.length,
+      ongoingCount: ongoingUploads.length,
+    });
+
+  } catch (error) {
+    console.error("Error fetching deliverables:", error);
+    return NextResponse.json(
+      {
+        error: "Failed to fetch deliverables",
+        details: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// OPTIONS handler for CORS
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
+}
