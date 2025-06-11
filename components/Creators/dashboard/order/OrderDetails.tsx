@@ -1404,7 +1404,7 @@ const saveDeliverable = async (
 								{workStarted && (
 									<div className="flex items-center gap-4">
 										<div className="text-right">
-											<div className="text-2xl font-bold text-blue-600">
+											<div className="text-lg font-semibold text-blue-600">
 												{Math.round(
 													(videoProgress.filter(
 														(v) => v.status === "content_submitted"
@@ -1687,7 +1687,7 @@ const saveDeliverable = async (
 							<Button
 								onClick={handleRejectOrder}
 								disabled={!rejectReason.trim()}
-								className="bg-red-600 hover:bg-red-700"
+								className="bg-red-600 hover:bg-red-700 text-white"
 							>
 								Reject Order
 							</Button>
@@ -1736,7 +1736,7 @@ const saveDeliverable = async (
 						<div className="flex gap-3">
 							<Button
 								onClick={confirmStartWork}
-								className="bg-blue-600 hover:bg-blue-700"
+								className="bg-blue-600 hover:bg-blue-700 text-white"
 							>
 								Start Project
 							</Button>
