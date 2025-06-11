@@ -1,5 +1,24 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface ProjectBriefFormProps {
 	isOpen: boolean;
@@ -153,7 +172,10 @@ const ProjectBriefForm: React.FC<ProjectBriefFormProps> = ({
 		const specsValid =
 			formData.videoSpecs.duration && formData.videoSpecs.format;
 
-		return overviewValid && contentValid && specsValid;
+		const timelineValid =
+			formData.timeline.scriptDeadline && formData.timeline.finalDeadline;
+
+		return overviewValid && contentValid && specsValid && timelineValid;
 	};
 
 	const handleContinue = () => {
@@ -205,61 +227,61 @@ const ProjectBriefForm: React.FC<ProjectBriefFormProps> = ({
 	const renderOverviewTab = () => (
 		<div className="space-y-6">
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Project Goal *
-				</label>
-				<textarea
+				</Label>
+				<Textarea
 					value={formData.projectOverview.projectGoal}
 					onChange={(e) =>
 						updateSection("projectOverview", "projectGoal", e.target.value)
 					}
 					placeholder="What is the main objective of this video project? (e.g., increase brand awareness, drive sales, educate audience)"
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+					className="w-full px-3 py-2 border border-gray-300 rounded-md"
 					rows={3}
 				/>
 			</div>
 
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Target Audience *
-				</label>
-				<textarea
+				</Label>
+				<Textarea
 					value={formData.projectOverview.targetAudience}
 					onChange={(e) =>
 						updateSection("projectOverview", "targetAudience", e.target.value)
 					}
 					placeholder="Describe your ideal viewer (age, interests, demographics, pain points, platform behavior)"
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+					className="w-full px-3 py-2 border border-gray-300 rounded-md"
 					rows={3}
 				/>
 			</div>
 
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Key Messages *
-				</label>
-				<textarea
+				</Label>
+				<Textarea
 					value={formData.projectOverview.keyMessages}
 					onChange={(e) =>
 						updateSection("projectOverview", "keyMessages", e.target.value)
 					}
 					placeholder="What are the 2-3 main points you want viewers to remember?"
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+					className="w-full px-3 py-2 border border-gray-300 rounded-md"
 					rows={3}
 				/>
 			</div>
 
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Brand Background
-				</label>
-				<textarea
+				</Label>
+				<Textarea
 					value={formData.projectOverview.brandBackground}
 					onChange={(e) =>
 						updateSection("projectOverview", "brandBackground", e.target.value)
 					}
 					placeholder="Tell us about your brand, company culture, values, and what makes you unique"
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+					className="w-full px-3 py-2 border border-gray-300 rounded-md"
 					rows={3}
 				/>
 			</div>
@@ -269,48 +291,51 @@ const ProjectBriefForm: React.FC<ProjectBriefFormProps> = ({
 	const renderContentTab = () => (
 		<div className="space-y-6">
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Content Type
-				</label>
-				<select
+				</Label>
+				<Select
 					value={formData.contentRequirements.contentType}
-					onChange={(e) =>
-						updateSection("contentRequirements", "contentType", e.target.value)
+					onValueChange={(value) =>
+						updateSection("contentRequirements", "contentType", value)
 					}
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
 				>
-					<option value="">Select content type</option>
-					<option value="product-demo">Product Demonstration</option>
-					<option value="testimonial">Customer Testimonial</option>
-					<option value="educational">Educational/How-to</option>
-					<option value="brand-story">Brand Story</option>
-					<option value="promotional">Promotional</option>
-					<option value="explainer">Explainer Video</option>
-					<option value="social-media">Social Media Content</option>
-					<option value="other">Other</option>
-				</select>
+					<SelectTrigger className="w-full">
+						<SelectValue placeholder="Select content type" />
+					</SelectTrigger>
+					<SelectContent className="bg-white">
+						<SelectItem value="product-demo">Product Demonstration</SelectItem>
+						<SelectItem value="testimonial">Customer Testimonial</SelectItem>
+						<SelectItem value="educational">Educational/How-to</SelectItem>
+						<SelectItem value="brand-story">Brand Story</SelectItem>
+						<SelectItem value="promotional">Promotional</SelectItem>
+						<SelectItem value="explainer">Explainer Video</SelectItem>
+						<SelectItem value="social-media">Social Media Content</SelectItem>
+						<SelectItem value="other">Other</SelectItem>
+					</SelectContent>
+				</Select>
 			</div>
 
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Tone & Style *
-				</label>
-				<textarea
+				</Label>
+				<Textarea
 					value={formData.contentRequirements.toneAndStyle}
 					onChange={(e) =>
 						updateSection("contentRequirements", "toneAndStyle", e.target.value)
 					}
 					placeholder="How should the video feel? (e.g., professional, casual, energetic, calm, humorous, serious)"
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+					className="w-full px-3 py-2 border border-gray-300 rounded-md"
 					rows={3}
 				/>
 			</div>
 
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Call to Action *
-				</label>
-				<input
+				</Label>
+				<Input
 					type="text"
 					value={formData.contentRequirements.callToAction}
 					onChange={(e) =>
@@ -322,40 +347,40 @@ const ProjectBriefForm: React.FC<ProjectBriefFormProps> = ({
 			</div>
 
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Must Include
-				</label>
-				<textarea
+				</Label>
+				<Textarea
 					value={formData.contentRequirements.mustInclude}
 					onChange={(e) =>
 						updateSection("contentRequirements", "mustInclude", e.target.value)
 					}
 					placeholder="Specific elements, features, or messages that must be included"
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+					className="w-full px-3 py-2 border border-gray-300 rounded-md"
 					rows={3}
 				/>
 			</div>
 
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Must Avoid
-				</label>
-				<textarea
+				</Label>
+				<Textarea
 					value={formData.contentRequirements.mustAvoid}
 					onChange={(e) =>
 						updateSection("contentRequirements", "mustAvoid", e.target.value)
 					}
 					placeholder="Topics, styles, or approaches to avoid"
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+					className="w-full px-3 py-2 border border-gray-300 rounded-md"
 					rows={3}
 				/>
 			</div>
 
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Competitor Examples
-				</label>
-				<textarea
+				</Label>
+				<Textarea
 					value={formData.contentRequirements.competitorExamples}
 					onChange={(e) =>
 						updateSection(
@@ -365,7 +390,7 @@ const ProjectBriefForm: React.FC<ProjectBriefFormProps> = ({
 						)
 					}
 					placeholder="Links to competitor videos or describe what they're doing that you like/dislike"
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+					className="w-full px-3 py-2 border border-gray-300 rounded-md "
 					rows={3}
 				/>
 			</div>
@@ -375,77 +400,77 @@ const ProjectBriefForm: React.FC<ProjectBriefFormProps> = ({
 	const renderBrandTab = () => (
 		<div className="space-y-6">
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Brand Voice
-				</label>
-				<textarea
+				</Label>
+				<Textarea
 					value={formData.brandGuidelines.brandVoice}
 					onChange={(e) =>
 						updateSection("brandGuidelines", "brandVoice", e.target.value)
 					}
 					placeholder="How does your brand communicate? (e.g., friendly, authoritative, playful, sophisticated)"
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+					className="w-full px-3 py-2 border border-gray-300 rounded-md "
 					rows={3}
 				/>
 			</div>
 
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Visual Style
-				</label>
-				<textarea
+				</Label>
+				<Textarea
 					value={formData.brandGuidelines.visualStyle}
 					onChange={(e) =>
 						updateSection("brandGuidelines", "visualStyle", e.target.value)
 					}
 					placeholder="Describe your preferred visual aesthetic (modern, minimalist, bold, colorful, etc.)"
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+					className="w-full px-3 py-2 border border-gray-300 rounded-md"
 					rows={3}
 				/>
 			</div>
 
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Brand Assets
-				</label>
-				<textarea
+				</Label>
+				<Textarea
 					value={formData.brandGuidelines.brandAssets}
 					onChange={(e) =>
 						updateSection("brandGuidelines", "brandAssets", e.target.value)
 					}
 					placeholder="List available brand assets (logos, graphics, fonts, product images, etc.) and how to access them"
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+					className="w-full px-3 py-2 border border-gray-300 rounded-md "
 					rows={3}
 				/>
 			</div>
 
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Logo Usage
-				</label>
-				<textarea
+				</Label>
+				<Textarea
 					value={formData.brandGuidelines.logoUsage}
 					onChange={(e) =>
 						updateSection("brandGuidelines", "logoUsage", e.target.value)
 					}
 					placeholder="How should the logo be displayed? Any specific requirements or restrictions?"
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+					className="w-full px-3 py-2 border border-gray-300 rounded-md "
 					rows={2}
 				/>
 			</div>
 
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Color Preferences
-				</label>
-				<input
+				</Label>
+				<Input
 					type="text"
 					value={formData.brandGuidelines.colorPreferences}
 					onChange={(e) =>
 						updateSection("brandGuidelines", "colorPreferences", e.target.value)
 					}
 					placeholder="Brand colors, hex codes, or color palette preferences"
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+					className="w-full px-3 py-2 border border-gray-300 rounded-md"
 				/>
 			</div>
 		</div>
@@ -454,81 +479,100 @@ const ProjectBriefForm: React.FC<ProjectBriefFormProps> = ({
 	const renderSpecsTab = () => (
 		<div className="space-y-6">
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Duration *
-				</label>
-				<select
+				</Label>
+				<Select
 					value={formData.videoSpecs.duration}
-					onChange={(e) =>
-						updateSection("videoSpecs", "duration", e.target.value)
+					onValueChange={(value) =>
+						updateSection("videoSpecs", "duration", value)
 					}
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
 				>
-					<option value="">Select duration</option>
-					<option value="15-30s">15-30 seconds</option>
-					<option value="30-60s">30-60 seconds</option>
-					<option value="1-2min">1-2 minutes</option>
-					<option value="2-5min">2-5 minutes</option>
-					<option value="5-10min">5-10 minutes</option>
-					<option value="10min+">10+ minutes</option>
-					<option value="flexible">Flexible</option>
-				</select>
+					<SelectTrigger className="w-full">
+						<SelectValue placeholder="Select duration" />
+					</SelectTrigger>
+					<SelectContent className="bg-white">
+						<SelectItem value="15-30s">15-30 seconds</SelectItem>
+						<SelectItem value="30-60s">30-60 seconds</SelectItem>
+						<SelectItem value="1-2min">1-2 minutes</SelectItem>
+						<SelectItem value="2-5min">2-5 minutes</SelectItem>
+						<SelectItem value="5-10min">5-10 minutes</SelectItem>
+						<SelectItem value="10min+">10+ minutes</SelectItem>
+						<SelectItem value="flexible">Flexible</SelectItem>
+					</SelectContent>
+				</Select>
 			</div>
 
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Format *
-				</label>
-				<select
+				</Label>
+				<Select
 					value={formData.videoSpecs.format}
-					onChange={(e) =>
-						updateSection("videoSpecs", "format", e.target.value)
+					onValueChange={(value) =>
+						updateSection("videoSpecs", "format", value)
 					}
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
 				>
-					<option value="">Select format</option>
-					<option value="horizontal">Horizontal (16:9)</option>
-					<option value="vertical">Vertical (9:16)</option>
-					<option value="square">Square (1:1)</option>
-					<option value="multiple">Multiple formats needed</option>
-				</select>
+					<SelectTrigger className="w-full">
+						<SelectValue placeholder="Select format" />
+					</SelectTrigger>
+					<SelectContent className="bg-white">
+						<SelectItem value="horizontal">Horizontal (16:9)</SelectItem>
+						<SelectItem value="vertical">Vertical (9:16)</SelectItem>
+						<SelectItem value="square">Square (1:1)</SelectItem>
+						<SelectItem value="multiple">Multiple formats needed</SelectItem>
+					</SelectContent>
+				</Select>
 			</div>
 
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Delivery Format
-				</label>
-				<select
+				</Label>
+				<Select
 					value={formData.videoSpecs.deliveryFormat}
-					onChange={(e) =>
-						updateSection("videoSpecs", "deliveryFormat", e.target.value)
+					onValueChange={(value) =>
+						updateSection("videoSpecs", "deliveryFormat", value)
 					}
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
 				>
-					<option value="">Select delivery format</option>
-					<option value="mp4-1080p">MP4 - 1080p</option>
-					<option value="mp4-4k">MP4 - 4K</option>
-					<option value="mov-prores">MOV - ProRes</option>
-					<option value="multiple">Multiple formats</option>
-					<option value="platform-optimized">Platform optimized</option>
-				</select>
+					<SelectTrigger className="w-full">
+						<SelectValue placeholder="Select delivery format" />
+					</SelectTrigger>
+					<SelectContent className="bg-white">
+						<SelectItem value="mp4-1080p">MP4 - 1080p</SelectItem>
+						<SelectItem value="mp4-4k">MP4 - 4K</SelectItem>
+						<SelectItem value="mov-prores">MOV - ProRes</SelectItem>
+						<SelectItem value="multiple">Multiple formats</SelectItem>
+						<SelectItem value="platform-optimized">
+							Platform optimized
+						</SelectItem>
+					</SelectContent>
+				</Select>
 			</div>
 
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Script Approval
-				</label>
-				<select
+				</Label>
+				<Select
 					value={formData.videoSpecs.scriptApproval}
-					onChange={(e) =>
-						updateSection("videoSpecs", "scriptApproval", e.target.value)
+					onValueChange={(value) =>
+						updateSection("videoSpecs", "scriptApproval", value)
 					}
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
 				>
-					<option value="required">Approval required before filming</option>
-					<option value="review">Review preferred but not required</option>
-					<option value="not-required">Not required</option>
-				</select>
+					<SelectTrigger className="w-full">
+						<SelectValue placeholder="Select script approval method" />
+					</SelectTrigger>
+					<SelectContent className="bg-white">
+						<SelectItem value="required">
+							Approval required before filming
+						</SelectItem>
+						<SelectItem value="review">
+							Review preferred but not required
+						</SelectItem>
+						<SelectItem value="not-required">Not required</SelectItem>
+					</SelectContent>
+				</Select>
 			</div>
 		</div>
 	);
@@ -536,46 +580,46 @@ const ProjectBriefForm: React.FC<ProjectBriefFormProps> = ({
 	const renderExamplesTab = () => (
 		<div className="space-y-6">
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Preferred Videos
-				</label>
-				<textarea
+				</Label>
+				<Textarea
 					value={formData.examples.preferredVideos}
 					onChange={(e) =>
 						updateSection("examples", "preferredVideos", e.target.value)
 					}
 					placeholder="Share links to videos you love - style, tone, pacing, or approach you'd like to emulate"
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+					className="w-full px-3 py-2 border border-gray-300 rounded-md"
 					rows={4}
 				/>
 			</div>
 
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Style References
-				</label>
-				<textarea
+				</Label>
+				<Textarea
 					value={formData.examples.styleReferences}
 					onChange={(e) =>
 						updateSection("examples", "styleReferences", e.target.value)
 					}
 					placeholder="Any other visual or stylistic references (photography, design, other creators)"
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+					className="w-full px-3 py-2 border border-gray-300 rounded-md "
 					rows={3}
 				/>
 			</div>
 
 			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Examples to Avoid
-				</label>
-				<textarea
+				</Label>
+				<Textarea
 					value={formData.examples.avoidExamples}
 					onChange={(e) =>
 						updateSection("examples", "avoidExamples", e.target.value)
 					}
 					placeholder="Links to videos or styles you don't want - helps us understand what to avoid"
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+					className="w-full px-3 py-2 border border-gray-300 rounded-md "
 					rows={3}
 				/>
 			</div>
@@ -584,65 +628,106 @@ const ProjectBriefForm: React.FC<ProjectBriefFormProps> = ({
 
 	const renderTimelineTab = () => (
 		<div className="space-y-6">
-			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
-					Script Deadline
-				</label>
-				<input
-					type="date"
-					value={formData.timeline.scriptDeadline}
-					onChange={(e) =>
-						updateSection("timeline", "scriptDeadline", e.target.value)
-					}
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-				/>
+			<div className="space-y-2">
+				<Label className="text-sm font-medium">Script Deadline</Label>
+				<Popover>
+					<PopoverTrigger asChild>
+						<Button
+							variant="outline"
+							className={cn(
+								"w-full justify-start text-left font-normal",
+								!formData.timeline.scriptDeadline && "text-muted-foreground"
+							)}
+						>
+							<CalendarIcon className="mr-2 h-4 w-4" />
+							{formData.timeline.scriptDeadline ? (
+								format(new Date(formData.timeline.scriptDeadline), "PPP")
+							) : (
+								<span>Pick a date</span>
+							)}
+						</Button>
+					</PopoverTrigger>
+					<PopoverContent className="w-auto p-0 bg-white">
+						<Calendar
+							mode="single"
+							selected={
+								formData.timeline.scriptDeadline
+									? new Date(formData.timeline.scriptDeadline)
+									: undefined
+							}
+							onSelect={(date) =>
+								updateSection(
+									"timeline",
+									"scriptDeadline",
+									date ? format(date, "yyyy-MM-dd") : ""
+								)
+							}
+							initialFocus
+						/>
+					</PopoverContent>
+				</Popover>
 			</div>
 
-			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
+			{/* <div>
+				<Label className="block text-sm font-medium text-gray-700 mb-2">
 					Revision Rounds
-				</label>
-				<select
+				</Label>
+				<Select
 					value={formData.timeline.revisionRounds}
-					onChange={(e) =>
-						updateSection("timeline", "revisionRounds", e.target.value)
+					onValueChange={(value) =>
+						updateSection("timeline", "revisionRounds", value)
 					}
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
 				>
-					<option value="1">1 revision round</option>
-					<option value="2">2 revision rounds</option>
-					<option value="3">3 revision rounds</option>
-					<option value="unlimited">Unlimited (within reason)</option>
-				</select>
-			</div>
+					<SelectTrigger className="w-full">
+						<SelectValue placeholder="Select revision rounds" />
+					</SelectTrigger>
+					<SelectContent>
+						<SelectItem value="1">1 revision round</SelectItem>
+						<SelectItem value="2">2 revision rounds</SelectItem>
+						<SelectItem value="3">3 revision rounds</SelectItem>
+						<SelectItem value="unlimited">Unlimited (within reason)</SelectItem>
+					</SelectContent>
+				</Select>
+			</div> */}
 
-			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
-					Final Deadline
-				</label>
-				<input
-					type="date"
-					value={formData.timeline.finalDeadline}
-					onChange={(e) =>
-						updateSection("timeline", "finalDeadline", e.target.value)
-					}
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-				/>
-			</div>
-
-			<div>
-				<label className="block text-sm font-medium text-gray-700 mb-2">
-					Urgency Level
-				</label>
-				<select
-					value={formData.timeline.urgency}
-					onChange={(e) => updateSection("timeline", "urgency", e.target.value)}
-					className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-				>
-					<option value="standard">Standard timeline</option>
-					<option value="expedited">Expedited (+20% rush fee)</option>
-					<option value="urgent">Urgent (+50% rush fee)</option>
-				</select>
+			<div className="space-y-2">
+				<Label className="text-sm font-medium">Final Deadline</Label>
+				<Popover>
+					<PopoverTrigger asChild>
+						<Button
+							variant="outline"
+							className={cn(
+								"w-full justify-start text-left font-normal",
+								!formData.timeline.finalDeadline && "text-muted-foreground"
+							)}
+						>
+							<CalendarIcon className="mr-2 h-4 w-4" />
+							{formData.timeline.finalDeadline ? (
+								format(new Date(formData.timeline.finalDeadline), "PPP")
+							) : (
+								<span>Pick a date</span>
+							)}
+						</Button>
+					</PopoverTrigger>
+					<PopoverContent className="w-auto p-0 bg-white">
+						<Calendar
+							mode="single"
+							selected={
+								formData.timeline.finalDeadline
+									? new Date(formData.timeline.finalDeadline)
+									: undefined
+							}
+							onSelect={(date) =>
+								updateSection(
+									"timeline",
+									"finalDeadline",
+									date ? format(date, "yyyy-MM-dd") : ""
+								)
+							}
+							initialFocus
+						/>
+					</PopoverContent>
+				</Popover>
 			</div>
 		</div>
 	);

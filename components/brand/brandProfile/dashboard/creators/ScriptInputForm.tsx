@@ -1,5 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 
 interface ScriptInputFormProps {
 	isOpen: boolean;
@@ -324,27 +334,27 @@ const ScriptInputForm: React.FC<ScriptInputFormProps> = ({
 							{/* Current Script Form */}
 							<div className="space-y-4">
 								<div>
-									<label className="block text-sm font-medium text-gray-700 mb-2">
+									<Label className="block text-sm font-medium text-gray-700 mb-2">
 										Video Title *
-									</label>
-									<input
+									</Label>
+									<Input
 										type="text"
 										value={formData.scripts[currentScriptIndex].title}
 										onChange={(e) =>
 											updateScript(currentScriptIndex, "title", e.target.value)
 										}
 										placeholder="Enter a descriptive title for this video"
-										className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+										className="w-full p-3 border border-gray-300 rounded-lg"
 									/>
 								</div>
 
 								<div>
-									<label className="block text-sm font-medium text-gray-700 mb-2">
+									<Label className="block text-sm font-medium text-gray-700 mb-2">
 										{scriptChoice === "brand-written"
 											? "Complete Script *"
 											: "Video Brief *"}
-									</label>
-									<textarea
+									</Label>
+									<Textarea
 										value={formData.scripts[currentScriptIndex].script}
 										onChange={(e) =>
 											updateScript(currentScriptIndex, "script", e.target.value)
@@ -355,22 +365,22 @@ const ScriptInputForm: React.FC<ScriptInputFormProps> = ({
 												: "Describe what you want in this video - key points, style, call-to-action, etc. The creator will write the full script..."
 										}
 										rows={scriptChoice === "brand-written" ? 12 : 6}
-										className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+										className="w-full p-3 border border-gray-300 rounded-lg "
 									/>
 								</div>
 
 								<div>
-									<label className="block text-sm font-medium text-gray-700 mb-2">
+									<Label className="block text-sm font-medium text-gray-700 mb-2">
 										Additional Notes
-									</label>
-									<textarea
+									</Label>
+									<Textarea
 										value={formData.scripts[currentScriptIndex].notes}
 										onChange={(e) =>
 											updateScript(currentScriptIndex, "notes", e.target.value)
 										}
 										placeholder="Any specific instructions, props needed, or additional context for this video..."
 										rows={3}
-										className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+										className="w-full p-3 border border-gray-300 rounded-lg "
 									/>
 								</div>
 							</div>
@@ -392,92 +402,92 @@ const ScriptInputForm: React.FC<ScriptInputFormProps> = ({
 
 							<div className="space-y-6">
 								<div>
-									<label className="block text-sm font-medium text-gray-700 mb-2">
+									<Label className="block text-sm font-medium text-gray-700 mb-2">
 										Target Audience *
-									</label>
-									<textarea
+									</Label>
+									<Textarea
 										value={formData.generalRequirements.targetAudience}
 										onChange={(e) =>
 											updateRequirements("targetAudience", e.target.value)
 										}
 										placeholder="Describe your target audience (age, interests, demographics, pain points)..."
 										rows={3}
-										className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+										className="w-full p-3 border border-gray-300 rounded-lg "
 									/>
 								</div>
 
 								<div>
-									<label className="block text-sm font-medium text-gray-700 mb-2">
+									<Label className="block text-sm font-medium text-gray-700 mb-2">
 										Brand Voice & Tone
-									</label>
-									<textarea
+									</Label>
+									<Textarea
 										value={formData.generalRequirements.brandVoice}
 										onChange={(e) =>
 											updateRequirements("brandVoice", e.target.value)
 										}
 										placeholder="Describe your brand's voice and tone (professional, casual, energetic, etc.)..."
 										rows={3}
-										className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+										className="w-full p-3 border border-gray-300 rounded-lg"
 									/>
 								</div>
 
 								<div>
-									<label className="block text-sm font-medium text-gray-700 mb-2">
+									<Label className="block text-sm font-medium text-gray-700 mb-2">
 										Call-to-Action *
-									</label>
-									<textarea
+									</Label>
+									<Textarea
 										value={formData.generalRequirements.callToAction}
 										onChange={(e) =>
 											updateRequirements("callToAction", e.target.value)
 										}
 										placeholder="What action should viewers take? (visit website, use promo code, follow account, etc.)..."
 										rows={2}
-										className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+										className="w-full p-3 border border-gray-300 rounded-lg "
 									/>
 								</div>
 
 								<div>
-									<label className="block text-sm font-medium text-gray-700 mb-2">
+									<Label className="block text-sm font-medium text-gray-700 mb-2">
 										Key Messages
-									</label>
-									<textarea
+									</Label>
+									<Textarea
 										value={formData.generalRequirements.keyMessages}
 										onChange={(e) =>
 											updateRequirements("keyMessages", e.target.value)
 										}
 										placeholder="What are the main points you want to communicate across all videos?..."
 										rows={3}
-										className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+										className="w-full p-3 border border-gray-300 rounded-lg"
 									/>
 								</div>
 
 								<div>
-									<label className="block text-sm font-medium text-gray-700 mb-2">
+									<Label className="block text-sm font-medium text-gray-700 mb-2">
 										Style Preferences
-									</label>
-									<textarea
+									</Label>
+									<Textarea
 										value={formData.generalRequirements.stylePreferences}
 										onChange={(e) =>
 											updateRequirements("stylePreferences", e.target.value)
 										}
 										placeholder="Visual style, editing preferences, music style, pacing, etc...."
 										rows={3}
-										className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+										className="w-full p-3 border border-gray-300 rounded-lg "
 									/>
 								</div>
 
 								<div>
-									<label className="block text-sm font-medium text-gray-700 mb-2">
+									<Label className="block text-sm font-medium text-gray-700 mb-2">
 										Additional Notes
-									</label>
-									<textarea
+									</Label>
+									<Textarea
 										value={formData.generalRequirements.additionalNotes}
 										onChange={(e) =>
 											updateRequirements("additionalNotes", e.target.value)
 										}
 										placeholder="Any other important information or requirements..."
 										rows={3}
-										className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+										className="w-full p-3 border border-gray-300 rounded-lg "
 									/>
 								</div>
 							</div>
@@ -498,64 +508,77 @@ const ScriptInputForm: React.FC<ScriptInputFormProps> = ({
 
 							<div className="space-y-6">
 								<div>
-									<label className="block text-sm font-medium text-gray-700 mb-2">
+									<Label className="block text-sm font-medium text-gray-700 mb-2">
 										Video Duration *
-									</label>
-									<select
+									</Label>
+									<Select
 										value={formData.videoSpecs.duration}
-										onChange={(e) => updateSpecs("duration", e.target.value)}
-										className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+										onValueChange={(value) => updateSpecs("duration", value)}
 									>
-										<option value="">Select duration</option>
-										<option value="15-30s">15-30 seconds</option>
-										<option value="30-60s">30-60 seconds</option>
-										<option value="60-90s">60-90 seconds</option>
-										<option value="90-120s">90-120 seconds</option>
-										<option value="custom">Custom (specify in notes)</option>
-									</select>
+										<SelectTrigger className="w-full">
+											<SelectValue placeholder="Select duration" />
+										</SelectTrigger>
+										<SelectContent className="bg-white">
+											<SelectItem value="15-30s">15-30 seconds</SelectItem>
+											<SelectItem value="30-60s">30-60 seconds</SelectItem>
+											<SelectItem value="60-90s">60-90 seconds</SelectItem>
+											<SelectItem value="90-120s">90-120 seconds</SelectItem>
+											<SelectItem value="custom">
+												Custom (specify in notes)
+											</SelectItem>
+										</SelectContent>
+									</Select>
 								</div>
 
 								<div>
-									<label className="block text-sm font-medium text-gray-700 mb-2">
+									<Label className="block text-sm font-medium text-gray-700 mb-2">
 										Video Format *
-									</label>
-									<select
+									</Label>
+									<Select
 										value={formData.videoSpecs.format}
-										onChange={(e) => updateSpecs("format", e.target.value)}
-										className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+										onValueChange={(value) => updateSpecs("format", value)}
 									>
-										<option value="">Select format</option>
-										<option value="vertical">
-											Vertical (9:16) - TikTok, Instagram Stories
-										</option>
-										<option value="square">
-											Square (1:1) - Instagram Feed
-										</option>
-										<option value="horizontal">
-											Horizontal (16:9) - YouTube, Facebook
-										</option>
-										<option value="multiple">Multiple formats needed</option>
-									</select>
+										<SelectTrigger className="w-full">
+											<SelectValue placeholder="Select format" />
+										</SelectTrigger>
+										<SelectContent className="bg-white">
+											<SelectItem value="vertical">
+												Vertical (9:16) - TikTok, Instagram Stories
+											</SelectItem>
+											<SelectItem value="square">
+												Square (1:1) - Instagram Feed
+											</SelectItem>
+											<SelectItem value="horizontal">
+												Horizontal (16:9) - YouTube, Facebook
+											</SelectItem>
+											<SelectItem value="multiple">
+												Multiple formats needed
+											</SelectItem>
+										</SelectContent>
+									</Select>
 								</div>
 
 								<div>
-									<label className="block text-sm font-medium text-gray-700 mb-2">
+									<Label className="block text-sm font-medium text-gray-700 mb-2">
 										Delivery Format
-									</label>
-									<select
+									</Label>
+									<Select
 										value={formData.videoSpecs.deliveryFormat}
-										onChange={(e) =>
-											updateSpecs("deliveryFormat", e.target.value)
+										onValueChange={(value) =>
+											updateSpecs("deliveryFormat", value)
 										}
-										className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
 									>
-										<option value="">Select delivery format</option>
-										<option value="mp4-hd">MP4 (HD 1080p)</option>
-										<option value="mp4-4k">MP4 (4K)</option>
-										<option value="mov-hd">MOV (HD 1080p)</option>
-										<option value="mov-4k">MOV (4K)</option>
-										<option value="multiple">Multiple formats</option>
-									</select>
+										<SelectTrigger className="w-full">
+											<SelectValue placeholder="Select delivery format" />
+										</SelectTrigger>
+										<SelectContent className="bg-white">
+											<SelectItem value="mp4-hd">MP4 (HD 1080p)</SelectItem>
+											<SelectItem value="mp4-4k">MP4 (4K)</SelectItem>
+											<SelectItem value="mov-hd">MOV (HD 1080p)</SelectItem>
+											<SelectItem value="mov-4k">MOV (4K)</SelectItem>
+											<SelectItem value="multiple">Multiple formats</SelectItem>
+										</SelectContent>
+									</Select>
 								</div>
 							</div>
 						</div>
