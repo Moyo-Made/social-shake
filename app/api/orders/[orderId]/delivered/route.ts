@@ -37,8 +37,6 @@ export async function PATCH(
       );
     }
 
-    console.log("Marking order as delivered for order ID:", orderId);
-
     if (!adminDb) {
       throw new Error("Firebase admin database is not initialized");
     }
@@ -49,7 +47,6 @@ export async function PATCH(
 
     // Try internal ID first (since your JSON data uses internal IDs)
     if (orderId.startsWith('order_')) {
-      console.log("Querying by internal ID:", orderId);
       const ordersQuery = await adminDb
         .collection("orders")
         .where("id", "==", orderId)
@@ -60,11 +57,11 @@ export async function PATCH(
         orderDoc = ordersQuery.docs[0];
         orderData = orderDoc.data();
         isInternalIdQuery = true;
-        console.log("Order found by internal ID");
+
       }
     } else {
       // Try document ID if it doesn't look like an internal ID
-      console.log("Querying by document ID:", orderId);
+
       orderDoc = await adminDb.collection("orders").doc(orderId).get();
       if (orderDoc.exists) {
         orderData = orderDoc.data();
@@ -74,14 +71,12 @@ export async function PATCH(
     // If still not found, try the other method
     if (!orderDoc || !orderDoc.exists) {
       if (isInternalIdQuery) {
-        console.log("Internal ID failed, trying document ID...");
         orderDoc = await adminDb.collection("orders").doc(orderId).get();
         if (orderDoc.exists) {
           orderData = orderDoc.data();
           isInternalIdQuery = false;
         }
       } else {
-        console.log("Document ID failed, trying internal ID...");
         const ordersQuery = await adminDb
           .collection("orders")
           .where("id", "==", orderId)
@@ -124,7 +119,7 @@ export async function PATCH(
     }
 
     // Check if order is in a valid state to mark as delivered
-    const validStatuses = ['in_progress', 'pending_review', 'revision_requested', 'active'];
+    const validStatuses = ['in_progress', 'pending_review', 'revision_requested', 'active', 'content_submitted'];
     if (!validStatuses.includes(normalizedOrderData.status)) {
       return NextResponse.json(
         { 
@@ -247,7 +242,6 @@ export async function PATCH(
         };
 
         await adminDb.collection("notifications").add(notificationData);
-        console.log("Enhanced delivery notification created with view button");
       } catch (error) {
         console.error("Error creating delivery notification:", error);
         // Don't fail the entire operation if notification fails
@@ -276,7 +270,7 @@ export async function PATCH(
       };
 
       await adminDb.collection("project_milestones").add(milestoneData);
-      console.log("Milestone created for order delivery");
+
     } catch (error) {
       console.error("Error creating milestone:", error);
       // Don't fail the entire operation if milestone creation fails
@@ -306,7 +300,6 @@ export async function PATCH(
         }
 
         await batch.commit();
-        console.log("Updated deliverable statuses to delivered");
       } catch (error) {
         console.error("Error updating deliverable statuses:", error);
         // Continue without failing the main operation
@@ -332,7 +325,6 @@ export async function PATCH(
       };
 
       await adminDb.collection("order_activities").add(activityData);
-      console.log("Activity log entry created for delivery");
     } catch (error) {
       console.error("Error creating activity log:", error);
       // Continue without failing

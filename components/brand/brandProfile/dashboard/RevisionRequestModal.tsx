@@ -7,7 +7,7 @@ interface RevisionRequestModalProps {
   onClose: () => void;
   onSubmit: (revisionNotes: string) => void;
   deliverable: {
-    original_filename: string;
+   file_name: string;
     video_id: number;
   };
   order: {
@@ -87,7 +87,7 @@ const RevisionRequestModal: React.FC<RevisionRequestModalProps> = ({
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
             <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
               <span className="font-medium">Video:</span>
-              <span>{deliverable.original_filename}</span>
+              <span>{deliverable.file_name}</span>
             </div>
             {order.creator && (
               <div className="flex items-center gap-2 text-sm text-gray-600">

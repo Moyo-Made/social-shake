@@ -63,10 +63,10 @@ interface Deliverable {
 	id: number;
 	order_id: string;
 	video_id: number;
-	original_filename: string;
-	file_url: string;
+	file_name: string;
+	file_download_url: string;
 	file_size: number;
-	file_type: string;
+	file_content_type: string;
 	notes: string;
 	status: string;
 	created_at: string;
@@ -229,7 +229,7 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 			const video = videoRef.current;
 
 			// Set the video source directly
-			video.src = selectedDeliverable.file_url;
+			video.src = selectedDeliverable.file_download_url;
 
 			// Reset video state
 			video.currentTime = 0;
@@ -244,9 +244,6 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 				console.error("Video error code:", video.error?.code);
 				console.error("Video error message:", video.error?.message);
 
-				// Log network state and ready state for debugging
-				console.log("Network state:", video.networkState);
-				console.log("Ready state:", video.readyState);
 
 				toast.error(
 					`Video loading failed: ${video.error?.message || "Unknown error"}`
@@ -254,32 +251,10 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 			};
 
 			const handleVideoLoad = () => {
-				console.log("Video loaded successfully");
 			};
 
 			video.addEventListener("error", handleVideoError);
 			video.addEventListener("loadeddata", handleVideoLoad);
-
-			// Optional: Auto-play after loading (remove if you don't want auto-play)
-			const playVideo = async () => {
-				try {
-					await video.play();
-					console.log("Video started playing");
-				} catch (error) {
-					console.log("Auto-play prevented by browser:", error);
-					// This is normal - many browsers block auto-play
-				}
-			};
-
-			// Wait for video to be ready before trying to play
-			video.addEventListener("canplay", playVideo, { once: true });
-
-			// Cleanup
-			return () => {
-				video.removeEventListener("error", handleVideoError);
-				video.removeEventListener("loadeddata", handleVideoLoad);
-				video.removeEventListener("canplay", playVideo);
-			};
 		}
 	}, [isPreviewOpen, selectedDeliverable]);
 
@@ -298,8 +273,8 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 		setIsDownloading(deliverable.firestore_id);
 		try {
 			const link = document.createElement("a");
-			link.href = deliverable.file_url;
-			link.download = deliverable.original_filename;
+			link.href = deliverable.file_download_url;
+			link.download = deliverable.file_name;
 			link.target = "_blank";
 
 			document.body.appendChild(link);
@@ -343,13 +318,7 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 				toast.error("Payment ID not found for this order");
 				return;
 			}
-
-			console.log("Sending approval request:", {
-				paymentId,
-				action: "approve",
-				deliverableId: deliverable.firestore_id,
-			});
-
+			
 			const paymentResponse = await fetch("/api/payments/approve-video", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -493,7 +462,7 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 					.includes(searchQuery.toLowerCase()) ||
 				order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
 				order.deliverables.some((d) =>
-					d.original_filename.toLowerCase().includes(searchQuery.toLowerCase())
+					d.file_name.toLowerCase().includes(searchQuery.toLowerCase())
 				);
 			const matchesCreator =
 				selectedCreator === "all" || order.creator?.name === selectedCreator;
@@ -600,7 +569,7 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 			<div
 				className={`flex flex-col justify-center items-center h-64 ${className}`}
 			>
-				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500 h-screen"></div>
 				<span className="ml-3 text-gray-600">
 					Loading your delivered orders...
 				</span>
@@ -803,8 +772,8 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 													<div className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center">
 														<User size={12} className="text-orange-600" />
 													</div>
-													<span className="font-medium">
-														{order.creator.name}
+													<span className="font-normal">
+														{order.creator.email}
 													</span>
 												</div>
 											)}
@@ -909,11 +878,11 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 														>
 															{/* Video Preview */}
 															<div className="relative aspect-video bg-gradient-to-br from-gray-900 to-gray-800">
-																{deliverable.file_type.startsWith("video/") ? (
+																{deliverable.file_content_type && deliverable.file_content_type.startsWith("video/") ? (
 																	<>
 																		<video
 																			className="w-full h-full object-cover"
-																			src={deliverable.file_url}
+																			src={deliverable.file_download_url}
 																			preload="metadata"
 																		/>
 																		<div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity duration-200">
@@ -961,7 +930,7 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 																<p className="text-sm text-gray-600 mb-2 truncate">
 																	{isMultiVideo && !isExpanded
 																		? `${approvedCount} approved, ${pendingCount} pending review`
-																		: deliverable.original_filename}
+																		: deliverable.file_name}
 																</p>
 
 																{!isMultiVideo && (
@@ -1076,13 +1045,13 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 															>
 																{/* Video Preview */}
 																<div className="relative aspect-video bg-gradient-to-br from-gray-900 to-gray-800">
-																	{deliverable.file_type.startsWith(
+																	{deliverable.file_content_type.startsWith(
 																		"video/"
 																	) ? (
 																		<>
 																			<video
 																				className="w-full h-full object-cover"
-																				src={deliverable.file_url}
+																				src={deliverable.file_download_url}
 																				preload="metadata"
 																			/>
 																			<div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity duration-200">
@@ -1120,7 +1089,7 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 																		Video {deliverable.video_id}
 																	</h4>
 																	<p className="text-sm text-gray-600 mb-2 truncate">
-																		{deliverable.original_filename}
+																		{deliverable.file_name}
 																	</p>
 
 																	<div className="flex items-center gap-3 text-xs text-gray-500 mb-3">
@@ -1211,7 +1180,7 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 									</h3>
 									<p className="text-gray-600 mt-2 text-lg">
 										Video {selectedDeliverable.video_id}:{" "}
-										{selectedDeliverable.original_filename}
+										{selectedDeliverable.file_name}
 									</p>
 									{selectedOrder.creator && (
 										<div className="flex items-center gap-2 text-gray-600 mt-2">
@@ -1247,7 +1216,7 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 
 							{/* Video Player */}
 							<div className="aspect-video max-w-4xl bg-gray-900 rounded-xl mb-6 overflow-hidden shadow-lg">
-								{selectedDeliverable.file_type.startsWith("video/") ? (
+								{selectedDeliverable.file_content_type.startsWith("video/") ? (
 									<video
 										ref={videoRef}
 										key={selectedDeliverable.firestore_id}
@@ -1258,23 +1227,16 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 										crossOrigin="anonymous"
 										onError={(e) => {
 											console.error("Video loading error:", e);
-											console.error("Video URL:", selectedDeliverable.file_url);
+											console.error("Video URL:", selectedDeliverable.file_download_url);
 											console.error(
 												"Video type:",
-												selectedDeliverable.file_type
+												selectedDeliverable.file_content_type
 											);
 											toast.error(
 												"Failed to load video. Please check the video URL or format."
 											);
 										}}
-										onLoadStart={() => console.log("Video loading started")}
-										onCanPlay={() => console.log("Video can play")}
-										onLoadedData={() =>
-											console.log("Video loaded successfully")
-										}
-										onLoadedMetadata={() =>
-											console.log("Video metadata loaded")
-										}
+								
 									>
 										Your browser does not support the video tag.
 									</video>
