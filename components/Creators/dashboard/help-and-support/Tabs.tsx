@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import ContactSupportForm from "./ContactSupportForm";
 import Image from "next/image";
-import SupportTicketHistory from "./TicketHistory";
+// import SupportTicketHistory from "./TicketHistory";
 import FAQComponent from "./Help";
 
 const Tabs = () => {
@@ -45,30 +45,30 @@ const Tabs = () => {
 				</div>
 			),
 		},
-		{
-			id: "supportHistory",
-			label: "Support History",
-			icon: (
-				<div className="w-16 h-16 rounded-full bg-orange-50 flex items-center justify-center">
-					<Image
-						src="/icons/support-history.svg"
-						alt="Support History"
-						width={80}
-						height={80}
-					/>
-				</div>
-			),
-			content: (
-				<div className="p-6">
-					<SupportTicketHistory />
-				</div>
-			),
-		},
+		// {
+		// 	id: "supportHistory",
+		// 	label: "Support History",
+		// 	icon: (
+		// 		<div className="w-16 h-16 rounded-full bg-orange-50 flex items-center justify-center">
+		// 			<Image
+		// 				src="/icons/support-history.svg"
+		// 				alt="Support History"
+		// 				width={80}
+		// 				height={80}
+		// 			/>
+		// 		</div>
+		// 	),
+		// 	content: (
+		// 		<div className="p-6">
+		// 			<SupportTicketHistory />
+		// 		</div>
+		// 	),
+		// },
 	];
 
 	return (
 		<div className="w-full max-w-6xl mx-auto pt-10 p-8">
-			<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+			<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
 				{tabs.map((tab) => (
 					<div
 						key={tab.id}
