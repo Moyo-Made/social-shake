@@ -126,7 +126,6 @@ export default function ProjectDetails({
 
 			try {
 				setBrandLoading(true);
-				console.log("Fetching brand profile for userId:", projectData.userId);
 
 				const response = await fetch(
 					`/api/admin/brand-approval?userId=${projectData.userId}`
@@ -134,7 +133,6 @@ export default function ProjectDetails({
 
 				if (response.ok) {
 					const data = await response.json();
-					console.log("Received brand profile:", data);
 					setBrandProfile(data);
 				} else {
 					console.error("Error fetching brand profile:", response.status);

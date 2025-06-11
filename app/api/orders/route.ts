@@ -185,12 +185,6 @@ export async function PATCH(request: NextRequest) {
 			action
 		} = body;
 
-		console.log("Updating order section:", {
-			orderId,
-			section,
-			hasData: !!data,
-		});
-
 		// Validate required fields
 		if (!orderId || !section || !data) {
 			return NextResponse.json(
@@ -573,8 +567,6 @@ export async function PUT(request: NextRequest) {
 	try {
 		const body = await request.json();
 		const { orderId, userId } = body;
-
-		console.log("Finalizing order:", { orderId, userId });
 
 		if (!orderId) {
 			return NextResponse.json(

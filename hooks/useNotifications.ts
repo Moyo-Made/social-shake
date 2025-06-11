@@ -62,12 +62,9 @@ export function useNotifications(): UseNotificationsReturn {
   useEffect(() => {
     if (!socket || !isConnected || !currentUser) return;
 
-    console.log('Setting up notification socket listeners');
-
     socket.emit('subscribe-notifications', currentUser.uid);
 
     const handleNewNotification = (notification: any) => {
-      console.log('Received new notification:', notification);
       const formattedNotification = {
         ...notification,
         createdAt: new Date(notification.createdAt),
@@ -84,7 +81,6 @@ export function useNotifications(): UseNotificationsReturn {
     };
 
     const handleNotificationUpdate = (updatedNotification: any) => {
-      console.log('Received notification update:', updatedNotification);
       const formattedNotification = {
         ...updatedNotification,
         createdAt: new Date(updatedNotification.createdAt),
@@ -97,8 +93,6 @@ export function useNotifications(): UseNotificationsReturn {
     };
 
     const handleBulkNotificationUpdate = (updates: any[]) => {
-      console.log('Received bulk notification updates:', updates);
-      
       setNotifications(prev => {
         const updatedNotifications = [...prev];
         updates.forEach(update => {
@@ -121,7 +115,6 @@ export function useNotifications(): UseNotificationsReturn {
     socket.on('notifications-bulk-updated', handleBulkNotificationUpdate);
 
     return () => {
-      console.log('Cleaning up notification socket listeners');
       socket.off('new-notification', handleNewNotification);
       socket.off('notification-updated', handleNotificationUpdate);
       socket.off('notifications-bulk-updated', handleBulkNotificationUpdate);
@@ -150,9 +143,9 @@ export function useNotifications(): UseNotificationsReturn {
         throw new Error('Failed to mark notification as read');
       }
 
-      // Update local state after successful API call
+      // FIXED: Update only the specific notification, not all notifications
       setNotifications(prev => 
-        prev.map(n => n.id === id ? { ...n, read: true, readAt: new Date() } : n)
+        prev.map(n => n.id === id ? { ...n, status: 'read', readAt: new Date() } : n)
       );
 
       // Emit socket event to update other clients
@@ -180,7 +173,7 @@ export function useNotifications(): UseNotificationsReturn {
         throw new Error(errorData.error || 'Failed to mark all notifications as read');
       }
   
-      // Update local state - FIXED: Use status field
+      // Update local state - mark ALL notifications as read
       setNotifications(prev =>
         prev.map(n => ({ ...n, status: 'read', readAt: new Date() }))
       );
@@ -220,8 +213,9 @@ export function useNotifications(): UseNotificationsReturn {
       setNotifications(prev => 
         prev.map(n => n.id === notificationId ? { 
           ...n, 
-          read: true, 
-          responded: true, 
+          status: 'read', // Use status instead of read
+          responded: true,
+          response: response === 'accepted' ? 'accepted' : 'rejected', // Ensure compatibility with NotificationData type
           readAt: new Date() 
         } : n)
       );
@@ -236,7 +230,6 @@ export function useNotifications(): UseNotificationsReturn {
         });
       }
 
-      console.log(`${response} invitation for project ${projectId}`);
     } catch (error) {
       console.error(`Error ${response}ing invitation:`, error);
       throw error;

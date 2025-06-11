@@ -1,4 +1,5 @@
 export interface NotificationData {
+	response: "accepted" | "rejected" | null;
 	id?: string;
 	type:
 		| "project_invitation"
@@ -17,8 +18,7 @@ export interface NotificationData {
 	projectTitle?: string;
 	creatorId?: string;
 	creatorName?: string;
-	read: boolean;
-	responded?: boolean;
+	responded?: boolean | string;
 	createdAt: Date;
 	readAt?: Date;
 

@@ -8,8 +8,6 @@ export async function GET(request: NextRequest) {
 		const { searchParams } = new URL(request.url);
 		const userId = searchParams.get("userId");
 
-		console.log(`🔍 GET /api/notifications called for userId: ${userId}`);
-
 		if (!userId) {
 			return NextResponse.json(
 				{ error: "User ID is required" },
@@ -31,21 +29,10 @@ export async function GET(request: NextRequest) {
 			.orderBy("createdAt", "desc")
 			.limit(50);
 
-		console.log(`📊 Executing Firestore query for userId: ${userId}`);
 		const snapshot = await query.get();
-		console.log(`📋 Found ${snapshot.docs.length} total notifications`);
 
 		const notifications: NotificationData[] = snapshot.docs.map((doc) => {
 			const data = doc.data();
-
-			// Log each notification's read status - FIXED: Check status field
-			console.log(`📄 Notification ${doc.id}:`, {
-				type: data.type,
-				status: data.status, // Changed from read to status
-				readAt: data.readAt,
-				title: data.title?.substring(0, 50) + '...',
-				createdAt: data.createdAt,
-			});
 
 			// Helper function to safely convert dates
 			const convertToDate = (dateValue: any): Date | undefined => {
@@ -83,34 +70,6 @@ export async function GET(request: NextRequest) {
 		// Count and log read/unread stats - FIXED: Use status field
 		const unreadNotifications = notifications.filter(n => n.status === "unread");
 		const readNotifications = notifications.filter(n => n.status === "read");
-		
-		console.log(`📊 Notification Statistics:`, {
-			total: notifications.length,
-			unread: unreadNotifications.length,
-			read: readNotifications.length,
-		});
-
-		// Log details of unread notifications
-		if (unreadNotifications.length > 0) {
-			console.log(`🔴 Unread notifications:`, unreadNotifications.map(n => ({
-				id: n.id,
-				type: n.type,
-				title: n.title?.substring(0, 30) + '...',
-				createdAt: n.createdAt,
-				status: n.status // Changed from read to status
-			})));
-		}
-
-		// Log details of read notifications
-		if (readNotifications.length > 0) {
-			console.log(`✅ Read notifications:`, readNotifications.map(n => ({
-				id: n.id,
-				type: n.type,
-				title: n.title?.substring(0, 30) + '...',
-				readAt: n.readAt,
-				status: n.status // Changed from read to status
-			})));
-		}
 
 		return NextResponse.json({ 
 			notifications,
@@ -156,13 +115,6 @@ export async function POST(request: NextRequest) {
 			creatorName,
 		} = body;
 
-		console.log(`📝 Creating new notification:`, {
-			type,
-			userId,
-			title: title?.substring(0, 50) + '...',
-			timestamp: new Date().toISOString()
-		});
-
 		if (!userId) {
 			return NextResponse.json(
 				{ error: "User ID is required" },
@@ -182,17 +134,15 @@ export async function POST(request: NextRequest) {
 			projectTitle,
 			creatorId,
 			creatorName,
-			status: "unread", // Changed from read: false to status: "unread"
+			status: "unread",
 			responded: false,
 			createdAt: new Date(),
-			read: false
+			response: null, // Default response is null
 		};
 
 		const docRef = await adminDb
 			.collection("notifications")
 			.add(notificationData);
-
-		console.log(`✅ Created notification with ID: ${docRef.id}`);
 
 		return NextResponse.json({
 			success: true,
