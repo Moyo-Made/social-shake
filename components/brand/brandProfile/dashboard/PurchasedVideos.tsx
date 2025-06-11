@@ -567,9 +567,9 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 	if (loading) {
 		return (
 			<div
-				className={`flex flex-col justify-center items-center h-64 ${className}`}
+				className={`flex flex-col justify-center items-center h-screen ${className}`}
 			>
-				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500 h-screen"></div>
+				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
 				<span className="ml-3 text-gray-600">
 					Loading your delivered orders...
 				</span>

@@ -196,7 +196,7 @@ const SideNav: React.FC = () => {
 					<MenuItem
 						href="/brand/dashboard/videos/purchased"
 						icon={<VideoIcon size={20} />}
-						text="My Videos"
+						text="My Purchased Videos"
 					/>
 
 					<MenuItem
@@ -275,7 +275,7 @@ const getPageTitle = (pathname: string): string => {
 		"/brand/dashboard/creators": "Creators",
 		"/brand/dashboard/creators/all": "All Creators",
 		"/brand/dashboard/creators/saved": "Saved Creators",
-		"/brand/dashboard/videos/purchased": "My Videos",
+		"/brand/dashboard/videos/purchased": "My Purchased Videos",
 		"/brand/dashboard/messages": "Messages",
 		"/brand/dashboard/transactions": "Transactions",
 		"/brand/dashboard/settings": "Settings",
@@ -307,7 +307,7 @@ const getPageTitle = (pathname: string): string => {
 	}
 
 	if (pathname.startsWith("/brand/dashboard/videos/")) {
-		return "My Videos";
+		return "My Purchased Videos";
 	}
 
 	if (pathname.startsWith("/brand/dashboard/settings/")) {
