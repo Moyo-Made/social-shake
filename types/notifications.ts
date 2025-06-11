@@ -30,6 +30,7 @@ export interface NotificationData {
 	orderId?: string;
 	relatedId?: string; 
 	relatedTo?: "order" | "project";
+	status?: "unread" | "read";
 }
 
 export interface InvitationResponse {

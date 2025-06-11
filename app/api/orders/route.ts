@@ -27,14 +27,6 @@ export async function POST(request: NextRequest) {
 			metadata,
 		} = body;
 
-		console.log("Creating draft order:", {
-			userId,
-			creatorId,
-			packageType,
-			totalPrice,
-			paymentType,
-		});
-
 		// Stringent validation for required fields only
 		if (!userId || typeof userId !== "string" || userId.trim() === "") {
 			return NextResponse.json(
@@ -633,12 +625,12 @@ export async function PUT(request: NextRequest) {
 		const userMessage =
 			orderData?.paymentType === "escrow"
 				? `Your order #${orderId} has been sent and your payment is held securely in escrow until delivery is confirmed.`
-				: `Your order #${orderId} is ready for payment. Please proceed to confirm the order.`;
+				: `Your order #${orderId} has been sent and your payment is held securely in escrow until delivery is confirmed.`;
 
 		const creatorMessage =
 			orderData?.paymentType === "escrow"
 				? `You have a new order! Payment is held in escrow and will be released upon completion of the order.`
-				: `Order #${orderId} received from ${orderData?.user_name || "customer"}. Waiting for payment.`;
+				: `OYou have a new order! Payment is held in escrow and will be released upon completion of the order.`;
 
 		await Promise.all([
 			adminDb.collection("notifications").add({

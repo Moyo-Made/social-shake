@@ -150,7 +150,7 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
 			<div
 				key={notification.id}
 				className={`p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-					!notification.read ? "bg-orange-50 border-l-4 border-l-blue-500" : ""
+					notification.status === "unread" ? "bg-orange-50 border-l-4 border-l-blue-500" : ""
 				}`}
 			>
 				<div className="flex items-start gap-3">
@@ -307,13 +307,13 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
 						)}
 					</div>
 
-					{!notification.read && (
-						<button
-							onClick={() => markAsRead(notification.id!)}
-							className="flex-shrink-0 w-2 h-2 bg-orange-500 rounded-full hover:bg-orange-600 transition-colors"
-							title="Mark as read"
-						/>
-					)}
+					{notification.status === "unread" && (
+	<button
+		onClick={() => markAsRead(notification.id!)}
+		className="flex-shrink-0 w-2 h-2 bg-orange-500 rounded-full hover:bg-orange-600 transition-colors"
+		title="Mark as read"
+	/>
+)}
 				</div>
 			</div>
 		);
