@@ -47,8 +47,14 @@ export async function POST(request: NextRequest) {
     }
     
     // Validate file type
-    const validVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo'];
-    if (!validVideoTypes.includes(videoFile.type)) {
+    const validVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo', 'video/mpeg'];
+    const validExtensions = ['.mp4', '.webm', '.mov', '.avi'];
+    
+    const fileExtension2 = videoFile.name.toLowerCase().substring(videoFile.name.lastIndexOf('.'));
+    const isValidType = validVideoTypes.includes(videoFile.type);
+    const isValidExtension = validExtensions.includes(fileExtension2);
+    
+    if (!isValidType && !isValidExtension) {
       return NextResponse.json(
         { error: "Invalid file format. Please upload a video file." },
         { status: 400 }

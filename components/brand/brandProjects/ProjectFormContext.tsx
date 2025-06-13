@@ -108,7 +108,7 @@ const defaultFormData: ProjectFormData = {
 	paymentAmount: null,
 	projectTitle: "",
 	brandEmail: "",
-	projectName: undefined
+	projectName: ""
 };
 
 interface ProjectFormContextType {

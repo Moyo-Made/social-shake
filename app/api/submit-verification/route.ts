@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
 			profilePictureUrl,
 			aboutMeVideo,
 			portfolioVideoUrls,
+			languages,
 		} = body;
 
 		if (!userId) {
@@ -66,12 +67,14 @@ export async function POST(request: NextRequest) {
 			country,
 			contentTypes,
 			pricing,
+			languages,
 		};
 
 		const missingFields = Object.entries(requiredFields)
 			.filter(([key, value]) => {
 				if (key === "contentTypes") return !value || value.length === 0;
 				if (key === "pricing") return !value || Object.keys(value).length === 0;
+				if (key === "languages") return !value || !Array.isArray(value) || value.length === 0;
 				return !value || (typeof value === "string" && value.trim() === "");
 			})
 			.map(([key]) => key);
@@ -181,6 +184,7 @@ export async function POST(request: NextRequest) {
 			profilePictureUrl,
 			aboutMeVideoUrl: aboutMeVideo,
 			portfolioVideoUrls: validPortfolioUrls,
+			languages: languages || [],
 		};
 
 		// Create or update verification document in Firestore

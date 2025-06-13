@@ -60,7 +60,8 @@ const CompleteCreatorProfile = () => {
 	const [ethnicity, setEthnicity] = useState("");
 	const [dateOfBirth, setDateOfBirth] = useState("");
 	const [gender, setGender] = useState("");
-	const [language, setLanguage] = useState("");
+	const [languages, setLanguages] = useState<string[]>([]);
+	const [languageInput, setLanguageInput] = useState<string>("");
 	const [selectedCountry, setSelectedCountry] = useState("");
 	const [contentLinks, setContentLinks] = useState<string[]>([""]);
 	const [aboutMeVideo, setAboutMeVideo] = useState<File | null>(null);
@@ -130,7 +131,12 @@ const CompleteCreatorProfile = () => {
 			setEthnicity(profileData.ethnicity || "");
 			setDateOfBirth(profileData.dateOfBirth || "");
 			setGender(profileData.gender || "");
-			setLanguage(profileData.language || "");
+			setLanguages(
+				Array.isArray(profileData?.languages) &&
+					profileData.languages.length > 0
+					? profileData.languages
+					: []
+			);
 			setSelectedCountry(profileData.country || "");
 
 			// Handle arrays and objects
@@ -277,7 +283,7 @@ const CompleteCreatorProfile = () => {
 			setAboutMeVideo(file);
 
 			// Update context with the File object (not a URL)
-			await toast.promise(updateProfileData({ aboutMeVideo: file }), {
+			toast.promise(updateProfileData({ aboutMeVideo: file }), {
 				loading: "Uploading about me video...",
 				success: "Your about me video has been uploaded successfully.",
 				error: "Failed to upload video. Please try again.",
@@ -314,6 +320,72 @@ const CompleteCreatorProfile = () => {
 				setBioWarning("");
 			}, 3000);
 		}
+	};
+
+	// Update your useEffect to load languages from context
+	useEffect(() => {
+		if (profileData && Object.keys(profileData).length > 0) {
+			// ... your existing code ...
+
+			// Add this for languages
+			setLanguages(
+				Array.isArray(profileData?.languages) &&
+					profileData.languages.length > 0
+					? profileData.languages
+					: []
+			);
+
+			// Remove the single language line:
+			// setLanguage(profileData.language || "");
+		}
+	}, [profileData]);
+
+	// Add these helper functions
+	const addLanguages = (input: string) => {
+		if (!input.trim()) return;
+
+		// Split by comma, trim whitespace, filter out empty strings, and convert to proper case
+		const newLanguages = input
+			.split(",")
+			.map((lang) => lang.trim())
+			.filter((lang) => lang.length > 0)
+			.map((lang) => lang.charAt(0).toUpperCase() + lang.slice(1).toLowerCase())
+			.filter((lang) => !languages.includes(lang)); // Remove duplicates
+
+		if (newLanguages.length > 0) {
+			const updatedLanguages = [...languages, ...newLanguages];
+			setLanguages(updatedLanguages);
+			updateProfileData({ languages: updatedLanguages });
+			setLanguageInput(""); // Clear input after adding
+		}
+	};
+
+	const removeLanguage = (indexToRemove: number) => {
+		const newLanguages = languages.filter(
+			(_, index) => index !== indexToRemove
+		);
+		setLanguages(newLanguages);
+		updateProfileData({ languages: newLanguages });
+	};
+
+	const handleLanguageInputChange = (
+		e: React.ChangeEvent<HTMLInputElement>
+	) => {
+		setLanguageInput(e.target.value);
+		clearFieldError("languages");
+	};
+
+	const handleLanguageInputKeyPress = (
+		e: React.KeyboardEvent<HTMLInputElement>
+	) => {
+		if (e.key === "Enter") {
+			e.preventDefault();
+			addLanguages(languageInput);
+		}
+	};
+
+	const handleAddLanguagesClick = () => {
+		addLanguages(languageInput);
 	};
 
 	const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
@@ -439,7 +511,7 @@ const CompleteCreatorProfile = () => {
 			setAbnNumber("");
 			updateProfileData({ abnNumber: "" });
 		}
-		
+
 		setSelectedCountry(value);
 		clearFieldError("country");
 		updateProfileData({ country: value });
@@ -931,18 +1003,56 @@ const CompleteCreatorProfile = () => {
 			)}
 
 			{/* Your Language? */}
-			<label className="block text-base font-medium text-gray-700 mt-4">
-				Your Language
+			<label className="block text-base font-medium text-gray-700 mt-4 mb-1">
+				What Language(s) do you speak?
 			</label>
-			<Input
-				className={`mt-1 placeholder:text-[#667085] ${fieldErrors.language ? "border-red-500" : ""}`}
-				placeholder="English"
-				value={language}
-				onChange={(e) => handleTextInputChange(e, "language")}
-				onBlur={() => handleBlur("language")}
-			/>
-			{renderFieldError("language")}
+			{languages.length > 0 && (
+				<div className="mb-3 flex flex-wrap gap-2">
+					{languages.map((lang, index) => (
+						<div
+							key={index}
+							className="bg-white border border-[#D0D5DD] text-gray-600 px-2 py-1 rounded-md flex items-center text-sm"
+						>
+							{lang}
+							<button
+								type="button"
+								onClick={() => removeLanguage(index)}
+								className="ml-2 text-gray-600 hover:text-gray-800"
+							>
+								<X size={14} />
+							</button>
+						</div>
+					))}
+				</div>
+			)}
 
+			{/* Language input field */}
+			<div className="flex gap-2">
+				<Input
+					type="text"
+					value={languageInput}
+					onChange={handleLanguageInputChange}
+					onKeyPress={handleLanguageInputKeyPress}
+					placeholder="Enter languages separated by commas (e.g., English, Spanish, French)"
+					className={`flex-1 px-3 py-2 border rounded-md  ${
+						fieldErrors.languages ? "border-red-500" : "border-[#D0D5DD]"
+					}`}
+				/>
+				<button
+					type="button"
+					onClick={handleAddLanguagesClick}
+					disabled={!languageInput.trim()}
+					className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+				>
+					Add
+				</button>
+			</div>
+
+			<p className="text-sm text-[#475467] mt-1">
+				Enter languages separated by commas and press Enter or click Add. You
+				can add multiple languages at once.
+			</p>
+			{renderFieldError("languages")}
 
 			{/* Best Tiktok Links */}
 			<div className="space-y-1 mt-4">

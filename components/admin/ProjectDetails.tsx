@@ -9,13 +9,14 @@ import { ProjectStatus } from "@/types/projects";
 import { ProjectFormData } from "@/types/contestFormData";
 import { BrandProfile } from "@/types/user";
 import Image from "next/image";
+import { topLanguages } from "@/types/languages";
 
 const ProjectDetailsPage: React.FC = () => {
 	const params = useParams();
 	const projectId = params?.projectId as string;
 
-		const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
-			const [brandEmail, setBrandEmail] = useState<string>("");
+	const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
+	const [brandEmail, setBrandEmail] = useState<string>("");
 
 	const [project, setProject] = useState<ProjectFormData | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -90,9 +91,7 @@ const ProjectDetailsPage: React.FC = () => {
 						setBrandEmail(data.email);
 					}
 				} else {
-		
 				}
-
 			} catch (err) {
 				console.error("Error fetching brand profile:", err);
 				setError(
@@ -270,9 +269,15 @@ const ProjectDetailsPage: React.FC = () => {
 				color: "bg-[#FFF7ED] border border-[#FBBF24] text-[#FBBF24]",
 				text: "• Request Edit",
 			},
+			invite: {
+				color: "bg-[#E0F2FE] border border-[#0EA5E9] text-[#0EA5E9]",
+				text: "• Inviting Creators",
+			},
 		};
 
-		const config = statusConfig[status as keyof typeof statusConfig] || statusConfig["pending"];
+		const config =
+			statusConfig[status as keyof typeof statusConfig] ||
+			statusConfig["pending"];
 
 		return (
 			<span
@@ -283,10 +288,46 @@ const ProjectDetailsPage: React.FC = () => {
 		);
 	};
 
+	// Helper function to get creator details based on selection method
+	const getCreatorDetails = () => {
+		if (!project) return null;
+
+		const selectionMethod = project.creatorPricing.selectionMethod;
+
+		// Only show specific creators if the selection method explicitly says so
+		if (selectionMethod === "Invite Specific Creators") {
+			const selectedCreators = project.creatorPricing.selectedCreators || [];
+			return {
+				type: "specific",
+				creators: selectedCreators,
+				totalVideos: project.creatorPricing.totalVideos,
+				totalBudget: project.creatorPricing.totalBudget,
+				totalAmount: project.creatorPricing.totalAmount,
+			};
+		} else {
+			// For all other cases (including "Post Public Brief"), show criteria
+			const creator = project.creatorPricing.creator || project.creatorPricing;
+			return {
+				type: "criteria",
+				ageGroup: creator.ageGroup || "Not specified",
+				gender: creator.gender || "Not specified",
+				industry: creator.industry || "Not specified",
+				language: creator.language || "Not specified",
+				countries: creator.countries || [],
+				creatorCount: project.creatorPricing.creatorCount,
+				videosPerCreator: project.creatorPricing.videosPerCreator,
+				totalVideos: project.creatorPricing.totalVideos,
+				budgetPerVideo: project.creatorPricing.budgetPerVideo,
+				totalBudget: project.creatorPricing.totalBudget,
+				totalAmount: project.creatorPricing.totalAmount,
+			};
+		}
+	};
+
 	if (loading) {
 		return (
 			<div className="flex justify-center items-center py-20 h-screen">
-				<div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
+				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
 			</div>
 		);
 	}
@@ -308,6 +349,8 @@ const ProjectDetailsPage: React.FC = () => {
 			</div>
 		);
 	}
+
+	const creatorDetails = getCreatorDetails();
 
 	return (
 		<div className="bg-white p-6 w-full mx-auto">
@@ -392,6 +435,13 @@ const ProjectDetailsPage: React.FC = () => {
 					{/* Project details in row layout */}
 					<div className="mb-6">
 						<div className="grid grid-cols-1 md:grid-cols-3 mb-4 pb-2">
+							<div className="font-medium text-gray-500">Selection Method</div>
+							<div className="md:col-span-2">
+								{project.creatorPricing.selectionMethod}
+							</div>
+						</div>
+
+						<div className="grid grid-cols-1 md:grid-cols-3 mb-4 pb-2">
 							<div className="font-medium text-gray-500">Project Type</div>
 							<div className="md:col-span-2">
 								{project.projectDetails.projectType}
@@ -411,18 +461,13 @@ const ProjectDetailsPage: React.FC = () => {
 							<div className="font-medium text-gray-500">Content Type</div>
 							<div className="md:col-span-2">
 								{(() => {
-									// Make sure we're accessing the correct property path
 									const contentType = project.projectRequirements.contentType;
-
-									// Map technical values to display-friendly names
 									const contentTypeMap = {
 										"product-showcase": "Product Showcase",
 										testimonials: "Testimonials",
 										tutorials: "Tutorials",
 										"trend-participation": "Trend Participation",
 									};
-
-									// Return the mapped name if it exists, otherwise use the original value
 									return (
 										contentTypeMap[
 											contentType as keyof typeof contentTypeMap
@@ -435,9 +480,7 @@ const ProjectDetailsPage: React.FC = () => {
 						</div>
 
 						<div className="grid grid-cols-1 md:grid-cols-3 mb-4 pb-2">
-							<div className="font-medium text-gray-500">
-								Product Type
-							</div>
+							<div className="font-medium text-gray-500">Product Type</div>
 							<div className="md:col-span-2">
 								{project.projectDetails.productType || "Not specified"}
 							</div>
@@ -448,13 +491,10 @@ const ProjectDetailsPage: React.FC = () => {
 							<div className="md:col-span-2">
 								{(() => {
 									const videoType = project.projectRequirements.videoType;
-
 									const videoTypeMap = {
 										"client-script": "Client's Script",
 										"creator-script": "Creator's Script",
 									};
-
-									// Return the mapped name if it exists, otherwise use the original value
 									return (
 										videoTypeMap[videoType as keyof typeof videoTypeMap] ||
 										videoType ||
@@ -471,14 +511,16 @@ const ProjectDetailsPage: React.FC = () => {
 							</div>
 						</div>
 
-						<div className="grid grid-cols-1 md:grid-cols-3 mb-4 pb-2">
-							<div className="font-medium text-gray-500">
-								Client&apos;s Script
+						{project.projectRequirements.script && (
+							<div className="grid grid-cols-1 md:grid-cols-3 mb-4 pb-2">
+								<div className="font-medium text-gray-500">
+									Client&apos;s Script
+								</div>
+								<div className="md:col-span-2">
+									{project.projectRequirements.script}
+								</div>
 							</div>
-							<div className="md:col-span-2">
-								{project.projectRequirements.script || "No script provided"}
-							</div>
-						</div>
+						)}
 
 						{project.projectRequirements.contentLinks &&
 							project.projectRequirements.contentLinks.length > 0 && (
@@ -504,78 +546,195 @@ const ProjectDetailsPage: React.FC = () => {
 								</div>
 							)}
 
-						{project.projectRequirements.brandAssets &&
-							project.projectRequirements.contentLinks.length > 0 && (
-								<div className="grid grid-cols-1 md:grid-cols-3 mb-4">
-									<div className="font-medium text-gray-500">Brand Assets</div>
-									<div className="md:col-span-2">
-										<a
-											href={project.projectRequirements.brandAssets}
-											target="_blank"
-											rel="noopener noreferrer"
-											className="text-orange-500 hover:underline"
-										>
-											{project.projectRequirements.brandAssets}
-										</a>
+						{project.projectRequirements.brandAssets && (
+							<div className="grid grid-cols-1 md:grid-cols-3 mb-4">
+								<div className="font-medium text-gray-500">Brand Assets</div>
+								<div className="md:col-span-2">
+									<a
+										href={project.projectRequirements.brandAssets}
+										target="_blank"
+										rel="noopener noreferrer"
+										className="text-orange-500 hover:underline"
+									>
+										{project.projectRequirements.brandAssets}
+									</a>
+								</div>
+							</div>
+						)}
+
+						{/* Creator Requirements Section */}
+						<div className="mt-8 mb-6">
+							<h3 className="text-lg font-semibold text-gray-900 mb-4">
+								{creatorDetails?.type === "specific"
+									? "Selected Creators"
+									: "Creator Requirements"}
+							</h3>
+
+							{creatorDetails?.type === "specific" ? (
+								// Show selected creators
+								<div className="space-y-4">
+									{creatorDetails.creators?.map(
+										(
+											creator: {
+												id: string;
+												avatar: string;
+												name: string;
+												pricing: {
+													oneVideo: number;
+													threeVideos: number;
+													fiveVideos: number;
+													bulkVideos: number;
+												};
+											},
+											index: number
+										) => (
+											<div
+												key={creator.id || index}
+												className="border rounded-lg p-4"
+											>
+												<div className="flex items-center mb-3">
+													<Image
+														src={creator.avatar || "/default-avatar.png"}
+														alt={creator.name}
+														width={40}
+														height={40}
+														className="w-10 h-10 rounded-full mr-3"
+													/>
+													<div>
+														<h4 className="font-medium">{creator.name}</h4>
+														<p className="text-sm text-gray-500">
+															Creator ID: {creator.id}
+														</p>
+													</div>
+												</div>
+												<div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+													<div>
+														<p className="text-gray-500">Per Video</p>
+														<p className="font-medium">
+															${creator.pricing?.oneVideo || 0}
+														</p>
+													</div>
+													<div>
+														<p className="text-gray-500">3 Videos</p>
+														<p className="font-medium">
+															${creator.pricing?.threeVideos || 0}
+														</p>
+													</div>
+													<div>
+														<p className="text-gray-500">5 Videos</p>
+														<p className="font-medium">
+															${creator.pricing?.fiveVideos || 0}
+														</p>
+													</div>
+													<div>
+														<p className="text-gray-500">Bulk Rate</p>
+														<p className="font-medium">
+															${creator.pricing?.bulkVideos || 0}
+														</p>
+													</div>
+												</div>
+											</div>
+										)
+									)}
+								</div>
+							) : (
+								// Show creator criteria for public briefs
+								<div>
+									<div className="grid grid-cols-1 md:grid-cols-3 text-gray-500 mb-4">
+										<p className="font-medium text-gray-500">Age Group</p>
+										<p className="text-black capitalize">
+											{(() => {
+												const ageGroup = creatorDetails?.ageGroup;
+												const ageGroupMap = {
+													"18-24": "18-24 years",
+													"25-34": "25-34 years",
+													"35-44": "35-44 years",
+													"45+": "45+ years",
+												};
+												return (
+													ageGroupMap[ageGroup as keyof typeof ageGroupMap] ||
+													ageGroup ||
+													"Not specified"
+												);
+											})()}
+										</p>
+									</div>
+
+									<div className="grid grid-cols-1 md:grid-cols-3 text-gray-500 mb-4">
+										<p className="text-gray-500">Gender</p>
+										<p className="text-black">
+											{(() => {
+												const genderType = creatorDetails?.gender;
+												const genderTypeMap = {
+													male: "Male",
+													female: "Female",
+													any: "Any",
+												};
+												return (
+													genderTypeMap[
+														genderType as keyof typeof genderTypeMap
+													] ||
+													genderType ||
+													"Not specified"
+												);
+											})()}
+										</p>
+									</div>
+
+									<div className="grid grid-cols-1 md:grid-cols-3 text-gray-500 mb-4">
+										<p className="text-gray-500">Industry</p>
+										<p className="text-black capitalize">
+											{creatorDetails?.industry || "Not specified"}
+										</p>
+									</div>
+
+									<div className="grid grid-cols-1 md:grid-cols-3 text-gray-500 mb-4">
+										<p className="text-gray-500">Language</p>
+										<p className="text-black capitalize">
+											{(() => {
+												const language = creatorDetails?.language;
+												const foundLanguage = topLanguages.find(
+													(lang) => lang.code === language
+												);
+												return (
+													foundLanguage?.name || language || "Not specified"
+												);
+											})()}
+										</p>
+									</div>
+
+									{creatorDetails?.countries &&
+										creatorDetails.countries.length > 0 && (
+											<div className="grid grid-cols-1 md:grid-cols-3 text-gray-500 mb-4">
+												<p className="text-gray-500 ">Target Countries</p>
+												<p className="text-black capitalize">
+													{creatorDetails.countries.join(", ")}
+												</p>
+											</div>
+										)}
+
+									<div className="grid grid-cols-1 md:grid-cols-3 text-gray-500 mb-4">
+										<p className="text-gray-500">No of Creators</p>
+										<p className="text-black">
+											{`${creatorDetails?.creatorCount || 0} ${creatorDetails?.creatorCount === 1 ? "Creator" : "Creators"}`}
+										</p>
+									</div>
+
+									<div className="grid grid-cols-1 md:grid-cols-3 text-gray-500 mb-4">
+										<p className="text-gray-500">Videos per Creator</p>
+										<p className="text-black">
+											{`${creatorDetails?.videosPerCreator || 0} ${creatorDetails?.videosPerCreator === 1 ? "Video" : "Videos"}`}
+										</p>
+									</div>
+
+									<div className="grid grid-cols-1 md:grid-cols-3 text-gray-500 mb-4">
+										<p className="text-gray-500">Budget per Video</p>
+										<p className="text-black">
+											${creatorDetails?.budgetPerVideo || 0}
+										</p>
 									</div>
 								</div>
 							)}
-
-						{/* Target audience info */}
-						<div>
-							<div className="">
-								<div className="grid grid-cols-1 md:grid-cols-3 text-gray-500 mb-4">
-									<p className="font-medium text-gray-500">Age Group</p>
-									<p className="text-black">
-										{project.creatorPricing.creator?.ageGroup || "18-30"}
-									</p>
-								</div>
-
-								<div className="grid grid-cols-1 md:grid-cols-3 text-gray-500 mb-4">
-									<p className="text-gray-500">Gender</p>
-									<p className="text-black">
-										{(() => {
-											const genderType = project.creatorPricing.creator?.gender;
-
-											const genderTypeMap = {
-												male: "Male",
-												female: "Female",
-											};
-
-											// Return the mapped name if it exists, otherwise use the original value
-											return (
-												genderTypeMap[
-													genderType as keyof typeof genderTypeMap
-												] ||
-												genderType ||
-												"Not specified"
-											);
-										})()}
-									</p>
-								</div>
-
-								<div className="grid grid-cols-1 md:grid-cols-3 text-gray-500 mb-4">
-									<p className="text-gray-500">Industry</p>
-									<p className="text-black">
-										{project.creatorPricing.creator?.industry ||
-											"Beauty & Wellness"}
-									</p>
-								</div>
-
-								<div className="grid grid-cols-1 md:grid-cols-3 text-gray-500 mb-4">
-									<p className="text-gray-500">Language</p>
-									<p className="text-black">
-										{project.creatorPricing.creator?.language || "English"}
-									</p>
-								</div>
-
-								<div className="grid grid-cols-1 md:grid-cols-3 text-gray-500 mb-4">
-									<p className="text-gray-500">No of Creators</p>
-									<p className="text-black">
-										{project.creatorPricing.creatorCount || "2"} Creators
-									</p>
-								</div>
-							</div>
 						</div>
 					</div>
 				</div>
@@ -592,7 +751,9 @@ const ProjectDetailsPage: React.FC = () => {
 								height={32}
 								className="w-8 h-8 rounded-full mr-2"
 							/>
-							<p className="font-semibold">{brandProfile?.brandName || ""}</p>
+							<p className="font-semibold">
+								{brandProfile?.brandName || "Unknown Brand"}
+							</p>
 						</div>
 
 						<div className="space-y-4">
@@ -601,10 +762,11 @@ const ProjectDetailsPage: React.FC = () => {
 								<p className="text-black">
 									{project.createdAt
 										? new Date(
-												typeof project.createdAt === "object" && "_seconds" in project.createdAt
+												typeof project.createdAt === "object" &&
+												"_seconds" in project.createdAt
 													? project.createdAt._seconds * 1000
 													: project.createdAt
-										  ).toLocaleDateString()
+											).toLocaleDateString()
 										: "Unknown Date"}
 								</p>
 							</div>
@@ -612,17 +774,18 @@ const ProjectDetailsPage: React.FC = () => {
 							<div>
 								<p className="text-gray-500 mb-1">Product Type</p>
 								<p className="text-black">
-									{project.projectDetails.productType || "Physical Product"}
+									{project.projectDetails.productType || "Not specified"}
 								</p>
 							</div>
 
 							<div className="">
 								<p className="text-gray-500 mb-1">Number of Videos</p>
 								<p className="text-black">
-									{project.creatorPricing.totalVideos || ""} Videos
+									{creatorDetails?.totalVideos || 0} Videos
 								</p>
 							</div>
 						</div>
+
 						{/* Cost breakdown card */}
 						<div className="rounded-xl bg-[#FFF4EE] mt-5 p-6">
 							<h2 className="font-semibold mb-3">Cost Breakdown</h2>
@@ -631,26 +794,22 @@ const ProjectDetailsPage: React.FC = () => {
 								<div>
 									<p className="text-gray-500 mb-1">Total Budget</p>
 									<p className="text-black font-semibold">
-										$
-										{project.creatorPricing.totalBudget?.toLocaleString() ||
-											"6,000.00"}
+										${(creatorDetails?.totalBudget || 0).toLocaleString()}
 									</p>
-									<p className="text-gray-500 text-sm">
-										(Based on $1,500 per video ×{" "}
-										{project.creatorPricing.totalVideos || "4"} videos)
-									</p>
+									{creatorDetails?.type === "criteria" &&
+										(creatorDetails?.budgetPerVideo ?? 0) > 0 && (
+											<p className="text-gray-500 text-sm">
+												(Based on ${creatorDetails.budgetPerVideo} per video ×{" "}
+												{creatorDetails.totalVideos} videos)
+											</p>
+										)}
 								</div>
-
-								
 
 								<div className="pt-4 border-t border-gray-200">
 									<div className="flex justify-between items-center">
 										<p className="font-semibold">Total Amount:</p>
 										<p className="font-bold text-xl">
-											$
-											{(
-												project.creatorPricing.totalAmount || "6,600.00"
-											).toLocaleString()}
+											${(creatorDetails?.totalAmount || 0).toLocaleString()}
 										</p>
 									</div>
 								</div>

@@ -100,7 +100,7 @@ const defaultProfileData: CreatorProfileData = {
 	profilePictureUrl: null,
 	aboutMeVideo: null,
 	abnNumber: "",
-	language: ""
+	languages: []
 };
 
 const CreatorVerificationContext = createContext<
@@ -759,7 +759,7 @@ export const CreatorVerificationProvider = ({
 				socialMedia: updatedData.socialMedia,
 				pricing: updatedData.pricing,
 				abnNumber: updatedData.abnNumber || null,
-				language: updatedData.language,
+				language: updatedData.languages,
 			};
 
 			// Save to local storage

@@ -153,7 +153,7 @@ interface CostBreakdown {
 }
 
 export interface ProjectFormData {
-	projectName: any;
+	projectName: string;
 	projectTitle: string;
 	brandEmail: string;
 	paidfalse: boolean;

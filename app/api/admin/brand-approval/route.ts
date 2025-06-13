@@ -120,7 +120,6 @@ export async function GET(request: NextRequest) {
 
     // If userId is provided, search for brand by userId
     if (userId) {
-      console.log(`Searching for brand with userId: ${userId}`);
       
       // Try multiple approaches to find the brand
       let brandData = null;
@@ -138,10 +137,10 @@ export async function GET(request: NextRequest) {
             id: brandSnapshot.docs[0].id,
             ...brandSnapshot.docs[0].data()
           };
-          console.log(`Found brand by userId field:`, brandData);
+
         }
       } catch (error) {
-        console.log(`Error searching by userId field:`, error);
+        console.error(`Error searching by userId field:`, error);
       }
       
       // Approach 2: If not found, try using userId as document ID
@@ -155,10 +154,9 @@ export async function GET(request: NextRequest) {
               id: brandSnapshot.id,
               ...brandSnapshot.data()
             };
-            console.log(`Found brand by document ID:`, brandData);
           }
         } catch (error) {
-          console.log(`Error searching by document ID:`, error);
+          console.error(`Error searching by document ID:`, error);
         }
       }
       
@@ -176,27 +174,15 @@ export async function GET(request: NextRequest) {
               id: brandSnapshot.docs[0].id,
               ...brandSnapshot.docs[0].data()
             };
-            console.log(`Found brand by email field:`, brandData);
           }
         } catch (error) {
-          console.log(`Error searching by email field:`, error);
+          console.error(`Error searching by email:`, error);
         }
       }
       
       if (brandData) {
         return NextResponse.json(brandData);
       } else {
-        console.log(`No brand found for userId: ${userId}`);
-        
-        // Log what brands exist for debugging
-        const allBrands = await adminDb.collection("brandProfiles").limit(5).get();
-        console.log('Sample brand documents:', allBrands.docs.map(doc => ({
-          id: doc.id,
-          userId: doc.data().userId,
-          email: doc.data().email,
-          profileId: doc.data().profileId
-        })));
-        
         return NextResponse.json({ 
           error: "Brand not found for the given userId",
           searchedUserId: userId,
@@ -207,7 +193,6 @@ export async function GET(request: NextRequest) {
     
     // If profileId is provided, search by profileId
     if (profileId) {
-      console.log(`Searching for brand with profileId: ${profileId}`);
       const brandQuery = adminDb.collection("brandProfiles")
         .where("profileId", "==", profileId)
         .limit(1);
@@ -219,17 +204,14 @@ export async function GET(request: NextRequest) {
           id: brandSnapshot.docs[0].id,
           ...brandSnapshot.docs[0].data()
         };
-        console.log(`Found brand for profileId ${profileId}:`, brandData);
         return NextResponse.json(brandData);
       } else {
-        console.log(`No brand found for profileId: ${profileId}`);
         return NextResponse.json({ error: "Brand not found for the given profileId" }, { status: 404 });
       }
     }
     
     // If email is provided, search by email
     if (email) {
-      console.log(`Searching for brand with email: ${email}`);
       
       // Try as document ID first
       const brandRef = adminDb.collection("brandProfiles").doc(email);
@@ -240,7 +222,6 @@ export async function GET(request: NextRequest) {
           id: brandSnapshot.id,
           ...brandSnapshot.data()
         };
-        console.log(`Found brand for email ${email}:`, brandData);
         return NextResponse.json(brandData);
       } else {
         // Try as field
@@ -255,10 +236,8 @@ export async function GET(request: NextRequest) {
             id: querySnapshot.docs[0].id,
             ...querySnapshot.docs[0].data()
           };
-          console.log(`Found brand for email ${email}:`, brandData);
           return NextResponse.json(brandData);
         } else {
-          console.log(`No brand found for email: ${email}`);
           return NextResponse.json({ error: "Brand not found for the given email" }, { status: 404 });
         }
       }

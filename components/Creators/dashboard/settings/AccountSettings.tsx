@@ -543,7 +543,7 @@ const AccountSettings: React.FC = () => {
 							<Input
 								id="language"
 								name="language"
-								value={formData?.language || ""}
+								value={formData?.languages || ""}
 								onChange={handleInputChange}
 								className="w-full"
 							/>

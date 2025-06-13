@@ -12,7 +12,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { EyeIcon } from "lucide-react";
+import { Eye, Users, Globe, UserCheck, Calendar } from "lucide-react";
 import { BrandProfile } from "@/types/user";
 
 interface Project {
@@ -23,11 +23,32 @@ interface Project {
 		projectName: string;
 		projectDescription?: string;
 		projectThumbnail?: string;
+		projectType?: string;
+	};
+	creatorPricing: {
+		selectionMethod: "Invite Specific Creators" | "Post Public Brief";
+		selectedCreators?: Array<{
+			name: string;
+			avatar: string;
+			id: string;
+		}>;
+		creatorCount?: number;
+		totalVideos?: number;
+		totalAmount?: number;
+		totalBudget?: number;
 	};
 	status: ProjectStatus;
+	applicationStatus?: string;
+	metrics?: {
+		views: number;
+		applications: number;
+		participants: number;
+		submissions: number;
+	};
 	createdAt: string;
 	updatedAt: string;
 	participants?: number;
+	applicantsCount?: number;
 }
 
 interface PaginationInfo {
@@ -40,13 +61,8 @@ interface PaginationInfo {
 interface TabItem {
 	id: string;
 	label: string;
-	status?:
-		| ProjectStatus
-		| "all"
-		| "pending"
-		| "active"
-		| "rejected"
-		| "completed";
+	status?: ProjectStatus | "all" | "ongoing" | "completed";
+	selectionMethod?: "Invite Specific Creators" | "Post Public Brief" | "all";
 	emptyMessage: string;
 }
 
@@ -62,7 +78,7 @@ const ProjectManagement: React.FC = () => {
 		[key: string]: boolean;
 	}>({});
 	const [statusFilter, setStatusFilter] = useState<
-		ProjectStatus | "all" | "pending" | "active" | "rejected" | "completed"
+		ProjectStatus | "all" | "ongoing" | "completed"
 	>("all");
 	const [pagination, setPagination] = useState<PaginationInfo>({
 		total: 0,
@@ -70,76 +86,65 @@ const ProjectManagement: React.FC = () => {
 		limit: 10,
 		pages: 0,
 	});
-	const [actionProject, setActionProject] = useState<Project | null>(null);
-	const [actionType, setActionType] = useState<string>("");
-	const [actionMessage, setActionMessage] = useState<string>("");
 	const [searchTerm, setSearchTerm] = useState<string>("");
 	const [activeTab, setActiveTab] = useState<string>("all-projects");
-	const [brandEmail, setBrandEmail] = useState<string>("");
 
-	// Define available tabs with their corresponding status and empty messages
+	// Enhanced tabs with proper filtering
 	const tabs: TabItem[] = [
 		{
 			id: "all-projects",
 			label: "All Projects",
 			status: "all",
-			emptyMessage:
-				"No projects have been created yet. As brands create projects, they'll appear here.",
+			selectionMethod: "all",
+			emptyMessage: "No projects have been created yet. As brands create projects, they'll appear here.",
+		},
+		// {
+		// 	id: "public",
+		// 	label: "Public Briefs",
+		// 	status: "all",
+		// 	selectionMethod: "Post Public Brief",
+		// 	emptyMessage: "No public briefs yet. Public projects where any creator can apply will appear here.",
+		// },
+		{
+			id: "invite-only",
+			label: "Invite Only",
+			status: "all",
+			selectionMethod: "Invite Specific Creators",
+			emptyMessage: "No invite-only projects yet. Projects where brands invite specific creators will appear here.",
 		},
 		{
-			id: "active-projects",
-			label: "Active Projects",
-			status: "active",
-			emptyMessage:
-				"No active projects yet. When brands projects are active, they'll appear here for approval.",
-		},
-		{
-			id: "pending-approval",
-			label: "Pending Approval",
-			status: "pending",
-			emptyMessage:
-				"No projects are pending approval. New projects will appear here for review.",
-		},
-		{
-			id: "rejected-projects",
-			label: "Rejected Projects",
-			status: "rejected",
-			emptyMessage:
-				"No projects have been rejected. Projects that don't meet certain criterias will appear here.",
+			id: "ongoing-projects",
+			label: "Ongoing Projects",
+			status: "ongoing",
+			selectionMethod: "all",
+			emptyMessage: "No ongoing projects. Active projects will appear here.",
 		},
 		{
 			id: "completed-projects",
 			label: "Completed Projects",
 			status: "completed",
-			emptyMessage:
-				"No projects have been completed yet. Completed projects will be listed here.",
+			selectionMethod: "all",
+			emptyMessage: "No completed projects yet. Finished projects will be listed here.",
 		},
 	];
 
 	useEffect(() => {
-		// Clear any cached project when loading the project list
-		// to ensure we always get fresh data from the API
 		localStorage.removeItem("viewingProject");
-		
 		fetchProjects();
-	  }, [statusFilter, pagination.page, pagination.limit]);
-	  
-	  // Also ensure your viewProjectDetails function is setting the right data
-	  const viewProjectDetails = (project: Project) => {
-		// Store the complete project object with ID
+	}, [statusFilter, pagination.page, pagination.limit]);
+
+	const viewProjectDetails = (project: Project) => {
 		localStorage.setItem("viewingProject", JSON.stringify(project));
 		router.push(`/admin/manage-projects/${project.id}`);
-	  };
+	};
 
 	// Fetch projects
 	const fetchProjects = async () => {
 		try {
 			setLoading(true);
-			const statusParam =
-				statusFilter !== "all" ? `&status=${statusFilter}` : "";
+			const statusParam = statusFilter !== "all" ? `&status=${statusFilter}` : "";
 			const url = `/api/admin/project-approval?page=${pagination.page}&limit=${pagination.limit}${statusParam}`;
 
-        
 			const response = await fetch(url);
 			
 			if (!response.ok) {
@@ -152,7 +157,6 @@ const ProjectManagement: React.FC = () => {
 			setProjects(data.projects);
 			setPagination(data.pagination);
 
-			// Request brand profile for each project
 			data.projects.forEach((project: Project) => {
 				if (project.userId) {
 					fetchBrandProfile(project.userId);
@@ -165,353 +169,148 @@ const ProjectManagement: React.FC = () => {
 			setLoading(false);
 		}
 	};
-// Updated fetchBrandProfile function to use profileId approach
-const fetchBrandProfile = async (userId: string) => {
-	// Skip if we already have this brand profile or it's already loading
-	if (brandProfiles[userId] || loadingBrands[userId]) {
-	  return;
-	}
-  
-	try {
-	  setLoadingBrands((prev) => ({ ...prev, [userId]: true }));
-  
-	  console.log(`🔍 Attempting to fetch brand profile for userId: "${userId}"`);
-	  console.log(`🔍 UserId type: ${typeof userId}, length: ${userId.length}`);
-  
-	  // Use profileId parameter as specified
-	  const response = await fetch(
-		`/api/admin/brand-approval?profileId=${encodeURIComponent(userId)}`
-	  );
-  
-	  console.log(`📡 API Response status: ${response.status}`);
-  
-	  if (response.ok) {
-		const data = await response.json();
-		console.log(`✅ Successfully found brand profile for userId ${userId}:`, data);
-		setBrandProfiles((prev) => ({
-		  ...prev,
-		  [userId]: data,
-		}));
-	  } else {
-		const errorData = await response.json();
-		console.log(`❌ Failed to find brand profile for userId ${userId}:`);
-		console.log(`   - Response status: ${response.status}`);
-		console.log(`   - Error data:`, errorData);
-		
-		// Log the actual projects to see what userIds we have
-		console.log(`📊 Current projects with userIds:`, projects.map(p => ({
-		  projectId: p.id,
-		  userId: p.userId,
-		  userIdType: typeof p.userId
-		})));
-	  }
-	} catch (error) {
-	  console.error(`💥 Error fetching brand profile for userId ${userId}:`, error);
-	} finally {
-	  setLoadingBrands((prev) => {
-		const updated = { ...prev };
-		delete updated[userId];
-		return updated;
-	  });
-	}
-  };
 
-	// Add this useEffect to track which brand profiles we need to fetch
+	const fetchBrandProfile = async (userId: string) => {
+		if (brandProfiles[userId] || loadingBrands[userId]) {
+			return;
+		}
+
+		try {
+			setLoadingBrands((prev) => ({ ...prev, [userId]: true }));
+			const response = await fetch(`/api/admin/brand-approval?userId=${userId}`);
+
+			if (response.ok) {
+				const data = await response.json();
+				setBrandProfiles((prev) => ({
+					...prev,
+					[userId]: data,
+				}));
+			}
+		} catch (error) {
+			console.error(`Error fetching brand profile for userId ${userId}:`, error);
+		} finally {
+			setLoadingBrands((prev) => {
+				const updated = { ...prev };
+				delete updated[userId];
+				return updated;
+			});
+		}
+	};
+
 	useEffect(() => {
-		// Get unique brandUserIds from projects
 		const uniqueBrandIds = projects
 			.filter((project) => project.userId)
 			.map((project) => project.userId as string);
 
-		// Filter to only fetch those we don't already have
 		const missingBrandIds = uniqueBrandIds.filter(
 			(id) => !brandProfiles[id] && !loadingBrands[id]
 		);
 
-		// Fetch all missing brand profiles in parallel
 		missingBrandIds.forEach((userId) => {
 			fetchBrandProfile(userId);
 		});
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [projects, brandProfiles, loadingBrands]);
 
-	// When a tab is changed, update the status filter
 	useEffect(() => {
 		const selectedTab = tabs.find((tab) => tab.id === activeTab);
-		if (selectedTab && selectedTab.status) {
-			setStatusFilter(selectedTab.status);
+		if (selectedTab && selectedTab.status && selectedTab.status !== "all") {
+			setStatusFilter(selectedTab.status as ProjectStatus | "all" | "ongoing" | "completed");
+		} else if (activeTab === "all-projects") {
+			setStatusFilter("all");
 		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [activeTab]);
 
-	// Call fetchProjects when dependencies change
-	useEffect(() => {
-		fetchProjects();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [statusFilter, pagination.page, pagination.limit]);
-
-	// Handle project action (approve, reject, request info)
-	const handleProjectAction = async () => {
-		if (!actionProject || !actionType) return;
-
-		try {
-			// Fetch the brand email if not already set
-			let email = brandEmail;
-			if (!email) {
-				const profile = actionProject.userId
-					? brandProfiles[actionProject.userId]
-					: undefined;
-				if (profile && profile.email) {
-					email = profile.email;
-				} else {
-					const fetchedEmail = actionProject.userId
-						? await fetchBrandProfile(actionProject.userId)
-						: null;
-					if (!fetchedEmail) {
-						throw new Error("Could not find brand email for this project");
-					}
-					email = fetchedEmail;
-				}
-
-				if (!email) {
-					throw new Error("Could not find brand email for this project");
-				}
-				setBrandEmail(email);
-			}
-
-			const response = await fetch("/api/admin/project-approval", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					brandEmail: email,
-					projectId: actionProject.id,
-					action: actionType,
-					message: actionMessage,
-				}),
-			});
-
-			if (!response.ok) {
-				throw new Error("Failed to perform action");
-			}
-
-			// Refresh projects list
-			fetchProjects();
-
-			// Reset action state
-			setActionProject(null);
-			setActionType("");
-			setActionMessage("");
-			setBrandEmail("");
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "An error occurred");
-			console.error("Error performing project action:", err);
-		}
-	};
-
-	// Filter projects by search term and active tab status
+	// Fixed filtering logic
 	const filteredProjects = projects.filter((project) => {
-		// For the "all-projects" tab, use the explicit status filter selection
-		// For other tabs, use the tab's predefined status
-		const effectiveStatus =
-			activeTab === "all-projects"
-				? statusFilter
-				: tabs.find((tab) => tab.id === activeTab)?.status || "all";
+		const selectedTab = tabs.find((tab) => tab.id === activeTab);
+		
+		// Status filter - handle ongoing projects properly
+		let statusMatch = true;
+		if (selectedTab?.status && selectedTab.status !== "all") {
+			if (selectedTab.status === "ongoing") {
+				// Ongoing projects are those with status "active" or "invite"
+				statusMatch = project.status === "active" || project.status === "invite";
+			} else {
+				statusMatch = project.status === selectedTab.status;
+			}
+		}
 
-		// Apply status filter
-		const statusMatch =
-			effectiveStatus === "all" || project.status === effectiveStatus;
+		// Selection method filter - this is the key fix
+		let selectionMethodMatch = true;
+		if (selectedTab?.selectionMethod && selectedTab.selectionMethod !== "all") {
+			selectionMethodMatch = project.creatorPricing?.selectionMethod === selectedTab.selectionMethod;
+		}
 
-		// Apply search filter
+		// Search filter
 		const searchMatch =
-			project.projectDetails.projectName
-				.toLowerCase()
-				.includes(searchTerm.toLowerCase()) ||
+			!searchTerm ||
+			project.projectDetails.projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
 			project.id.toLowerCase().includes(searchTerm.toLowerCase());
 
-		return statusMatch && searchMatch;
+		return statusMatch && selectionMethodMatch && searchMatch;
 	});
 
-	// Get the empty message for the current tab
 	const getCurrentTabEmptyMessage = () => {
 		const currentTab = tabs.find((tab) => tab.id === activeTab);
-		return (
-			currentTab?.emptyMessage || "No projects found matching your criteria."
-		);
+		return currentTab?.emptyMessage || "No projects found matching your criteria.";
 	};
 
-	// Render action modal
-	const renderActionModal = () => {
-		if (!actionProject) return null;
-
-		let title = "";
-		let description = "";
-		let placeholder = "";
-		let buttonText = "";
-		let buttonColor = "";
-		let needsMessage = false;
-
-		switch (actionType) {
-			case "approve":
-				title = "Approve Project";
-				description =
-					"Once approved, the project will be visible to creators and they can submit pitches";
-				buttonText = "Approve Project";
-				buttonColor = "bg-green-600 hover:bg-green-700";
-				break;
-			case "reject":
-				title = "Reject Project";
-				description =
-					"Please provide a reason for rejection. This feedback will be shared with the Brand.";
-				placeholder = "Type Reason for Rejection";
-				buttonText = "Reject Project";
-				buttonColor = "bg-red-600 hover:bg-red-700";
-				needsMessage = true;
-				break;
-			case "request_info":
-				title = "Request More Information";
-				description =
-					"Type in the Information you need from the Brand to approve their project";
-				placeholder = "Type Requests";
-				buttonText = "Send Request";
-				buttonColor = "bg-orange-500 hover:bg-orange-600";
-				needsMessage = true;
-				break;
-			case "suspend":
-				title = "Suspend Project";
-				description = "Please provide a reason for suspension.";
-				placeholder = "Type Reason for Suspension";
-				buttonText = "Suspend Project";
-				buttonColor = "bg-yellow-600 hover:bg-yellow-700";
-				needsMessage = true;
-				break;
-			default:
-				return null;
-		}
-
-		return (
-			<div>
-				<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-					<div className="bg-white rounded-lg p-6 max-w-md w-full">
-						<h2 className="text-xl font-semibold mb-4">{title}</h2>
-						<p className="mb-4 text-gray-600">{description}</p>
-
-						{needsMessage && (
-							<textarea
-								className="w-full border border-gray-300 rounded p-2 mb-4"
-								rows={4}
-								value={actionMessage}
-								onChange={(e) => setActionMessage(e.target.value)}
-								placeholder={placeholder}
-							/>
-						)}
-
-						<div className="flex justify-end space-x-2">
-							<button
-								className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-								onClick={() => {
-									setActionProject(null);
-									setActionType("");
-									setActionMessage("");
-									setBrandEmail("");
-								}}
-							>
-								Cancel
-							</button>
-							<button
-								className={`px-4 py-2 text-white rounded ${buttonColor} flex items-center`}
-								onClick={handleProjectAction}
-								disabled={needsMessage && !actionMessage.trim()}
-							>
-								{buttonText}
-								{actionType === "request_info" && (
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										className="h-5 w-5 ml-2"
-										viewBox="0 0 20 20"
-										fill="currentColor"
-									>
-										<path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-									</svg>
-								)}
-								{(actionType === "approve" || actionType === "reject") && (
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										className="h-5 w-5 ml-2"
-										viewBox="0 0 20 20"
-										fill="currentColor"
-									>
-										<path
-											fillRule="evenodd"
-											d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-											clipRule="evenodd"
-										/>
-									</svg>
-								)}
-							</button>
-						</div>
-					</div>
-				</div>
-			</div>
-		);
-	};
-
-	// Handle pagination
 	const handlePageChange = (newPage: number) => {
 		if (newPage < 1 || newPage > pagination.pages) return;
 		setPagination({ ...pagination, page: newPage });
 	};
 
+	// Enhanced Status Badge
+	const StatusBadge = ({ status, applicationStatus }: { 
+		status: ProjectStatus; 
+		applicationStatus?: string;
+	}) => {
+		let displayText = "";
+		let colorClass = "";
 
-	// Status badge component
-	const StatusBadge = ({ status }: { status: ProjectStatus }) => {
-		const statusConfig = {
-			pending: {
-				color: "bg-[#FFF0C3] border border-[#FDD849] text-[#1A1A1A]",
-				text: "• Pending",
-			},
-			active: {
-				color: "bg-[#FFF0C3] border border-[#FDD849] text-[#1A1A1A]",
-				text: "✓ Accepting Pitches",
-			},
-			rejected: {
-				color: "bg-[#FFE9E7] border border-[#F04438] text-[#F04438]",
-				text: "• Rejected",
-			},
-			completed: {
-				color: "bg-[#E0F2FE] border border-[#60A5FA] text-[#1D4ED8]",
-				text: "✓ Completed",
-			},
-			request_edit: {
-				color: "bg-[#FFF3CD] border border-[#FFBF47] text-[#856404]",
-				text: "• Request Edit",
-			},
-		};
-
-		const config = statusConfig[status as keyof typeof statusConfig] || statusConfig["pending"];
+		switch (status) {
+			case "active":
+			case "invite":
+				displayText = applicationStatus === "open" ? "🔄 Ongoing - Open" : "🔄 Ongoing";
+				colorClass = "bg-blue-100 border border-blue-300 text-blue-800";
+				break;
+			case "completed":
+				displayText = "✅ Completed";
+				colorClass = "bg-green-100 border border-green-300 text-green-800";
+				break;
+			case "rejected":
+				displayText = "❌ Rejected";
+				colorClass = "bg-red-100 border border-red-300 text-red-800";
+				break;
+			case "pending":
+				displayText = "⏳ Pending";
+				colorClass = "bg-yellow-100 border border-yellow-300 text-yellow-800";
+				break;
+			default:
+				displayText = `• ${status}`;
+				colorClass = "bg-gray-100 border border-gray-300 text-gray-800";
+		}
 
 		return (
-			<span
-				className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}
-			>
-				{config.text}
+			<span className={`px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}>
+				{displayText}
 			</span>
 		);
 	};
 
-	// Render brand info component
- const BrandInfo = ({ userId }: { userId: string }) => {
+
+
+	// Enhanced Brand Info
+	const BrandInfo = ({ userId }: { userId: string }) => {
 		const brandProfile = brandProfiles[userId];
 		const isLoading = loadingBrands[userId];
 
 		if (isLoading) {
 			return (
 				<div className="flex items-center">
-					<div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center mr-2">
+					<div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center mr-2 animate-pulse">
 						<span className="text-gray-500 font-medium">...</span>
 					</div>
-
 					<div className="text-sm text-gray-500">Loading...</div>
 				</div>
 			);
@@ -532,27 +331,31 @@ const fetchBrandProfile = async (userId: string) => {
 			<div className="flex items-center">
 				{brandProfile.logoUrl ? (
 					<Image
-						className="h-8 w-8 rounded-full mr-2"
+						className="h-8 w-8 rounded-full mr-2 object-cover"
 						src={brandProfile.logoUrl}
 						alt={`${brandProfile.brandName || "Brand"} logo`}
 						width={32}
 						height={32}
 					/>
 				) : (
-					<div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center mr-2">
-						<span className="text-[#101828] font-medium">
+					<div className="h-8 w-8 rounded-full bg-gradient-to-r from-orange-400 to-pink-400 flex items-center justify-center mr-2">
+						<span className="text-white font-medium text-sm">
 							{(brandProfile.brandName || "B").charAt(0).toUpperCase()}
 						</span>
 					</div>
 				)}
-				<div className="text-[#101828]">
-					{brandProfile.brandName || brandProfile.email || "Unknown Brand"}
+				<div>
+					<div className="text-[#101828] font-medium">
+						{brandProfile.brandName || "Unknown Brand"}
+					</div>
+					<div className="text-xs text-gray-500">
+						{brandProfile.email}
+					</div>
 				</div>
 			</div>
 		);
 	};
 
-	// Render project table content based on current tab
 	const renderProjectTable = () => {
 		if (loading) {
 			return (
@@ -565,6 +368,15 @@ const fetchBrandProfile = async (userId: string) => {
 		if (filteredProjects.length === 0) {
 			return (
 				<div className="text-center py-16 bg-gray-50 rounded-lg">
+					<div className="mb-4">
+						{activeTab.includes("public") ? (
+							<Globe className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+						) : activeTab.includes("invite") ? (
+							<UserCheck className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+						) : (
+							<Users className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+						)}
+					</div>
 					<p className="text-gray-500">{getCurrentTabEmptyMessage()}</p>
 				</div>
 			);
@@ -576,16 +388,17 @@ const fetchBrandProfile = async (userId: string) => {
 					<thead className="bg-gray-50">
 						<tr>
 							<th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
-								Creator
+								Brand
 							</th>
 							<th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
 								Project Name
 							</th>
-							<th className="px-6 py-3 text-left text-sm font-medium text-gray-500 ">
-								Created On
-							</th>
+							
 							<th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
 								Status
+							</th>
+							<th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+								Date
 							</th>
 							<th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
 								Actions
@@ -594,32 +407,41 @@ const fetchBrandProfile = async (userId: string) => {
 					</thead>
 					<tbody className="bg-white divide-y divide-gray-200">
 						{filteredProjects.map((project) => (
-							<tr key={project.id}>
+							<tr key={project.id} className="hover:bg-gray-50">
 								<td className="px-6 py-4 whitespace-nowrap">
 									<BrandInfo userId={project.userId || ""} />
 								</td>
-								<td className="px-6 py-4 whitespace-nowrap">
-									<div className=" text-[#101828]">
-										{project.projectDetails.projectName}
-									</div>
-								</td>
-								<td className="px-6 py-4 whitespace-nowrap text-sm text-[#101828]">
-									{new Date(project.createdAt).toLocaleDateString()}
-								</td>
-								<td className="px-6 py-4 whitespace-nowrap">
-									<StatusBadge status={project.status} />
-								</td>
-								<td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-									<div className="flex flex-col space-y-2">
-										<button
-											className="text-orange-500 hover:underline flex items-center gap-1"
-											onClick={() => viewProjectDetails(project)}
-										>
-											<span>View Project</span>
-											<EyeIcon className="w-4 h-4 text-orange-500" />
-										</button>
+								<td className="px-6 py-4">
+									<div className="max-w-xs">
+										<div className="text-[#101828] font-medium mb-1">
+											{project.projectDetails.projectName}
+										</div>
 										
 									</div>
+								</td>
+								
+								<td className="px-6 py-4 whitespace-nowrap">
+									<StatusBadge 
+										status={project.status} 
+										applicationStatus={project.applicationStatus}
+									/>
+								</td>
+								<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+									<div className="flex items-center gap-1">
+										<Calendar className="w-3 h-3" />
+										<span>
+											{new Date(project.createdAt).toLocaleDateString()}
+										</span>
+									</div>
+								</td>
+								<td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+									<button
+										className="text-orange-500 hover:text-orange-700 flex items-center gap-1 text-sm font-medium"
+										onClick={() => viewProjectDetails(project)}
+									>
+										<Eye className="w-4 h-4" />
+										<span>View Details</span>
+									</button>
 								</td>
 							</tr>
 						))}
@@ -638,17 +460,23 @@ const fetchBrandProfile = async (userId: string) => {
 						<button
 							key={tab.id}
 							onClick={() => setActiveTab(tab.id)}
-							className={`text-left p-3 rounded-md ${
+							className={`text-left p-3 rounded-md transition-all duration-200 ${
 								activeTab === tab.id
-									? "text-[#FD5C02] bg-[#FFF4EE] border-b-2 border-[#FC52E4] rounded-none"
-									: "text-[#667085] hover:bg-gray-100"
+									? "text-[#FD5C02] bg-[#FFF4EE] border-l-4 border-[#FD5C02] font-medium"
+									: "text-[#667085] hover:bg-gray-100 hover:text-gray-900"
 							}`}
 						>
-							{tab.label}
+							<div className="flex items-center gap-2">
+								{tab.id.includes("public") && <Globe className="w-4 h-4" />}
+								{tab.id.includes("invite") && <UserCheck className="w-4 h-4" />}
+								{tab.id.includes("all") && <Users className="w-4 h-4" />}
+								<span>{tab.label}</span>
+							</div>
 						</button>
 					))}
 				</div>
 			</div>
+
 			<div className="flex-1 p-4 flex flex-col border border-[#FFD9C3] rounded-lg">
 				{error && (
 					<div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -662,13 +490,14 @@ const fetchBrandProfile = async (userId: string) => {
 					</div>
 				)}
 
-				<div className="flex flex-col md:flex-row justify-between mb-6 space-y-4 md:space-y-0 ">
+				<div className="flex flex-col md:flex-row justify-between mb-6 space-y-4 md:space-y-0">
 					<div className="w-full md:w-1/3">
 						<Input
 							type="text"
 							placeholder="Search by project name or ID..."
 							value={searchTerm}
 							onChange={(e) => setSearchTerm(e.target.value)}
+							className="border-gray-300 focus:border-orange-500 focus:ring-orange-500"
 						/>
 					</div>
 
@@ -676,29 +505,16 @@ const fetchBrandProfile = async (userId: string) => {
 						<div>
 							<Select
 								value={statusFilter}
-								onValueChange={(value) =>
-									setStatusFilter(
-										value as
-											| ProjectStatus
-											| "all"
-											| "pending"
-											| "active"
-											| "rejected"
-											| "completed"
-									)
-								}
+								onValueChange={(value: ProjectStatus | "all" | "ongoing" | "completed") => setStatusFilter(value)}
 							>
 								<SelectTrigger className="w-[180px]">
 									<SelectValue placeholder="Select Status" />
 								</SelectTrigger>
-								<SelectContent className="bg-[#f7f7f7]">
+								<SelectContent className="bg-white">
 									<SelectItem value="all">All Statuses</SelectItem>
-									<SelectItem value="pending">Pending</SelectItem>
-									<SelectItem value="active">Active</SelectItem>
-									<SelectItem value="rejected">Rejected</SelectItem>
+									<SelectItem value="ongoing">Ongoing</SelectItem>
 									<SelectItem value="completed">Completed</SelectItem>
-									<SelectItem value="INFO_REQUESTED">Info Requested</SelectItem>
-									<SelectItem value="SUSPENDED">Suspended</SelectItem>
+									<SelectItem value="pending">Pending</SelectItem>
 								</SelectContent>
 							</Select>
 						</div>
@@ -707,47 +523,48 @@ const fetchBrandProfile = async (userId: string) => {
 
 				{renderProjectTable()}
 
-				{/* Pagination */}
+				{/* Enhanced Pagination */}
 				{!loading && pagination.pages > 1 && filteredProjects.length > 0 && (
 					<div className="flex justify-center mt-6">
-						<nav className="flex items-center">
+						<nav className="flex items-center space-x-1">
 							<button
 								onClick={() => handlePageChange(pagination.page - 1)}
 								disabled={pagination.page === 1}
-								className={`px-3 py-1 rounded-l border ${
+								className={`px-3 py-2 rounded-l-md border ${
 									pagination.page === 1
 										? "bg-gray-100 text-gray-400 cursor-not-allowed"
-										: "bg-white text-orange-600 hover:bg-blue-50"
+										: "bg-white text-orange-600 hover:bg-orange-50 border-orange-300"
 								}`}
 							>
 								Previous
 							</button>
 
 							<div className="flex">
-								{Array.from({ length: pagination.pages }, (_, i) => i + 1).map(
-									(page) => (
+								{Array.from({ length: Math.min(pagination.pages, 5) }, (_, i) => {
+									const pageNumber = i + 1;
+									return (
 										<button
-											key={page}
-											onClick={() => handlePageChange(page)}
-											className={`px-3 py-1 border-t border-b ${
-												pagination.page === page
-													? "bg-orange-600 text-white"
-													: "bg-white text-orange-600 hover:bg-orange-50"
+											key={pageNumber}
+											onClick={() => handlePageChange(pageNumber)}
+											className={`px-3 py-2 border-t border-b ${
+												pagination.page === pageNumber
+													? "bg-orange-600 text-white border-orange-600"
+													: "bg-white text-orange-600 hover:bg-orange-50 border-orange-300"
 											}`}
 										>
-											{page}
+											{pageNumber}
 										</button>
-									)
-								)}
+									);
+								})}
 							</div>
 
 							<button
 								onClick={() => handlePageChange(pagination.page + 1)}
 								disabled={pagination.page === pagination.pages}
-								className={`px-3 py-1 rounded-r border ${
+								className={`px-3 py-2 rounded-r-md border ${
 									pagination.page === pagination.pages
 										? "bg-gray-100 text-gray-400 cursor-not-allowed"
-										: "bg-white text-orange-600 hover:bg-orange-50"
+										: "bg-white text-orange-600 hover:bg-orange-50 border-orange-300"
 								}`}
 							>
 								Next
@@ -755,9 +572,6 @@ const fetchBrandProfile = async (userId: string) => {
 						</nav>
 					</div>
 				)}
-
-				{/* Action Modal */}
-				{renderActionModal()}
 			</div>
 		</div>
 	);

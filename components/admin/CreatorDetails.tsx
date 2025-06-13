@@ -14,7 +14,7 @@ import { toast } from "sonner";
 const CreatorDetailsPage: React.FC = () => {
 	const params = useParams();
 	const userId = params?.userId as string;
-	const { socket, isConnected, subscribeToVerification } = useSocket(); 
+	const { socket, isConnected, subscribeToVerification } = useSocket();
 
 	const [creator, setCreator] = useState<Creator | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -30,21 +30,25 @@ const CreatorDetailsPage: React.FC = () => {
 	useEffect(() => {
 		if (!socket || !isConnected || !userId) return;
 
-		console.log('Admin: Setting up verification listener for userId:', userId);
-		
+		console.log("Admin: Setting up verification listener for userId:", userId);
+
 		// Subscribe to verification updates for this specific creator
 		subscribeToVerification(userId);
 
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const handleVerificationUpdate = (data: any) => {
-			console.log('Admin: Received verification status update:', data);
-			
+			console.log("Admin: Received verification status update:", data);
+
 			// Update creator status if this update is for the current creator
 			if (data.userId === userId) {
-				setCreator(prev => prev ? {
-					...prev,
-					status: data.status
-				} : null);
+				setCreator((prev) =>
+					prev
+						? {
+								...prev,
+								status: data.status,
+							}
+						: null
+				);
 
 				// Show notification
 				toast.success(`Creator verification status updated to: ${data.status}`);
@@ -52,11 +56,11 @@ const CreatorDetailsPage: React.FC = () => {
 		};
 
 		// Listen for verification updates
-		socket.on('verification-status-update', handleVerificationUpdate);
+		socket.on("verification-status-update", handleVerificationUpdate);
 
 		// Cleanup
 		return () => {
-			socket.off('verification-status-update', handleVerificationUpdate);
+			socket.off("verification-status-update", handleVerificationUpdate);
 		};
 	}, [socket, isConnected, userId, subscribeToVerification]);
 
@@ -452,7 +456,8 @@ const CreatorDetailsPage: React.FC = () => {
 							{/* Show Approve Creator button only when status is pending, rejected, or suspended */}
 							{(creator.status === "pending" ||
 								creator.status === "rejected" ||
-								creator.status === "suspended" || creator.status === "info_requested") && (
+								creator.status === "suspended" ||
+								creator.status === "info_requested") && (
 								<Button
 									className="px-5 bg-[#067647] text-white rounded-lg hover:bg-green-700 transition-colors duration-200"
 									onClick={() => {
@@ -467,17 +472,18 @@ const CreatorDetailsPage: React.FC = () => {
 							)}
 
 							{/* Show Reject Creator button only when status is pending */}
-							{creator.status === "pending" || creator.status === "info_requested" && (
-								<Button
-									className="px-6 bg-[#E61A1A] text-white rounded-lg hover:bg-red-700 transition-colors duration-200"
-									onClick={() => {
-										setActionType("reject");
-										setShowModal(true);
-									}}
-								>
-									Reject Creator
-								</Button>
-							)}
+							{creator.status === "pending" ||
+								(creator.status === "info_requested" && (
+									<Button
+										className="px-6 bg-[#E61A1A] text-white rounded-lg hover:bg-red-700 transition-colors duration-200"
+										onClick={() => {
+											setActionType("reject");
+											setShowModal(true);
+										}}
+									>
+										Reject Creator
+									</Button>
+								))}
 
 							{/* Show Suspend Creator button only when status is approved */}
 							{creator.status === "approved" && (
@@ -540,7 +546,7 @@ const CreatorDetailsPage: React.FC = () => {
 								<p className="text-gray-500 mb-1">Creator Bio</p>
 								<p className="text-black">{creator.bio}</p>
 							</div>
-							
+
 							<div>
 								<p className="text-gray-500 mb-1">Creator Country</p>
 								<p className="text-black">{creator.country}</p>
@@ -549,7 +555,9 @@ const CreatorDetailsPage: React.FC = () => {
 							{creator.abnNumber && (
 								<div>
 									<p className="text-gray-500 mb-1">Australian Business No.</p>
-									<p className="mt-1 text-sm md:text-base max-w-sm break-words">{creator.abnNumber}</p>
+									<p className="mt-1 text-sm md:text-base max-w-sm break-words">
+										{creator.abnNumber}
+									</p>
 								</div>
 							)}
 
@@ -587,8 +595,7 @@ const CreatorDetailsPage: React.FC = () => {
 
 							<div>
 								<p className="text-gray-500 mb-1">Languages</p>
-								
-								<p className="text-black">{creator.languages}</p>
+								<p className="text-black">{creator.languages.join(", ")}</p>
 							</div>
 
 							<div className="md:col-span-2">

@@ -273,7 +273,7 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 									type="file"
 									onChange={handleFileChange}
 									className="hidden"
-									accept="video/mp4,video/quicktime,video/webm"
+									accept=".mp4,.mov,.webm,video/mp4,video/quicktime,video/webm"
 								/>
 
 								{filePreviewUrl && fileToUpload?.type.includes("video") ? (

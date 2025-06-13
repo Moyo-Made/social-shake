@@ -741,6 +741,44 @@ export default function CreatorPricingTab() {
 													className="absolute z-10 mt-1 w-full bg-white border rounded-md shadow-lg"
 												>
 													<div className="py-1">
+														{/* Add Select All option */}
+														{/* Add Select All/Deselect All option */}
+														<div
+															className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200"
+															onClick={() => {
+																if (countries.length === allCountries.length) {
+																	// If all countries are selected, deselect all
+																	setCountries([]);
+																} else {
+																	// If not all countries are selected, select all
+																	const allCountryNames = allCountries.map(
+																		(country) => country.name
+																	);
+																	setCountries(allCountryNames);
+																}
+															}}
+														>
+															<div className="flex items-center gap-2">
+																<div
+																	className={`w-4 h-4 border rounded flex items-center justify-center ${
+																		countries.length === allCountries.length
+																			? "bg-orange-500 border-orange-500"
+																			: "border-gray-400"
+																	}`}
+																>
+																	{countries.length === allCountries.length && (
+																		<div className="w-2 h-2 rounded bg-white"></div>
+																	)}
+																</div>
+																<span className="font-medium">
+																	{countries.length === allCountries.length
+																		? "Deselect All Countries"
+																		: "Select All Countries"}
+																</span>
+															</div>
+														</div>
+
+														{/* Existing countries mapping */}
 														{allCountries.map((country) => (
 															<div
 																key={country.code}
