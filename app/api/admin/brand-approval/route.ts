@@ -114,38 +114,100 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1");
     const offset = (page - 1) * limit;
 
+    if (!adminDb) {
+      return NextResponse.json({ error: "Database connection is not initialized" }, { status: 500 });
+    }
 
     // If userId is provided, search for brand by userId
     if (userId) {
-
-      if (!adminDb) {
-        return NextResponse.json({ error: "Database connection is not initialized" }, { status: 500 });
+      console.log(`Searching for brand with userId: ${userId}`);
+      
+      // Try multiple approaches to find the brand
+      let brandData = null;
+      
+      // Approach 1: Search by userId field
+      try {
+        const brandQuery = adminDb.collection("brandProfiles")
+          .where("userId", "==", userId)
+          .limit(1);
+        
+        const brandSnapshot = await brandQuery.get();
+        
+        if (!brandSnapshot.empty) {
+          brandData = {
+            id: brandSnapshot.docs[0].id,
+            ...brandSnapshot.docs[0].data()
+          };
+          console.log(`Found brand by userId field:`, brandData);
+        }
+      } catch (error) {
+        console.log(`Error searching by userId field:`, error);
       }
-      const brandQuery = adminDb.collection("brandProfiles")
-        .where("userId", "==", userId)
-        .limit(1);
       
-      const brandSnapshot = await brandQuery.get();
+      // Approach 2: If not found, try using userId as document ID
+      if (!brandData) {
+        try {
+          const brandRef = adminDb.collection("brandProfiles").doc(userId);
+          const brandSnapshot = await brandRef.get();
+          
+          if (brandSnapshot.exists) {
+            brandData = {
+              id: brandSnapshot.id,
+              ...brandSnapshot.data()
+            };
+            console.log(`Found brand by document ID:`, brandData);
+          }
+        } catch (error) {
+          console.log(`Error searching by document ID:`, error);
+        }
+      }
       
-      if (!brandSnapshot.empty) {
-        const brandData = {
-          id: brandSnapshot.docs[0].id,
-          ...brandSnapshot.docs[0].data()
-        };
-        console.log(`Found brand for userId ${userId}:`, brandData);
+      // Approach 3: If still not found, search by email (if userId is an email)
+      if (!brandData && userId.includes('@')) {
+        try {
+          const brandQuery = adminDb.collection("brandProfiles")
+            .where("email", "==", userId)
+            .limit(1);
+          
+          const brandSnapshot = await brandQuery.get();
+          
+          if (!brandSnapshot.empty) {
+            brandData = {
+              id: brandSnapshot.docs[0].id,
+              ...brandSnapshot.docs[0].data()
+            };
+            console.log(`Found brand by email field:`, brandData);
+          }
+        } catch (error) {
+          console.log(`Error searching by email field:`, error);
+        }
+      }
+      
+      if (brandData) {
         return NextResponse.json(brandData);
       } else {
         console.log(`No brand found for userId: ${userId}`);
-        return NextResponse.json({ error: "Brand not found for the given userId" }, { status: 404 });
+        
+        // Log what brands exist for debugging
+        const allBrands = await adminDb.collection("brandProfiles").limit(5).get();
+        console.log('Sample brand documents:', allBrands.docs.map(doc => ({
+          id: doc.id,
+          userId: doc.data().userId,
+          email: doc.data().email,
+          profileId: doc.data().profileId
+        })));
+        
+        return NextResponse.json({ 
+          error: "Brand not found for the given userId",
+          searchedUserId: userId,
+          suggestion: "Check if the userId in projects matches the userId/email/profileId in brandProfiles"
+        }, { status: 404 });
       }
     }
     
     // If profileId is provided, search by profileId
     if (profileId) {
       console.log(`Searching for brand with profileId: ${profileId}`);
-      if (!adminDb) {
-        return NextResponse.json({ error: "Database connection is not initialized" }, { status: 500 });
-      }
       const brandQuery = adminDb.collection("brandProfiles")
         .where("profileId", "==", profileId)
         .limit(1);
@@ -168,9 +230,8 @@ export async function GET(request: NextRequest) {
     // If email is provided, search by email
     if (email) {
       console.log(`Searching for brand with email: ${email}`);
-      if (!adminDb) {
-        return NextResponse.json({ error: "Database connection is not initialized" }, { status: 500 });
-      }
+      
+      // Try as document ID first
       const brandRef = adminDb.collection("brandProfiles").doc(email);
       const brandSnapshot = await brandRef.get();
       
@@ -182,15 +243,28 @@ export async function GET(request: NextRequest) {
         console.log(`Found brand for email ${email}:`, brandData);
         return NextResponse.json(brandData);
       } else {
-        console.log(`No brand found for email: ${email}`);
-        return NextResponse.json({ error: "Brand not found for the given email" }, { status: 404 });
+        // Try as field
+        const brandQuery = adminDb.collection("brandProfiles")
+          .where("email", "==", email)
+          .limit(1);
+        
+        const querySnapshot = await brandQuery.get();
+        
+        if (!querySnapshot.empty) {
+          const brandData = {
+            id: querySnapshot.docs[0].id,
+            ...querySnapshot.docs[0].data()
+          };
+          console.log(`Found brand for email ${email}:`, brandData);
+          return NextResponse.json(brandData);
+        } else {
+          console.log(`No brand found for email: ${email}`);
+          return NextResponse.json({ error: "Brand not found for the given email" }, { status: 404 });
+        }
       }
     }
     
     // If no specific query parameter is provided, return paginated list with filters
-    if (!adminDb) {
-      return NextResponse.json({ error: "Database connection is not initialized" }, { status: 500 });
-    }
     let query: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> = adminDb.collection("brandProfiles");
     
     // Add status filter if provided

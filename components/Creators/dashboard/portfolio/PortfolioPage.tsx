@@ -12,6 +12,7 @@ import {
 	Camera,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import Image from "next/image";
 
 interface PortfolioData {
 	aboutMeVideoUrl: string;
@@ -27,6 +28,7 @@ interface UploadState {
 	selectedFile: File | null;
 	uploadStatus: string;
 	uploadId: string | null;
+	thumbnail: string | null; // Added thumbnail property
 }
 
 const CreatorPortfolio = () => {
@@ -48,6 +50,34 @@ const CreatorPortfolio = () => {
 	const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
 	const CHUNK_SIZE = 1 * 1024 * 1024; // 1MB chunks
 
+	// Function to extract thumbnail from video file
+	const extractVideoThumbnail = (file: File): Promise<string> => {
+		return new Promise((resolve, reject) => {
+			const video = document.createElement('video');
+			const canvas = document.createElement('canvas');
+			const ctx = canvas.getContext('2d');
+			
+			video.addEventListener('loadedmetadata', () => {
+				canvas.width = video.videoWidth;
+				canvas.height = video.videoHeight;
+				video.currentTime = 1; // Extract frame at 1 second
+			});
+			
+			video.addEventListener('seeked', () => {
+				if (ctx) {
+					ctx.drawImage(video, 0, 0);
+					const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
+					resolve(thumbnailUrl);
+				} else {
+					reject(new Error('Could not get canvas context'));
+				}
+			});
+			
+			video.addEventListener('error', reject);
+			video.src = URL.createObjectURL(file);
+		});
+	};
+
 	// Upload states for each video slot
 	const [aboutVideoUpload, setAboutVideoUpload] = useState<UploadState>({
 		isUploading: false,
@@ -57,6 +87,7 @@ const CreatorPortfolio = () => {
 		selectedFile: null,
 		uploadStatus: "",
 		uploadId: null,
+		thumbnail: null, // Added thumbnail
 	});
 
 	const [portfolioUploads, setPortfolioUploads] = useState<
@@ -70,6 +101,7 @@ const CreatorPortfolio = () => {
 			selectedFile: null,
 			uploadStatus: "",
 			uploadId: null,
+			thumbnail: null, // Added thumbnail
 		},
 		1: {
 			isUploading: false,
@@ -79,6 +111,7 @@ const CreatorPortfolio = () => {
 			selectedFile: null,
 			uploadStatus: "",
 			uploadId: null,
+			thumbnail: null, // Added thumbnail
 		},
 		2: {
 			isUploading: false,
@@ -88,6 +121,7 @@ const CreatorPortfolio = () => {
 			selectedFile: null,
 			uploadStatus: "",
 			uploadId: null,
+			thumbnail: null, // Added thumbnail
 		},
 	});
 
@@ -175,8 +209,8 @@ const CreatorPortfolio = () => {
 		return { valid: true };
 	};
 
-	// Handle file selection and preview
-	const handleFileSelect = (
+	// Handle file selection and preview - UPDATED with thumbnail extraction
+	const handleFileSelect = async (
 		file: File,
 		type: "about" | "portfolio",
 		index?: number
@@ -195,23 +229,52 @@ const CreatorPortfolio = () => {
 
 		const previewUrl = URL.createObjectURL(file);
 
-		if (type === "about") {
-			setAboutVideoUpload((prev) => ({
-				...prev,
-				preview: previewUrl,
-				selectedFile: file,
-				error: null,
-			}));
-		} else if (typeof index === "number") {
-			setPortfolioUploads((prev) => ({
-				...prev,
-				[index]: {
-					...prev[index],
+		try {
+			const thumbnailUrl = await extractVideoThumbnail(file);
+			
+			if (type === "about") {
+				setAboutVideoUpload((prev) => ({
+					...prev,
 					preview: previewUrl,
 					selectedFile: file,
 					error: null,
-				},
-			}));
+					thumbnail: thumbnailUrl,
+				}));
+			} else if (typeof index === "number") {
+				setPortfolioUploads((prev) => ({
+					...prev,
+					[index]: {
+						...prev[index],
+						preview: previewUrl,
+						selectedFile: file,
+						error: null,
+						thumbnail: thumbnailUrl,
+					},
+				}));
+			}
+		} catch (error) {
+			console.error('Failed to extract thumbnail:', error);
+			// Fallback to just preview without thumbnail
+			if (type === "about") {
+				setAboutVideoUpload((prev) => ({
+					...prev,
+					preview: previewUrl,
+					selectedFile: file,
+					error: null,
+					thumbnail: null,
+				}));
+			} else if (typeof index === "number") {
+				setPortfolioUploads((prev) => ({
+					...prev,
+					[index]: {
+						...prev[index],
+						preview: previewUrl,
+						selectedFile: file,
+						error: null,
+						thumbnail: null,
+					},
+				}));
+			}
 		}
 	};
 
@@ -474,6 +537,7 @@ const CreatorPortfolio = () => {
 						selectedFile: null,
 						uploadStatus: "Upload completed successfully!",
 						uploadId: null,
+						thumbnail: null, // Clear thumbnail
 					});
 
 					// Force video refresh
@@ -499,6 +563,7 @@ const CreatorPortfolio = () => {
 							selectedFile: null,
 							uploadStatus: "Upload completed successfully!",
 							uploadId: null,
+							thumbnail: null, // Clear thumbnail
 						},
 					}));
 
@@ -650,23 +715,26 @@ const CreatorPortfolio = () => {
 						<div>
 							<h3 className="font-medium text-gray-900 mb-3">Current Video</h3>
 							{portfolioData?.aboutMeVideoUrl ? (
-								<div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden group cursor-pointer">
-									<video
-										key={`about-${videoKeys.about}-${portfolioData.aboutMeVideoUrl}`}
-										className="w-full h-full object-cover"
-										preload="metadata"
-										muted
-										onError={(e) => {
-											console.error("Video load error:", e);
-											// You could add retry logic here or show an error state
-										}}
-										onLoadStart={() => {
-											console.log(
-												"Video load started:",
-												portfolioData.aboutMeVideoUrl
-											);
-										}}
-									>
+								 <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden group cursor-pointer">
+								 {/* Loading overlay with thumbnail */}
+								 <div id="loading-overlay-about" className="absolute inset-0 bg-gray-200 flex items-center justify-center">
+								   <div className="bg-white bg-opacity-90 rounded-full p-3">
+									 <Loader className="w-6 h-6 text-orange-500 animate-spin" />
+								   </div>
+								 </div>
+								 
+								 <video
+								   key={`about-${videoKeys.about}-${portfolioData.aboutMeVideoUrl}`}
+								   className="w-full h-full object-cover opacity-0 transition-opacity duration-500"
+								   preload="metadata"
+								   muted
+								   onLoadedData={(e) => {
+									 e.currentTarget.style.opacity = '1';
+									 const overlay = document.getElementById('loading-overlay-about');
+									 if (overlay) overlay.style.display = 'none';
+								   }}
+								   onError={(e) => console.error("Video load error:", e)}
+								 >
 										<source
 											src={`${portfolioData.aboutMeVideoUrl}?t=${Date.now()}`}
 											type="video/mp4"
@@ -875,10 +943,21 @@ const CreatorPortfolio = () => {
 
 									{/* Current Video */}
 									{hasVideo ? (
-										<div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden group cursor-pointer">
-											<video
-												key={`portfolio-${index}-${videoKeys.portfolio[index]}-${portfolioData.portfolioVideoUrls[index]}`}
-												className="w-full h-full object-cover"
+										 <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden group cursor-pointer">
+										 <div id={`loading-overlay-portfolio-${index}`} className="absolute inset-0 bg-gray-200 flex items-center justify-center">
+										   <div className="bg-white bg-opacity-90 rounded-full p-2">
+											 <Loader className="w-4 h-4 text-orange-500 animate-spin" />
+										   </div>
+										 </div>
+										 
+										 <video
+										   key={`portfolio-${index}-${videoKeys.portfolio[index]}-${portfolioData.portfolioVideoUrls[index]}`}
+										   className="w-full h-full object-cover opacity-0 transition-opacity duration-500"
+										   onLoadedData={(e) => {
+											 e.currentTarget.style.opacity = '1';
+											 const overlay = document.getElementById(`loading-overlay-portfolio-${index}`);
+											 if (overlay) overlay.style.display = 'none';
+										   }}
 												preload="metadata"
 												muted
 												onError={(e) => {
@@ -934,14 +1013,32 @@ const CreatorPortfolio = () => {
 
 									{/* Upload/Replace */}
 									{uploadState.preview ? (
-										<div className="space-y-3">
-											<div className="relative aspect-video bg-gray-100 animate-pulse rounded-lg overflow-hidden">
-												<video
-													className="w-full h-full object-cover"
-													controls
-													src={uploadState.preview}
-												/>
-											</div>
+										 <div className="space-y-3">
+										 <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden">
+										   {/* Show blurred thumbnail if available */}
+										   {uploadState.thumbnail && (
+											 <div className="absolute inset-0">
+											   <Image 
+												 src={uploadState.thumbnail} 
+												 alt="Video thumbnail"
+												 className="w-full h-full object-cover filter blur-sm"
+												 width={640}
+												 height={360}
+											   />
+											   <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
+												 <div className="bg-white bg-opacity-90 rounded-full p-2">
+												   <Play className="w-4 h-4 text-orange-500" />
+												 </div>
+											   </div>
+											 </div>
+										   )}
+										   
+										   <video
+											 className="w-full h-full object-cover relative z-10"
+											 controls
+											 src={uploadState.preview}
+										   />
+										 </div>
 											{/* File info */}
 											{uploadState.selectedFile && (
 												<div className="text-xs text-gray-600">

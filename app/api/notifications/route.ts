@@ -137,7 +137,8 @@ export async function POST(request: NextRequest) {
 			status: "unread",
 			responded: false,
 			createdAt: new Date(),
-			response: null, // Default response is null
+			response: null,
+			read: undefined
 		};
 
 		const docRef = await adminDb

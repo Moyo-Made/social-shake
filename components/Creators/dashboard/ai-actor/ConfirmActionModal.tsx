@@ -59,7 +59,7 @@ export default function ConfirmActorModal({
 					</p>
 					<p className="text-gray-700">
 						Uploading images of others without their consent is strictly
-						prohibited. Arcads may suspend accounts or take action against
+						prohibited. Social Shake may suspend accounts or take action against
 						misuse.
 					</p>
 				</div>

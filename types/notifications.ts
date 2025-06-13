@@ -1,4 +1,5 @@
 export interface NotificationData {
+  read: any;
 	response: "accepted" | "rejected" | null;
 	id?: string;
 	type:

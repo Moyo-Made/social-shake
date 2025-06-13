@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -77,6 +77,11 @@ export default function ApplyModal({
 	const [isDefault, setIsDefault] = useState(false);
 	const [deliveryInstructions, setDeliveryInstructions] = useState("");
 
+	const [reasonError, setReasonError] = useState("");
+	const [, setAddressError] = useState("");
+
+	const reasonTextareaRef = useRef<HTMLTextAreaElement>(null);
+
 	// Fetch user's existing shipping addresses
 	useEffect(() => {
 		async function fetchAddresses() {
@@ -148,6 +153,8 @@ export default function ApplyModal({
 			setZipCode("");
 			setCountry("United States");
 			setIsDefault(false);
+			setReasonError("");
+			setAddressError("");
 		}
 	}, [isOpen, addresses.length]);
 
@@ -164,13 +171,12 @@ export default function ApplyModal({
 	// Handle reason text change and update character count
 	const handleReasonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
 		const text = e.target.value;
-		// Limit to 500 characters
 		if (text.length <= 500) {
 			setReason(text);
 			setCharCount(text.length);
+			if (reasonError) setReasonError(""); // Clear error when user types
 		}
 	};
-
 	// Create a new shipping address
 	const createShippingAddress = async () => {
 		if (!currentUser) return null;
@@ -282,9 +288,17 @@ export default function ApplyModal({
 		}
 
 		if (reason.trim().length < 10) {
-			setError("Please provide a detailed reason why you should be selected.");
+			setReasonError(
+				"Please provide a detailed reason (at least 10 characters)"
+			);
+			reasonTextareaRef.current?.scrollIntoView({
+				behavior: "smooth",
+				block: "center",
+			});
+			reasonTextareaRef.current?.focus();
 			return;
 		}
+		setReasonError(""); // Clear error if valid
 
 		let shippingAddressId = null;
 
@@ -293,7 +307,9 @@ export default function ApplyModal({
 			const isAddressValid = validateAddress();
 
 			if (!isAddressValid) {
-				setError("Please complete all required shipping address fields.");
+				setAddressError(
+					"Please complete all required shipping address fields."
+				);
 				return;
 			}
 
@@ -433,12 +449,16 @@ export default function ApplyModal({
 								Why should you be selected?
 							</h3>
 							<Textarea
-								placeholder="Hi Social Shake, I'm thrilled about the opportunity to participate in your contest! As a content creator with 10,000 Followers and an engagement rate of 60%, I've honed my skills in crafting TikTok videos that are not only visually appealing but also"
+								ref={reasonTextareaRef}
+								placeholder="Hi Social Shake, I'm thrilled..."
 								value={reason}
 								onChange={handleReasonChange}
-								className="min-h-32"
+								className={`min-h-32 ${reasonError ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
 								maxLength={500}
 							/>
+							{reasonError && (
+								<p className="text-red-500 text-sm mt-1">{reasonError}</p>
+							)}
 							<div className="flex justify-start">
 								<p
 									className={`text-sm ${charCount > 450 ? (charCount > 480 ? "text-red-500" : "text-orange-500") : "text-gray-500"}`}
@@ -459,21 +479,26 @@ export default function ApplyModal({
 								className="flex flex-wrap gap-3 mt-2"
 							>
 								<div
-									className="flex items-center space-x-2 cursor-pointer text-[#667085] border-[#667085] border px-6 py-2 rounded-lg data-[state=checked]:bg-[#f26f38] data-[state=checked]:text-[#fff] data-[state=checked]:border-none"
-									data-state={
-										productOwnership === "own" ? "checked" : "unchecked"
-									}
+									className={`flex items-center space-x-2 cursor-pointer px-6 py-2 rounded-lg border transition-colors ${
+										productOwnership === "own"
+											? "bg-[#f26f38] text-white border-[#f26f38]"
+											: "text-[#667085] border-[#667085] hover:bg-gray-50"
+									}`}
+									onClick={() => setProductOwnership("own")}
 								>
 									<RadioGroupItem value="own" id="own" />
 									<Label htmlFor="own" className="cursor-pointer">
 										I Own It
 									</Label>
 								</div>
+
 								<div
-									className="flex items-center space-x-2 cursor-pointer text-[#667085] border-[#667085] border px-6 py-2 rounded-lg data-[state=checked]:bg-[#f26f38] data-[state=checked]:text-[#fff] data-[state=checked]:border-none"
-									data-state={
-										productOwnership === "need" ? "checked" : "unchecked"
-									}
+									className={`flex items-center space-x-2 cursor-pointer px-6 py-2 rounded-lg border transition-colors ${
+										productOwnership === "need"
+											? "bg-[#f26f38] text-white border-[#f26f38]"
+											: "text-[#667085] border-[#667085] hover:bg-gray-50"
+									}`}
+									onClick={() => setProductOwnership("need")}
 								>
 									<RadioGroupItem value="need" id="need" />
 									<Label htmlFor="need" className="cursor-pointer">

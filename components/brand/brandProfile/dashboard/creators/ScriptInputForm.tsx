@@ -591,6 +591,40 @@ const ScriptInputForm: React.FC<ScriptInputFormProps> = ({
 						<Button onClick={onBack} variant="outline" className="px-6">
 							Back
 						</Button>
+
+						{/* Center - Tab navigation */}
+						<div className="flex items-center space-x-3">
+							{/* Previous Tab Button */}
+							{(activeTab === "requirements" || activeTab === "specs") && (
+								<Button
+									onClick={() => {
+										if (activeTab === "requirements") setActiveTab("scripts");
+										if (activeTab === "specs") setActiveTab("requirements");
+									}}
+									variant="outline"
+									size="default"
+									className="px-4"
+								>
+									← Previous
+								</Button>
+							)}
+
+							{/* Next Tab Button */}
+							{(activeTab === "scripts" || activeTab === "requirements") && (
+								<Button
+									onClick={() => {
+										if (activeTab === "scripts") setActiveTab("requirements");
+										if (activeTab === "requirements") setActiveTab("specs");
+									}}
+									variant="outline"
+									size="default"
+									className="px-4"
+								>
+									Next →
+								</Button>
+							)}
+						</div>
+
 						<Button
 							onClick={handleContinue}
 							disabled={!isFormValid()}

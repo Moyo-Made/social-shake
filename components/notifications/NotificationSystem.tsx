@@ -18,10 +18,37 @@ import { NotificationData } from "@/types/notifications";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import ProjectDetailsModal from "../Creators/dashboard/ProjectDetailsModal";
+// import Link from "next/link";
 
 interface NotificationSystemProps {
 	className?: string;
 	userId: string;
+}
+
+// Add interface for project details
+interface ProjectDetails {
+	id: string;
+	title: string;
+	description: string;
+	requirements: string[];
+	deliverables: string[];
+	timeline: {
+		startDate: string;
+		endDate: string;
+		duration: string;
+	};
+	budget: {
+		amount: number;
+		currency: string;
+		paymentType: string;
+	};
+	brand: {
+		name: string;
+		logo?: string;
+	};
+	categories: string[];
+	targetAudience?: string;
 }
 
 const NotificationSystem: React.FC<NotificationSystemProps> = ({
@@ -33,6 +60,13 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
 	const [orderStates, setOrderStates] = useState<{
 		[key: string]: "approved" | "rejected" | null;
 	}>({});
+
+	const [showProjectModal, setShowProjectModal] = useState(false);
+	const [projectDetails, setProjectDetails] = useState<ProjectDetails | null>(
+		null
+	);
+	const [loadingProjectDetails, setLoadingProjectDetails] = useState(false);
+
 	const router = useRouter();
 	const { currentUser } = useAuth();
 
@@ -43,107 +77,178 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
 		error,
 		markAsRead,
 		markAllAsRead,
-		refetch
+		refetch,
 	} = useNotifications();
+
+	// Function to fetch project details
+	const fetchProjectDetails = async (projectId: string) => {
+		setLoadingProjectDetails(true);
+		try {
+			const response = await fetch(`/api/projects/${projectId}/details`);
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Failed to fetch project details");
+			}
+
+			// The issue is here - you need to access data.data, not data.project
+			if (data.success && data.exists && data.data) {
+				// Transform the API response to match your ProjectDetails interface
+				const projectData = data.data;
+
+				const transformedProject: ProjectDetails = {
+					id: projectData.projectId,
+					title: projectData.projectDetails.projectName,
+					description: projectData.projectDetails.projectDescription,
+					requirements: [
+						`Content Type: ${projectData.projectRequirements.contentType}`,
+						`Platform: ${projectData.projectRequirements.platform.join(", ")}`,
+						`Aspect Ratio: ${projectData.projectRequirements.aspectRatio}`,
+						`Duration: ${projectData.projectRequirements.duration}`,
+						`Video Type: ${projectData.projectRequirements.videoType}`,
+						...(projectData.projectRequirements.script
+							? [`Script: ${projectData.projectRequirements.script}`]
+							: []),
+					],
+					deliverables: [
+						`${projectData.creatorPricing.totalVideos} video(s)`,
+						`${projectData.projectRequirements.duration} duration`,
+						`${projectData.projectRequirements.aspectRatio} format`,
+					],
+					timeline: {
+						startDate: projectData.createdAt,
+						endDate: projectData.updatedAt, // You might want to calculate this based on project duration
+						duration: projectData.projectRequirements.duration,
+					},
+					budget: {
+						amount: projectData.creatorPricing.totalAmount,
+						currency: "$", // Assuming USD, you might want to make this dynamic
+						paymentType: "Per project",
+					},
+					brand: {
+						name: projectData.brandInfo.brandName,
+						logo: undefined, // No logo in the API response
+					},
+					categories: [projectData.projectDetails.projectType],
+					targetAudience: `${projectData.creatorPricing.ageGroup} ${projectData.creatorPricing.gender}`,
+				};
+
+				setProjectDetails(transformedProject);
+			} else {
+				throw new Error("Project not found or invalid response structure");
+			}
+		} catch (error) {
+			console.error("Error fetching project details:", error);
+			toast.error("Failed to load project details");
+		} finally {
+			setLoadingProjectDetails(false);
+		}
+	};
 
 	// Project invitation handlers
 	const handleAcceptProject = async (
 		notificationId: string,
 		projectId: string
-	  ) => {
+	) => {
 		setProcessingAction(`accept-${notificationId}`);
-	  
+
 		try {
-		  console.log("Accepting project invitation...");
-	  
-		  const response = await fetch("/api/projects/accept-invitation", {
-			method: "POST",
-			headers: {
-			  "Content-Type": "application/json",
-			},
-			body: JSON.stringify({
-			  userId: currentUser?.uid,
-			  notificationId,
-			  projectId,
-			}),
-		  });
-	  
-		  const data = await response.json();
-	  
-		  if (!response.ok) {
-			throw new Error(data.error || "Failed to accept project invitation");
-		  }
-	  
-		  // Mark notification as read
-		  await markAsRead(notificationId);
-	  
-		  // Refetch notifications to get updated data from server
-		  await refetch();
-	  
-		  console.log("Project invitation accepted successfully!");
-		  toast.success(
-			data.message || "Project invitation accepted successfully!"
-		  );
+			console.log("Accepting project invitation...");
+
+			const response = await fetch("/api/projects/accept-invitation", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					userId: currentUser?.uid,
+					notificationId,
+					projectId,
+				}),
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Failed to accept project invitation");
+			}
+
+			// Mark notification as read
+			await markAsRead(notificationId);
+
+			// Refetch notifications to get updated data from server
+			await refetch();
+
+			// Close the project modal if it's open
+			setShowProjectModal(false);
+
+			console.log("Project invitation accepted successfully!");
+			toast.success(
+				data.message || "Project invitation accepted successfully!"
+			);
 		} catch (error) {
-		  console.error("Error accepting project invitation:", error);
-		  toast.error(
-			error instanceof Error
-			  ? error.message
-			  : "Failed to accept project invitation"
-		  );
+			console.error("Error accepting project invitation:", error);
+			toast.error(
+				error instanceof Error
+					? error.message
+					: "Failed to accept project invitation"
+			);
 		} finally {
-		  setProcessingAction(null);
+			setProcessingAction(null);
 		}
-	  };
-	  
-	  const handleRejectProject = async (
+	};
+
+	const handleRejectProject = async (
 		notificationId: string,
 		projectId: string
-	  ) => {
+	) => {
 		setProcessingAction(`reject-${notificationId}`);
-	  
+
 		try {
-		  console.log("Rejecting project invitation...");
-	  
-		  const response = await fetch("/api/projects/reject-invitation", {
-			method: "POST",
-			headers: {
-			  "Content-Type": "application/json",
-			},
-			body: JSON.stringify({
-			  userId,
-			  notificationId,
-			  projectId,
-			}),
-		  });
-	  
-		  const data = await response.json();
-	  
-		  if (!response.ok) {
-			throw new Error(data.error || "Failed to reject project invitation");
-		  }
-	  
-		  // Mark notification as read
-		  await markAsRead(notificationId);
-	  
-		  // Refetch notifications to get updated data from server
-		  await refetch();
-	  
-		  console.log("Project invitation rejected successfully!");
-		  toast.success(
-			data.message || "Project invitation rejected successfully!"
-		  );
+			console.log("Rejecting project invitation...");
+
+			const response = await fetch("/api/projects/reject-invitation", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					userId,
+					notificationId,
+					projectId,
+				}),
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Failed to reject project invitation");
+			}
+
+			// Mark notification as read
+			await markAsRead(notificationId);
+
+			// Refetch notifications to get updated data from server
+			await refetch();
+
+			// Close the project modal if it's open
+			setShowProjectModal(false);
+
+			console.log("Project invitation rejected successfully!");
+			toast.success(
+				data.message || "Project invitation rejected successfully!"
+			);
 		} catch (error) {
-		  console.error("Error rejecting project invitation:", error);
-		  toast.error(
-			error instanceof Error
-			  ? error.message
-			  : "Failed to reject project invitation"
-		  );
+			console.error("Error rejecting project invitation:", error);
+			toast.error(
+				error instanceof Error
+					? error.message
+					: "Failed to reject project invitation"
+			);
 		} finally {
-		  setProcessingAction(null);
+			setProcessingAction(null);
 		}
-	  };
+	};
 
 	// Get notification icon based on type
 	const getNotificationIcon = (type: string) => {
@@ -185,7 +290,14 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
 		notificationId: string
 	) => {
 		await markAsRead(notificationId);
-		router.push(`/creator/dashboard/project/applied`);
+
+		// Set loading state and show modal
+		setLoadingProjectDetails(true);
+		setShowProjectModal(true);
+
+		// Fetch project details
+		await fetchProjectDetails(projectId);
+		setLoadingProjectDetails(false);
 	};
 
 	// Handle order actions
@@ -254,14 +366,15 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
 	const renderNotification = (notification: NotificationData) => {
 		const isInvitation = notification.type === "project_invitation";
 		const isOrder = notification.type === "order_finalized";
-	  
+
 		// Extract orderId from notification - you might need to adjust this based on your NotificationData structure
 		const orderId = notification.orderId || notification.relatedId;
 		const orderState = orderId ? orderStates[orderId] : null;
-	  
+
 		// Get project invitation state from server data
-		const projectInvitationState = notification.responded ? notification.response : null;
-	  
+		const projectInvitationState = notification.responded
+			? notification.response
+			: null;
 
 		return (
 			<div
@@ -369,7 +482,7 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
 											) : (
 												<Eye className="w-3 h-3" />
 											)}
-											View Project
+											View Details
 										</button>
 									</>
 								)}
@@ -390,7 +503,6 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
 										<>
 											<Check className="w-3 h-3" />
 											Accepted
-											
 										</>
 									) : (
 										<>
@@ -496,19 +608,16 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
 						)}
 
 						{/* View project button for other notification types */}
-						{!isInvitation && !isOrder && notification.projectId && (
+						{/* {!isInvitation && !isOrder && notification.projectId && (
 							<div className="mt-3">
-								<button
-									onClick={() =>
-										handleViewProject(notification.projectId!, notification.id!)
-									}
-									className="flex items-center gap-1 px-3 py-1 bg-orange-500 text-white text-xs rounded-md hover:bg-orange-600 transition-colors"
-								>
-									<Eye className="w-3 h-3" />
-									View Project
-								</button>
+								<Link href={`/creator/dashboard/project/applied`}>
+									<button className="flex items-center gap-1 px-3 py-1 bg-orange-500 text-white text-xs rounded-md hover:bg-orange-600 transition-colors">
+										<Eye className="w-3 h-3" />
+										View Project
+									</button>
+								</Link>
 							</div>
-						)}
+						)} */}
 					</div>
 
 					{notification.status === "unread" && (
@@ -619,6 +728,49 @@ const NotificationSystem: React.FC<NotificationSystemProps> = ({
 					</div>
 				</div>
 			)}
+
+			{/* Project Details Modal */}
+			<ProjectDetailsModal
+				isOpen={showProjectModal}
+				onClose={() => {
+					setShowProjectModal(false);
+					setProjectDetails(null);
+				}}
+				projectDetails={projectDetails}
+				isLoading={loadingProjectDetails}
+				onAccept={() => {
+					if (projectDetails) {
+						// Find the notification that corresponds to this project
+						const projectNotification = notifications.find(
+							(n) =>
+								n.projectId === projectDetails.id &&
+								n.type === "project_invitation"
+						);
+						if (projectNotification) {
+							handleAcceptProject(projectNotification.id!, projectDetails.id);
+						}
+					}
+				}}
+				onReject={() => {
+					if (projectDetails) {
+						// Find the notification that corresponds to this project
+						const projectNotification = notifications.find(
+							(n) =>
+								n.projectId === projectDetails.id &&
+								n.type === "project_invitation"
+						);
+						if (projectNotification) {
+							handleRejectProject(projectNotification.id!, projectDetails.id);
+						}
+					}
+				}}
+				processingAccept={processingAction?.startsWith("accept-") || false}
+				processingReject={processingAction?.startsWith("reject-") || false}
+				showActions={true}
+				notification={
+					notifications.find((n) => n.projectId === projectDetails?.id) || null
+				}
+			/>
 		</>
 	);
 };

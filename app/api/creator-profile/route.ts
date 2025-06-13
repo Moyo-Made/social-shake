@@ -57,7 +57,6 @@ export async function POST(request: NextRequest) {
     // Handle image upload if file exists
     if (imageFile && imageFile.size > 0) {
       try {
-        console.log(`Processing image: ${imageFile.name}, size: ${imageFile.size} bytes`);
         
         // Check if the file is actually an image
         if (!imageFile.type.startsWith('image/')) {
@@ -97,7 +96,6 @@ export async function POST(request: NextRequest) {
           });
           
           blobStream.on('finish', () => {
-            console.log('Upload stream finished');
             resolve(true);
           });
           
@@ -109,7 +107,6 @@ export async function POST(request: NextRequest) {
         
         // Get the public URL
         const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
-        console.log(`File uploaded successfully. URL: ${publicUrl}`);
         
         profileData.profileImageUrl = publicUrl;
       } catch (uploadError: unknown) {
@@ -151,22 +148,13 @@ export async function GET(request: NextRequest) {
     const email = searchParams.get("email");
     let tiktokId = searchParams.get("tiktokId");
 
-    console.log("Received query for creator profile lookup:", {
-      profileId,
-      userId,
-      email,
-      tiktokId
-    });
-
     // Handle TikTok provider format in userId (e.g. tiktok:12345)
     if (userId && userId.includes(':')) {
       const [provider, providerId] = userId.split(':');
-      console.log(`Detected provider format in userId: ${provider}:${providerId}`);
       
       if (provider === 'tiktok') {
         // Store the extracted TikTok ID
         tiktokId = providerId;
-        console.log(`Extracted TikTok ID from userId: ${tiktokId}`);
       }
     }
 
@@ -177,7 +165,6 @@ export async function GET(request: NextRequest) {
 
     // 1. First try checking for the full userId as it is, including provider prefix
     if (userId) {
-      console.log(`Checking for creator profile with full userId: ${userId}`);
       const userIdQuery = await adminDb
         .collection("creatorProfiles")
         .where("userId", "==", userId)
@@ -188,13 +175,11 @@ export async function GET(request: NextRequest) {
         profileData = userIdQuery.docs[0].data();
         // Save email for verification lookup
         if (profileData.email) creatorEmail = profileData.email as string;
-        console.log("Found creator profile using full userId:", profileData);
       }
     }
 
     // 2. Try by TikTok ID if available and profile not found yet
     if (tiktokId && Object.keys(profileData).length === 0) {
-      console.log(`Checking for creator profile with tiktokId: ${tiktokId}`);
       const tiktokQuery = await adminDb
         .collection("creatorProfiles")
         .where("tiktokId", "==", tiktokId)
@@ -206,7 +191,6 @@ export async function GET(request: NextRequest) {
         // Save email for verification lookup
         if (profileData.email) creatorEmail = profileData.email as string;
         if (profileData.userId) creatorUserId = profileData.userId as string;
-        console.log("Found creator profile using tiktokId:", profileData);
       }
     }
 
@@ -215,7 +199,6 @@ export async function GET(request: NextRequest) {
       const [provider, providerId] = userId.split(':');
       
       // Try the provider ID directly (without prefix)
-      console.log(`Checking for creator profile with providerId: ${providerId}`);
       const providerIdQuery = await adminDb
         .collection("creatorProfiles")
         .where("userId", "==", providerId)
@@ -226,13 +209,11 @@ export async function GET(request: NextRequest) {
         profileData = providerIdQuery.docs[0].data();
         // Save email for verification lookup
         if (profileData.email) creatorEmail = profileData.email as string;
-        console.log("Found creator profile using providerId as userId:", profileData);
       }
 
       // For TikTok specifically, also try "provider" + "Id" fields
       if (provider === 'tiktok' && Object.keys(profileData).length === 0) {
         // Try the provider field approach
-        console.log(`Checking with ${provider}Id field (tiktokId): ${providerId}`);
         const providerFieldQuery = await adminDb
           .collection("creatorProfiles")
           .where(`${provider}Id`, "==", providerId)
@@ -244,14 +225,12 @@ export async function GET(request: NextRequest) {
           // Save email for verification lookup
           if (profileData.email) creatorEmail = profileData.email as string;
           if (profileData.userId) creatorUserId = profileData.userId as string;
-          console.log(`Found creator profile using ${provider}Id field:`, profileData);
         }
       }
     }
 
     // 4. If profile by ID still not found, try by profileId if provided
     if (profileId && Object.keys(profileData).length === 0) {
-      console.log(`Checking for creator profile with profileId: ${profileId}`);
       const profilesQuery = await adminDb
         .collectionGroup("creatorProfiles")
         .where("profileId", "==", profileId)
@@ -263,13 +242,11 @@ export async function GET(request: NextRequest) {
         // Save email for verification lookup
         if (profileData.email) creatorEmail = profileData.email as string;
         if (profileData.userId) creatorUserId = profileData.userId as string;
-        console.log("Found creator profile using profileId:", profileData);
       }
     }
 
     // 5. Try by email if available and profile not found yet
     if (email && Object.keys(profileData).length === 0) {
-      console.log(`Checking for creator profile with email: ${email}`);
       const creatorRef = adminDb.collection("creatorProfiles").doc(email);
       const docSnap = await creatorRef.get();
       
@@ -282,7 +259,6 @@ export async function GET(request: NextRequest) {
         // Save email for verification lookup
         creatorEmail = email;
         if (profileData.userId) creatorUserId = profileData.userId as string;
-        console.log("Found creator profile using email as document ID:", profileData);
       } else {
         // Also try email as a field
         const emailQuery = await adminDb
@@ -296,7 +272,6 @@ export async function GET(request: NextRequest) {
           // Save email for verification lookup
           creatorEmail = email;
           if (profileData.userId) creatorUserId = profileData.userId as string;
-          console.log("Found creator profile using email field:", profileData);
         }
       }
     }
@@ -316,7 +291,6 @@ export async function GET(request: NextRequest) {
     
     // Try to find verification by email first (most reliable)
     if (creatorEmail) {
-      console.log(`Fetching verification data for email: ${creatorEmail}`);
       
       // Get the most recent verification document
       const verificationByEmailSnapshot = await adminDb.collection("creator_verifications")
@@ -329,13 +303,11 @@ export async function GET(request: NextRequest) {
         const verificationDoc = verificationByEmailSnapshot.docs[0];
         verificationData = verificationDoc.data();
         verificationData.id = verificationDoc.id;
-        console.log("Found verification data by email:", verificationData);
       }
     }
     
     // If no verification found by email but we have userId, try that next
     if (Object.keys(verificationData).length === 0 && creatorUserId) {
-      console.log(`Searching for verification by userId: ${creatorUserId}`);
       
       const verificationByUserIdSnapshot = await adminDb.collection("creator_verifications")
         .where("userId", "==", creatorUserId)
@@ -347,7 +319,6 @@ export async function GET(request: NextRequest) {
         const verificationDoc = verificationByUserIdSnapshot.docs[0];
         verificationData = verificationDoc.data();
         verificationData.id = verificationDoc.id;
-        console.log("Found verification data by userId:", verificationData);
       }
     }
 
@@ -412,11 +383,9 @@ export async function GET(request: NextRequest) {
         }
       }
     } else {
-      console.log("No verification data found for this creator");
       mergedResponse.verificationStatus = "not_submitted";
     }
     
-    console.log("Final merged response:", mergedResponse);
     
     return NextResponse.json(mergedResponse);
   } catch (error) {

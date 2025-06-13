@@ -15,6 +15,7 @@ import CreatorProfileDropdown from "../CreatorProfileDropdown";
 import { useCreatorProfile } from "@/hooks/useCreatorProfile";
 import { useNotifications } from "@/context/NotificationContext";
 import NotificationSystem from "@/components/notifications/NotificationSystem";
+import { useAuth } from "@/context/AuthContext";
 
 interface MenuItemProps {
 	icon: React.ReactNode;
@@ -374,6 +375,7 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 	const pathname = usePathname();
 	const pageTitle = getPageTitle(pathname);
 	const { creatorProfile } = useCreatorProfile();
+	const {currentUser} = useAuth()
 
 	return (
 		<div className="h-screen flex">
@@ -382,7 +384,7 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 				<header className="bg-white p-4 w-full flex justify-between items-center border-b border-[#FD5C02]">
 					<h1 className="text-xl font-semibold">{pageTitle}</h1>
 					<div className="flex items-center">
-						<NotificationSystem />
+						<NotificationSystem userId={currentUser?.uid || ""} />
 						{creatorProfile && (
 							<CreatorProfileDropdown
 								creatorProfile={creatorProfile}

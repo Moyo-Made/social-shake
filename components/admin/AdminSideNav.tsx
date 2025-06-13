@@ -327,7 +327,7 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 				<header className="bg-white p-4 w-full flex justify-between items-center border-b border-[#FD5C02]">
 					<h1 className="text-xl font-semibold">{pageTitle}</h1>
 					<div className="flex items-center">
-						<NotificationSystem />
+						<NotificationSystem userId={currentUser?.uid || ""} />
 						<div className="flex items-center">
 							<span className="mr-4 text-sm text-gray-500">
 								{currentUser?.email}

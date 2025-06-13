@@ -1,4 +1,4 @@
-import { Play } from "lucide-react";
+import { Loader, Play } from "lucide-react";
 import { useRef, useState } from "react";
 
 interface VideoComponentProps {
@@ -42,6 +42,18 @@ const VideoComponent = ({ creator, onClick }: VideoComponentProps) => {
 			onMouseEnter={handleMouseEnter}
 			onMouseLeave={handleMouseLeave}
 		>
+			{/* Only show loading overlay when actually loading */}
+			{isLoading && (
+				<div
+					id="loading-overlay-about"
+					className="absolute inset-0 bg-gray-200 flex items-center justify-center rounded-lg"
+				>
+					<div className="bg-white bg-opacity-90 rounded-full p-3">
+						<Loader className="w-6 h-6 text-orange-500 animate-spin" />
+					</div>
+				</div>
+			)}
+
 			<video
 				ref={videoRef}
 				src={creator.aboutMeVideoUrl}
@@ -49,7 +61,7 @@ const VideoComponent = ({ creator, onClick }: VideoComponentProps) => {
 					width: "350px",
 					height: "250px",
 					objectFit: "cover",
-					backgroundColor: "transparent", // Explicitly remove any background
+					backgroundColor: "transparent",
 				}}
 				className="rounded-lg"
 				onClick={handleVideoClick}
@@ -65,7 +77,7 @@ const VideoComponent = ({ creator, onClick }: VideoComponentProps) => {
 				<p>Your browser doesn&apos;t support HTML video.</p>
 			</video>
 
-			{/* Loading pulse animation */}
+			{/* Loading pulse animation - also only when loading */}
 			{isLoading && (
 				<div className="absolute inset-0 rounded-lg animate-pulse bg-gradient-to-r from-gray-100 to-gray-200" />
 			)}

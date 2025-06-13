@@ -90,9 +90,9 @@ export async function POST(request: NextRequest) {
 
     const projectData = projectDoc.data();
 
-    // Create the application document with "active" status (accepted invitation)
+    // Create the application document with "approved" status (accepted invitation)
     const applicationData = {
-      userId: userId.trim(),  // Ensure it's not an empty string
+      userId: userId.trim(),
       projectId,
       reason: "Accepted project invitation",
       productOwnership: "have", // Default for invited creators
@@ -104,47 +104,48 @@ export async function POST(request: NextRequest) {
       invitationAccepted: true,
     };
 
-    // Create the application document
+    // Create the application document 
     const applicationRef = adminDb.collection("project_applications").doc();
     await applicationRef.set(applicationData);
 
-    // Update the notification to mark as responded
-    await notificationRef.update({
-      responded: true,
-      response: "accepted",
-      respondedAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    });
+    // Update the notification to mark as responded and project applicants count
+    await Promise.all([
+      notificationRef.update({
+        responded: true,
+        response: "accepted",
+        respondedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      }),
+      projectRef.update({
+        applicantsCount: FieldValue.increment(1),
+      })
+    ]);
 
-    // Update project applicants count
-    await projectRef.update({
-      applicantsCount: FieldValue.increment(1),
-    });
-
-    // Create notification for the project owner (brand)
-    if (projectData?.createdBy) {
-      await adminDb.collection("notifications").add({
-        userId: projectData.createdBy,
-        message: `Great news! A creator has accepted your project invitation for: ${projectData?.title || projectId}`,
+    // Send notifications to both brand and creator
+    await Promise.all([
+      // Notification for brand (project owner)
+      adminDb.collection("notifications").add({
+        userId: projectData?.userId,
+        message: `Great news! A creator has accepted your project invitation for "${projectData?.title || 'your project'}". They will now begin working on your content.`,
         status: "unread",
         type: "invitation_accepted",
         createdAt: FieldValue.serverTimestamp(),
         relatedTo: "project",
         projectId,
         applicationId: applicationRef.id,
-      });
-    }
-
-    // Create confirmation notification for the creator
-    await adminDb.collection("notifications").add({
-      userId: userId.trim(),
-      message: `You've successfully accepted the project invitation for: ${projectData?.projectTitle || projectId}.`,
-      status: "unread",
-      type: "invitation_response_confirmation",
-      createdAt: FieldValue.serverTimestamp(),
-      relatedTo: "project",
-      projectId,
-    });
+      }),
+      // Notification for creator (confirmation)
+      adminDb.collection("notifications").add({
+        userId: userId.trim(),
+        message: `You've successfully accepted the project invitation for "${projectData?.title || projectId}". You can now start working on the project.`,
+        status: "unread",
+        type: "invitation_accepted_creator",
+        createdAt: FieldValue.serverTimestamp(),
+        relatedTo: "project",
+        projectId,
+        applicationId: applicationRef.id,
+      })
+    ]);
 
     return NextResponse.json({
       success: true,

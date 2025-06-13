@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     // Create notification for the project owner (brand)
     if (projectData?.createdBy) {
       await adminDb.collection("notifications").add({
-        userId: projectData.createdBy,
+        userId: projectData.userId,
         message: `A creator has declined your project invitation for: ${projectData?.title || projectId}`,
         status: "unread",
         type: "invitation_rejected",

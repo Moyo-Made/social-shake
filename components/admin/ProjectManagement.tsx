@@ -165,45 +165,56 @@ const ProjectManagement: React.FC = () => {
 			setLoading(false);
 		}
 	};
-
-	// In your fetchBrandProfile function:
-	const fetchBrandProfile = async (userId: string) => {
-		// Skip if we already have this brand profile or it's already loading
-		if (brandProfiles[userId] || loadingBrands[userId]) {
-			return;
-		}
-
-		try {
-			setLoadingBrands((prev) => ({ ...prev, [userId]: true }));
-
-			const response = await fetch(
-				`/api/admin/brand-approval?userId=${userId}`
-			);
-
-			if (response.ok) {
-				const data = await response.json();
-				setBrandProfiles((prev) => ({
-					...prev,
-					[userId]: data,
-				}));
-			} else {
-
-			}
-		} catch (error) {
-			console.error(
-				`Error fetching brand profile for userId ${userId}:`,
-				error
-			);
-			// Set placeholder data on error
+// Updated fetchBrandProfile function to use profileId approach
+const fetchBrandProfile = async (userId: string) => {
+	// Skip if we already have this brand profile or it's already loading
+	if (brandProfiles[userId] || loadingBrands[userId]) {
+	  return;
+	}
+  
+	try {
+	  setLoadingBrands((prev) => ({ ...prev, [userId]: true }));
+  
+	  console.log(`🔍 Attempting to fetch brand profile for userId: "${userId}"`);
+	  console.log(`🔍 UserId type: ${typeof userId}, length: ${userId.length}`);
+  
+	  // Use profileId parameter as specified
+	  const response = await fetch(
+		`/api/admin/brand-approval?profileId=${encodeURIComponent(userId)}`
+	  );
+  
+	  console.log(`📡 API Response status: ${response.status}`);
+  
+	  if (response.ok) {
+		const data = await response.json();
+		console.log(`✅ Successfully found brand profile for userId ${userId}:`, data);
+		setBrandProfiles((prev) => ({
+		  ...prev,
+		  [userId]: data,
+		}));
+	  } else {
+		const errorData = await response.json();
+		console.log(`❌ Failed to find brand profile for userId ${userId}:`);
+		console.log(`   - Response status: ${response.status}`);
+		console.log(`   - Error data:`, errorData);
 		
-		} finally {
-			setLoadingBrands((prev) => {
-				const updated = { ...prev };
-				delete updated[userId];
-				return updated;
-			});
-		}
-	};
+		// Log the actual projects to see what userIds we have
+		console.log(`📊 Current projects with userIds:`, projects.map(p => ({
+		  projectId: p.id,
+		  userId: p.userId,
+		  userIdType: typeof p.userId
+		})));
+	  }
+	} catch (error) {
+	  console.error(`💥 Error fetching brand profile for userId ${userId}:`, error);
+	} finally {
+	  setLoadingBrands((prev) => {
+		const updated = { ...prev };
+		delete updated[userId];
+		return updated;
+	  });
+	}
+  };
 
 	// Add this useEffect to track which brand profiles we need to fetch
 	useEffect(() => {

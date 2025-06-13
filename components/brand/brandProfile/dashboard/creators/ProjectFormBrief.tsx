@@ -887,12 +887,73 @@ const ProjectBriefForm: React.FC<ProjectBriefFormProps> = ({
 							Back to Script Approach
 						</Button>
 
+						{/* Center - Tab navigation */}
 						<div className="flex items-center space-x-3">
-							<div className="text-sm text-gray-600">
+							{/* Previous Tab Button */}
+							{(activeTab === "content" ||
+								activeTab === "brand" ||
+								activeTab === "specs" ||
+								activeTab === "examples" ||
+								activeTab === "timeline") && (
+								<Button
+									onClick={() => {
+										const tabs = [
+											"overview",
+											"content",
+											"brand",
+											"specs",
+											"examples",
+											"timeline",
+										];
+										const currentIndex = tabs.indexOf(activeTab);
+										if (currentIndex > 0) {
+											setActiveTab(tabs[currentIndex - 1] as "overview" | "content" | "brand" | "specs" | "examples" | "timeline");
+										}
+									}}
+									variant="outline"
+									size="default"
+									className="px-4"
+								>
+									← Previous
+								</Button>
+							)}
+
+							{/* Next Tab Button */}
+							{(activeTab === "overview" ||
+								activeTab === "content" ||
+								activeTab === "brand" ||
+								activeTab === "specs" ||
+								activeTab === "examples") && (
+								<Button
+									onClick={() => {
+										const tabs = [
+											"overview",
+											"content",
+											"brand",
+											"specs",
+											"examples",
+											"timeline",
+										];
+										const currentIndex = tabs.indexOf(activeTab);
+										if (currentIndex < tabs.length - 1) {
+											setActiveTab(tabs[currentIndex + 1] as "overview" | "content" | "brand" | "specs" | "examples" | "timeline");
+										}
+									}}
+									variant="outline"
+									size="default"
+									className="px-4"
+								>
+									Next →
+								</Button>
+							)}
+						</div>
+
+						<div className="flex items-center space-x-3">
+							{/* <div className="text-sm text-gray-600">
 								{isFormValid()
 									? "Ready to continue"
 									: "Complete required fields to continue"}
-							</div>
+							</div> */}
 							<Button
 								onClick={handleContinue}
 								disabled={!isFormValid()}

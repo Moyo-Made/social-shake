@@ -230,7 +230,9 @@ const DashboardContent = ({ userId }: UserDashboardProps) => {
 	};
 
 	return (
-		<div className="max-w-6xl px-4 py-8">
+		<div className="max-w-6xl px-4 py-6">
+			{/* Project Invitations Section - NEW */}
+			<ProjectInvitationsSection userId={userId} />
 			{/* Summary Cards */}
 			<div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
 				{/* Active Projects Card */}
@@ -303,6 +305,7 @@ const DashboardContent = ({ userId }: UserDashboardProps) => {
 
 // Properly use dynamic import for the dashboard component
 import dynamic from "next/dynamic";
+import ProjectInvitationsSection from "./ProjectInvitation";
 
 const CreatorDashboard = dynamic(() => Promise.resolve(DashboardContent), {
 	ssr: false,

@@ -79,9 +79,11 @@ export async function POST(request: NextRequest) {
 			creatorId: userId,
 			creatorName: creatorName,
 			projectTitle: projectData?.title,
-			read: false,
+			status: 'unread',
 			createdAt: new Date(),
-		  };
+			response: null,
+			read: undefined
+		};
   
 		const responseNotificationRef = adminDb.collection('notifications').doc();
 		transaction.set(responseNotificationRef, responseNotification);

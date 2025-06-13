@@ -9,6 +9,7 @@ import { useBrandProfile } from "@/hooks/useBrandProfile";
 import BrandProfileDropdown from "@/components/brand/brandProfile/BrandProfileDropdown";
 import { useNotifications } from "@/context/NotificationContext";
 import NotificationSystem from "@/components/notifications/NotificationSystem";
+import { useAuth } from "@/context/AuthContext";
 
 interface MenuItemProps {
 	icon: React.ReactNode;
@@ -31,6 +32,8 @@ const MenuItem: React.FC<MenuItemProps> = ({
 	const pathname = usePathname();
 	const [isOpen, setIsOpen] = useState(false);
 	const hasSubItems = subItems && subItems.length > 0;
+
+
 
 	// Modified isActive condition to handle special case for contests
 	const isActive =
@@ -337,6 +340,7 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 	const pathname = usePathname();
 	const pageTitle = getPageTitle(pathname);
 	const { brandProfile, loading } = useBrandProfile();
+	const { currentUser } = useAuth();
 
 	return (
 		<div className="h-screen flex">
@@ -345,7 +349,7 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 				<header className="bg-white p-4 w-full flex justify-between items-center border-b border-[#FD5C02]">
 					<h1 className="text-xl font-semibold">{pageTitle}</h1>
 					<div className="flex items-center">
-						<NotificationSystem />
+						<NotificationSystem userId={currentUser?.uid || ""} />
 						{brandProfile && (
 							<BrandProfileDropdown
 								brandProfile={brandProfile}
