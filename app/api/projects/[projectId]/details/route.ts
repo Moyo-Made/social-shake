@@ -3,14 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/config/firebase-admin";
 import * as admin from "firebase-admin";
 
-
 // GET handler - Fetch individual project details
 export async function GET(
   request: NextRequest,
   { params }: any
 ) {
   try {
-    const { projectId } = params;
+    // FIXED: Await params before destructuring
+    const { projectId } = await params;
 
     if (!projectId) {
       return NextResponse.json(
@@ -123,7 +123,8 @@ export async function PUT(
   { params }: any
 ) {
   try {
-    const { projectId } = params;
+    // FIXED: Await params before destructuring
+    const { projectId } = await params;
     const requestData = await request.json();
     const { userId, ...updateData } = requestData;
 
@@ -205,7 +206,8 @@ export async function DELETE(
   { params }: any
 ) {
   try {
-    const { projectId } = params;
+    // FIXED: Await params before destructuring
+    const { projectId } = await params;
     const url = new URL(request.url);
     const userId = url.searchParams.get("userId");
 
@@ -307,7 +309,8 @@ export async function PATCH(
   { params }: any
 ) {
   try {
-    const { projectId } = params;
+    // FIXED: Await params before destructuring
+    const { projectId } = await params;
     const requestData = await request.json();
     const { userId, action, ...patchData } = requestData;
 

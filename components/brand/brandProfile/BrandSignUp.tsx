@@ -67,7 +67,7 @@ const BusinessSignup = () => {
 			date: "May 28, 2025",
 			rating: 5,
 			text: "The ability to curate and manage user-generated content from diverse platforms has transformed our brand strategy. Social Shake has been a game-changer in enhancing our authenticity.",
-			avatar: "/icons/sophia.svg"
+			avatar: "/icons/Hripsime.svg"
 		},
 		{
 			name: "Oliver Smith",
