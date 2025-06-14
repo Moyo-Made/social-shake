@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import UserDashboard from "@/components/brand/brandProfile/dashboard/DashboardOverview";
-import SideNavLayout from "@/components/brand/brandProfile/dashboard/SideNav";
 import { useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/brand/brandProfile/ProtectedRoute";
 
@@ -33,12 +32,11 @@ export default function DashboardPage() {
   }
 
   return (
-    <SideNavLayout>
+   
       <div className="p-6">
         <ProtectedRoute>
             <UserDashboard userId={currentUser.uid} />
         </ProtectedRoute>
       </div>
-    </SideNavLayout>
   );
 }

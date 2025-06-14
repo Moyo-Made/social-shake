@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
       // Notification for brand (project owner)
       adminDb.collection("notifications").add({
         userId: projectData?.userId,
-        message: `Great news! A creator has accepted your project invitation for "${projectData?.title || 'your project'}". They will now begin working on your content.`,
+        message: `Great news! A creator has accepted your project invitation for "${projectData?.title || projectId}". They will now begin working on your content.`,
         status: "unread",
         type: "invitation_accepted",
         createdAt: FieldValue.serverTimestamp(),

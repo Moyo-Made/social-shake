@@ -68,26 +68,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 	const updateUserDocument = async (
 		uid: string,
 		email: string,
-		isNewUser: boolean = false
+		isNewUser: boolean = false,
+		displayName?: string,
+		userType: string = "brand"
 	): Promise<void> => {
 		const userRef = doc(db, "users", uid);
-
+	
+		// Parse display name into firstName and lastName
+		let firstName = "";
+		let lastName = "";
+		
+		if (displayName) {
+			const nameParts = displayName.trim().split(" ");
+			firstName = nameParts[0] || "";
+			lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : "";
+		}
+	
+		const userData = {
+			email,
+			role: UserRole.USER,
+			userType,
+			...(firstName && { firstName }),
+			...(lastName && { lastName }),
+			updatedAt: new Date(),
+		};
+	
 		if (isNewUser) {
 			await setDoc(userRef, {
-				email,
-				role: UserRole.USER,
+				...userData,
 				createdAt: new Date(),
-				updatedAt: new Date(),
 			});
 		} else {
 			const userDoc = await getDoc(userRef);
 			if (!userDoc.exists()) {
 				await setDoc(userRef, {
-					email,
-					role: UserRole.USER,
+					...userData,
 					createdAt: new Date(),
-					updatedAt: new Date(),
 				});
+			} else {
+				// Update existing user if they don't have firstName/lastName
+				const existingData = userDoc.data();
+				const shouldUpdate = !existingData.firstName || !existingData.lastName;
+				
+				if (shouldUpdate && (firstName || lastName)) {
+					await setDoc(userRef, userData, { merge: true });
+				}
 			}
 		}
 	};
@@ -332,7 +357,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 		  const isExistingAccount = !!existingUser;
 	  
 		  if (result.user.email) {
-			await updateUserDocument(result.user.uid, result.user.email, !isExistingAccount);
+			await updateUserDocument(
+				result.user.uid, 
+				result.user.email, 
+				!isExistingAccount,
+				result.user.displayName || undefined,
+			);
 		  }
 	  
 		  clearUserCache(result.user.uid);

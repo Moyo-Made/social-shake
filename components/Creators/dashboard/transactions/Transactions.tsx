@@ -203,74 +203,9 @@ const Transactions: React.FC = () => {
 		// Only initialize when we have currentUser and confirmed Stripe connection
 		if (currentUser && stripeConnected && stripeAccountId) {
 			initializeData();
-		} else if (currentUser && stripeConnected === false) {
-			// User is logged in but Stripe is not connected
-			setLoadingError(
-				"Stripe account not connected. Please connect your Stripe account to view transactions."
-			);
-			setIsInitializing(false);
-		}
-	}, [currentUser, stripeConnected, stripeAccountId]); // Add stripeConnected and stripeAccountId as dependencies
+		} 
+	}, [currentUser, stripeConnected, stripeAccountId]);
 
-	// Update the existing useEffect to depend on stripeAccountId
-	useEffect(() => {
-		const initializeData = async () => {
-			if (!currentUser) {
-				setLoadingError("Please log in to view transactions");
-				setIsInitializing(false);
-				return;
-			}
-
-			if (!stripeAccountId) {
-				setLoadingError("Stripe account not connected");
-				setIsInitializing(false);
-				return;
-			}
-
-			setIsInitializing(true);
-
-			try {
-				await Promise.all([fetchBalanceData(), fetchTransactions()]);
-			} catch (error) {
-				console.error("Error initializing data:", error);
-				setLoadingError("Failed to load data. Please try again.");
-			} finally {
-				setIsInitializing(false);
-			}
-		};
-
-		// Only initialize when we have both currentUser and stripeAccountId
-		if (currentUser && stripeAccountId) {
-			initializeData();
-		} else if (currentUser && stripeAccountId === null) {
-			// Still loading stripeAccountId
-			setIsInitializing(true);
-		}
-	}, [currentUser, stripeAccountId]);
-
-	// Fetch transactions on component mount
-	useEffect(() => {
-		const initializeData = async () => {
-			if (!stripeAccountId) {
-				setLoadingError("Stripe account not connected");
-				setIsInitializing(false);
-				return;
-			}
-
-			setIsInitializing(true);
-
-			try {
-				await Promise.all([fetchBalanceData(), fetchTransactions()]);
-			} catch (error) {
-				console.error("Error initializing data:", error);
-				setLoadingError("Failed to load data. Please try again.");
-			} finally {
-				setIsInitializing(false);
-			}
-		};
-
-		initializeData();
-	}, [stripeAccountId]);
 
 	// Fetch balance data from Stripe
 	const fetchBalanceData = async () => {

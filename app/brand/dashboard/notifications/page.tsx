@@ -5,7 +5,6 @@ import { useAuth } from "@/context/AuthContext";
 import NotificationPreferences from "@/components/brand/settings/notification/NotificationsPreferences";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import SideNavLayout from "@/components/brand/brandProfile/dashboard/SideNav";
 
 const NotificationsPage: NextPage = () => {
 	const { currentUser, isLoading } = useAuth();
@@ -20,11 +19,9 @@ const NotificationsPage: NextPage = () => {
 
 	if (isLoading) {
 		return (
-			<SideNavLayout>
 				<div className="flex justify-center items-center h-64">
 					<p>Loading...</p>
 				</div>
-			</SideNavLayout>
 		);
 	}
 
@@ -33,11 +30,9 @@ const NotificationsPage: NextPage = () => {
 	}
 
 	return (
-		<SideNavLayout>
 			<div className="max-w-5xl mx-auto px-4 py-8">
 				<NotificationPreferences />
 			</div>
-		</SideNavLayout>
 	);
 };
 

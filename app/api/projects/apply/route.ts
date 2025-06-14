@@ -116,30 +116,39 @@ export async function POST(request: NextRequest) {
       applicantsCount: FieldValue.increment(1),
     });
 
-    // Create notification for the applicant
-    await adminDb.collection("notifications").add({
-      userId,
-      message: "Your application has been submitted for review. We'll notify you once it's approved.",
-      status: "unread",
-      type: "project_application",
-      createdAt: FieldValue.serverTimestamp(),
-      relatedTo: "project",
-      projectId,
-    });
-
-    // Create notification for the project owner
-    if (projectData?.createdBy) {
-      await adminDb.collection("notifications").add({
-        userId: projectData.createdBy,
-        message: `New application received for project: ${projectData?.title || projectId}`,
+    // Send notifications using Promise.all for better performance
+    const notificationPromises = [
+      // Notification for the applicant
+      adminDb.collection("notifications").add({
+        userId,
+        message: "Your application has been submitted for review. We'll notify you once it's approved.",
         status: "unread",
-        type: "new_application",
+        type: "project_application",
         createdAt: FieldValue.serverTimestamp(),
         relatedTo: "project",
         projectId,
         applicationId: applicationRef.id,
-      });
+      })
+    ];
+
+    // Add notification for project owner if they exist
+    if (projectData?.userId) {
+      notificationPromises.push(
+        adminDb.collection("notifications").add({
+          userId: projectData.userId,
+          message: `New application received for project: ${projectData?.title || projectId}`,
+          status: "unread",
+          type: "new_application",
+          createdAt: FieldValue.serverTimestamp(),
+          relatedTo: "project",
+          projectId,
+          applicationId: applicationRef.id,
+        })
+      );
     }
+
+    // Execute all notifications concurrently
+    await Promise.all(notificationPromises);
 
     return NextResponse.json({
       success: true,

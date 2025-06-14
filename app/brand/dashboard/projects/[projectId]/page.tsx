@@ -2,12 +2,10 @@
 
 import { useParams } from "next/navigation";
 import ProjectDetailPage from "@/components/brand/brandProjects/viewProject/ProjectDetailsPage";
-import SideNavLayout from "@/components/brand/brandProfile/dashboard/SideNav";
 
 export default function ProjectPage() {
 	const params = useParams();
 	const projectId = params.projectId as string;
-
 
 	if (!projectId) {
 		return (
@@ -17,9 +15,5 @@ export default function ProjectPage() {
 		);
 	}
 
-	return (
-		<SideNavLayout>
-			<ProjectDetailPage projectId={projectId} />
-		</SideNavLayout>
-	);
+	return <ProjectDetailPage projectId={projectId} />;
 }

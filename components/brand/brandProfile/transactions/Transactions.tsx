@@ -38,6 +38,7 @@ interface TotalTransactions {
 	totalSpend: string;
 	pendingPayments: string;
 	totalProcessed: string;
+	dataSource?: string; // Added to track if data comes from Stripe or Firestore
 }
 
 // Helper function to get type badge styling
@@ -95,6 +96,14 @@ const getStatusIcon = (status: TransactionStatus): React.ReactNode => {
 	}
 };
 
+// Interface for pagination state
+interface PaginationState {
+	currentPage: number;
+	hasMore: boolean;
+	cursor: string | null;
+	totalCount: number;
+}
+
 const Transactions: React.FC = () => {
 	const [modalOpen, setModalOpen] = useState<boolean>(false);
 	const [selectedTransaction, setSelectedTransaction] =
@@ -116,20 +125,27 @@ const Transactions: React.FC = () => {
 			totalProcessed: "0",
 		}
 	);
-	const [currentPage, setCurrentPage] = useState<number>(1);
+	
+	// Updated pagination state
+	const [pagination, setPagination] = useState<PaginationState>({
+		currentPage: 1,
+		hasMore: false,
+		cursor: null,
+		totalCount: 0,
+	});
+	
+	// Store cursor history for going back
+	const [cursorHistory, setCursorHistory] = useState<(string | null)[]>([null]);
+	
 	const [pageSize] = useState<number>(10); // Fixed at 10 items per page
-	const [hasMore, setHasMore] = useState<boolean>(false);
-	const [piCursor, setPiCursor] = useState<string | null>(null);
-	const [chargeCursor, setChargeCursor] = useState<string | null>(null);
 	const { currentUser } = useAuth();
 
 	// Whether the user has any transactions
 	const hasTransactions = transactions.length > 0;
 
 	const fetchTransactions = async (
-		page = 1,
-		piCursorParam: string | null = null,
-		chargeCursorParam: string | null = null
+		cursor: string | null = null,
+		pageNumber: number = 1
 	) => {
 		// Don't try to fetch if there's no user
 		if (!currentUser) {
@@ -141,14 +157,15 @@ const Transactions: React.FC = () => {
 			setLoading(true);
 			setError(null);
 
-			// Build the URL with pagination parameters - keeping just the user ID
-			let url = `/api/transactions?userId=${currentUser.uid}&page=${page}&pageSize=${pageSize}`;
-			if (piCursorParam) {
-				url += `&piCursor=${piCursorParam}`;
+			// Build the URL with proper parameters that match your API
+			let url = `/api/transactions?userId=${currentUser.uid}&pageSize=${pageSize}`;
+			
+			// Add cursor if provided
+			if (cursor) {
+				url += `&cursor=${encodeURIComponent(cursor)}`;
 			}
-			if (chargeCursorParam) {
-				url += `&chargeCursor=${chargeCursorParam}`;
-			}
+
+			console.log('Fetching URL:', url); // Debug log
 
 			const response = await fetch(url, {
 				method: "GET",
@@ -163,6 +180,7 @@ const Transactions: React.FC = () => {
 			}
 
 			const data = await response.json();
+			console.log('API Response:', data); // Debug log
 
 			// Update state with the fetched data
 			setTransactions(data.transactions || []);
@@ -174,16 +192,13 @@ const Transactions: React.FC = () => {
 				}
 			);
 
-			// Update pagination state
-			setCurrentPage(page);
-			setHasMore(data.pagination?.hasMore || false);
-			setPiCursor(data.pagination?.piCursor || null);
-			setChargeCursor(data.pagination?.chargeCursor || null);
-
-			// Optional: You can also store metadata about user's accounts and brands
-			// if (data.metadata) {
-			// 	setAccountMetadata(data.metadata);
-			// }
+			// Update pagination state properly
+			setPagination({
+				currentPage: pageNumber,
+				hasMore: data.pagination?.hasMore || false,
+				cursor: data.pagination?.cursor || null,
+				totalCount: data.pagination?.totalCount || 0,
+			});
 
 			setLoading(false);
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -196,25 +211,40 @@ const Transactions: React.FC = () => {
 		}
 	};
 
-	// Update the next page function
+	// Updated next page function
 	const goToNextPage = () => {
-		if (hasMore) {
-			fetchTransactions(currentPage + 1, piCursor, chargeCursor);
+		if (pagination.hasMore && pagination.cursor) {
+			// Add current cursor to history before moving forward
+			setCursorHistory(prev => [...prev, pagination.cursor]);
+			fetchTransactions(pagination.cursor, pagination.currentPage + 1);
 		}
 	};
 
+	// Updated previous page function
 	const goToPreviousPage = () => {
-		if (currentPage > 1) {
-			// Note: Going back a page is tricky without storing previous cursors
-			// A simpler approach for now is to start over and fetch up to the previous page
-			fetchTransactions(currentPage - 1);
+		if (pagination.currentPage > 1 && cursorHistory.length > 1) {
+			// Get the previous cursor from history
+			const newHistory = [...cursorHistory];
+			newHistory.pop(); // Remove current cursor
+			const previousCursor = newHistory[newHistory.length - 1];
+			
+			setCursorHistory(newHistory);
+			fetchTransactions(previousCursor, pagination.currentPage - 1);
 		}
 	};
 
+	// Reset pagination when component mounts or user changes
 	useEffect(() => {
-		// Only fetch if there's a user
 		if (currentUser) {
-			fetchTransactions();
+			// Reset pagination state
+			setPagination({
+				currentPage: 1,
+				hasMore: false,
+				cursor: null,
+				totalCount: 0,
+			});
+			setCursorHistory([null]);
+			fetchTransactions(null, 1);
 		}
 	}, [currentUser]);
 
@@ -264,7 +294,7 @@ const Transactions: React.FC = () => {
 	// Render loading state
 	if (loading) {
 		return (
-			<div className="w-full flex flex-col items-center justify-center py-12">
+			<div className="w-full flex flex-col items-center justify-center py-12 h-screen">
 				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
 				<p className="mt-4 text-gray-600">Loading transactions...</p>
 			</div>
@@ -284,7 +314,17 @@ const Transactions: React.FC = () => {
 				</div>
 				<Button
 					className="mt-4 bg-orange-500 hover:bg-orange-600 text-white"
-					onClick={() => window.location.reload()}
+					onClick={() => {
+						// Reset everything and retry
+						setPagination({
+							currentPage: 1,
+							hasMore: false,
+							cursor: null,
+							totalCount: 0,
+						});
+						setCursorHistory([null]);
+						fetchTransactions(null, 1);
+					}}
 				>
 					Try Again
 				</Button>
@@ -301,6 +341,7 @@ const Transactions: React.FC = () => {
 					<h2 className="text-2xl text-[#101828] font-semibold">
 						${hasTransactions ? totalTransactions.totalSpend : "0"}
 					</h2>
+					
 				</Card>
 
 				<Card className="py-4 px-5 flex flex-col items-center justify-center border border-[#6670854D] shadow-none">
@@ -426,7 +467,7 @@ const Transactions: React.FC = () => {
 						// We have transactions that match the filters
 						filteredTransactions.map((item, index) => (
 							<div
-								key={index}
+								key={`${item.id}-${index}`} // Better key for React
 								className="grid grid-cols-7 p-3 items-center border-t border-gray-200 text-sm text-[#101828] hover:bg-gray-50"
 							>
 								<div className="col-span-1 pl-4">{item.transactionDate}</div>
@@ -481,19 +522,24 @@ const Transactions: React.FC = () => {
 			{/* Pagination Controls - Only show if there are transactions */}
 			{hasTransactions && (
 				<div className="flex justify-between items-center mt-4 mx-10 pb-5">
-					<div className="text-sm text-gray-500">Page {currentPage}</div>
+					<div className="text-sm text-gray-500">
+						Page {pagination.currentPage}
+						{pagination.totalCount > 0 && (
+							<span> (Total: {pagination.totalCount} transactions)</span>
+						)}
+					</div>
 					<div className="flex gap-2">
 						<Button
 							onClick={goToPreviousPage}
-							disabled={currentPage <= 1}
-							className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+							disabled={pagination.currentPage <= 1}
+							className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
 						>
 							Previous
 						</Button>
 						<Button
 							onClick={goToNextPage}
-							disabled={!hasMore}
-							className="bg-orange-500 hover:bg-orange-600 text-white"
+							disabled={!pagination.hasMore}
+							className="bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50"
 						>
 							Next
 						</Button>

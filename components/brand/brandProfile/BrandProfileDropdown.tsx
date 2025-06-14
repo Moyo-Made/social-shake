@@ -117,8 +117,8 @@ const BrandProfileDropdown: React.FC<BrandProfileDropdownProps> = ({
 								src={brandProfile.logoUrl}
 								alt={brandProfile.brandName || "Brand Logo"}
 								className="object-cover w-full h-full"
-								width={40}
-								height={40}
+								width={32}
+								height={32}
 								style={{ objectFit: "cover" }}
 							/>
 						) : (

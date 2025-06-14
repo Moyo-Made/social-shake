@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import Stripe from 'stripe';
 
 // Initialize Firebase Admin if not already initialized
 if (!getApps().length) {
@@ -13,14 +14,17 @@ if (!getApps().length) {
   });
 }
 
-// Initialize Firestore
+// Initialize Firestore and Stripe
 const db = getFirestore();
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2025-03-31.basil",
+});
 
 // Set the default page size
 const DEFAULT_PAGE_SIZE = 10;
 
 /**
- * GET handler for fetching transactions with pagination directly from Firestore
+ * GET handler for fetching transactions with pagination and accurate Stripe totals
  */
 export async function GET(request: NextRequest) {
   try {
@@ -67,16 +71,10 @@ export async function GET(request: NextRequest) {
     const cursor = url.searchParams.get("cursor");
     if (cursor) {
       try {
-        // The cursor should be a serialized object containing the timestamp and docId
-        const cursorData = JSON.parse(Buffer.from(cursor, 'base64').toString('utf-8'));
-        
-        // Get a reference to the document at the cursor position
-        if (cursorData.timestamp && cursorData.docId) {
-          const cursorTimestamp = new Date(cursorData.timestamp);
-          
-          // Find documents with timestamps equal to or older than the cursor
-          query = query
-            .startAfter(cursorTimestamp, cursorData.docId);
+        const docId = Buffer.from(cursor, 'base64').toString('utf-8');
+        const cursorDoc = await db.collection("payments").doc(docId).get();
+        if (cursorDoc.exists) {
+          query = query.startAfter(cursorDoc);
         }
       } catch (error) {
         console.error("Invalid cursor format:", error);
@@ -135,16 +133,11 @@ export async function GET(request: NextRequest) {
     // Create the next cursor
     let nextCursor = null;
     if (hasMore && lastDoc) {
-      const lastDocData = lastDoc.data();
-      const cursorData = {
-        timestamp: lastDocData.createdAt,
-        docId: lastDoc.id
-      };
-      nextCursor = Buffer.from(JSON.stringify(cursorData)).toString('base64');
+      // Just use the document ID as cursor
+      nextCursor = Buffer.from(lastDoc.id).toString('base64');
     }
     
     // Get total count in a separate query for pagination metadata
-    // Note: This is optional and can be removed if performance is a concern
     const countQuery = await db.collection("payments")
       .where("userId", "==", userId)
       .count()
@@ -152,13 +145,13 @@ export async function GET(request: NextRequest) {
     
     const totalCount = countQuery.data().count;
     
-    // Calculate transaction totals
-    const totals = calculateTransactionTotals(transactions);
+    // Calculate accurate totals from Stripe
+    const stripeTotals = await calculateStripeBasedTotals(userId, transactions);
     
     // Return the formatted response
     return NextResponse.json({
       transactions,
-      totals,
+      totals: stripeTotals,
       pagination: {
         pageSize,
         hasMore,
@@ -177,6 +170,168 @@ export async function GET(request: NextRequest) {
       { status: error.message.includes("Unauthorized") ? 401 : 500 }
     );
   }
+}
+
+/**
+ * Calculate accurate transaction totals using Stripe data
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function calculateStripeBasedTotals(userId: string, transactions: any[]) {
+  try {
+    // Get user data to find Stripe customer ID
+    const userDoc = await db.collection("users").doc(userId).get();
+    const userData = userDoc.data();
+    const stripeCustomerId = userData?.stripeCustomerId;
+
+    let totalSpendFromStripe = 0;
+    let pendingPaymentsFromStripe = 0;
+    let totalProcessedFromStripe = 0;
+    let allStripePayments: Stripe.PaymentIntent[] = [];
+
+    if (stripeCustomerId) {
+      try {
+        // Fetch all payment intents for this customer
+        const paymentIntentsResponse = await stripe.paymentIntents.list({
+          customer: stripeCustomerId,
+          limit: 100, // Adjust as needed
+        });
+
+        allStripePayments = paymentIntentsResponse.data;
+
+        // Calculate totals based on Stripe payment status
+        allStripePayments.forEach(pi => {
+          const amount = pi.amount / 100; // Convert from cents
+          
+          if (pi.status === 'succeeded') {
+            totalProcessedFromStripe += amount;
+            totalSpendFromStripe += amount;
+          } else if (pi.status === 'processing' || pi.status === 'requires_action' || pi.status === 'requires_confirmation') {
+            pendingPaymentsFromStripe += amount;
+          }
+          // Note: cancelled, requires_payment_method, etc. are not counted
+        });
+
+      } catch (stripeError) {
+        console.error("Stripe API Error:", stripeError);
+        // Fall back to Firestore calculation if Stripe fails
+        return calculateFirestoreBasedTotals(transactions);
+      }
+    } else {
+      // Try alternative methods if no Stripe customer ID
+      try {
+        // Option 1: Search by metadata
+        const paymentIntentsResponse = await stripe.paymentIntents.list({
+          limit: 100,
+        });
+        
+        const userPayments = paymentIntentsResponse.data.filter(pi => 
+          pi.metadata?.userId === userId || pi.metadata?.user_id === userId
+        );
+        
+        if (userPayments.length > 0) {
+          userPayments.forEach(pi => {
+            const amount = pi.amount / 100;
+            
+            if (pi.status === 'succeeded') {
+              totalProcessedFromStripe += amount;
+              totalSpendFromStripe += amount;
+            } else if (pi.status === 'processing' || pi.status === 'requires_action' || pi.status === 'requires_confirmation') {
+              pendingPaymentsFromStripe += amount;
+            }
+          });
+        } else if (userData?.email) {
+          // Option 2: Search by email
+          const customers = await stripe.customers.list({
+            email: userData.email,
+            limit: 10,
+          });
+          
+          if (customers.data.length > 0) {
+            const customer = customers.data[0];
+            const customerPayments = await stripe.paymentIntents.list({
+              customer: customer.id,
+              limit: 100,
+            });
+            
+            customerPayments.data.forEach(pi => {
+              const amount = pi.amount / 100;
+              
+              if (pi.status === 'succeeded') {
+                totalProcessedFromStripe += amount;
+                totalSpendFromStripe += amount;
+              } else if (pi.status === 'processing' || pi.status === 'requires_action' || pi.status === 'requires_confirmation') {
+                pendingPaymentsFromStripe += amount;
+              }
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Alternative Stripe search failed:", error);
+        // Fall back to Firestore calculation
+        return calculateFirestoreBasedTotals(transactions);
+      }
+    }
+
+    // If we couldn't get any Stripe data, fall back to Firestore
+    if (totalSpendFromStripe === 0 && pendingPaymentsFromStripe === 0) {
+      return calculateFirestoreBasedTotals(transactions);
+    }
+
+    // Format and return Stripe-based totals
+    return {
+      totalSpend: totalSpendFromStripe.toLocaleString(),
+      pendingPayments: pendingPaymentsFromStripe.toLocaleString(),
+      totalProcessed: totalProcessedFromStripe.toLocaleString(),
+      dataSource: 'stripe', // Indicate source of data
+      stripePaymentsCount: allStripePayments.length,
+    };
+
+  } catch (error) {
+    console.error("Error calculating Stripe totals:", error);
+    // Fall back to Firestore calculation
+    return calculateFirestoreBasedTotals(transactions);
+  }
+}
+
+/**
+ * Fallback: Calculate transaction totals from Firestore data
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function calculateFirestoreBasedTotals(transactions: any[]) {
+  // Initialize totals
+  let totalSpend = 0;
+  let pendingPayments = 0;
+  let totalProcessed = 0;
+
+  // Calculate totals
+  transactions.forEach((transaction) => {
+    try {
+      // Parse the amount (remove commas and convert to number)
+      const amount = parseFloat(transaction.amount.replace(/,/g, ""));
+
+      if (!isNaN(amount)) {
+        // Add to appropriate total based on status
+        if (transaction.status === "Pending") {
+          pendingPayments += amount;
+        } else if (transaction.status === "Processed") {
+          totalProcessed += amount;
+          totalSpend += amount; // Add processed to total spend
+        }
+        // Note: Refunded amounts don't contribute to totals
+      }
+    } catch (error) {
+      console.error("Error calculating transaction total:", error);
+      // Skip this transaction in the total calculation
+    }
+  });
+
+  // Format totals
+  return {
+    totalSpend: totalSpend.toLocaleString(),
+    pendingPayments: pendingPayments.toLocaleString(),
+    totalProcessed: totalProcessed.toLocaleString(),
+    dataSource: 'firestore', // Indicate source of data
+  };
 }
 
 /**
@@ -283,44 +438,4 @@ function formatTransaction(id: string, payment: any) {
       error: "Error formatting transaction"
     };
   }
-}
-
-/**
- * Calculate transaction totals
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function calculateTransactionTotals(transactions: any[]) {
-  // Initialize totals
-  let totalSpend = 0;
-  let pendingPayments = 0;
-  let totalProcessed = 0;
-
-  // Calculate totals
-  transactions.forEach((transaction) => {
-    try {
-      // Parse the amount (remove commas and convert to number)
-      const amount = parseFloat(transaction.amount.replace(/,/g, ""));
-
-      if (!isNaN(amount)) {
-        // Add to appropriate total based on status
-        if (transaction.status === "Pending") {
-          pendingPayments += amount;
-        } else if (transaction.status === "Processed") {
-          totalProcessed += amount;
-          totalSpend += amount; // Add processed to total spend
-        }
-        // Note: Refunded amounts don't contribute to totals
-      }
-    } catch (error) {
-      console.error("Error calculating transaction total:", error);
-      // Skip this transaction in the total calculation
-    }
-  });
-
-  // Format totals
-  return {
-    totalSpend: totalSpend.toLocaleString(),
-    pendingPayments: pendingPayments.toLocaleString(),
-    totalProcessed: totalProcessed.toLocaleString(),
-  };
 }
