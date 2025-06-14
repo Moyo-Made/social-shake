@@ -119,7 +119,8 @@ const Transactions: React.FC = () => {
 	const [searchTerm, setSearchTerm] = useState<string>("");
 	const [typeFilter, setTypeFilter] = useState<string>("");
 	const [statusFilter, setStatusFilter] = useState<string>("");
-	const [date, setDate] = useState<Date | undefined>(new Date());
+	const [date, setDate] = useState<Date | undefined>(undefined); // Changed: Start with no date filter
+	const [dateFilterEnabled, setDateFilterEnabled] = useState<boolean>(false); // New: Track if date filter is active
 
 	// Loading states
 	const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -231,7 +232,7 @@ const Transactions: React.FC = () => {
 		}
 	};
 
-	// Fetch transactions from Stripe
+	// Fixed: Fetch transactions from Stripe
 	const fetchTransactions = async (resetList = true) => {
 		if (!stripeAccountId) return;
 
@@ -251,8 +252,8 @@ const Transactions: React.FC = () => {
 				url += `&type=${typeFilter}`;
 			}
 
-			// Add date filter
-			if (date) {
+			// FIXED: Only add date filter if it's explicitly enabled and date is selected
+			if (dateFilterEnabled && date) {
 				const timestamp = Math.floor(date.getTime() / 1000);
 				url += `&created=${timestamp}`;
 			}
@@ -282,33 +283,47 @@ const Transactions: React.FC = () => {
 	};
 
 	// Fetch transaction details from Stripe
-	const fetchTransactionDetails = async (transactionId: string) => {
-		if (!stripeAccountId) return null;
+	// const fetchTransactionDetails = async (transactionId: string) => {
+	// 	if (!stripeAccountId) return null;
 
-		try {
-			const response = await fetch(
-				`/api/stripe/transactions/${transactionId}?accountId=${stripeAccountId}`
-			);
+	// 	try {
+	// 		const response = await fetch(
+	// 			`/api/stripe/transactions/${transactionId}?accountId=${stripeAccountId}`
+	// 		);
 
-			if (!response.ok) {
-				throw new Error("Failed to fetch transaction details");
-			}
+	// 		if (!response.ok) {
+	// 			throw new Error("Failed to fetch transaction details");
+	// 		}
 
-			const data = await response.json();
-			return data.transaction;
-		} catch (error) {
-			console.error("Error fetching transaction details:", error);
-			toast("Failed to load transaction details");
-			return null;
-		}
-	};
+	// 		const data = await response.json();
+	// 		return data.transaction;
+	// 	} catch (error) {
+	// 		console.error("Error fetching transaction details:", error);
+	// 		toast("Failed to load transaction details");
+	// 		return null;
+	// 	}
+	// };
 
-	// Refresh data when filters change
+	// FIXED: Refresh data when filters change (but not when date changes unless explicitly enabled)
 	useEffect(() => {
 		if (!isInitializing && stripeAccountId) {
 			fetchTransactions();
 		}
-	}, [typeFilter, date]);
+	}, [typeFilter, dateFilterEnabled, date]); // Added dateFilterEnabled dependency
+
+	// FIXED: Handle date selection
+	const handleDateSelect = (selectedDate: Date | undefined) => {
+		setDate(selectedDate);
+		if (selectedDate) {
+			setDateFilterEnabled(true);
+		}
+	};
+
+	// FIXED: Clear date filter
+	const clearDateFilter = () => {
+		setDate(undefined);
+		setDateFilterEnabled(false);
+	};
 
 	const handleExportReport = () => {
 		// Generate the PDF with the current filtered transactions
@@ -319,22 +334,22 @@ const Transactions: React.FC = () => {
 		});
 	};
 
-	const handleViewTransaction = async (
-		transaction: Transaction
-	): Promise<void> => {
-		setSelectedTransaction(transaction);
+	// const handleViewTransaction = async (
+	// 	transaction: Transaction
+	// ): Promise<void> => {
+	// 	setSelectedTransaction(transaction);
 
-		// Get full transaction details from Stripe
-		const details = await fetchTransactionDetails(transaction.id);
-		setTransactionDetails(details);
+	// 	// Get full transaction details from Stripe
+	// 	const details = await fetchTransactionDetails(transaction.id);
+	// 	setTransactionDetails(details);
 
-		// Show different modals based on transaction status
-		if (transaction.status === "Withdrawn") {
-			setWithdrawalDetailsModalOpen(true);
-		} else {
-			setTransactionModalOpen(true);
-		}
-	};
+	// 	// Show different modals based on transaction status
+	// 	if (transaction.status === "Withdrawn") {
+	// 		setWithdrawalDetailsModalOpen(true);
+	// 	} else {
+	// 		setTransactionModalOpen(true);
+	// 	}
+	// };
 
 	// Handle initiating withdrawal
 	const handleWithdraw = () => {
@@ -456,25 +471,48 @@ const Transactions: React.FC = () => {
 		<div className="px-4 w-[70rem] mx-auto font-satoshi pt-10">
 			{/* Header with Month Filter and Export/Settings buttons */}
 			<div className="flex justify-between items-center mb-6">
-				<Popover>
-					<PopoverTrigger asChild>
+				<div className="flex items-center gap-2">
+					<Popover>
+						<PopoverTrigger asChild>
+							<Button
+								variant="outline"
+								className="flex items-center gap-2 border-gray-300"
+							>
+								<CalendarIcon className="h-4 w-4" />
+								<span>
+									{dateFilterEnabled && date 
+										? date.toLocaleDateString("en-US", {
+												year: "numeric",
+												month: "short",
+												day: "numeric",
+											})
+										: "Filter by Date"
+									}
+								</span>
+							</Button>
+						</PopoverTrigger>
+						<PopoverContent className="w-auto p-0">
+							<Calendar
+								mode="single"
+								selected={date}
+								onSelect={handleDateSelect}
+								className="rounded-md border bg-white"
+							/>
+						</PopoverContent>
+					</Popover>
+					
+					{/* FIXED: Add clear date filter button */}
+					{dateFilterEnabled && (
 						<Button
 							variant="outline"
-							className="flex items-center gap-2 border-gray-300"
+							size="sm"
+							onClick={clearDateFilter}
+							className="text-gray-500 hover:text-gray-700"
 						>
-							<CalendarIcon className="h-4 w-4" />
-							<span>This Month</span>
+							Clear Date Filter
 						</Button>
-					</PopoverTrigger>
-					<PopoverContent className="w-auto p-0">
-						<Calendar
-							mode="single"
-							selected={date}
-							onSelect={setDate}
-							className="rounded-md border bg-white"
-						/>
-					</PopoverContent>
-				</Popover>
+					)}
+				</div>
 
 				<div className="flex gap-3">
 					<Button
@@ -613,16 +651,17 @@ const Transactions: React.FC = () => {
 				) : filteredTransactions.length === 0 ? (
 					<div className="flex flex-col items-center justify-center py-10">
 						<p className="text-gray-500 mb-2">No transactions found</p>
-						{(searchTerm || typeFilter || statusFilter) && (
+						{(searchTerm || typeFilter || statusFilter || dateFilterEnabled) && (
 							<Button
 								variant="outline"
 								onClick={() => {
 									setSearchTerm("");
 									setTypeFilter("");
 									setStatusFilter("");
+									clearDateFilter();
 								}}
 							>
-								Clear Filters
+								Clear All Filters
 							</Button>
 						)}
 					</div>
@@ -637,7 +676,7 @@ const Transactions: React.FC = () => {
 									<th className="px-6 py-3 text-left font-medium">Date</th>
 									<th className="px-6 py-3 text-left font-medium">Status</th>
 									<th className="px-6 py-3 text-left font-medium">Amount</th>
-									<th className="px-6 py-3 text-right font-medium">Action</th>
+									
 								</tr>
 							</thead>
 							<tbody className="divide-y">
@@ -667,7 +706,7 @@ const Transactions: React.FC = () => {
 										<td className="px-6 py-4 font-medium">
 											{transaction.amount}
 										</td>
-										<td className="px-6 py-4 text-right">
+										{/* <td className="px-6 py-4 text-right">
 											<Button
 												variant="ghost"
 												className="text-gray-600 hover:text-gray-900"
@@ -675,7 +714,7 @@ const Transactions: React.FC = () => {
 											>
 												View
 											</Button>
-										</td>
+										</td> */}
 									</tr>
 								))}
 							</tbody>

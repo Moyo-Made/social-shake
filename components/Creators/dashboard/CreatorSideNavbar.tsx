@@ -8,7 +8,6 @@ import {
 	ChevronDown,
 	ChevronRight,
 	VideoIcon,
-	WandIcon,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import CreatorProfileDropdown from "../CreatorProfileDropdown";
@@ -250,11 +249,11 @@ const SideNav: React.FC = () => {
 						text="Transactions"
 					/>
 
-					<MenuItem
+					{/* <MenuItem
 						href="/creator/dashboard/ai-actor"
 						icon={<WandIcon />}
 						text="AI Actor"
-					/>
+					/> */}
 				</div>
 			</nav>
 
