@@ -99,6 +99,19 @@ const ChatPage = () => {
 		return () => document.removeEventListener("mousedown", handleClickOutside);
 	}, []);
 
+	useEffect(() => {
+		const refreshParam = searchParams.get("refresh");
+		if (refreshParam && conversationIdFromUrl) {
+			// This indicates a new conversation was just created
+			refreshConversations();
+
+			// Clean up the URL by removing the refresh parameter
+			const newUrl = new URL(window.location.href);
+			newUrl.searchParams.delete("refresh");
+			router.replace(newUrl.pathname + newUrl.search, { scroll: false });
+		}
+	}, [searchParams, conversationIdFromUrl, refreshConversations, router]);
+
 	// Filter users based on search query
 	const filteredUsers = users.filter((user) => {
 		if (!searchQuery.trim()) return true;
@@ -106,18 +119,41 @@ const ChatPage = () => {
 		const searchTermLower = searchQuery.toLowerCase();
 		return (
 			user.name.toLowerCase().includes(searchTermLower) ||
-			(user.username && user.username.toLowerCase().includes(searchTermLower)) ||
+			(user.username &&
+				user.username.toLowerCase().includes(searchTermLower)) ||
 			(user.creator && user.creator.toLowerCase().includes(searchTermLower)) ||
-			(user.lastMessage && user.lastMessage.toLowerCase().includes(searchTermLower))
+			(user.lastMessage &&
+				user.lastMessage.toLowerCase().includes(searchTermLower))
 		);
 	});
 
 	// Set conversation from URL on mount
 	useEffect(() => {
-		if (conversationIdFromUrl && conversationIdFromUrl !== selectedConversation) {
-			setSelectedConversation(conversationIdFromUrl);
+		if (
+			conversationIdFromUrl &&
+			conversationIdFromUrl !== selectedConversation
+		) {
+			// Check if this conversation exists in our current list
+			const conversationExists = users.some(
+				(user) => user.conversationId === conversationIdFromUrl
+			);
+
+			if (!conversationExists) {
+				// This might be a new conversation, refresh the list first
+				refreshConversations().then(() => {
+					setSelectedConversation(conversationIdFromUrl);
+				});
+			} else {
+				setSelectedConversation(conversationIdFromUrl);
+			}
 		}
-	}, [conversationIdFromUrl, selectedConversation, setSelectedConversation]);
+	}, [
+		conversationIdFromUrl,
+		selectedConversation,
+		setSelectedConversation,
+		users,
+		refreshConversations,
+	]);
 
 	// Fetch total unread count
 	const fetchTotalUnreadCount = async () => {
@@ -269,7 +305,8 @@ const ChatPage = () => {
 	}, [messages]);
 
 	// Find selected user for header display
-	const selectedUser = users.find((u) => u.conversationId === selectedConversation) || null;
+	const selectedUser =
+		users.find((u) => u.conversationId === selectedConversation) || null;
 
 	// Handle sending a new message
 	const handleSendMessage = async () => {
@@ -308,12 +345,12 @@ const ChatPage = () => {
 	const handleConversationSelect = (conversationId: string) => {
 		handleSelectConversation(conversationId);
 		markMessagesAsReadSocket(conversationId);
-		
+
 		// Update URL
 		router.push(`/brand/dashboard/messages?conversation=${conversationId}`, {
 			scroll: false,
 		});
-		
+
 		// Close sidebar on mobile
 		if (window.innerWidth < 768) {
 			setShowSidebar(false);
@@ -511,7 +548,7 @@ const ChatPage = () => {
 			<div className="flex-1 flex flex-col h-full min-w-0 relative">
 				{/* Chat header - fixed height */}
 				{selectedUser ? (
-					<div className="py-2 sm:py-3 px-3 sm:px-4 border-b flex items-center flex-shrink-0 bg-white shadow-sm z-30">
+					<div className="py-2 sm:py-3 px-3 sm:px-4 border-b flex items-center flex-shrink-0 bg-white shadow-sm">
 						{/* Mobile menu button */}
 						<button
 							onClick={() => setShowSidebar(true)}
@@ -570,7 +607,7 @@ const ChatPage = () => {
 						</div>
 					</div>
 				) : (
-					<div className="py-2 sm:py-3 px-3 sm:px-4 border-b flex-shrink-0 bg-white shadow-sm flex items-center z-30">
+					<div className="py-2 sm:py-3 px-3 sm:px-4 border-b flex-shrink-0 bg-white shadow-sm flex items-center z-10">
 						{/* Mobile menu button */}
 						<button
 							onClick={() => setShowSidebar(true)}
@@ -578,7 +615,7 @@ const ChatPage = () => {
 						>
 							<Menu className="h-4 w-4 sm:h-5 sm:w-5" />
 						</button>
-						<p className="text-sm sm:text-base md:text-lg font-medium text-gray-900">
+						<p className="text-sm md:text-base font-medium text-gray-900">
 							Select a conversation
 						</p>
 					</div>

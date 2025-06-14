@@ -321,16 +321,15 @@ const CreatorMarketplace = () => {
 	const handleBackToList = (): void => {
 		setSelectedCreator(null);
 	};
-
 	const handleSendMessage = async (creator: Creators) => {
 		if (!currentUser) {
 			alert("You need to be logged in to send messages");
 			return;
 		}
-
+	
 		try {
 			// Show loading indicator or disable button here if needed
-
+	
 			const response = await fetch("/api/createConversation", {
 				method: "POST",
 				headers: {
@@ -351,16 +350,18 @@ const CreatorMarketplace = () => {
 					},
 				}),
 			});
-
+	
 			const data = await response.json();
-
+	
 			if (!response.ok) {
 				throw new Error(data.error || "Failed to create conversation");
 			}
-
+	
 			// Navigate to chat page with this conversation
+			// Add a timestamp or random param to force a fresh load
+			const timestamp = Date.now();
 			router.push(
-				`/brand/dashboard/messages?conversation=${data.conversationId}`
+				`/brand/dashboard/messages?conversation=${data.conversationId}&refresh=${timestamp}`
 			);
 		} catch (error) {
 			console.error("Error creating conversation:", error);

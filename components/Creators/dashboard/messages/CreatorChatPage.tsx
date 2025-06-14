@@ -109,18 +109,24 @@ const CreatorChatPage = () => {
 		return () => document.removeEventListener("mousedown", handleClickOutside);
 	}, []);
 
-useEffect(() => {
-	// Check if we have brand profiles loaded for the users we're displaying
-	if (users.length > 0 && Object.keys(brandProfiles).length > 0) {
-	  // Check if at least some users have their brand profiles loaded
-	  const hasProfiles = users.some(user => 
-		brandProfiles[user.id] || user.avatar
-	  );
-	  if (hasProfiles) {
-		setBrandProfilesLoaded(true);
-	  }
-	}
-  }, [users, brandProfiles]);
+	useEffect(() => {
+		// If no users, consider profiles "loaded" since there's nothing to load
+		if (users.length === 0) {
+			setBrandProfilesLoaded(true);
+			return;
+		}
+
+		// Check if we have brand profiles loaded for the users we're displaying
+		if (Object.keys(brandProfiles).length > 0) {
+			// Check if at least some users have their brand profiles loaded
+			const hasProfiles = users.some(
+				(user) => brandProfiles[user.id] || user.avatar
+			);
+			if (hasProfiles) {
+				setBrandProfilesLoaded(true);
+			}
+		}
+	}, [users, brandProfiles]);
 
 	const handleSortChange = (option: "Newest" | "Oldest") => {
 		setSortOption(option);
@@ -608,7 +614,7 @@ useEffect(() => {
 
 				{/* User list */}
 				<ScrollArea className="flex-1">
-				{loading || !brandProfilesLoaded ? (
+					{loading || !brandProfilesLoaded ? (
 						<div className="space-y-1">
 							{[1, 2, 3, 4, 5].map((i) => (
 								<div key={i} className="flex items-center p-3 sm:p-4">
@@ -724,7 +730,7 @@ useEffect(() => {
 			<div className="flex-1 flex flex-col min-w-0">
 				{/* Chat header */}
 				{selectedUser ? (
-					<div className="py-3 px-3 sm:px-4 border-b flex justify-between items-center bg-white relative z-10">
+					<div className="py-3 px-3 sm:px-4 border-b flex justify-between items-center bg-white relative">
 						<div className="flex items-center min-w-0">
 							{/* Mobile menu button */}
 							<button
@@ -807,7 +813,7 @@ useEffect(() => {
 						</div>
 					</div>
 				) : (
-					<div className="py-3 px-3 sm:px-4 border-b bg-white relative z-10">
+					<div className="py-3 px-3 sm:px-4 border-b bg-white relative ">
 						<div className="flex items-center">
 							{/* Mobile menu button */}
 							<button

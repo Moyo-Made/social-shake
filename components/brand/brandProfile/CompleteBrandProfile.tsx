@@ -17,6 +17,7 @@ import { Button } from "../../ui/button";
 import { FaArrowRight } from "react-icons/fa6";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { categories } from "@/types/categories";
 
 interface BrandProfileData {
 	brandName: string;
@@ -38,10 +39,10 @@ interface BrandProfileData {
 }
 
 interface UserSignupData {
-  email: string;
-  userId: string;
-  firstName: string;
-  lastName: string;
+	email: string;
+	userId: string;
+	firstName: string;
+	lastName: string;
 }
 
 interface ValidationErrors {
@@ -95,32 +96,32 @@ const BrandProfileForm = () => {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [formData]);
 
-  // Fetch user data from session storage
-  useEffect(() => {
-    // Get user data from session storage
-    const userDataString = sessionStorage.getItem("userSignupData");
-    if (userDataString) {
-      try {
-        const userData = JSON.parse(userDataString);
-        // Set it to your form state or component state
-        setUserData(userData);
-        
-        // Pre-fill form fields if needed
-        setFormData(prev => ({
-          ...prev,
-          email: userData.email,
-          // Other fields you want to pre-fill
-          userId: userData.userId || currentUser?.uid,
-        }));
-      } catch (err) {
-        console.error("Error parsing user data:", err);
-        // Handle error, maybe redirect back to signup
-      }
-    } else {
-      // No user data found, redirect back to signup
-      router.push("/brand/signup");
-    }
-  }, [currentUser, router]);
+	// Fetch user data from session storage
+	useEffect(() => {
+		// Get user data from session storage
+		const userDataString = sessionStorage.getItem("userSignupData");
+		if (userDataString) {
+			try {
+				const userData = JSON.parse(userDataString);
+				// Set it to your form state or component state
+				setUserData(userData);
+
+				// Pre-fill form fields if needed
+				setFormData((prev) => ({
+					...prev,
+					email: userData.email,
+					// Other fields you want to pre-fill
+					userId: userData.userId || currentUser?.uid,
+				}));
+			} catch (err) {
+				console.error("Error parsing user data:", err);
+				// Handle error, maybe redirect back to signup
+			}
+		} else {
+			// No user data found, redirect back to signup
+			router.push("/brand/signup");
+		}
+	}, [currentUser, router]);
 
 	const validateForm = () => {
 		const errors: ValidationErrors = {};
@@ -312,7 +313,7 @@ const BrandProfileForm = () => {
 			formDataToSubmit.append("userId", userData.userId);
 			formDataToSubmit.append("firstName", userData.firstName);
 			formDataToSubmit.append("lastName", userData.lastName);
-			
+
 			// Add all form fields except logo and socialMedia
 			Object.entries(formData).forEach(([key, value]) => {
 				if (
@@ -518,11 +519,11 @@ const BrandProfileForm = () => {
 									<SelectValue placeholder="Select Industry" />
 								</SelectTrigger>
 								<SelectContent className="bg-[#f7f7f7]">
-									<SelectItem value="tech">Technology</SelectItem>
-									<SelectItem value="retail">Retail</SelectItem>
-									<SelectItem value="food">Food & Beverage</SelectItem>
-									<SelectItem value="fashion">Fashion</SelectItem>
-									<SelectItem value="health">Health & Wellness</SelectItem>
+									{categories.map((category) => (
+										<SelectItem key={category.value} value={category.value}>
+											{category.label}
+										</SelectItem>
+									))}
 								</SelectContent>
 							</Select>
 							<ErrorMessage name="industry" />

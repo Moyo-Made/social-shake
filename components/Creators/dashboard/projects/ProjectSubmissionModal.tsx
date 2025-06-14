@@ -34,6 +34,37 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 		file?: string;
 	}>({});
 
+	// Expanded video format support
+	const SUPPORTED_VIDEO_TYPES = [
+		'video/mp4',
+		'video/webm',
+		'video/quicktime',
+		'video/x-msvideo',
+		'video/mpeg',
+		'video/ogg',
+		'video/3gpp',
+		'video/x-ms-wmv',
+		'video/x-flv',
+		'video/mp2t',
+		'video/x-matroska'
+	];
+
+	const SUPPORTED_VIDEO_EXTENSIONS = [
+		'.mp4',
+		'.webm',
+		'.mov',
+		'.avi',
+		'.mpeg',
+		'.mpg',
+		'.ogg',
+		'.3gp',
+		'.wmv',
+		'.flv',
+		'.mkv',
+		'.m4v',
+		'.ts'
+	];
+
 	useEffect(() => {
 		// Clean up object URLs when component unmounts or when file changes
 		return () => {
@@ -53,12 +84,17 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 			// Clear previous errors
 			setErrors({ ...errors, file: undefined });
 
-			// Validate file type
-			const validTypes = ["video/mp4", "video/quicktime", "video/webm"];
-			if (!validTypes.includes(file.type)) {
+			// Get file extension
+			const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+			
+			// Validate file type - check both MIME type and extension
+			const isValidMimeType = SUPPORTED_VIDEO_TYPES.includes(file.type);
+			const isValidExtension = SUPPORTED_VIDEO_EXTENSIONS.includes(fileExtension);
+			
+			if (!isValidMimeType && !isValidExtension) {
 				setErrors({
 					...errors,
-					file: "Please upload a valid video file (MP4, QuickTime, WebM)",
+					file: `Unsupported video format. Supported formats: ${SUPPORTED_VIDEO_EXTENSIONS.join(', ')}`,
 				});
 				return;
 			}
@@ -143,10 +179,27 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 				body: formData,
 			});
 
-			const data = await response.json();
+			// Better error handling for non-JSON responses
+			let data;
+			const contentType = response.headers.get("content-type");
+			
+			if (contentType && contentType.includes("application/json")) {
+				data = await response.json();
+			} else {
+				// Handle non-JSON responses (like HTML error pages)
+				const textResponse = await response.text();
+				console.error("Non-JSON response:", textResponse);
+				
+				if (!response.ok) {
+					throw new Error(`Server error: ${response.status} ${response.statusText}`);
+				}
+				
+				// If response is OK but not JSON, treat as success
+				data = { success: true, message: "Upload completed successfully" };
+			}
 
 			if (!response.ok) {
-				throw new Error(data.error || "Failed to submit project entry");
+				throw new Error(data?.error || `Server error: ${response.status} ${response.statusText}`);
 			}
 
 			// If provided, call onSubmitSuccess with the new submission count
@@ -161,7 +214,23 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 
 		} catch (error) {
 			console.error("Error submitting project entry:", error);
-			toast.error(error instanceof Error ? error.message : "Failed to submit project entry. Please try again.");
+			
+			// More specific error messages
+			let errorMessage = "Failed to submit project entry. Please try again.";
+			
+			if (error instanceof Error) {
+				if (error.message.includes("Failed to fetch")) {
+					errorMessage = "Network error. Please check your connection and try again.";
+				} else if (error.message.includes("Server error: 413")) {
+					errorMessage = "File too large for server. Please try a smaller file.";
+				} else if (error.message.includes("Server error: 415")) {
+					errorMessage = "Unsupported file format. Please try a different video format.";
+				} else {
+					errorMessage = error.message;
+				}
+			}
+			
+			toast.error(errorMessage);
 		} finally {
 			setIsSubmitting(false);
 		}
@@ -203,7 +272,6 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 	};
 
 	if (!isOpen) return null;
-
 
 	// If showing success modal, render it on top of the project modal
 	if (showSuccessModal) {
@@ -273,7 +341,7 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 									type="file"
 									onChange={handleFileChange}
 									className="hidden"
-									accept=".mp4,.mov,.webm,video/mp4,video/quicktime,video/webm"
+									accept={SUPPORTED_VIDEO_EXTENSIONS.join(',')}
 								/>
 
 								{filePreviewUrl && fileToUpload?.type.includes("video") ? (
@@ -303,8 +371,7 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 											<span className="text-gray-500">or drag and drop</span>
 										</p>
 										<p className="text-gray-500 text-xs mt-1">
-											(MP4, QuickTime, WebM) accepted
-											(max 500MB)
+											Most video formats supported (max 500MB)
 										</p>
 									</>
 								)}
