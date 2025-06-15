@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 // Maximum video size: 500MB
 const MAX_VIDEO_SIZE = 500 * 1024 * 1024; // 500MB in bytes
 // Chunk size for large file uploads: 5MB
-const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB in bytes
+const CHUNK_SIZE = 3 * 1024 * 1024; // 5MB in bytes
 
 // Expanded video format support
 const SUPPORTED_VIDEO_TYPES = [

@@ -38,7 +38,7 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 
 	// These should match your backend constants
 	const MAX_VIDEO_SIZE = 500 * 1024 * 1024; // 500MB
-	const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB - matches your backend
+	const CHUNK_SIZE = 3 * 1024 * 1024; // 5MB - matches your backend
 
 	// Expanded video format support - matches your backend
 	const SUPPORTED_VIDEO_TYPES = [
