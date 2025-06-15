@@ -344,7 +344,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Create temp directory for chunks if it doesn't exist
-    const tempDir = join(process.cwd(), 'tmp', 'uploads', fileId);
+    const tempDir = join('/tmp', 'uploads', fileId);
     if (!existsSync(tempDir)) {
       await mkdir(tempDir, { recursive: true });
     }
@@ -433,7 +433,7 @@ export async function PATCH(request: NextRequest) {
     }
     
     // Reconstruct file from chunks
-    tempDir = join(process.cwd(), 'tmp', 'uploads', fileId);
+     tempDir = join('/tmp', 'uploads', fileId);
     
     if (!existsSync(tempDir)) {
       return NextResponse.json(
