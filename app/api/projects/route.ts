@@ -251,6 +251,88 @@ async function emitNotificationsToCreators(
 	}
 }
 
+// Add this function after your existing helper functions
+async function checkSubscriptionAccess(userId: string): Promise<{
+	canCreateNew: boolean;
+	canModifyExisting: boolean;
+	blockMessage: string;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	subscriptionData: any;
+}> {
+	try {
+		// Fetch user's subscription data
+		const subscriptionQuery = await adminDb
+			.collection("subscriptions")
+			.where("userId", "==", userId)
+			.where("status", "in", ["active", "trialing", "past_due"])
+			.orderBy("createdAt", "desc")
+			.limit(1)
+			.get();
+
+		let subscriptionData = null;
+		if (!subscriptionQuery.empty) {
+			subscriptionData = subscriptionQuery.docs[0].data();
+		}
+
+		// Apply same logic as your hook
+		const isFutureDate = (dateString: string | null | undefined): boolean => {
+			if (!dateString) return false;
+			try {
+				return new Date(dateString) > new Date();
+			} catch {
+				return false;
+			}
+		};
+
+		const isActive = subscriptionData?.status === "active";
+		const isInTrial =
+			subscriptionData?.status === "trialing" &&
+			isFutureDate(subscriptionData?.trialEnd);
+		const isTrialExpired =
+			subscriptionData?.status === "trialing" &&
+			!isFutureDate(subscriptionData?.trialEnd);
+		const isPastDue = subscriptionData?.status === "past_due";
+
+		const canAccessPremiumFeatures = isActive || (isInTrial && !isTrialExpired);
+		const canCreateNew = canAccessPremiumFeatures;
+
+		const blockedStatuses = ["canceled", "incomplete_expired", "unpaid"];
+		const canModifyExisting =
+			canAccessPremiumFeatures ||
+			isPastDue ||
+			!blockedStatuses.includes(subscriptionData?.status);
+
+		let blockMessage = "";
+		if (!canAccessPremiumFeatures) {
+			if (isTrialExpired) {
+				blockMessage =
+					"Your free trial has ended. Upgrade to continue creating projects.";
+			} else if (isPastDue) {
+				blockMessage =
+					"Please update your payment method to continue creating projects.";
+			} else {
+				blockMessage =
+					"Upgrade to Pro to create projects and access premium features.";
+			}
+		}
+
+		return {
+			canCreateNew,
+			canModifyExisting,
+			blockMessage,
+			subscriptionData,
+		};
+	} catch (error) {
+		console.error("Subscription check error:", error);
+		return {
+			canCreateNew: false,
+			canModifyExisting: false,
+			blockMessage: "Unable to verify subscription status.",
+			subscriptionData: null,
+		};
+	}
+}
+
 export async function GET(request: NextRequest) {
 	try {
 		const url = new URL(request.url);
@@ -398,6 +480,21 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json(
 				{ error: "User ID is required" },
 				{ status: 400 }
+			);
+		}
+
+		// Check subscription access
+		const subscriptionCheck = await checkSubscriptionAccess(userId);
+
+		// For new project creation, check canCreateNew
+		if (!isDraft && !subscriptionCheck.canCreateNew) {
+			return NextResponse.json(
+				{
+					error: "Subscription required",
+					message: subscriptionCheck.blockMessage,
+					subscriptionRequired: true,
+				},
+				{ status: 402 } // Payment Required
 			);
 		}
 
@@ -698,6 +795,22 @@ export async function PUT(request: NextRequest) {
 		const existingProject = projectDoc.data();
 		if (existingProject?.userId !== userId && userId !== "admin") {
 			return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+		}
+
+		// Check subscription access for modifications
+		if (userId !== "admin") {
+			const subscriptionCheck = await checkSubscriptionAccess(userId);
+
+			if (!subscriptionCheck.canModifyExisting) {
+				return NextResponse.json(
+					{
+						error: "Subscription required",
+						message: subscriptionCheck.blockMessage,
+						subscriptionRequired: true,
+					},
+					{ status: 402 }
+				);
+			}
 		}
 
 		// Update project

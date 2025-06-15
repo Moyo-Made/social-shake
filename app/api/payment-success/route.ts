@@ -34,12 +34,6 @@ export async function GET(request: NextRequest) {
     
     const paymentData = paymentDoc.data();
     
-    console.log("Payment data from DB:", {
-      status: paymentData?.status,
-      paymentType: paymentData?.paymentType,
-      storedSessionId: paymentData?.stripeSessionId,
-      storedPaymentIntentId: paymentData?.stripePaymentIntentId
-    });
     
     // FIXED: More flexible status validation
     const validPendingStatuses = ["pending", "processing", "pending_capture"];

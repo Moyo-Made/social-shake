@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
@@ -7,6 +8,7 @@ import { useSocket } from "@/context/SocketContext";
 import { Input } from "@/components/ui/input";
 import { ContestFormData } from "@/types/contestFormData";
 import dynamic from "next/dynamic";
+import { AlertCircle } from "lucide-react";
 
 interface UserDashboardProps {
 	userId: string;
@@ -58,6 +60,17 @@ interface ContestParticipant {
 		comments: number;
 		followers?: number;
 	};
+}
+
+interface SubscriptionStatus {
+	id: string;
+	status: string;
+	currentPeriodStart: string;
+	currentPeriodEnd: string;
+	cancelAtPeriodEnd: boolean;
+	trialStart: string | null;
+	trialEnd: string | null;
+	amount: number;
 }
 
 const LoadingState = () => (
@@ -121,6 +134,8 @@ const UserDashboard = dynamic(
 			const [selectedCreator, setSelectedCreator] = useState<Creators | null>(
 				null
 			);
+			const [subscriptionData, setSubscriptionData] =
+				useState<SubscriptionStatus | null>(null);
 
 			// Add state for latest contest and leaderboard data
 			const [latestContest, setLatestContest] =
@@ -156,6 +171,46 @@ const UserDashboard = dynamic(
 				if (diffHours < 24)
 					return `${diffHours} ${diffHours === 1 ? "hour" : "hours"} ago`;
 				return `${diffDays} ${diffDays === 1 ? "day" : "days"} ago`;
+			};
+
+			// Helper function to calculate days remaining in trial
+			const getTrialDaysRemaining = () => {
+				if (!subscriptionData?.trialEnd) return 0;
+
+				const trialEndDate = new Date(subscriptionData.trialEnd);
+				const currentDate = new Date();
+				const diffTime = trialEndDate.getTime() - currentDate.getTime();
+				const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+				return Math.max(0, diffDays);
+			};
+
+			// Check if user is in trial period
+			const isInTrial =
+				subscriptionData?.trialEnd &&
+				new Date(subscriptionData.trialEnd) > new Date();
+			const trialDaysLeft = getTrialDaysRemaining();
+
+			const fetchSubscriptionStatus = async () => {
+				try {
+					const response = await fetch("/api/subscription/manage", {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+						},
+						body: JSON.stringify({
+							action: "get_status",
+							userId,
+						}),
+					});
+
+					const data = await response.json();
+					if (response.ok) {
+						setSubscriptionData(data.subscription);
+					}
+				} catch (error) {
+					console.error("Failed to fetch subscription status:", error);
+				}
 			};
 
 			const fetchCreatorMessages = async () => {
@@ -431,6 +486,10 @@ const UserDashboard = dynamic(
 				}
 			}, [userData]);
 
+			useEffect(() => {
+				fetchSubscriptionStatus();
+			  }, [userId]);
+
 			if (loading) {
 				return (
 					<div className="flex flex-col justify-center items-center h-64">
@@ -559,6 +618,30 @@ const UserDashboard = dynamic(
 
 			return (
 				<div className="max-w-6xl px-4 py-8">
+					{/* Trial Period Alert */}
+					{isInTrial && trialDaysLeft > 0 && (
+						<div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg flex items-center justify-between">
+							<div className="flex items-center">
+								<AlertCircle className="w-5 h-5 text-orange-500 mr-3" />
+								<div>
+									<p className="text-orange-800 font-medium">
+										Trial Period Ending Soon
+									</p>
+									<p className="text-orange-700 text-sm">
+										Your trial period ends in {trialDaysLeft}{" "}
+										{trialDaysLeft === 1 ? "day" : "days"}. Upgrade now to
+										continue using all features.
+									</p>
+								</div>
+							</div>
+							<button
+								onClick={() => (window.location.href = "/brand/dashboard/settings")}
+								className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md text-sm font-medium"
+							>
+								Upgrade Now
+							</button>
+						</div>
+					)}
 					{/* Summary Cards */}
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
 						{/* Active Projects Card */}
@@ -666,12 +749,8 @@ const UserDashboard = dynamic(
 											.sort((a, b) => {
 												// Sort by creation date (most recent first)
 												// Assuming there's a createdAt, dateCreated, or timestamp field
-												const dateA = new Date(
-													a.createdAt || a.timestamp || 0
-												);
-												const dateB = new Date(
-													b.createdAt || b.timestamp || 0
-												);
+												const dateA = new Date(a.createdAt || a.timestamp || 0);
+												const dateB = new Date(b.createdAt || b.timestamp || 0);
 												return dateB.getTime() - dateA.getTime(); // Most recent first
 											})
 											.slice(0, 5) // Take top 5 most recent
@@ -682,7 +761,6 @@ const UserDashboard = dynamic(
 															{project.projectDetails?.projectName ||
 																"Untitled Project"}
 														</div>
-														
 													</td>
 													<td className="px-6 py-4 whitespace-nowrap">
 														<div className="text-sm text-gray-500">

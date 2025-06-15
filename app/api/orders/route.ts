@@ -12,6 +12,49 @@ const removeUndefined = (
 	);
 };
 
+// Helper function to check subscription access
+const checkSubscriptionAccess = async (userId: string) => {
+	try {
+	  const subscriptionDoc = await adminDb!.collection("subscriptions")
+		.where("userId", "==", userId)
+		.limit(1)
+		.get();
+  
+	  if (subscriptionDoc.empty) {
+		return { hasAccess: false, message: "No active subscription found" };
+	  }
+  
+	  const subscriptionData = subscriptionDoc.docs[0].data();
+	  const status = subscriptionData.status;
+	  
+	  // Allow access for active subscriptions or valid trials
+	  const hasValidTrial = status === 'trialing' && 
+		subscriptionData.trialEnd && 
+		new Date(subscriptionData.trialEnd) > new Date();
+  
+	  if (status === 'active' || hasValidTrial) {
+		return { hasAccess: true };
+	  }
+  
+	  // Custom messages for different states
+	  const statusMessages = {
+		'past_due': 'Please update your payment method to create new orders',
+		'canceled': 'Your subscription has been canceled. Please reactivate to create orders',
+		'trialing': 'Your free trial has ended. Please upgrade to continue',
+		'incomplete': 'Please complete your subscription setup',
+		'unpaid': 'Payment failed. Please update your payment method'
+	  };
+  
+	  return { 
+		hasAccess: false, 
+		message: statusMessages[status as keyof typeof statusMessages] || 'Subscription required to create orders'
+	  };
+	} catch (error) {
+	  console.error('Error checking subscription:', error);
+	  return { hasAccess: false, message: "Unable to verify subscription status" };
+	}
+  };
+
 // POST endpoint - Create Draft Order (minimal required fields only)
 export async function POST(request: NextRequest) {
 	try {
@@ -79,6 +122,18 @@ export async function POST(request: NextRequest) {
 		if (!creatorDoc.exists) {
 			return NextResponse.json({ error: "Creator not found" }, { status: 404 });
 		}
+
+		const subscriptionCheck = await checkSubscriptionAccess(userId);
+if (!subscriptionCheck.hasAccess) {
+  return NextResponse.json(
+    {
+      error: "Subscription required",
+      message: subscriptionCheck.message,
+      errorCode: "SUBSCRIPTION_REQUIRED"
+    },
+    { status: 402 } // 402 Payment Required
+  );
+}
 
 		const creatorData = creatorDoc.data();
 		const stripeAccountId = creatorData?.stripeAccountId;

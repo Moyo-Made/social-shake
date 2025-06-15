@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { ProjectFormProvider, useProjectForm } from "./ProjectFormContext";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, X } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/context/AuthContext";
 import ProjectDetails from "./ProjectDetails";
@@ -15,6 +15,73 @@ import CreatorProjectReview from "./ProjectReview";
 import TikTokShopProjectReview from "./TikTokShopReview";
 import ContentRequirements from "./ContentRequirements";
 import { useRouter } from "next/navigation";
+
+// Subscription Error Modal Component
+interface SubscriptionErrorModalProps {
+	isOpen: boolean;
+	onClose: () => void;
+	message: string;
+}
+
+const SubscriptionErrorModal = ({ isOpen, onClose, message }: SubscriptionErrorModalProps) => {
+	if (!isOpen) return null;
+
+	return (
+		<div className="fixed inset-0 z-50 flex items-center justify-center">
+			{/* Backdrop */}
+			<div 
+				className="absolute inset-0 bg-black bg-opacity-50" 
+				onClick={onClose}
+			/>
+			
+			{/* Modal */}
+			<div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+				{/* Close button */}
+				<button
+					onClick={onClose}
+					className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+				>
+					<X className="h-5 w-5" />
+				</button>
+
+				{/* Icon */}
+				<div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
+					<AlertCircle className="h-6 w-6 text-red-600" />
+				</div>
+
+				{/* Title */}
+				<h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+					Subscription Required
+				</h3>
+
+				{/* Message */}
+				<p className="text-gray-600 text-center mb-6">
+					{message}
+				</p>
+
+				{/* Actions */}
+				<div className="flex flex-col sm:flex-row gap-3">
+					<Button
+						onClick={() => {
+							// Navigate to subscription/upgrade page
+							window.location.href = '/brand/dashboard/settings'; // Adjust path as needed
+						}}
+						className="flex-1 bg-[#FD5C02] hover:bg-orange-600 text-white"
+					>
+						Upgrade Subscription
+					</Button>
+					<Button
+						onClick={onClose}
+						variant="outline"
+						className="flex-1"
+					>
+						Cancel
+					</Button>
+				</div>
+			</div>
+		</div>
+	);
+};
 
 const ProjectFormContent = () => {
 	const [step, setStep] = useState(1);
@@ -31,6 +98,8 @@ const ProjectFormContent = () => {
 	} = useProjectForm();
 
 	const [submissionError, setSubmissionError] = useState<string | null>(null);
+	const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
+	const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 	const [draftSuccess, setDraftSuccess] = useState<boolean>(false);
 	const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -314,10 +383,10 @@ const ProjectFormContent = () => {
 	}, [draftSuccess]);
 
 	const handleSubmit = async () => {
-		console.log("Submit button clicked");
 		try {
 			setIsLoading(true);
 			setSubmissionError(null);
+			setSubscriptionError(null);
 			setValidationError(null);
 
 			if (!currentUser?.email) {
@@ -369,8 +438,6 @@ const ProjectFormContent = () => {
 				// If it's a base64 string or URL, it will be handled by the API endpoint
 			}
 
-			console.log("Submitting project data to /api/projects");
-
 			// Submit to the projects API endpoint
 			const response = await fetch("/api/projects", {
 				method: "POST",
@@ -380,16 +447,21 @@ const ProjectFormContent = () => {
 			const result = await response.json();
 
 			if (!response.ok) {
-				throw new Error(
-					result.error || `HTTP error! status: ${response.status}`
-				);
+				// Handle subscription-specific errors
+				if (response.status === 402 && result.subscriptionRequired) {
+					setSubscriptionError(result.message);
+					setShowSubscriptionModal(true);
+				} else {
+					throw new Error(
+						result.error || `HTTP error! status: ${response.status}`
+					);
+				}
+				return;
 			}
 
 			if (!result.success) {
 				throw new Error(result.error || "Failed to create project");
 			}
-
-			console.log("Project created successfully:", result);
 
 			// Clear saved form state on success
 			sessionStorage.removeItem("projectFormStep");
@@ -500,6 +572,13 @@ const ProjectFormContent = () => {
 
 	return (
 		<div className="max-w-[56rem] mx-auto">
+			{/* Subscription Error Modal */}
+			<SubscriptionErrorModal
+				isOpen={showSubscriptionModal}
+				onClose={() => setShowSubscriptionModal(false)}
+				message={subscriptionError || " You need a valid subscription to create a project."}
+			/>
+
 			{/* Navigation Tabs */}
 			<nav className="flex pb-5 pt-5 gap-8">
 				{[
@@ -539,7 +618,7 @@ const ProjectFormContent = () => {
 				))}
 			</nav>
 
-			{/* Error Message */}
+			{/* Regular Error Message (non-subscription errors) */}
 			{submissionError && (
 				<Alert variant="destructive" className="mb-4">
 					<AlertCircle className="h-4 w-4" />

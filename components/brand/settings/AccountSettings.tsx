@@ -18,6 +18,7 @@ import ProjectPreference from "./ProjectPreference";
 import NotificationPreferences from "./notification/NotificationsPreferences";
 import SecurityPage from "./SecurityPage";
 import { countries } from "@/types/countries";
+import SubscriptionManager from "../subscription/SubscriptionManager";
 
 // Interface for social media data
 interface SocialMedia {
@@ -68,6 +69,7 @@ const AccountSettings: React.FC = () => {
 		{ id: "account", label: "Account Settings" },
 		{ id: "billing", label: "Billing & Payments" },
 		{ id: "project", label: "Project Preference" },
+		{ id: "manage-subscriptions", label: "Manage Subscriptions" },
 		{ id: "notifications", label: "Notifications & Alerts" },
 		{ id: "security", label: "Security & Privacy" },
 	];
@@ -553,6 +555,12 @@ const AccountSettings: React.FC = () => {
 				{activeTab === "project" && (
 					<div className="md:w-[50rem] max-w-4xl mx-auto">
 						<ProjectPreference />
+					</div>
+				)}
+
+				{activeTab === "manage-subscriptions" && (
+					<div className="md:w-[50rem] max-w-4xl mx-auto">
+						<SubscriptionManager userId={currentUser?.uid || ""} />
 					</div>
 				)}
 

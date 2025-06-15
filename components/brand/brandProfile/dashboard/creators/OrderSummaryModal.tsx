@@ -93,6 +93,58 @@ const OrderErrorHandler = ({
 	);
 };
 
+const SubscriptionRequiredModal = ({
+	isOpen,
+	onClose,
+	message,
+}: {
+	isOpen: boolean;
+	onClose: () => void;
+	message: string;
+}) => {
+	if (!isOpen) return null;
+
+	return (
+		<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+			<div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+				<div className="p-6">
+					<div className="flex items-center justify-between mb-4">
+						<h3 className="text-lg font-semibold text-gray-900">
+							Subscription Required
+						</h3>
+						<button
+							onClick={onClose}
+							className="text-gray-400 hover:text-gray-600"
+						>
+							<X className="w-5 h-5" />
+						</button>
+					</div>
+					<div className="mb-6">
+						<p className="text-gray-600">{message}</p>
+					</div>
+					<div className="flex gap-3">
+						<button
+							onClick={onClose}
+							className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+						>
+							Cancel
+						</button>
+						<button
+							onClick={() => {
+								// Navigate to subscription page
+								window.location.href = "/brand/dashboard/settings";
+							}}
+							className="flex-1 px-4 py-2 bg-[#FD5C02] hover:bg-orange-600 text-white rounded-lg transition-colors"
+						>
+							Upgrade Now
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	);
+};
+
 const OrderSummaryModal: React.FC<OrderSummaryModalProps> = ({
 	isOpen,
 	onClose,
@@ -119,13 +171,27 @@ const OrderSummaryModal: React.FC<OrderSummaryModalProps> = ({
 	const [pendingOrder, setPendingOrder] = useState<PendingOrder | null>(null);
 	const { currentUser } = useAuth();
 
+	const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+
 	const actualTotalPrice =
 		packageType === "bulk" ? totalPrice * videoCount : totalPrice;
 
 	// Resume incomplete orders on page load
 	useEffect(() => {
-		const checkPendingOrder = async () => {
-			if (typeof window !== "undefined" && window.localStorage && isOpen) {
+		const checkSubscriptionAndPendingOrder = async () => {
+			if (typeof window !== "undefined" && window.localStorage && isOpen && currentUser) {
+				// Check subscription first
+				try {
+					const subscriptionResponse = await fetch(`/api/subscription/status?userId=${currentUser.uid}`);
+					const subscriptionData = await subscriptionResponse.json();
+					
+					if (!subscriptionData.hasActiveSubscription) {
+						setShowSubscriptionModal(true);
+						return;
+					}
+				} catch (error) {
+					console.error("Failed to check subscription:", error);
+				}
 				const pendingOrderId = localStorage.getItem("pendingOrderId");
 				if (pendingOrderId && currentUser) {
 					const order = await checkOrderStatus(pendingOrderId);
@@ -141,22 +207,30 @@ const OrderSummaryModal: React.FC<OrderSummaryModalProps> = ({
 			}
 		};
 
-		checkPendingOrder();
+		checkSubscriptionAndPendingOrder();
 	}, [currentUser, isOpen]);
 
 	if (!isOpen) return null;
-
-	// Helper function to calculate application fee
-	// const calculateApplicationFee = (amount: number) => {
-	// 	// Adjust this calculation based on your fee structure
-	// 	return Math.round(amount * 0.05 * 100) / 100; // 5% fee example
-	// };
 
 	// handleOrderConfirm function for OrderSummaryModal
 	const handleOrderConfirm = async () => {
 		try {
 			setLoading(true);
 			setError(null);
+
+			const subscriptionResponse = await fetch(`/api/subscription/status?userId=${currentUser?.uid}`);
+		
+			if (!subscriptionResponse.ok) {
+				throw new Error("Failed to check subscription status");
+			}
+	
+			const subscriptionData = await subscriptionResponse.json();
+			
+			// If user doesn't have an active subscription, show modal and return
+			if (!subscriptionData.hasActiveSubscription) {
+				setShowSubscriptionModal(true);
+				return;
+			}
 
 			// Step 1: Create draft order first
 			const orderRequirements = {
@@ -176,10 +250,20 @@ const OrderSummaryModal: React.FC<OrderSummaryModalProps> = ({
 					packageType: packageType,
 					videoCount: videoCount,
 					totalPrice: actualTotalPrice,
-					paymentType: "escrow", // Add this
-					// Remove: requirements, projectBrief
+					paymentType: "escrow",
 				}),
 			});
+
+			if (!orderResponse.ok) {
+				if (orderResponse.status === 402) {
+					const result = await orderResponse.json();
+					if (result.subscriptionRequired) {
+						setShowSubscriptionModal(true);
+						return;
+					}
+				}
+				throw new Error("Failed to create order");
+			}
 
 			const orderResult = await orderResponse.json();
 			const newOrderId = orderResult.orderId;
@@ -354,6 +438,12 @@ const OrderSummaryModal: React.FC<OrderSummaryModalProps> = ({
 			}
 		} catch (error: unknown) {
 			console.error("Order creation error:", error);
+			// Add this check for subscription errors
+			if (error instanceof Error && error.message.includes("subscription")) {
+				setShowSubscriptionModal(true);
+				return;
+			}
+
 			if (error instanceof Error) {
 				setError(error.message);
 			} else {
@@ -437,6 +527,16 @@ const OrderSummaryModal: React.FC<OrderSummaryModalProps> = ({
 						<OrderErrorHandler error={error} onRetry={retryOrder} />
 					</div>
 				)}
+
+				{/* Add this subscription modal */}
+				<SubscriptionRequiredModal
+					isOpen={showSubscriptionModal}
+					onClose={() => {
+						setShowSubscriptionModal(false);
+						setLoading(false);
+					}}
+					message="You need an active subscription to create orders."
+				/>
 
 				{/* Resume Order Notice */}
 				{showResumeOrder && pendingOrder && (

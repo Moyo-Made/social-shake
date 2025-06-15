@@ -5,7 +5,7 @@ import SecurityPrivacySettings from "./SecurityPrivacy";
 import { useAuth } from "@/context/AuthContext";
 
 export default function SecurityPage() {
-	const { currentUser } = useAuth(); // Get the current user from your auth context
+	const { currentUser } = useAuth(); 
 	const [isLoading, setIsLoading] = useState(true);
 
 	useEffect(() => {

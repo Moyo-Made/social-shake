@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
 						? `Escrow payment for ${packageType} package with ${videoCount} ${videoText}`
 						: `Direct payment for ${packageType} package with ${videoCount} ${videoText}`;
 				successUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-success?payment_id=${paymentId}&session_id={CHECKOUT_SESSION_ID}&order_id=${orderId || paymentData?.orderId}`;
-				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-cancelled?canceled=true`;
+				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/dashboard?canceled=true`;
 				break;
 			case "submission_approval":
 				// Better fallback chain for project title
@@ -148,13 +148,13 @@ export async function POST(request: NextRequest) {
 				productName = `Submission Approval - ${submissionProjectTitle}`;
 				productDescription = `Payment for approved submission in project: ${submissionProjectTitle}`;
 				successUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-success?payment_id=${paymentId}&session_id={CHECKOUT_SESSION_ID}&type=project`;
-				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-cancelled?canceled=true`;
+				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/dashboard?canceled=true`;
 				break;
 			case "video":
 				productName = videoTitle || paymentData?.videoTitle || "Video Purchase";
 				productDescription = `Purchase of video: ${productName}`;
 				successUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-success?payment_id=${paymentId}&session_id={CHECKOUT_SESSION_ID}`;
-				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-cancelled?canceled=true`;
+				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/dashboard?canceled=true`;
 				break;
 			case "project":
 				const projectName =
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
 				productName = projectName;
 				productDescription = `Payment for project: ${projectName}`;
 				successUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-success?payment_id=${paymentId}&session_id={CHECKOUT_SESSION_ID}&type=project`;
-				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-cancelled?canceled=true`;
+				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/dashboard?canceled=true`;
 				break;
 			case "contest":
 			default:
@@ -177,7 +177,7 @@ export async function POST(request: NextRequest) {
 				productName = contestName;
 				productDescription = `Payment for contest: ${contestName}`;
 				successUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-success?payment_id=${paymentId}&session_id={CHECKOUT_SESSION_ID}&type=contest`;
-				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/payment-cancelled?canceled=true`;
+				cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/brand/dashboard?canceled=true`;
 				break;
 		}
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { adminDb } from "@/config/firebase-admin";
 
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
 
 // Helper function to send notifications
@@ -9,6 +10,18 @@ export interface Notification {
 	type: string;
 	message: string;
 	[key: string]: string | number | boolean | null | undefined;
+}
+
+export interface StripeSubscriptionWithPeriods extends Stripe.Subscription {
+	current_period_start: number;
+	current_period_end: number;
+	trial_start: number | null;
+	trial_end: number | null;
+	cancel_at_period_end: boolean;
+}
+
+interface StripeInvoiceWithSubscription extends Stripe.Invoice {
+	subscription: string | null;
 }
 
 const sendNotification = async (userId: string, notification: Notification) => {
@@ -202,9 +215,258 @@ const handleExpiredCheckout = async (session: Stripe.Checkout.Session) => {
 	}
 };
 
-export async function POST(request: NextRequest) {
-	const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
+// Handle customer.subscription.created
+async function handleSubscriptionCreated(event: Stripe.Event) {
+	console.log("=== SUBSCRIPTION CREATED ===");
+	const subscription = event.data.object as StripeSubscriptionWithPeriods;
 
+	const userId = subscription.metadata?.userId;
+	if (!userId) {
+		console.error("No userId in subscription metadata");
+		return;
+	}
+
+	try {
+		// Update subscription record in database
+		const subscriptionQuery = await adminDb
+			.collection("subscriptions")
+			.where("userId", "==", userId)
+			.where("status", "==", "pending")
+			.limit(1)
+			.get();
+
+		if (subscriptionQuery.empty) {
+			console.error(`No pending subscription found for user ${userId}`);
+			return;
+		}
+
+		const subscriptionDoc = subscriptionQuery.docs[0];
+		await subscriptionDoc.ref.update({
+			stripeSubscriptionId: subscription.id,
+			status: subscription.status, // "trialing" during free trial
+			trialStart: subscription.trial_start
+				? new Date(subscription.trial_start * 1000).toISOString()
+				: null,
+			trialEnd: subscription.trial_end
+				? new Date(subscription.trial_end * 1000).toISOString()
+				: null,
+			currentPeriodStart: new Date(
+				subscription.current_period_start * 1000
+			).toISOString(),
+			currentPeriodEnd: new Date(
+				subscription.current_period_end * 1000
+			).toISOString(),
+			updatedAt: new Date().toISOString(),
+		});
+
+		// Update user record
+		await adminDb
+			.collection("users")
+			.doc(userId)
+			.update({
+				subscriptionStatus: subscription.status,
+				stripeSubscriptionId: subscription.id,
+				subscriptionTrial: subscription.status === "trialing",
+				trialEndDate: subscription.trial_end
+					? new Date(subscription.trial_end * 1000).toISOString()
+					: null,
+				updatedAt: new Date().toISOString(),
+			});
+
+		// Send welcome notification
+		await sendNotification(userId, {
+			type: "subscription_trial_started",
+			message:
+				"Welcome to Social Shake Pro! Your 7-day free trial has started. You'll be charged $99 on " +
+				(subscription.trial_end
+					? new Date(subscription.trial_end * 1000).toLocaleDateString()
+					: "trial end"),
+		});
+
+		console.log(`Subscription created for user ${userId}: ${subscription.id}`);
+	} catch (error) {
+		console.error("Error handling subscription created:", error);
+		throw error;
+	}
+}
+
+// Handle customer.subscription.trial_will_end (3 days before trial ends)
+async function handleTrialWillEnd(event: Stripe.Event) {
+	console.log("=== TRIAL WILL END ===");
+	const subscription = event.data.object as StripeSubscriptionWithPeriods;
+
+	const userId = subscription.metadata?.userId;
+	if (!userId) return;
+
+	try {
+		// Send reminder notification
+		await sendNotification(userId, {
+			type: "trial_ending_reminder",
+			message:
+				"Your Social Shake Pro trial ends in 3 days. Your card will be charged $99 unless you cancel.",
+		});
+
+		// Optional: Send email reminder (if you have email service set up)
+		console.log(`Trial ending reminder sent to user ${userId}`);
+	} catch (error) {
+		console.error("Error handling trial will end:", error);
+	}
+}
+
+// Handle invoice.payment_succeeded (when trial ends and first payment is charged)
+async function handleSubscriptionPaymentSucceeded(event: Stripe.Event) {
+	console.log("=== SUBSCRIPTION PAYMENT SUCCEEDED ===");
+	const invoice = event.data.object as StripeInvoiceWithSubscription;
+
+	if (!invoice.subscription) return;
+
+	try {
+		// Get the subscription
+		const subscription = (await stripe.subscriptions.retrieve(
+			invoice.subscription as string
+		)) as unknown as StripeSubscriptionWithPeriods;
+		const userId = subscription.metadata?.userId;
+
+		if (!userId) return;
+
+		// Update subscription record
+		const subscriptionQuery = await adminDb
+			.collection("subscriptions")
+			.where("stripeSubscriptionId", "==", subscription.id)
+			.limit(1)
+			.get();
+
+		if (!subscriptionQuery.empty) {
+			const subscriptionDoc = subscriptionQuery.docs[0];
+			await subscriptionDoc.ref.update({
+				status: subscription.status, // Should be "active" now
+				lastPaymentDate: new Date().toISOString(),
+				lastPaymentAmount: invoice.amount_paid / 100,
+				nextPaymentDate: new Date(
+					subscription.current_period_end * 1000
+				).toISOString(),
+				updatedAt: new Date().toISOString(),
+			});
+		}
+
+		// Update user record
+		await adminDb.collection("users").doc(userId).update({
+			subscriptionStatus: subscription.status,
+			subscriptionTrial: false, // Trial is over
+			lastPaymentDate: new Date().toISOString(),
+			updatedAt: new Date().toISOString(),
+		});
+
+		// Send payment confirmation
+		await sendNotification(userId, {
+			type: "subscription_payment_succeeded",
+			message: `Payment of $${(invoice.amount_paid / 100).toFixed(2)} processed successfully. Your Social Shake Pro subscription is now active!`,
+		});
+
+		console.log(
+			`Subscription payment succeeded for user ${userId}: $${invoice.amount_paid / 100}`
+		);
+	} catch (error) {
+		console.error("Error handling subscription payment succeeded:", error);
+	}
+}
+
+// Handle invoice.payment_failed (when payment fails)
+async function handleSubscriptionPaymentFailed(event: Stripe.Event) {
+	console.log("=== SUBSCRIPTION PAYMENT FAILED ===");
+	const invoice = event.data.object as StripeInvoiceWithSubscription;
+
+	if (!invoice.subscription) return;
+
+	try {
+		const subscription = await stripe.subscriptions.retrieve(
+			invoice.subscription as string
+		);
+		const userId = subscription.metadata?.userId;
+
+		if (!userId) return;
+
+		// Update subscription record
+		const subscriptionQuery = await adminDb
+			.collection("subscriptions")
+			.where("stripeSubscriptionId", "==", subscription.id)
+			.limit(1)
+			.get();
+
+		if (!subscriptionQuery.empty) {
+			const subscriptionDoc = subscriptionQuery.docs[0];
+			await subscriptionDoc.ref.update({
+				status: subscription.status, // Might be "past_due" or "unpaid"
+				lastFailedPaymentDate: new Date().toISOString(),
+				updatedAt: new Date().toISOString(),
+			});
+		}
+
+		// Update user record
+		await adminDb.collection("users").doc(userId).update({
+			subscriptionStatus: subscription.status,
+			updatedAt: new Date().toISOString(),
+		});
+
+		// Send payment failure notification
+		await sendNotification(userId, {
+			type: "subscription_payment_failed",
+			message:
+				"Your subscription payment failed. Please update your payment method to continue using Social Shake Pro.",
+		});
+
+		console.log(`Subscription payment failed for user ${userId}`);
+	} catch (error) {
+		console.error("Error handling subscription payment failed:", error);
+	}
+}
+
+// Handle customer.subscription.deleted (when subscription is canceled)
+async function handleSubscriptionDeleted(event: Stripe.Event) {
+	console.log("=== SUBSCRIPTION DELETED ===");
+	const subscription = event.data.object as Stripe.Subscription;
+
+	const userId = subscription.metadata?.userId;
+	if (!userId) return;
+
+	try {
+		// Update subscription record
+		const subscriptionQuery = await adminDb
+			.collection("subscriptions")
+			.where("stripeSubscriptionId", "==", subscription.id)
+			.limit(1)
+			.get();
+
+		if (!subscriptionQuery.empty) {
+			const subscriptionDoc = subscriptionQuery.docs[0];
+			await subscriptionDoc.ref.update({
+				status: "canceled",
+				canceledAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString(),
+			});
+		}
+
+		// Update user record
+		await adminDb.collection("users").doc(userId).update({
+			subscriptionStatus: "canceled",
+			subscriptionTrial: false,
+			updatedAt: new Date().toISOString(),
+		});
+
+		// Send cancellation confirmation
+		await sendNotification(userId, {
+			type: "subscription_canceled",
+			message:
+				"Your Social Shake Pro subscription has been canceled. You can resubscribe anytime!",
+		});
+
+		console.log(`Subscription canceled for user ${userId}`);
+	} catch (error) {
+		console.error("Error handling subscription deleted:", error);
+	}
+}
+
+export async function POST(request: NextRequest) {
 	try {
 		// Get raw body as buffer - this is crucial for signature verification
 		const body = await request.text();
@@ -280,6 +542,26 @@ export async function POST(request: NextRequest) {
 				case "payment_intent.payment_failed":
 				case "payment_intent.canceled":
 					await handlePaymentFailed(event);
+					break;
+
+				case "customer.subscription.created":
+					await handleSubscriptionCreated(event);
+					break;
+
+				case "customer.subscription.trial_will_end":
+					await handleTrialWillEnd(event);
+					break;
+
+				case "invoice.payment_succeeded":
+					await handleSubscriptionPaymentSucceeded(event);
+					break;
+
+				case "invoice.payment_failed":
+					await handleSubscriptionPaymentFailed(event);
+					break;
+
+				case "customer.subscription.deleted":
+					await handleSubscriptionDeleted(event);
 					break;
 
 				default:
@@ -516,7 +798,8 @@ async function handleVideoEscrowPayment(
 			type: "video_payment_received",
 			videoId: videoId,
 			paymentId: paymentId,
-			message: "Payment received! Please review and approve the video purchase to release payment to creator.",
+			message:
+				"Payment received! Please review and approve the video purchase to release payment to creator.",
 		});
 	}
 
@@ -525,11 +808,14 @@ async function handleVideoEscrowPayment(
 		await sendNotification(creatorId, {
 			type: "video_payment_pending",
 			videoId: videoId,
-			message: "A brand has paid for your video! Payment is being held and will be released once they approve the purchase.",
+			message:
+				"A brand has paid for your video! Payment is being held and will be released once they approve the purchase.",
 		});
 	}
 
-	console.log(`Video ${videoId} payment held in escrow successfully - awaiting brand approval`);
+	console.log(
+		`Video ${videoId} payment held in escrow successfully - awaiting brand approval`
+	);
 }
 
 // Separate handler for submission approval payments
@@ -673,11 +959,14 @@ async function handleOrderEscrowSuccess(paymentIntent: Stripe.PaymentIntent) {
 // NEW: Handle video escrow payment success (from payment_intent.succeeded)
 async function handleVideoEscrowSuccess(paymentIntent: Stripe.PaymentIntent) {
 	const paymentId = paymentIntent.metadata.paymentId;
-	const brandId = paymentIntent.metadata.brandId || paymentIntent.metadata.buyerId;
+	const brandId =
+		paymentIntent.metadata.brandId || paymentIntent.metadata.buyerId;
 	// const creatorId = paymentIntent.metadata.creatorId;
 
 	if (!paymentId) {
-		console.log("No paymentId in metadata, skipping video escrow success handling");
+		console.log(
+			"No paymentId in metadata, skipping video escrow success handling"
+		);
 		return;
 	}
 
@@ -699,11 +988,14 @@ async function handleVideoEscrowSuccess(paymentIntent: Stripe.PaymentIntent) {
 		await sendNotification(brandId, {
 			type: "video_payment_received",
 			paymentId: paymentId,
-			message: "Payment received! Please review and approve the video purchase to release payment to creator.",
+			message:
+				"Payment received! Please review and approve the video purchase to release payment to creator.",
 		});
 	}
 
-	console.log(`Video payment ${paymentId} held in escrow - awaiting brand approval`);
+	console.log(
+		`Video payment ${paymentId} held in escrow - awaiting brand approval`
+	);
 }
 
 // Handle submission approval success

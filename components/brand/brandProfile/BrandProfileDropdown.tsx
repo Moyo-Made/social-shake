@@ -13,20 +13,95 @@ interface BrandProfileDropdownProps {
 		logoUrl?: string;
 		industry?: string;
 		email?: string;
+		subscriptionStatus?: string;
 	};
 	loading: boolean;
 	dropdownPosition?: "header" | "sidenav";
+	userId?: string; // Add userId prop for fetching subscription
+}
+
+interface SubscriptionStatus {
+	id: string;
+	status: string;
+	currentPeriodStart: string;
+	currentPeriodEnd: string;
+	cancelAtPeriodEnd: boolean;
+	trialStart: string | null;
+	trialEnd: string | null;
+	amount: number;
 }
 
 const BrandProfileDropdown: React.FC<BrandProfileDropdownProps> = ({
 	brandProfile,
 	loading,
 	dropdownPosition = "header",
+	userId,
 }) => {
 	const [isOpen, setIsOpen] = useState(false);
+	const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
+	const [subscriptionLoading, setSubscriptionLoading] = useState(false);
 	const dropdownRef = useRef<HTMLDivElement>(null);
-	const { logout } = useAuth();
+	const { logout, currentUser } = useAuth();
 	const router = useRouter();
+	
+	// Use userId prop first, then fall back to user from AuthContext
+	const currentUserId = currentUser?.uid || userId;
+
+	// Function to call subscription API
+	const callSubscriptionAPI = async (action: string) => {
+		try {
+			const response = await fetch("/api/subscription/manage", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					action,
+					userId: currentUserId,
+				}),
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || "Something went wrong");
+			}
+
+			return data;
+		} catch (err) {
+			throw err;
+		}
+	};
+
+	// Fetch subscription status
+	const fetchSubscriptionStatus = async () => {
+		if (!currentUserId) {
+			console.log("No userId provided, skipping subscription fetch");
+			return;
+		}
+		
+		try {
+			console.log("Fetching subscription for userId:", currentUserId);
+			setSubscriptionLoading(true);
+			const data = await callSubscriptionAPI("get_status");
+			console.log("Subscription data received:", data);
+			setSubscription(data.subscription);
+		} catch (err) {
+			console.error("Failed to fetch subscription:", err);
+		} finally {
+			setSubscriptionLoading(false);
+		}
+	};
+
+	// Fetch subscription when component mounts or userId changes
+	useEffect(() => {
+		if (currentUserId) {
+			console.log("Component mounted/userId changed, fetching subscription");
+			fetchSubscriptionStatus();
+		} else {
+			console.log("No userId available for subscription fetch");
+		}
+	}, [currentUserId]);
 
 	// Function to get brand initials
 	const getBrandInitials = () => {
@@ -37,6 +112,43 @@ const BrandProfileDropdown: React.FC<BrandProfileDropdownProps> = ({
 			return words[0].substring(0, 2).toUpperCase();
 		}
 		return (words[0][0] + words[1][0]).toUpperCase();
+	};
+
+	const getSubscriptionStatusDisplay = (status?: string) => {
+		if (!status) return null;
+
+		const statusConfig: {
+			[key: string]: { label: string; className: string };
+		} = {
+			active: {
+				label: "Active",
+				className:
+					"px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full",
+			},
+			trialing: {
+				label: "Trial",
+				className:
+					"px-2 py-1 text-xs font-medium bg-orange-100 text-orange-700 rounded-full",
+			},
+			canceled: {
+				label: "Canceled",
+				className:
+					"px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded-full",
+			},
+			past_due: {
+				label: "Past Due",
+				className:
+					"px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-full",
+			},
+		};
+
+		return (
+			statusConfig[status.toLowerCase()] || {
+				label: status.charAt(0).toUpperCase() + status.slice(1),
+				className:
+					"px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded-full",
+			}
+		);
 	};
 
 	// Handle click outside to close dropdown
@@ -66,6 +178,9 @@ const BrandProfileDropdown: React.FC<BrandProfileDropdownProps> = ({
 		}
 	};
 
+	// Use subscription status from API if available, otherwise fall back to prop
+	const currentSubscriptionStatus = subscription?.status || brandProfile?.subscriptionStatus;
+
 	return (
 		<div className="relative" ref={dropdownRef}>
 			<div
@@ -86,8 +201,8 @@ const BrandProfileDropdown: React.FC<BrandProfileDropdownProps> = ({
 									src={brandProfile.logoUrl}
 									alt={brandProfile.brandName || "Brand Logo"}
 									className="w-full h-full object-cover"
-									width={40}
-									height={40}
+									width={32}
+									height={32}
 								/>
 							) : (
 								<div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold">
@@ -109,9 +224,9 @@ const BrandProfileDropdown: React.FC<BrandProfileDropdownProps> = ({
 				)}
 
 				{dropdownPosition === "header" && (
-					<div className="h-10 w-10 overflow-hidden rounded-full flex items-center justify-center">
+					<div className="h-8 w-8 first-letter:overflow-hidden rounded-full flex items-center justify-center">
 						{loading ? (
-							<div className="w-10 h-10 bg-gray-700 rounded-full animate-pulse"></div>
+							<div className="w-8 h-8 bg-gray-700 rounded-full animate-pulse"></div>
 						) : brandProfile?.logoUrl ? (
 							<Image
 								src={brandProfile.logoUrl}
@@ -145,12 +260,15 @@ const BrandProfileDropdown: React.FC<BrandProfileDropdownProps> = ({
 					}`}
 				>
 					<div
-						className={`px-4 py-3 border-b ${
+						className={`flex justify-between px-4 py-3 border-b ${
 							dropdownPosition === "header"
 								? "border-gray-200"
 								: "border-gray-700"
 						}`}
 					>
+						<div>
+
+						
 						<p
 							className={`text-sm font-medium ${
 								dropdownPosition === "header" ? "text-gray-800" : "text-white"
@@ -159,14 +277,47 @@ const BrandProfileDropdown: React.FC<BrandProfileDropdownProps> = ({
 							{brandProfile?.brandName || "Complete Your Profile"}
 						</p>
 						<p
-							className={`text-xs ${
+							className={`text-xs capitalize ${
 								dropdownPosition === "header"
 									? "text-gray-500"
 									: "text-gray-400"
 							}`}
 						>
-							{brandProfile?.industry || "Update your profile"}
+							{brandProfile?.industry
+								?.split("-")
+								.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+								.join(" & ") || "Update your profile"}
 						</p>
+						</div>
+
+						{/* Show subscription status with loading state */}
+						<div className="mt-2">
+							{subscriptionLoading ? (
+								<div className="px-2 py-1 text-xs bg-gray-100 text-gray-500 rounded-full animate-pulse">
+									Loading subscription...
+								</div>
+							) : currentSubscriptionStatus ? (
+								<span
+									className={
+										getSubscriptionStatusDisplay(currentSubscriptionStatus)
+											?.className
+									}
+								>
+									{
+										getSubscriptionStatusDisplay(currentSubscriptionStatus)
+											?.label
+									}
+								</span>
+							) : currentUserId ? (
+								<div className="px-2 py-1 text-xs bg-gray-100 text-gray-500 rounded-full">
+									No subscription found
+								</div>
+							) : (
+								<div className="px-2 py-1 text-xs bg-gray-100 text-gray-500 rounded-full">
+									No user ID provided
+								</div>
+							)}
+						</div>
 					</div>
 
 					<div className="py-1">

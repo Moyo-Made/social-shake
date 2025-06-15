@@ -355,6 +355,7 @@ const SideNavLayout: React.FC<{ children: React.ReactNode }> = ({
 								brandProfile={brandProfile}
 								loading={loading}
 								dropdownPosition="header"
+								userId={currentUser?.uid || ""}
 							/>
 						)}
 					</div>
