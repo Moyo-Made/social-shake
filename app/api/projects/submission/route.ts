@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, adminStorage } from "@/config/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { join } from "path";
+import { mkdir, writeFile, readFile, unlink, rmdir } from "fs/promises";
 import { v4 as uuidv4 } from "uuid";
+import { existsSync } from "fs";
 
 // Maximum video size: 500MB
 const MAX_VIDEO_SIZE = 500 * 1024 * 1024; // 500MB in bytes
 // Chunk size for large file uploads: 5MB
-const CHUNK_SIZE = 3 * 1024 * 1024; // 5MB in bytes
+const CHUNK_SIZE = 3 * 1024 * 1024; // 3MB in bytes
 
 // Expanded video format support
 const SUPPORTED_VIDEO_TYPES = [
@@ -151,15 +154,20 @@ export async function POST(request: NextRequest) {
     }
     
     // Determine upload method based on file size
-    const useResumableUpload = videoFile.size > CHUNK_SIZE;
+    const useChunkedUpload = videoFile.size > CHUNK_SIZE;
     
-    if (useResumableUpload) {
-      // For large files, use Firebase Storage resumable upload
+    if (useChunkedUpload) {
+      // For large files, return chunked upload instructions
+      const fileId = uuidv4();
+      const totalChunks = Math.ceil(videoFile.size / CHUNK_SIZE);
+      
       return NextResponse.json({
-        useResumableUpload: true,
-        message: "File is large. Please use resumable upload method.",
-        maxFileSize: MAX_VIDEO_SIZE,
-        uploadEndpoint: `/api/projects/submit-video/resumable`
+        useChunkedUpload: true,
+        fileId,
+        chunkSize: CHUNK_SIZE,
+        totalChunks,
+        message: "File is large. Please use chunked upload method.",
+        uploadEndpoint: `/api/projects/submit-video/chunk`
       });
     }
     
@@ -305,19 +313,20 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Handle resumable uploads for large files
+// Additional endpoint to handle large file uploads with chunks
 export async function PUT(request: NextRequest) {
   try {
-    const formData = await request.formData();
+    // Get query parameters
+    const searchParams = request.nextUrl.searchParams;
+    const userId = searchParams.get('userId');
+    const projectId = searchParams.get('projectId');
+    const filename = searchParams.get('filename');
+    const chunkIndex = searchParams.get('chunkIndex');
+    const totalChunks = searchParams.get('totalChunks');
+    const fileId = searchParams.get('fileId') || uuidv4();
     
-    // Extract form data fields
-    const userId = formData.get("userId") as string;
-    const projectId = formData.get("projectId") as string;
-    const note = formData.get("note") as string || "";
-    const videoFile = formData.get("video") as File | null;
-    
-    // Validate required fields
-    if (!userId || !projectId || !videoFile) {
+    // Validate parameters
+    if (!userId || !projectId || !filename || !chunkIndex || !totalChunks) {
       return NextResponse.json(
         { error: "Missing required parameters" },
         { status: 400 }
@@ -334,12 +343,79 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Verify project exists and user hasn't already submitted
+    // Create temp directory for chunks if it doesn't exist
+    const tempDir = join(process.cwd(), 'tmp', 'uploads', fileId);
+    if (!existsSync(tempDir)) {
+      await mkdir(tempDir, { recursive: true });
+    }
+
+    // Save this chunk to temporary storage
+    const chunkData = await request.arrayBuffer();
+    const chunkPath = join(tempDir, `chunk-${chunkIndex.padStart(4, '0')}`);
+    await writeFile(chunkPath, Buffer.from(chunkData));
+
+    // If this is the last chunk, return success with fileId for the client to finalize
+    if (parseInt(chunkIndex) === parseInt(totalChunks) - 1) {
+      return NextResponse.json({
+        success: true,
+        message: "All chunks received",
+        fileId,
+        ready: true
+      });
+    }
+
+    // Return success for this chunk
+    return NextResponse.json({
+      success: true,
+      message: `Chunk ${parseInt(chunkIndex) + 1} of ${totalChunks} received`,
+      fileId,
+      ready: false,
+      progress: Math.round(((parseInt(chunkIndex) + 1) / parseInt(totalChunks)) * 100)
+    });
+    
+  } catch (error) {
+    console.error("Error handling chunk upload:", error);
+    return NextResponse.json(
+      { error: "Failed to process chunk upload", details: String(error) },
+      { status: 500 }
+    );
+  }
+}
+
+// Finalize the chunked upload
+export async function PATCH(request: NextRequest) {
+  let tempDir = '';
+  
+  try {
+    const { userId, projectId, fileId, filename, note, fileType, fileSize } = await request.json();
+    
+    // Validate parameters
+    if (!userId || !projectId || !fileId || !filename) {
+      return NextResponse.json(
+        { error: "Missing required parameters" },
+        { status: 400 }
+      );
+    }
+    
+    // Verify the user exists
+    try {
+      await adminAuth.getUser(userId);
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid user ID. Please sign in again." },
+        { status: 401 }
+      );
+    }
+    
+    // Verify project exists and is still open
     const projectRef = adminDb.collection("projects").doc(projectId);
     const projectDoc = await projectRef.get();
     
     if (!projectDoc.exists) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Project not found" },
+        { status: 404 }
+      );
     }
     
     // Check if user has already submitted
@@ -355,44 +431,73 @@ export async function PUT(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    // Process large file upload with resumable upload
-    const videoArrayBuffer = await videoFile.arrayBuffer();
-    const videoBuffer = Buffer.from(videoArrayBuffer);
     
-    // Generate a unique filename with original extension
-    const fileExtension = videoFile.name.toLowerCase().substring(videoFile.name.lastIndexOf('.')) || '.mp4';
+    // Reconstruct file from chunks
+    tempDir = join(process.cwd(), 'tmp', 'uploads', fileId);
+    
+    if (!existsSync(tempDir)) {
+      return NextResponse.json(
+        { error: "Upload session not found. Please restart the upload." },
+        { status: 404 }
+      );
+    }
+    
+    // Read all chunks and combine them
+    const chunks = [];
+    let chunkIndex = 0;
+    
+    while (true) {
+      const chunkPath = join(tempDir, `chunk-${chunkIndex.toString().padStart(4, '0')}`);
+      
+      if (!existsSync(chunkPath)) {
+        break;
+      }
+      
+      const chunkData = await readFile(chunkPath);
+      chunks.push(chunkData);
+      chunkIndex++;
+    }
+    
+    if (chunks.length === 0) {
+      return NextResponse.json(
+        { error: "No chunks found. Please restart the upload." },
+        { status: 400 }
+      );
+    }
+    
+    // Combine all chunks into a single buffer
+    const combinedBuffer = Buffer.concat(chunks);
+    
+    // Generate file path and upload to Firebase Storage
+    const fileExtension = filename.toLowerCase().substring(filename.lastIndexOf('.')) || '.mp4';
     const uniqueFileName = `${uuidv4()}${fileExtension}`;
     const filePath = `projects/${projectId}/submissions/${userId}/${uniqueFileName}`;
     
-    // Upload to Firebase Storage with resumable upload
     const bucket = adminStorage.bucket();
     const fileRef = bucket.file(filePath);
     
     try {
-      await fileRef.save(videoBuffer, {
+      await fileRef.save(combinedBuffer, {
         metadata: {
-          contentType: videoFile.type || 'video/mp4',
+          contentType: fileType || 'video/mp4',
           customMetadata: {
-            originalName: videoFile.name,
+            originalName: filename,
             uploadedBy: userId,
             projectId: projectId,
             uploadDate: new Date().toISOString(),
-            uploadMethod: 'resumable'
+            uploadMethod: 'chunked'
           }
         },
         resumable: true, // Use resumable upload for large files
-        timeout: 10 * 60 * 1000, // 10 minutes timeout
       });
       
-      // Get the public URL
+      // Make file public and get URL
       await fileRef.makePublic();
       const videoUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
       
-      // Create submission document
+      // Create submission document and update project in transaction
       const submissionRef = adminDb.collection("project_submissions").doc();
       
-      // Start a transaction
       const result = await adminDb.runTransaction(async (transaction) => {
         const currentProject = await transaction.get(projectRef);
         const currentSubmissionsCount = currentProject.data()?.submissionsCount || 0;
@@ -400,16 +505,16 @@ export async function PUT(request: NextRequest) {
         transaction.set(submissionRef, {
           userId,
           projectId,
-          note,
+          note: note || "",
           videoUrl,
-          fileName: videoFile.name,
-          fileSize: videoFile.size,
-          fileType: videoFile.type,
+          fileName: filename,
+          fileSize: fileSize || combinedBuffer.length,
+          fileType: fileType || 'video/mp4',
           fileExtension,
           createdAt: FieldValue.serverTimestamp(),
           status: "pending",
           storagePath: filePath,
-          uploadMethod: 'resumable'
+          uploadMethod: 'chunked'
         });
         
         transaction.update(projectRef, {
@@ -431,20 +536,34 @@ export async function PUT(request: NextRequest) {
         projectId,
       });
       
+      // Clean up temp files
+      try {
+        for (let i = 0; i < chunks.length; i++) {
+          const chunkPath = join(tempDir, `chunk-${i.toString().padStart(4, '0')}`);
+          if (existsSync(chunkPath)) {
+            await unlink(chunkPath);
+          }
+        }
+        await rmdir(tempDir);
+      } catch (cleanupError) {
+        console.error("Error cleaning up temp files:", cleanupError);
+        // Don't fail the request if cleanup fails
+      }
+      
       return NextResponse.json({
         success: true,
-        message: "Large file submission completed successfully",
+        message: "Project submission finalized successfully",
         submissionsCount: result,
         submissionId: submissionRef.id,
         videoUrl,
-        fileName: videoFile.name,
-        fileSize: videoFile.size
+        fileName: filename,
+        fileSize: fileSize || combinedBuffer.length
       });
       
     } catch (uploadError) {
-      console.error("Error uploading large file:", uploadError);
+      console.error("Error uploading combined file:", uploadError);
       
-      // Try to clean up any partially uploaded file
+      // Try to clean up the failed upload
       try {
         await fileRef.delete();
       } catch (cleanupError) {
@@ -453,7 +572,7 @@ export async function PUT(request: NextRequest) {
       
       return NextResponse.json(
         { 
-          error: "Failed to upload large video file",
+          error: "Failed to upload combined video file",
           details: uploadError instanceof Error ? uploadError.message : String(uploadError)
         },
         { status: 500 }
@@ -461,10 +580,19 @@ export async function PUT(request: NextRequest) {
     }
     
   } catch (error) {
-    console.error("Error handling large file upload:", error);
+    console.error("Error finalizing upload:", error);
     return NextResponse.json(
-      { error: "Failed to process large file upload", details: String(error) },
+      { error: "Failed to finalize upload", details: String(error) },
       { status: 500 }
     );
+  } finally {
+    // Cleanup temp directory in case of any error
+    if (tempDir && existsSync(tempDir)) {
+      try {
+        await rmdir(tempDir, { recursive: true });
+      } catch (cleanupError) {
+        console.error("Error cleaning up temp directory:", cleanupError);
+      }
+    }
   }
 }
