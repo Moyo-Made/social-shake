@@ -33,13 +33,14 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 		videoUrl?: string;
 		additionalNote?: string;
 		file?: string;
+		agreement?: string;
 	}>({});
 
-	// File size thresholds
-	const CHUNK_SIZE = 3 * 1024 * 1024; // 5MB chunks
-	const LARGE_FILE_THRESHOLD = 3 * 1024 * 1024; // 10MB - use chunked upload for files larger than this
+	// These should match your backend constants
+	const MAX_VIDEO_SIZE = 500 * 1024 * 1024; // 500MB
+	const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB - matches your backend
 
-	// Expanded video format support
+	// Expanded video format support - matches your backend
 	const SUPPORTED_VIDEO_TYPES = [
 		'video/mp4',
 		'video/webm',
@@ -51,7 +52,8 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 		'video/x-ms-wmv',
 		'video/x-flv',
 		'video/mp2t',
-		'video/x-matroska'
+		'video/x-matroska',
+		'video/x-m4v'
 	];
 
 	const SUPPORTED_VIDEO_EXTENSIONS = [
@@ -81,13 +83,17 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 
 	const handleToggle = () => {
 		setIsChecked(!isChecked);
+		// Clear agreement error when checked
+		if (!isChecked) {
+			setErrors(prev => ({ ...prev, agreement: undefined }));
+		}
 	};
 
 	const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const file = e.target.files?.[0] || null;
 		if (file) {
 			// Clear previous errors
-			setErrors({ ...errors, file: undefined });
+			setErrors(prev => ({ ...prev, file: undefined }));
 
 			// Get file extension
 			const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
@@ -97,21 +103,27 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 			const isValidExtension = SUPPORTED_VIDEO_EXTENSIONS.includes(fileExtension);
 			
 			if (!isValidMimeType && !isValidExtension) {
-				setErrors({
-					...errors,
+				setErrors(prev => ({
+					...prev,
 					file: `Unsupported video format. Supported formats: ${SUPPORTED_VIDEO_EXTENSIONS.join(', ')}`,
-				});
+				}));
 				return;
 			}
 
-			// Check file size - 500MB max
-			const maxSize = 500 * 1024 * 1024; // 500MB
+			// Check file size
+			if (file.size > MAX_VIDEO_SIZE) {
+				setErrors(prev => ({
+					...prev,
+					file: `File too large. Maximum size is 500MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB.`,
+				}));
+				return;
+			}
 
-			if (file.size > maxSize) {
-				setErrors({
-					...errors,
-					file: "File too large. Maximum size is 500MB.",
-				});
+			if (file.size === 0) {
+				setErrors(prev => ({
+					...prev,
+					file: "The uploaded file appears to be empty. Please try again.",
+				}));
 				return;
 			}
 
@@ -133,11 +145,7 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 	};
 
 	const validateForm = () => {
-		const newErrors: {
-			videoUrl?: string;
-			agreement?: string;
-			file?: string;
-		} = {};
+		const newErrors: typeof errors = {};
 
 		// Check if file is uploaded
 		if (!fileToUpload) {
@@ -153,79 +161,12 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 		return Object.keys(newErrors).length === 0;
 	};
 
-	// Chunked upload function
-	const uploadFileInChunks = async (file: File): Promise<{ success: boolean; fileId?: string; error?: string }> => {
-		const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-		const fileId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-		
+	// Standard upload function (matches your backend POST endpoint)
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const uploadFile = async (file: File): Promise<{ success: boolean; data?: any; error?: string }> => {
 		try {
-			// Upload each chunk
-			for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-				const start = chunkIndex * CHUNK_SIZE;
-				const end = Math.min(start + CHUNK_SIZE, file.size);
-				const chunk = file.slice(start, end);
+			setUploadProgress(10);
 
-				const formData = new FormData();
-				formData.append('chunk', chunk);
-
-				const response = await fetch(`/api/projects/submission?userId=${currentUser?.uid}&projectId=${projectId}&filename=${encodeURIComponent(file.name)}&chunkIndex=${chunkIndex}&totalChunks=${totalChunks}&fileId=${fileId}`, {
-					method: 'PUT',
-					body: chunk, // Send raw chunk data
-				});
-
-				if (!response.ok) {
-					const errorData = await response.json().catch(() => ({ error: 'Upload failed' }));
-					throw new Error(errorData.error || `Chunk upload failed: ${response.status}`);
-				}
-
-				// Update progress
-				const progress = Math.round(((chunkIndex + 1) / totalChunks) * 90); // Reserve 10% for finalization
-				setUploadProgress(progress);
-			}
-
-			// Finalize the upload
-			setUploadProgress(95);
-			const finalizeResponse = await fetch('/api/projects/submission', {
-				method: 'PATCH',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({
-					userId: currentUser?.uid,
-					projectId,
-					fileId,
-					filename: file.name,
-					note: additionalNote,
-					fileType: file.type,
-				}),
-			});
-
-			if (!finalizeResponse.ok) {
-				const errorData = await finalizeResponse.json().catch(() => ({ error: 'Finalization failed' }));
-				throw new Error(errorData.error || `Finalization failed: ${finalizeResponse.status}`);
-			}
-
-			setUploadProgress(100);
-			return { success: true, fileId };
-
-		} catch (error) {
-			console.error('Chunked upload failed:', error);
-			return { 
-				success: false, 
-				error: error instanceof Error ? error.message : 'Upload failed' 
-			};
-		}
-	};
-
-	// Standard upload function (for smaller files)
-	interface UploadResponseData {
-		submissionsCount?: number;
-		message?: string;
-		// Add other expected properties here
-	}
-
-	const uploadFileStandard = async (file: File): Promise<{ success: boolean; data?: UploadResponseData; error?: string }> => {
-		try {
 			const formData = new FormData();
 			formData.append("userId", currentUser?.uid || "");
 			formData.append("projectId", projectId);
@@ -236,10 +177,15 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 			
 			formData.append("video", file);
 
+			setUploadProgress(30);
+
+
 			const response = await fetch("/api/projects/submission", {
 				method: "POST",
 				body: formData,
 			});
+
+			setUploadProgress(70);
 
 			let data;
 			const contentType = response.headers.get("content-type");
@@ -258,13 +204,72 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 			}
 
 			if (!response.ok) {
+				// Handle specific error cases from your backend
+				if (response.status === 401) {
+					throw new Error("Please sign in again");
+				}
+				if (response.status === 404) {
+					throw new Error("Project not found");
+				}
+				if (response.status === 413) {
+					throw new Error("File too large. Maximum size is 500MB");
+				}
+				if (response.status === 415) {
+					throw new Error(data?.error || "Unsupported video format");
+				}
+				
 				throw new Error(data?.error || `Server error: ${response.status} ${response.statusText}`);
 			}
 
+			setUploadProgress(100);
 			return { success: true, data };
 
 		} catch (error) {
-			console.error('Standard upload failed:', error);
+			console.error('Upload failed:', error);
+			return { 
+				success: false, 
+				error: error instanceof Error ? error.message : 'Upload failed' 
+			};
+		}
+	};
+
+	// Large file upload function (matches your backend PUT endpoint)
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const uploadLargeFile = async (file: File): Promise<{ success: boolean; data?: any; error?: string }> => {
+		try {
+			setUploadProgress(10);
+
+			const formData = new FormData();
+			formData.append("userId", currentUser?.uid || "");
+			formData.append("projectId", projectId);
+			
+			if (additionalNote) {
+				formData.append("note", additionalNote);
+			}
+			
+			formData.append("video", file);
+
+			setUploadProgress(30);
+
+			// Use PUT method for large files as per your backend
+			const response = await fetch("/api/projects/submission", {
+				method: "PUT",
+				body: formData,
+			});
+
+			setUploadProgress(70);
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data?.error || `Server error: ${response.status} ${response.statusText}`);
+			}
+
+			setUploadProgress(100);
+			return { success: true, data };
+
+		} catch (error) {
+			console.error('Large file upload failed:', error);
 			return { 
 				success: false, 
 				error: error instanceof Error ? error.message : 'Upload failed' 
@@ -285,23 +290,33 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 		try {
 			let result;
 			
-			// Decide whether to use chunked or standard upload
-			if (fileToUpload.size > LARGE_FILE_THRESHOLD) {
-				// Use chunked upload for large files
-				result = await uploadFileInChunks(fileToUpload);
+			// Decide whether to use regular or large file upload based on your backend logic
+			if (fileToUpload.size > CHUNK_SIZE) {
+				// Use PUT endpoint for large files
+				result = await uploadLargeFile(fileToUpload);
 			} else {
-				// Use standard upload for smaller files
-				result = await uploadFileStandard(fileToUpload);
+				// Use POST endpoint for smaller files
+				result = await uploadFile(fileToUpload);
 			}
 
 			if (result.success) {
 				// If provided, call onSubmitSuccess with the new submission count
-				if (onSubmitSuccess && 'data' in result && result.data?.submissionsCount) {
+				if (onSubmitSuccess && result.data?.submissionsCount) {
 					onSubmitSuccess(result.data.submissionsCount);
 				}
 
-				toast.success("Your video has been submitted successfully!");
+				toast.success(result.data?.message || "Your video has been submitted successfully!");
+				
+				// Reset form
+				setFileToUpload(null);
+				setFilePreviewUrl(null);
+				setAdditionalNote("");
+				setIsChecked(false);
+				setErrors({});
+				
+				// Show success modal or close
 				onClose();
+
 			} else {
 				throw new Error(result.error || 'Upload failed');
 			}
@@ -313,15 +328,7 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 			let errorMessage = "Failed to submit project entry. Please try again.";
 			
 			if (error instanceof Error) {
-				if (error.message.includes("Failed to fetch")) {
-					errorMessage = "Network error. Please check your connection and try again.";
-				} else if (error.message.includes("Server error: 413")) {
-					errorMessage = "File too large for server. Please try a smaller file.";
-				} else if (error.message.includes("Server error: 415")) {
-					errorMessage = "Unsupported file format. Please try a different video format.";
-				} else {
-					errorMessage = error.message;
-				}
+				errorMessage = error.message;
 			}
 			
 			toast.error(errorMessage);
@@ -386,6 +393,7 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 						onClick={onClose}
 						className="absolute top-5 right-5 text-gray-500 hover:text-gray-700"
 						aria-label="Close"
+						disabled={isSubmitting}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -422,16 +430,19 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 							<label
 								className={`border ${
 									errors.file ? "border-red-500" : "border-gray-300"
-								} rounded-md p-4 flex flex-col items-center justify-center cursor-pointer transition-colors`}
-								onDragOver={handleDragOver}
-								onDragLeave={handleDragLeave}
-								onDrop={handleDrop}
+								} rounded-md p-4 flex flex-col items-center justify-center cursor-pointer transition-colors ${
+									isSubmitting ? "opacity-50 cursor-not-allowed" : ""
+								}`}
+								onDragOver={!isSubmitting ? handleDragOver : undefined}
+								onDragLeave={!isSubmitting ? handleDragLeave : undefined}
+								onDrop={!isSubmitting ? handleDrop : undefined}
 							>
 								<input
 									type="file"
 									onChange={handleFileChange}
 									className="hidden"
 									accept={SUPPORTED_VIDEO_EXTENSIONS.join(',')}
+									disabled={isSubmitting}
 								/>
 
 								{filePreviewUrl && fileToUpload?.type.includes("video") ? (
@@ -445,7 +456,6 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 											Video uploaded: {fileToUpload?.name} (
 											{(fileToUpload?.size / (1024 * 1024)).toFixed(2)}MB)
 										</p>
-										
 									</div>
 								) : (
 									<>
@@ -519,7 +529,9 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 											disabled={isSubmitting}
 										/>
 										<span
-											className={`flex items-center justify-center w-3.5 h-3.5 rounded border border-gray-300`}
+											className={`flex items-center justify-center w-3.5 h-3.5 rounded border border-gray-300 ${
+												isSubmitting ? "opacity-50" : ""
+											}`}
 											style={{
 												backgroundColor: isChecked ? "#f97316" : "transparent",
 												borderColor: isChecked ? "#f97316" : "#d1d5db",
@@ -545,31 +557,26 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 									</p>
 								</div>
 							</div>
+							{errors.agreement && (
+								<p className="text-red-500 text-xs mt-1 ml-5">{errors.agreement}</p>
+							)}
+						</div>
+
+						{/* Submit Button */}
+						<div className="mt-6">
+							<button
+								type="submit"
+								disabled={isSubmitting || !isChecked || !fileToUpload}
+								className={`w-full py-2 ${
+									isSubmitting || !isChecked || !fileToUpload
+										? "bg-orange-300 cursor-not-allowed"
+										: "bg-orange-500 hover:bg-orange-600"
+								} text-white rounded-md transition-colors`}
+							>
+								{isSubmitting ? `Uploading... ${uploadProgress}%` : "Submit Video"}
+							</button>
 						</div>
 					</form>
-				</div>
-
-				{/* Modal Footer */}
-				<div className="p-4 bottom-0 bg-white rounded-b-lg">
-					<button
-						type="submit"
-						onClick={(e) => {
-							e.preventDefault();
-							const form = e.currentTarget
-								.closest("div")
-								?.previousElementSibling?.querySelector("form");
-							if (form)
-								form.dispatchEvent(new Event("submit", { bubbles: true }));
-						}}
-						disabled={isSubmitting || !isChecked || !fileToUpload}
-						className={`w-full py-2 ${
-							isSubmitting || !isChecked || !fileToUpload
-								? "bg-orange-300 cursor-not-allowed"
-								: "bg-orange-500 hover:bg-orange-600"
-						} text-white rounded-md transition-colors`}
-					>
-						{isSubmitting ? `Uploading... ${uploadProgress}%` : "Submit Video"}
-					</button>
 				</div>
 			</div>
 		</div>
