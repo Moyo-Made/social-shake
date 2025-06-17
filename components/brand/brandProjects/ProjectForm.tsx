@@ -659,7 +659,7 @@ const ProjectFormContent = () => {
 			</div>
 
 			{/* Navigation Buttons */}
-			<div className="flex justify-between pb-5">
+			<div className="flex justify-between pb-5 pt-5">
 				{/* Save Draft Button */}
 				<div className="relative">
 					<Button

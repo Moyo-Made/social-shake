@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/config/firebase-admin";
 import Stripe from 'stripe';
@@ -18,47 +19,40 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if user exists and has Stripe customer ID
+    // Get user data
     const userDoc = await adminDb.collection("users").doc(userId).get();
     const userData = userDoc.data();
+    const userEmail = userData?.email;
     const stripeCustomerId = userData?.stripeCustomerId;
 
+    const paymentsSnapshot = await adminDb
+    .collection("payments")
+    .where("brandEmail", "==", userEmail)
+    .where("status", "==", "completed")
+    .get();
 
+    const paymentsFromCollection = paymentsSnapshot.docs.map(doc => doc.data());
+    const totalSpendFromPayments = paymentsFromCollection.reduce((total, payment) => {
+      return total + (payment.amount || payment.calculatedAmount || 0);
+    }, 0);
+
+    // Optional: Also check Stripe for any missing payments (BACKUP METHOD)
     let totalSpendFromStripe = 0;
-    let paymentIntents: Stripe.PaymentIntent[] = [];
-    const debugInfo: {
-      hasStripeCustomerId: boolean;
-      stripeCustomerId: string | undefined;
-      paymentIntentsCount: number;
-      allPaymentIntents: {
-        id: string;
-        status: Stripe.PaymentIntent.Status;
-        amount: number;
-        currency: string;
-        created: Date;
-        description: string | null;
-      }[];
-      successfulPaymentIntents: {
-        id: string;
-        amount: number;
-        currency: string;
-        created: Date;
-      }[];
-      stripeError?: string;
-      paymentsByMetadata?: number;
-      customersFoundByEmail?: number;
-      foundCustomerByEmail?: string;
-    } = {
+    let stripePayments: any[] = [];
+    const debugInfo: any = {
       hasStripeCustomerId: !!stripeCustomerId,
       stripeCustomerId: stripeCustomerId,
-      paymentIntentsCount: 0,
+      paymentsFromCollection: paymentsFromCollection.length,
+      totalFromPaymentsCollection: totalSpendFromPayments,
+      stripePaymentIntentsCount: 0,
+      stripeCheckoutSessionsCount: 0,
       allPaymentIntents: [],
       successfulPaymentIntents: [],
     };
 
     if (stripeCustomerId) {
       try {
-        // Fetch ALL payment intents first to see what's there
+        // Check PaymentIntents
         const paymentIntentsResponse = await stripe.paymentIntents.list({
           customer: stripeCustomerId,
           limit: 100,
@@ -73,87 +67,53 @@ export async function GET(request: NextRequest) {
           description: pi.description,
         }));
 
-
-        // Filter successful ones
-        paymentIntents = paymentIntentsResponse.data.filter(
+        const successfulPaymentIntents = paymentIntentsResponse.data.filter(
           pi => pi.status === 'succeeded'
         );
 
-        debugInfo.successfulPaymentIntents = paymentIntents.map(pi => ({
+        debugInfo.successfulPaymentIntents = successfulPaymentIntents.map(pi => ({
           id: pi.id,
           amount: pi.amount / 100,
           currency: pi.currency,
           created: new Date(pi.created * 1000),
         }));
 
-        debugInfo.paymentIntentsCount = paymentIntents.length;
+        debugInfo.stripePaymentIntentsCount = successfulPaymentIntents.length;
 
-        // Calculate total spend from successful payments
-        totalSpendFromStripe = paymentIntents.reduce((total, pi) => {
+        // Also check Checkout Sessions (this might be where your payments are)
+        const checkoutSessionsResponse = await stripe.checkout.sessions.list({
+          customer: stripeCustomerId,
+          limit: 100,
+        });
+
+        const successfulSessions = checkoutSessionsResponse.data.filter(
+          session => session.payment_status === 'paid'
+        );
+
+        debugInfo.stripeCheckoutSessionsCount = successfulSessions.length;
+        debugInfo.checkoutSessions = successfulSessions.map(session => ({
+          id: session.id,
+          amount_total: session.amount_total ? session.amount_total / 100 : 0,
+          currency: session.currency,
+          created: new Date(session.created * 1000),
+          payment_status: session.payment_status,
+        }));
+
+        // Calculate total from both PaymentIntents and Checkout Sessions
+        const paymentIntentsTotal = successfulPaymentIntents.reduce((total, pi) => {
           return total + (pi.amount / 100);
         }, 0);
+
+        const checkoutSessionsTotal = successfulSessions.reduce((total, session) => {
+          return total + (session.amount_total ? session.amount_total / 100 : 0);
+        }, 0);
+
+        totalSpendFromStripe = paymentIntentsTotal + checkoutSessionsTotal;
+        stripePayments = [...successfulPaymentIntents, ...successfulSessions];
 
       } catch (stripeError) {
         console.error("Stripe API Error:", stripeError);
         debugInfo.stripeError = stripeError instanceof Error ? stripeError.message : String(stripeError);
-      }
-    } else {
-      
-      // Option 1: Search by metadata (if you store userId in Stripe metadata)
-      try {
-        const paymentIntentsResponse = await stripe.paymentIntents.list({
-          limit: 100,
-        });
-        
-        // Filter by metadata if you store userId there
-        const userPayments = paymentIntentsResponse.data.filter(pi => 
-          pi.metadata?.userId === userId || pi.metadata?.user_id === userId
-        );
-        
-        debugInfo.paymentsByMetadata = userPayments.length;
-        
-        if (userPayments.length > 0) {
-          paymentIntents = userPayments.filter(pi => pi.status === 'succeeded');
-          totalSpendFromStripe = paymentIntents.reduce((total, pi) => total + (pi.amount / 100), 0);
-        }
-      } catch (error) {
-        if (error instanceof Error) {
-          debugInfo.stripeError = error.message;
-        } else {
-        
-        }
-      }
-
-      // Option 2: Check if email is stored and search by that
-      if (userData?.email && totalSpendFromStripe === 0) {
-        try {
-          const customers = await stripe.customers.list({
-            email: userData.email,
-            limit: 10,
-          });
-          
-          debugInfo.customersFoundByEmail = customers.data.length;
-          
-          if (customers.data.length > 0) {
-            const customer = customers.data[0];
-            const paymentIntentsResponse = await stripe.paymentIntents.list({
-              customer: customer.id,
-              limit: 100,
-            });
-            
-            paymentIntents = paymentIntentsResponse.data.filter(pi => pi.status === 'succeeded');
-            totalSpendFromStripe = paymentIntents.reduce((total, pi) => total + (pi.amount / 100), 0);
-            
-            debugInfo.foundCustomerByEmail = customer.id;
-          }
-        } catch (error) {
-          if (error instanceof Error) {
-            debugInfo.stripeError = error.message;
-            console.error("Stripe email search error:", error.message);
-          } else {
-            console.error("Stripe email search error:", error);
-          }
-        }
       }
     }
 
@@ -191,33 +151,52 @@ export async function GET(request: NextRequest) {
       ? contestDraftDoc.data() 
       : null;
 
-    // Return comprehensive debug info
     return NextResponse.json({
       success: true,
       data: {
         totalProjects: projects.length,
         totalContests: contests.length,
-        totalSpend: totalSpendFromStripe,
-        totalPayments: paymentIntents.length,
+        // Use payments collection as primary source
+        totalSpend: totalSpendFromPayments,
+        totalPayments: paymentsFromCollection.length,
         projects: projects,
         contests: contests,
-        paymentHistory: paymentIntents.map(pi => ({
-          id: pi.id,
-          amount: pi.amount / 100,
-          currency: pi.currency,
-          created: new Date(pi.created * 1000),
-          description: pi.description,
+        paymentHistory: paymentsFromCollection.map(payment => ({
+          id: payment.paymentId,
+          amount: payment.amount || payment.calculatedAmount,
+          currency: 'usd', // assuming USD, adjust as needed
+          created: new Date(payment.createdAt),
+          description: payment.paymentName,
+          type: payment.paymentType,
+          status: payment.status,
         })),
         hasProjectDraft: projectDraft !== null,
         hasContestDraft: contestDraft !== null,
         summary: {
-          activeProjects: projects.filter(p => p.status === "active").length,
+          activeProjects: projects.filter(p => p.status === "active" || p.status === "invite").length,
           completedProjects: projects.filter(p => p.status === "completed").length,
           activeContests: contests.filter(c => c.status === "active").length,
           completedContests: contests.filter(c => c.status === "completed").length,
         },
-        // Debug information
-        debug: debugInfo
+        // Enhanced debug information
+        debug: {
+          ...debugInfo,
+          // Comparison between sources
+          totalFromPaymentsCollection: totalSpendFromPayments,
+          totalFromStripe: totalSpendFromStripe,
+          paymentsInCollection: paymentsFromCollection.length,
+          paymentsInStripe: stripePayments.length,
+          // Show actual payments from collection
+          paymentsCollectionData: paymentsFromCollection.map(p => ({
+            id: p.paymentId,
+            amount: p.amount || p.calculatedAmount,
+            type: p.paymentType,
+            status: p.status,
+            createdAt: p.createdAt,
+            checkoutSessionId: p.checkoutSessionId,
+            stripePaymentIntentId: p.stripePaymentIntentId,
+          }))
+        }
       }
     });
   } catch (error) {

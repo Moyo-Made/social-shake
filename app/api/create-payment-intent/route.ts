@@ -92,48 +92,51 @@ export async function POST(request: NextRequest) {
 					{ status: 400 }
 				);
 			}
-
+		
 			try {
 				const submissionDoc = await adminDb
 					.collection("project_submissions")
 					.doc(requestData.submissionId)
 					.get();
-
+		
 				if (!submissionDoc.exists) {
 					return NextResponse.json(
 						{ error: "Submission not found" },
 						{ status: 404 }
 					);
 				}
-
+		
 				const submissionData = submissionDoc.data();
 				const creatorId = submissionData?.userId;
-
+		
 				if (!creatorId) {
 					return NextResponse.json(
 						{ error: "Creator ID not found in submission" },
 						{ status: 400 }
 					);
 				}
-
+		
 				const creatorDoc = await adminDb
 					.collection("creators")
 					.doc(creatorId)
 					.get();
-
+		
 				if (!creatorDoc.exists) {
 					return NextResponse.json(
 						{ error: "Creator not found" },
 						{ status: 404 }
 					);
 				}
-
+		
 				const creatorData = creatorDoc.data();
+				
+				// IMPORTANT: Keep original userId as brandId, set creatorId separately
+				requestData.brandId = userId; // Preserve the original brand ID
 				requestData.stripeConnectId = creatorData?.stripeAccountId;
 				requestData.creatorEmail = creatorData?.email;
 				requestData.projectId = submissionData?.projectId;
-				requestData.creatorId = creatorId;
-
+				requestData.creatorId = creatorId; // Set creator ID separately
+		
 				if (!requestData.stripeConnectId) {
 					return NextResponse.json(
 						{
@@ -293,7 +296,7 @@ export async function POST(request: NextRequest) {
 		];
 
 		// Define payment types that use escrow (held until approval)
-		const escrowPaymentTypes = ["order_escrow", "submission_approval"];
+		const escrowPaymentTypes = ["order_escrow"];
 
 		const requiresCreatorAccount = creatorPaymentTypes.includes(paymentType);
 		const isEscrowPayment = escrowPaymentTypes.includes(paymentType);
@@ -374,12 +377,16 @@ export async function POST(request: NextRequest) {
 					metadata: {
 						paymentId: paymentId,
 						paymentType: paymentType,
-						creatorId: requestData.creatorId || "",
+						userId: userId, // This should be the BRAND ID, not creator ID
+						brandId: requestData.brandId || userId, // Explicitly set brand ID
+						brandEmail: requestData.brandEmail || "",
+						creatorId: requestData.creatorId || "", // Creator ID goes here
 						orderId: requestData.orderId || "",
 						submissionId: requestData.submissionId || "",
+						projectId: requestData.projectId || "",
 					},
 				});
-
+		
 				stripePaymentIntentId = paymentIntent.id;
 				console.log(`Created escrow PaymentIntent: ${stripePaymentIntentId}`);
 			} catch (stripeError) {
@@ -394,16 +401,17 @@ export async function POST(request: NextRequest) {
 		// Store payment intent data in Firestore
 		const paymentData = removeUndefined({
 			paymentId,
-			userId,
-			brandEmail: requestData.brandEmail || "",
-			amount: parseFloat(amount),
-			paymentType: paymentType || "contest",
-			paymentName,
-			status: isEscrowPayment ? "pending_capture" : "pending", // Different status for escrow
-			escrowPayment: isEscrowPayment,
-			stripePaymentIntentId: stripePaymentIntentId,
-			createdAt: new Date().toISOString(),
-			requiresCreatorAccount,
+	userId, // This should remain the BRAND ID
+	brandId: requestData.brandId || userId, // Explicitly store brand ID
+	brandEmail: requestData.brandEmail || "",
+	amount: parseFloat(amount),
+	paymentType: paymentType || "contest",
+	paymentName,
+	status: isEscrowPayment ? "pending_capture" : "pending",
+	escrowPayment: isEscrowPayment,
+	stripePaymentIntentId: stripePaymentIntentId,
+	createdAt: new Date().toISOString(),
+	requiresCreatorAccount,
 			directPayment: requiresCreatorAccount,
 
 			// Creator fields (for all creator payment types)
@@ -507,18 +515,20 @@ export async function POST(request: NextRequest) {
 				submissionId: requestData.submissionId,
 				projectId: requestData.projectId,
 				stripeConnectId: requestData.stripeConnectId,
-				stripePaymentIntentId: stripePaymentIntentId, // Include for escrow tracking
-				brandId: userId,
+				stripePaymentIntentId: stripePaymentIntentId,
+				brandId: userId, // This should be the BRAND ID (person making payment)
+				creatorId: requestData.creatorId, // This should be the CREATOR ID (person receiving payment)
 				amount: parseFloat(amount),
-				status: "pending_capture", // Changed from pending_payment for escrow
+				status: "pending_capture",
 				escrowStatus: "held",
 				createdAt: new Date().toISOString(),
 				projectTitle: requestData.projectTitle || "",
 				brandEmail: requestData.brandEmail || "",
+				creatorEmail: requestData.creatorEmail || "",
 				directPayment: true,
 				escrowPayment: true,
 			};
-
+		
 			await adminDb
 				.collection("submission_payments")
 				.doc(paymentId)

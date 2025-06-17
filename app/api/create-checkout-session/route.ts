@@ -17,10 +17,8 @@ export async function POST(request: NextRequest) {
 			userEmail,
 			userId,
 			paymentType = "contest", // Default for backward compatibility
-			// Add these new parameters for proper pricing calculation
 			projectFormData,
 			submissionData,
-			// NEW: Order-specific parameters
 			orderId,
 		} = await request.json();
 
@@ -64,7 +62,7 @@ export async function POST(request: NextRequest) {
 		];
 
 		// Define payment types that use escrow (held until approval)
-		const escrowPaymentTypes = ["order_escrow", "submission_approval"];
+		const escrowPaymentTypes = ["order_escrow"];
 
 		const requiresCreatorAccount = creatorPaymentTypes.includes(paymentType);
 		const isEscrowPayment = escrowPaymentTypes.includes(paymentType);
@@ -99,15 +97,13 @@ export async function POST(request: NextRequest) {
 						submissionData.userId
 					];
 
-				if (creatorPaymentData) {
-					// For bulk pricing, use price per video
 					if (creatorPaymentData.pricingTier === "bulk rate") {
 						calculatedAmount = creatorPaymentData.pricePerVideo || 0;
 					} else {
-						// For other pricing tiers, use total amount
-						calculatedAmount = creatorPaymentData.totalAmount || 0;
+						// For other pricing tiers, calculate price per video from total amount
+						const videosPerCreator = projectFormData.creatorPricing?.videosPerCreator || 1;
+						calculatedAmount = (creatorPaymentData.totalAmount || 0) / videosPerCreator;
 					}
-				}
 			} else {
 				// For non-specific creator selection, use budget per video
 				calculatedAmount = projectFormData.creatorPricing?.budgetPerVideo || 0;
@@ -289,6 +285,7 @@ export async function POST(request: NextRequest) {
 				paymentId,
 				userId,
 				paymentType,
+				
 				paymentName: productName,
 				description: productDescription,
 				calculatedAmount: calculatedAmount.toString(),

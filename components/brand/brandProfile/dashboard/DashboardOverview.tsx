@@ -151,7 +151,8 @@ const UserDashboard = dynamic(
 				userData.projects.filter(
 					(project) =>
 						project.status === "active" ||
-						project.status === "accepting pitches"
+						project.status === "accepting pitches" ||
+						project.status === "invite"
 				).length > 0;
 
 			// function to calculate time ago
@@ -744,7 +745,8 @@ const UserDashboard = dynamic(
 											.filter(
 												(project) =>
 													project.status === "active" ||
-													project.status === "accepting pitches"
+													project.status === "accepting pitches" ||
+													project.status === "invite" 
 											)
 											.sort((a, b) => {
 												// Sort by creation date (most recent first)

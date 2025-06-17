@@ -5,6 +5,8 @@ import { adminDb } from "@/config/firebase-admin";
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
 
+
+
 // Helper function to send notifications
 export interface Notification {
 	type: string;

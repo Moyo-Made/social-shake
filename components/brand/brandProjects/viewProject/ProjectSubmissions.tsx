@@ -284,8 +284,12 @@ export default function ProjectSubmissions({
 				return creatorPaymentData.pricePerVideo || 0;
 			}
 
-			// For other pricing tiers (one video, three videos, five videos), return total amount
-			return creatorPaymentData.totalAmount || 0;
+			// For other pricing tiers, calculate price per video from total amount
+			const videosPerCreator =
+				projectFormData.creatorPricing.videosPerCreator || 1;
+			const pricePerVideo =
+				(creatorPaymentData.totalAmount || 0) / videosPerCreator;
+			return Math.round(pricePerVideo * 100) / 100; // Round to 2 decimal places
 		} else {
 			// For non-specific creator selection, return budget per video
 			return projectFormData.creatorPricing.budgetPerVideo || 0;
@@ -294,45 +298,57 @@ export default function ProjectSubmissions({
 
 	// Replace the handleApprove function in your ProjectSubmissions component with this:
 
-const handleApprove = async () => {
-	if (currentSubmission) {
-		let creatorPayments = 0;
+	const handleApprove = async () => {
+		if (currentSubmission) {
+			// Calculate the payment per video instead of total amount
+			let creatorPaymentPerVideo = 0;
 
-		if (
-			projectFormData.creatorPricing.selectionMethod ===
-			"Invite Specific Creators"
-		) {
-			// Get the creator's payment data using their ID as the key
-			const creatorPaymentData =
-				projectFormData.creatorPricing.creatorPayments?.[
-					currentSubmission.userId
-				];
+			if (
+				projectFormData.creatorPricing.selectionMethod ===
+				"Invite Specific Creators"
+			) {
+				// Get the creator's payment data using their ID as the key
+				const creatorPaymentData =
+					projectFormData.creatorPricing.creatorPayments?.[
+						currentSubmission.userId
+					];
 
-			creatorPayments = creatorPaymentData?.totalAmount || 0;
-		} else {
-			creatorPayments = projectFormData.creatorPricing.budgetPerVideo || 0;
+				if (creatorPaymentData) {
+					if (creatorPaymentData.pricingTier === "bulk rate") {
+						creatorPaymentPerVideo = creatorPaymentData.pricePerVideo || 0;
+					} else {
+						// Calculate per video from total amount
+						const videosPerCreator =
+							projectFormData.creatorPricing.videosPerCreator || 1;
+						creatorPaymentPerVideo =
+							(creatorPaymentData.totalAmount || 0) / videosPerCreator;
+					}
+				}
+			} else {
+				creatorPaymentPerVideo =
+					projectFormData.creatorPricing.budgetPerVideo || 0;
+			}
+
+			try {
+				// Pass the per-video payment amount to the payment intent
+				await triggerPaymentIntent(creatorPaymentPerVideo, {
+					...currentSubmission,
+					type: "submission_approval",
+					submissionId: currentSubmission.id,
+					// Add the project form data and submission data
+					projectFormData: projectFormData,
+					submissionData: currentSubmission,
+				});
+
+				// Close dialog and show loading state
+				setOpenApproveDialog(false);
+				toast("Processing payment...");
+			} catch (error) {
+				console.error("Error initiating payment:", error);
+				toast.error("Failed to initiate payment");
+			}
 		}
-
-		try {
-			// Pass the projectFormData and submission data to the payment intent
-			await triggerPaymentIntent(creatorPayments, {
-				...currentSubmission,
-				type: "submission_approval",
-				submissionId: currentSubmission.id,
-				// Add the project form data and submission data
-				projectFormData: projectFormData,
-				submissionData: currentSubmission,
-			});
-
-			// Close dialog and show loading state
-			setOpenApproveDialog(false);
-			toast("Processing payment...");
-		} catch (error) {
-			console.error("Error initiating payment:", error);
-			toast.error("Failed to initiate payment");
-		}
-	}
-};
+	};
 
 	const handleRequestSparkCode = async (submission: CreatorSubmission) => {
 		// First update the status to spark_requested and don't change it automatically
@@ -576,7 +592,11 @@ const handleApprove = async () => {
 	);
 
 	// Calculate progress metrics
-	const totalVideos = submissionsList.length;
+	const totalVideosRequested = projectFormData?.creatorPricing?.videosPerCreator
+		? projectFormData.creatorPricing.videosPerCreator *
+			(projectFormData.creatorPricing.creatorCount || 1)
+		: submissionsList.length; // fallback to actual submissions if data not available
+
 	const completedVideos = submissionsList.filter(
 		(sub) =>
 			sub.status === "pending" ||
@@ -592,7 +612,9 @@ const handleApprove = async () => {
 	).length;
 
 	const completionPercentage =
-		totalVideos > 0 ? (completedVideos / totalVideos) * 100 : 0;
+		totalVideosRequested > 0
+			? (completedVideos / totalVideosRequested) * 100
+			: 0;
 
 	// Render buttons based on submission status
 	const renderSubmissionButtons = (submission: CreatorSubmission) => {
@@ -817,9 +839,9 @@ const handleApprove = async () => {
 			{sortedSubmissions.map((submission) => (
 				<Card
 					key={submission.id}
-					className="overflow-hidden border border-[#FFBF9BBA]"
+					className="overflow-hidden border border-[#FFBF9BBA] w-full"
 				>
-					<CardContent className="p-0">
+					<CardContent className=" p-0">
 						<div className="p-4">
 							<div className="flex items-center mb-2">
 								<div className="w-10 h-10 bg-gray-200 rounded-full overflow-hidden mr-2">
@@ -987,7 +1009,7 @@ const handleApprove = async () => {
 							className="border border-gray-200 rounded-lg overflow-hidden"
 						>
 							<div
-								className="flex justify-between items-center p-4 cursor-pointer"
+								className="grid grid-cols-1 lg:grid-cols-2 p-4 cursor-pointer"
 								onClick={() => toggleCreatorExpand(creatorName)}
 							>
 								<div className="flex items-center gap-3">
@@ -1150,7 +1172,7 @@ const handleApprove = async () => {
 		<div className="container mx-auto p-6">
 			<div className="flex justify-between items-center mb-6">
 				<h1 className="text-2xl text-black font-bold">
-					Project Submissions ({totalVideos})
+					Project Submissions ({completedVideos}/{totalVideosRequested})
 				</h1>
 				<div className="inline-flex rounded-full border border-orange-500 overflow-hidden">
 					<Button
@@ -1185,7 +1207,7 @@ const handleApprove = async () => {
 							Submission Progress
 						</div>
 						<div className="text-sm text-black">
-							{completedVideos}/{totalVideos} videos (
+							{completedVideos}/{totalVideosRequested} videos (
 							{Math.round(completionPercentage)}%)
 						</div>
 					</div>

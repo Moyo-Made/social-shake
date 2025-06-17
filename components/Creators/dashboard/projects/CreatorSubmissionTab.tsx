@@ -12,6 +12,7 @@ import SparkCodeModal from "@/components/Creators/dashboard/projects/SparkCodeMo
 import Link from "next/link";
 import TikTokLinkModal from "./TikTokLinkModal";
 import AffiliateLinkModal from "./AffiliateLinkModal";
+import { toast } from "sonner";
 
 interface ProjectSubmissionsProps {
 	projectFormData: ProjectFormData;
@@ -54,7 +55,9 @@ export default function CreatorSubmissionTab({
 
 	const totalVideos = projectFormData?.creatorPricing?.videosPerCreator || 0;
 	const completedVideos = submissionsList.length || 0;
-	const completionPercentage = (completedVideos / totalVideos) * 100;
+	const hasReachedLimit = completedVideos >= totalVideos;
+	const completionPercentage =
+		totalVideos > 0 ? (completedVideos / totalVideos) * 100 : 0;
 
 	// Fetch submissions via API endpoint when component mounts
 	useEffect(() => {
@@ -64,18 +67,15 @@ export default function CreatorSubmissionTab({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [currentUser, projectId]);
 
-
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const handleRevisionSubmit = (newSubmissionData: any) => {
-    // Update your submissions state with the new data
-    setSubmissionsList(prevSubmissions => 
-        prevSubmissions.map(submission => 
-            submission.id === newSubmissionData.id 
-                ? newSubmissionData 
-                : submission
-        )
-    );
-};
+		// Update your submissions state with the new data
+		setSubmissionsList((prevSubmissions) =>
+			prevSubmissions.map((submission) =>
+				submission.id === newSubmissionData.id ? newSubmissionData : submission
+			)
+		);
+	};
 
 	// Fetch tiktok links for submissions that need them
 	useEffect(() => {
@@ -234,7 +234,7 @@ export default function CreatorSubmissionTab({
 		};
 
 		fetchAffiliateLink();
-	}, [submissionsList.length, fetchingAffiliateLink]);
+	}, [submissionsList.length]);
 
 	// Fetch spark codes for submissions that need them
 	useEffect(() => {
@@ -415,9 +415,18 @@ export default function CreatorSubmissionTab({
 
 	const handleSubmitSuccess = async (
 		newParticipantCount: number,
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		newSubmissionData?: any
 	) => {
+		// Check if adding this submission would exceed the limit
+		if (submissionsList.length >= totalVideos) {
+			console.warn("Cannot submit more videos - limit reached");
+			toast.error(
+				"You have reached the maximum number of submissions for this project."
+			);
+			return;
+		}
+
 		// Update participant count
 		setCurrentParticipantCount(newParticipantCount);
 
@@ -460,7 +469,7 @@ export default function CreatorSubmissionTab({
 				projectId: "",
 				fileName: "",
 				fileSize: 0,
-				fileType: ""
+				fileType: "",
 			};
 
 			// Add the new submission to the list immediately
@@ -604,12 +613,18 @@ export default function CreatorSubmissionTab({
 						move forward with the project and receive feedback from the brand.
 					</p>
 					<div className="pt-2">
-						<button
-							onClick={openProjectModal}
-							className="bg-orange-500 text-white shadow-none px-10 py-2 rounded-md"
-						>
-							Upload Video Now
-						</button>
+						{totalVideos > 0 ? (
+							<button
+								onClick={openProjectModal}
+								className="bg-orange-500 text-white shadow-none px-10 py-2 rounded-md"
+							>
+								Upload Video Now
+							</button>
+						) : (
+							<p className="text-gray-500">
+								No videos required for this project
+							</p>
+						)}
 					</div>
 				</div>
 			) : (
@@ -617,14 +632,21 @@ export default function CreatorSubmissionTab({
 					<div className="flex justify-between items-center mb-6">
 						<h1 className="text-2xl text-black font-bold">Your Submissions</h1>
 
-						<Button
-							className="bg-orange-500 text-white shadow-none"
-							onClick={openProjectModal}
-						>
-							Submit New Video <span className="text-base">+</span>
-						</Button>
+						{!hasReachedLimit ? (
+							<Button
+								className="bg-orange-500 text-white shadow-none"
+								onClick={openProjectModal}
+							>
+								Submit New Video <span className="text-base">+</span>
+							</Button>
+						) : (
+							<div className="text-sm text-gray-500 font-medium">
+								All videos submitted ({completedVideos}/{totalVideos})
+							</div>
+						)}
 					</div>
 
+					{/* Progress bar section with better validation */}
 					<div className="flex justify-between items-center mb-4">
 						<div className="w-full mb-6">
 							<div className="flex justify-between mb-2">
@@ -638,10 +660,15 @@ export default function CreatorSubmissionTab({
 							</div>
 							<div className="h-3 bg-[#FFD9C3] rounded-full w-full overflow-hidden">
 								<div
-									className="h-full bg-orange-500 rounded-full"
-									style={{ width: `${completionPercentage}%` }}
+									className="h-full bg-orange-500 rounded-full transition-all duration-300"
+									style={{ width: `${Math.min(completionPercentage, 100)}%` }}
 								></div>
 							</div>
+							{hasReachedLimit && (
+								<div className="text-sm text-green-600 font-medium mt-2">
+									✓ All required videos have been submitted!
+								</div>
+							)}
 						</div>
 					</div>
 
@@ -864,6 +891,9 @@ export default function CreatorSubmissionTab({
 				projectId={projectId}
 				onSubmitSuccess={handleSubmitSuccess}
 				contestId={contestId}
+				maxVideos={totalVideos}
+				currentVideoCount={completedVideos}
+				hasReachedLimit={hasReachedLimit}
 			/>
 		</div>
 	);

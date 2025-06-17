@@ -1014,13 +1014,13 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 										<div className="col-span-3">
 											{creator?.socialMedia?.tiktok ? (
 												<Link
-													href={creator.socialMedia.tiktok}
-													className="text-orange-500 hover:underline"
-													target="_blank"
-													rel="noopener noreferrer"
-												>
-													View Profile
-												</Link>
+												href={`https://${creator.socialMedia.tiktok}`}
+												className="text-orange-500 hover:underline"
+												target="_blank"
+												rel="noopener noreferrer"
+											  >
+												View Profile
+											  </Link>
 											) : (
 												<span className="text-gray-400">Not Provided</span>
 											)}

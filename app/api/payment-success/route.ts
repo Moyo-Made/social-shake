@@ -100,8 +100,7 @@ export async function GET(request: NextRequest) {
       
       // Determine if this is an escrow payment
       const isEscrowPayment = paymentData?.escrowPayment || 
-                             paymentData?.paymentType === "order_escrow" || 
-                             paymentData?.paymentType === "submission_approval";
+                             paymentData?.paymentType === "order_escrow" 
       
       // FIXED: Check payment status with escrow consideration
       // For escrow payments, session.payment_status will be 'unpaid' even when PaymentIntent is 'requires_capture'

@@ -231,7 +231,7 @@ const DashboardContent = ({ userId }: UserDashboardProps) => {
 
 	return (
 		<div className="max-w-6xl px-4 py-6">
-			{/* Project Invitations Section - NEW */}
+			{/* Project Invitations Section  */}
 			<ProjectInvitationsSection userId={userId} />
 			{/* Summary Cards */}
 			<div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">

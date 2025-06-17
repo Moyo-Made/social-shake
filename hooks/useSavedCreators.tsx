@@ -37,83 +37,102 @@ export const useSavedCreators = () => {
       setError(null);
       
       try {
-        const url = `/api/admin/creator-approval?status=approved`;
-        const response = await fetch(url);
+        // Add pagination parameters to get ALL creators
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let allFetchedCreators: any[] = [];
+        let page = 1;
+        let hasMore = true;
         
-        if (!response.ok) {
-          throw new Error(`Error: ${response.status}`);
+        while (hasMore) {
+          const url = `/api/admin/creator-approval?status=approved&page=${page}&limit=100`;
+          const response = await fetch(url);
+          
+          if (!response.ok) {
+            throw new Error(`Error: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          
+          // Map the API response data to our Creator interface
+          const mappedCreators = data.creators.map(
+            (creator: {
+              userId: string;
+              firstName?: string;
+              lastName?: string;
+              username?: string;
+              bio?: string;
+              totalGMV?: number;
+              avgGMVPerVideo?: number;
+              pricing: {
+                oneVideo?: number;
+                threeVideos?: number;
+                fiveVideos?: number;
+                bulkVideos?: number;
+                bulkVideosNote?: string;
+              };
+              logoUrl?: string;
+              contentTypes?: string[];
+              country?: string;
+              socialMedia?: {
+                tiktok?: string;
+              };
+              status?: string;
+              dateOfBirth?: string;
+              gender?: string;
+              ethnicity?: string;
+              contentLinks?: string[];
+              verificationVideoUrl?: string;
+              verifiableIDUrl?: string;
+            }) => ({
+              id: creator.userId,
+              name: `${creator.firstName || ""} ${creator.lastName || ""}`.trim(),
+              username: creator.username || "",
+              bio: creator.bio || "",
+              totalGMV: creator.totalGMV || 0, // Default to 0 instead of filtering out
+              avgGMVPerVideo: creator.avgGMVPerVideo || 0,
+              avgImpressions: "0",
+              pricing: {
+                oneVideo: creator.pricing?.oneVideo || 0,
+                threeVideos: creator.pricing?.threeVideos || 0,
+                fiveVideos: creator.pricing?.fiveVideos || 0,
+                bulkVideos: creator.pricing?.bulkVideos || 0,
+                bulkVideosNote: creator.pricing?.bulkVideosNote || "",
+              },
+              profilePictureUrl: creator.logoUrl || "/path/to/default-img.png",
+              contentTypes: creator.contentTypes || [],
+              country: creator.country || "",
+              socialMedia: creator.socialMedia || {},
+              tiktokUrl: creator.socialMedia?.tiktok || "",
+              status: creator.status || "pending",
+              dateOfBirth: creator.dateOfBirth || "",
+              gender: creator.gender || "",
+              ethnicity: creator.ethnicity || "",
+              contentLinks: creator.contentLinks || [],
+              verificationVideoUrl: creator.verificationVideoUrl || "",
+              verifiableIDUrl: creator.verifiableIDUrl || "",
+            })
+          );
+          
+          allFetchedCreators = [...allFetchedCreators, ...mappedCreators];
+          
+          // Check if there are more pages (adjust this logic based on your API response structure)
+          if (data.creators.length < 100 || !data.hasMore) {
+            hasMore = false;
+          } else {
+            page++;
+          }
         }
         
-        const data = await response.json();
-        
-        // Map the API response data to our Creator interface
-        const mappedCreators = data.creators.map(
-          (creator: {
-            userId: string;
-            firstName?: string;
-            lastName?: string;
-            username?: string;
-            bio?: string;
-            totalGMV?: number;
-            avgGMVPerVideo?: number;
-            pricing: {
-              oneVideo?: number;
-              threeVideos?: number;
-              fiveVideos?: number;
-              bulkVideos?: number;
-              bulkVideosNote?: string;
-            };
-            logoUrl?: string;
-            contentTypes?: string[];
-            country?: string;
-            socialMedia?: {
-              tiktok?: string;
-            };
-            status?: string;
-            dateOfBirth?: string;
-            gender?: string;
-            ethnicity?: string;
-            contentLinks?: string[];
-            verificationVideoUrl?: string;
-            verifiableIDUrl?: string;
-          }) => ({
-            id: creator.userId,
-            name: `${creator.firstName || ""} ${creator.lastName || ""}`.trim(),
-            username: creator.username || "",
-            bio: creator.bio || "",
-            totalGMV: creator.totalGMV || 0,
-            avgGMVPerVideo: creator.avgGMVPerVideo || 0,
-            avgImpressions: "0",
-            pricing: {
-              oneVideo: creator.pricing?.oneVideo || 0,
-              threeVideos: creator.pricing?.threeVideos || 0,
-              fiveVideos: creator.pricing?.fiveVideos || 0,
-              bulkVideos: creator.pricing?.bulkVideos || 0,
-              bulkVideosNote: creator.pricing?.bulkVideosNote || "",
-            },
-            profilePictureUrl: creator.logoUrl || "/path/to/default-img.png", // Update with your default image path
-            contentTypes: creator.contentTypes || [],
-            country: creator.country || "",
-            socialMedia: creator.socialMedia || {},
-            tiktokUrl: creator.socialMedia?.tiktok || "",
-            status: creator.status || "pending",
-            dateOfBirth: creator.dateOfBirth || "",
-            gender: creator.gender || "",
-            ethnicity: creator.ethnicity || "",
-            contentLinks: creator.contentLinks || [],
-            verificationVideoUrl: creator.verificationVideoUrl || "",
-            verifiableIDUrl: creator.verifiableIDUrl || "",
-          })
-        );
-        
-        // Filter out creators with undefined totalGMV if needed
-        const filteredCreators = mappedCreators.filter(
+        // Remove the strict filtering - only filter out null/invalid creators
+        const filteredCreators = allFetchedCreators.filter(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (creator: { totalGMV: any }) => 
+          (creator: any) => 
             creator !== null && 
-            creator.totalGMV !== undefined && 
-            typeof creator.totalGMV === "number"
+            creator.id && // Only require that creator has an ID
+            creator.name.trim() !== "" // And has a name
         );
+        
+        console.log(`Fetched ${filteredCreators.length} total creators`); // Debug log
         
         setAllCreators(filteredCreators);
       } catch (err) {
@@ -143,28 +162,28 @@ export const useSavedCreators = () => {
   const saveCreator = (creator: Creators) => {
     if (!isCreatorSaved(creator.id)) {
       setSavedCreators([...savedCreators, creator]);
-      return true; // Return true to indicate that the creator was saved
+      return true;
     }
-    return false; // Return false to indicate that the creator was already saved
+    return false;
   };
 
   // Remove a creator
   const removeCreator = (creatorId: string | number) => {
     if (isCreatorSaved(creatorId)) {
       setSavedCreators(savedCreators.filter((creator) => creator.id !== creatorId));
-      return true; // Return true to indicate that the creator was removed
+      return true;
     }
-    return false; // Return false to indicate that the creator was not found
+    return false;
   };
 
   // Toggle saved status
   const toggleSavedStatus = (creator: Creators) => {
     if (isCreatorSaved(creator.id)) {
       removeCreator(creator.id);
-      return false; // Indicates the creator is no longer saved
+      return false;
     } else {
       saveCreator(creator);
-      return true; // Indicates the creator is now saved
+      return true;
     }
   };
 
@@ -177,11 +196,15 @@ export const useSavedCreators = () => {
     const searchQuery = query.toLowerCase();
     const creatorsToSearch = searchAllCreators ? allCreators : savedCreators;
     
-    return creatorsToSearch.filter(
+    const results = creatorsToSearch.filter(
       (creator) =>
         creator.name.toLowerCase().includes(searchQuery) ||
         (creator.username && creator.username.toLowerCase().includes(searchQuery))
     );
+    
+    console.log(`Search results: ${results.length} creators found for "${query}"`); // Debug log
+    
+    return results;
   };
 
   return {

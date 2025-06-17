@@ -12,6 +12,9 @@ interface ProjectModalProps {
 	projectId: string;
 	onSubmitSuccess?: (newParticipantCount: number) => void;
 	contestId: string;
+	maxVideos?: number;
+	currentVideoCount?: number;
+	hasReachedLimit?: boolean;
 }
 
 const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
@@ -20,6 +23,9 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 	projectId,
 	contestId,
 	onSubmitSuccess,
+	maxVideos = 1,
+	currentVideoCount = 0,
+	hasReachedLimit = false,
 }) => {
 	const { currentUser } = useAuth();
 	const [additionalNote, setAdditionalNote] = useState("");
@@ -41,34 +47,43 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 
 	// Expanded video format support
 	const SUPPORTED_VIDEO_TYPES = [
-		'video/mp4',
-		'video/webm',
-		'video/quicktime',
-		'video/x-msvideo',
-		'video/mpeg',
-		'video/ogg',
-		'video/3gpp',
-		'video/x-ms-wmv',
-		'video/x-flv',
-		'video/mp2t',
-		'video/x-matroska'
+		"video/mp4",
+		"video/webm",
+		"video/quicktime",
+		"video/x-msvideo",
+		"video/mpeg",
+		"video/ogg",
+		"video/3gpp",
+		"video/x-ms-wmv",
+		"video/x-flv",
+		"video/mp2t",
+		"video/x-matroska",
 	];
 
 	const SUPPORTED_VIDEO_EXTENSIONS = [
-		'.mp4',
-		'.webm',
-		'.mov',
-		'.avi',
-		'.mpeg',
-		'.mpg',
-		'.ogg',
-		'.3gp',
-		'.wmv',
-		'.flv',
-		'.mkv',
-		'.m4v',
-		'.ts'
+		".mp4",
+		".webm",
+		".mov",
+		".avi",
+		".mpeg",
+		".mpg",
+		".ogg",
+		".3gp",
+		".wmv",
+		".flv",
+		".mkv",
+		".m4v",
+		".ts",
 	];
+
+	useEffect(() => {
+		if (hasReachedLimit) {
+			toast.error(
+				`You have reached the maximum number of submissions (${maxVideos}) for this project.`
+			);
+			onClose();
+		}
+	}, [hasReachedLimit, maxVideos, onClose]);
 
 	useEffect(() => {
 		// Clean up object URLs when component unmounts or when file changes
@@ -90,16 +105,19 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 			setErrors({ ...errors, file: undefined });
 
 			// Get file extension
-			const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-			
+			const fileExtension = file.name
+				.toLowerCase()
+				.substring(file.name.lastIndexOf("."));
+
 			// Validate file type - check both MIME type and extension
 			const isValidMimeType = SUPPORTED_VIDEO_TYPES.includes(file.type);
-			const isValidExtension = SUPPORTED_VIDEO_EXTENSIONS.includes(fileExtension);
-			
+			const isValidExtension =
+				SUPPORTED_VIDEO_EXTENSIONS.includes(fileExtension);
+
 			if (!isValidMimeType && !isValidExtension) {
 				setErrors({
 					...errors,
-					file: `Unsupported video format. Supported formats: ${SUPPORTED_VIDEO_EXTENSIONS.join(', ')}`,
+					file: `Unsupported video format. Supported formats: ${SUPPORTED_VIDEO_EXTENSIONS.join(", ")}`,
 				});
 				return;
 			}
@@ -137,7 +155,15 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 			videoUrl?: string;
 			agreement?: string;
 			file?: string;
+			limit?: string;
 		} = {};
+
+		// Add limit validation FIRST
+		if (hasReachedLimit || currentVideoCount >= (maxVideos || 1)) {
+			newErrors.limit = `You have reached the maximum number of submissions (${maxVideos}) for this project.`;
+			toast.error(newErrors.limit);
+			return false;
+		}
 
 		// Check if file is uploaded
 		if (!fileToUpload) {
@@ -154,10 +180,12 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 	};
 
 	// Chunked upload function
-	const uploadFileInChunks = async (file: File): Promise<{ success: boolean; fileId?: string; error?: string }> => {
+	const uploadFileInChunks = async (
+		file: File
+	): Promise<{ success: boolean; fileId?: string; error?: string }> => {
 		const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 		const fileId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-		
+
 		try {
 			// Upload each chunk
 			for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
@@ -166,16 +194,23 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 				const chunk = file.slice(start, end);
 
 				const formData = new FormData();
-				formData.append('chunk', chunk);
+				formData.append("chunk", chunk);
 
-				const response = await fetch(`/api/projects/submission?userId=${currentUser?.uid}&projectId=${projectId}&filename=${encodeURIComponent(file.name)}&chunkIndex=${chunkIndex}&totalChunks=${totalChunks}&fileId=${fileId}`, {
-					method: 'PUT',
-					body: chunk, // Send raw chunk data
-				});
+				const response = await fetch(
+					`/api/projects/submission?userId=${currentUser?.uid}&projectId=${projectId}&filename=${encodeURIComponent(file.name)}&chunkIndex=${chunkIndex}&totalChunks=${totalChunks}&fileId=${fileId}`,
+					{
+						method: "PUT",
+						body: chunk, // Send raw chunk data
+					}
+				);
 
 				if (!response.ok) {
-					const errorData = await response.json().catch(() => ({ error: 'Upload failed' }));
-					throw new Error(errorData.error || `Chunk upload failed: ${response.status}`);
+					const errorData = await response
+						.json()
+						.catch(() => ({ error: "Upload failed" }));
+					throw new Error(
+						errorData.error || `Chunk upload failed: ${response.status}`
+					);
 				}
 
 				// Update progress
@@ -185,10 +220,10 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 
 			// Finalize the upload
 			setUploadProgress(95);
-			const finalizeResponse = await fetch('/api/projects/submission', {
-				method: 'PATCH',
+			const finalizeResponse = await fetch("/api/projects/submission", {
+				method: "PATCH",
 				headers: {
-					'Content-Type': 'application/json',
+					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
 					userId: currentUser?.uid,
@@ -201,18 +236,21 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 			});
 
 			if (!finalizeResponse.ok) {
-				const errorData = await finalizeResponse.json().catch(() => ({ error: 'Finalization failed' }));
-				throw new Error(errorData.error || `Finalization failed: ${finalizeResponse.status}`);
+				const errorData = await finalizeResponse
+					.json()
+					.catch(() => ({ error: "Finalization failed" }));
+				throw new Error(
+					errorData.error || `Finalization failed: ${finalizeResponse.status}`
+				);
 			}
 
 			setUploadProgress(100);
 			return { success: true, fileId };
-
 		} catch (error) {
-			console.error('Chunked upload failed:', error);
-			return { 
-				success: false, 
-				error: error instanceof Error ? error.message : 'Upload failed' 
+			console.error("Chunked upload failed:", error);
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : "Upload failed",
 			};
 		}
 	};
@@ -224,16 +262,22 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 		// Add other expected properties here
 	}
 
-	const uploadFileStandard = async (file: File): Promise<{ success: boolean; data?: UploadResponseData; error?: string }> => {
+	const uploadFileStandard = async (
+		file: File
+	): Promise<{
+		success: boolean;
+		data?: UploadResponseData;
+		error?: string;
+	}> => {
 		try {
 			const formData = new FormData();
 			formData.append("userId", currentUser?.uid || "");
 			formData.append("projectId", projectId);
-			
+
 			if (additionalNote) {
 				formData.append("note", additionalNote);
 			}
-			
+
 			formData.append("video", file);
 
 			const response = await fetch("/api/projects/submission", {
@@ -243,37 +287,49 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 
 			let data;
 			const contentType = response.headers.get("content-type");
-			
+
 			if (contentType && contentType.includes("application/json")) {
 				data = await response.json();
 			} else {
 				const textResponse = await response.text();
 				console.error("Non-JSON response:", textResponse);
-				
+
 				if (!response.ok) {
-					throw new Error(`Server error: ${response.status} ${response.statusText}`);
+					throw new Error(
+						`Server error: ${response.status} ${response.statusText}`
+					);
 				}
-				
+
 				data = { success: true, message: "Upload completed successfully" };
 			}
 
 			if (!response.ok) {
-				throw new Error(data?.error || `Server error: ${response.status} ${response.statusText}`);
+				throw new Error(
+					data?.error ||
+						`Server error: ${response.status} ${response.statusText}`
+				);
 			}
 
 			return { success: true, data };
-
 		} catch (error) {
-			console.error('Standard upload failed:', error);
-			return { 
-				success: false, 
-				error: error instanceof Error ? error.message : 'Upload failed' 
+			console.error("Standard upload failed:", error);
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : "Upload failed",
 			};
 		}
 	};
 
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
+
+		// Add limit check at the beginning of submit
+		if (hasReachedLimit || currentVideoCount >= (maxVideos || 1)) {
+			toast.error(
+				`You have reached the maximum number of submissions (${maxVideos}) for this project.`
+			);
+			return;
+		}
 
 		if (!validateForm() || !fileToUpload) {
 			return;
@@ -284,7 +340,7 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 
 		try {
 			let result;
-			
+
 			// Decide whether to use chunked or standard upload
 			if (fileToUpload.size > LARGE_FILE_THRESHOLD) {
 				// Use chunked upload for large files
@@ -296,40 +352,49 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 
 			if (result.success) {
 				// If provided, call onSubmitSuccess with the new submission count
-				if (onSubmitSuccess && 'data' in result && result.data?.submissionsCount) {
+				if (
+					onSubmitSuccess &&
+					"data" in result &&
+					result.data?.submissionsCount
+				) {
 					onSubmitSuccess(result.data.submissionsCount);
 				}
 
 				toast.success("Your video has been submitted successfully!");
 				onClose();
 			} else {
-				throw new Error(result.error || 'Upload failed');
+				throw new Error(result.error || "Upload failed");
 			}
-
 		} catch (error) {
 			console.error("Error submitting project entry:", error);
-			
+
 			// More specific error messages
 			let errorMessage = "Failed to submit project entry. Please try again.";
-			
+
 			if (error instanceof Error) {
 				if (error.message.includes("Failed to fetch")) {
-					errorMessage = "Network error. Please check your connection and try again.";
+					errorMessage =
+						"Network error. Please check your connection and try again.";
 				} else if (error.message.includes("Server error: 413")) {
-					errorMessage = "File too large for server. Please try a smaller file.";
+					errorMessage =
+						"File too large for server. Please try a smaller file.";
 				} else if (error.message.includes("Server error: 415")) {
-					errorMessage = "Unsupported file format. Please try a different video format.";
+					errorMessage =
+						"Unsupported file format. Please try a different video format.";
 				} else {
 					errorMessage = error.message;
 				}
 			}
-			
+
 			toast.error(errorMessage);
 		} finally {
 			setIsSubmitting(false);
 			setUploadProgress(0);
 		}
 	};
+
+	// Don't render modal if limit is reached
+	if (!isOpen || hasReachedLimit) return null;
 
 	const handleSuccessModalClose = () => {
 		setShowSuccessModal(false);
@@ -409,6 +474,12 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 						Upload your video submission for the brand to review. Ensure it
 						meets all project requirements before submitting.
 					</p>
+
+					{maxVideos > 1 && (
+						<span className="block mt-1 text-orange-600 font-medium">
+							Submission {(currentVideoCount || 0) + 1} of {maxVideos}
+						</span>
+					)}
 				</div>
 
 				{/* Modal Body */}
@@ -431,7 +502,7 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 									type="file"
 									onChange={handleFileChange}
 									className="hidden"
-									accept={SUPPORTED_VIDEO_EXTENSIONS.join(',')}
+									accept={SUPPORTED_VIDEO_EXTENSIONS.join(",")}
 								/>
 
 								{filePreviewUrl && fileToUpload?.type.includes("video") ? (
@@ -445,7 +516,6 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 											Video uploaded: {fileToUpload?.name} (
 											{(fileToUpload?.size / (1024 * 1024)).toFixed(2)}MB)
 										</p>
-										
 									</div>
 								) : (
 									<>
@@ -477,10 +547,12 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 							<div className="mb-4">
 								<div className="flex justify-between items-center mb-1">
 									<span className="text-sm text-gray-600">Uploading...</span>
-									<span className="text-sm text-gray-600">{uploadProgress}%</span>
+									<span className="text-sm text-gray-600">
+										{uploadProgress}%
+									</span>
 								</div>
 								<div className="w-full bg-gray-200 rounded-full h-2">
-									<div 
+									<div
 										className="bg-orange-500 h-2 rounded-full transition-all duration-300"
 										style={{ width: `${uploadProgress}%` }}
 									></div>

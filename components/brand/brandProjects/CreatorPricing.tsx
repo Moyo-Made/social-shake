@@ -21,8 +21,14 @@ import { topLanguages } from "@/types/languages";
 export default function CreatorPricingTab() {
 	const { formData, updateCreatorPricing } = useProjectForm();
 	const { creatorPricing } = formData;
-	const { savedCreators, allCreators, isLoading, error, searchCreators } =
-		useSavedCreators();
+	const {
+		savedCreators,
+		allCreators,
+		isLoadingSaved,
+		isLoadingAll,
+		error,
+		searchCreators,
+	} = useSavedCreators();
 
 	// Initialize state from context or use default values
 	const [selectionMethod, setSelectionMethod] = useState<
@@ -71,6 +77,12 @@ export default function CreatorPricingTab() {
 	);
 	const [searchQuery, setSearchQuery] = useState("");
 	const dropdownRef = useRef<HTMLDivElement>(null);
+	const [currentPage, setCurrentPage] = useState(1);
+	const [itemsPerPage] = useState(20);
+
+	const isCreatorSaved = (creatorId: string) => {
+		return savedCreators.some((creator) => creator.id === creatorId);
+	};
 
 	const getBestPricing = (
 		creator: {
@@ -229,6 +241,10 @@ export default function CreatorPricingTab() {
 		// When switching to search mode, maintain current selections
 	}, [creatorSelectionMode, savedCreators]);
 
+	useEffect(() => {
+		setCurrentPage(1);
+	}, [searchQuery, creatorSelectionMode]);
+
 	// Function to toggle selection of a creator
 	const toggleCreatorSelection = (creatorId: string) => {
 		if (selectedCreatorIds.includes(creatorId)) {
@@ -243,7 +259,7 @@ export default function CreatorPricingTab() {
 			// Add creator if not already selected
 			setSelectedCreatorIds((prevIds) => [...prevIds, creatorId]);
 
-			// Find the creator from either allCreators or savedCreators
+			// Find the creator from the appropriate list based on current mode
 			const creatorsList =
 				creatorSelectionMode === "search" ? allCreators : savedCreators;
 			const creator = creatorsList.find((c) => c.id === creatorId);
@@ -266,9 +282,31 @@ export default function CreatorPricingTab() {
 
 	// Function to get filtered creators based on search
 	const getFilteredCreators = () => {
-		// When in "all" mode, only show saved creators
-		// When in "search" mode, search all creators
-		return searchCreators(searchQuery, creatorSelectionMode === "search");
+		// Don't try to filter if data is still loading
+		if (isLoadingAll && creatorSelectionMode === "search") {
+			return { creators: [], totalCount: 0, totalPages: 0 };
+		}
+
+		if (isLoadingSaved && creatorSelectionMode === "all") {
+			return { creators: [], totalCount: 0, totalPages: 0 };
+		}
+
+		let allCreators;
+		if (creatorSelectionMode === "all") {
+			allCreators = searchCreators(searchQuery, false);
+		} else {
+			allCreators = searchCreators(searchQuery, true);
+		}
+
+		// Calculate pagination
+		const startIndex = (currentPage - 1) * itemsPerPage;
+		const endIndex = startIndex + itemsPerPage;
+
+		return {
+			creators: allCreators.slice(startIndex, endIndex),
+			totalCount: allCreators.length,
+			totalPages: Math.ceil(allCreators.length / itemsPerPage),
+		};
 	};
 
 	// Handle budget value change
@@ -522,43 +560,112 @@ export default function CreatorPricingTab() {
 										</div>
 									)}
 
-									{isLoading ? (
-										<p className="text-gray-500">Loading creators...</p>
+									{isLoadingAll && creatorSelectionMode === "search" ? (
+										<p className="text-gray-500">Loading all creators...</p>
+									) : isLoadingSaved && creatorSelectionMode === "all" ? (
+										<p className="text-gray-500">Loading saved creators...</p>
 									) : error ? (
 										<p className="text-red-500">{error}</p>
-									) : getFilteredCreators().length > 0 ? (
-										<div className="flex flex-wrap gap-2">
-											{getFilteredCreators().map((creator) => (
-												<div
-													key={creator.id}
-													className={`flex items-center justify-between border gap-2 bg-white rounded-lg cursor-pointer px-2 py-1 min-w-0 ${
-														selectedCreatorIds.includes(creator.id)
-															? "border-orange-500"
-															: "border-[#D0D5DD]"
-													}`}
-													onClick={() => toggleCreatorSelection(creator.id)}
-												>
-													<div className="flex items-center gap-1 min-w-0">
-														<Image
-															src={creator.profilePictureUrl}
-															alt={creator.name}
-															width={24}
-															height={24}
-															className="w-6 h-6 rounded-full object-fill flex-shrink-0"
-														/>
-														<span className="text-sm truncate">
-															{creator.name}
-														</span>
-													</div>
-												</div>
-											))}
-										</div>
 									) : (
-										<p className="text-gray-500">
-											{creatorSelectionMode === "search"
-												? "No creators found."
-												: "No saved creators found."}
-										</p>
+										(() => {
+											const filteredData = getFilteredCreators();
+											return filteredData.creators.length > 0 ? (
+												<>
+													<div className="flex flex-wrap gap-2">
+														{filteredData.creators.map((creator) => (
+															<div
+																key={creator.id}
+																className={`flex items-center justify-between border gap-2 bg-white rounded-lg cursor-pointer px-2 py-1 min-w-0 ${
+																	selectedCreatorIds.includes(creator.id)
+																		? "border-orange-500"
+																		: "border-[#D0D5DD]"
+																}`}
+																onClick={() =>
+																	toggleCreatorSelection(creator.id)
+																}
+															>
+																<div className="flex items-center gap-1 min-w-0">
+																	<Image
+																		src={creator.profilePictureUrl}
+																		alt={creator.name}
+																		width={24}
+																		height={24}
+																		className="w-6 h-6 rounded-full object-fill flex-shrink-0"
+																	/>
+																	<span className="text-sm truncate">
+																		{creator.name}
+																	</span>
+																	{creatorSelectionMode === "search" &&
+																		isCreatorSaved(creator.id) && (
+																			<span className="text-xs bg-blue-100 text-blue-600 px-1 py-0.5 rounded text-[10px] flex-shrink-0">
+																				Saved
+																			</span>
+																		)}
+																</div>
+															</div>
+														))}
+													</div>
+
+													{/* Pagination Controls */}
+													{filteredData.totalPages > 1 && (
+														<div className="flex items-center justify-between mt-4 pt-4 pb-6">
+															<div className="text-sm text-gray-500">
+																Showing {(currentPage - 1) * itemsPerPage + 1}{" "}
+																to{" "}
+																{Math.min(
+																	currentPage * itemsPerPage,
+																	filteredData.totalCount
+																)}{" "}
+																of {filteredData.totalCount} creators
+															</div>
+															<div className="flex items-center gap-2">
+																<Button
+																	variant="outline"
+																	size="sm"
+																	onClick={() =>
+																		setCurrentPage((prev) =>
+																			Math.max(1, prev - 1)
+																		)
+																	}
+																	disabled={currentPage === 1}
+																	className="px-3 py-1"
+																>
+																	Previous
+																</Button>
+																<span className="text-sm">
+																	Page {currentPage} of{" "}
+																	{filteredData.totalPages}
+																</span>
+																<Button
+																	variant="outline"
+																	size="sm"
+																	onClick={() =>
+																		setCurrentPage((prev) =>
+																			Math.min(
+																				filteredData.totalPages,
+																				prev + 1
+																			)
+																		)
+																	}
+																	disabled={
+																		currentPage === filteredData.totalPages
+																	}
+																	className="px-3 py-1"
+																>
+																	Next
+																</Button>
+															</div>
+														</div>
+													)}
+												</>
+											) : (
+												<p className="text-gray-500">
+													{creatorSelectionMode === "search"
+														? "No creators found."
+														: "No saved creators found."}
+												</p>
+											);
+										})()
 									)}
 								</div>
 							) : (
