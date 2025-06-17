@@ -40,7 +40,9 @@ export async function POST(request: NextRequest) {
 			verifiableIDUrl,
 			profilePictureUrl,
 			aboutMeVideo,
-			portfolioVideoUrls,
+			aboutMeVideoThumbnailUrl, 
+      portfolioVideoUrls,
+      portfolioVideoThumbnailUrls,
 			languages,
 		} = body;
 
@@ -57,6 +59,29 @@ export async function POST(request: NextRequest) {
 				{ status: 400 }
 			);
 		}
+
+		if (!aboutMeVideoThumbnailUrl) {
+			return NextResponse.json(
+			  {
+				error: "About me video thumbnail is required",
+			  },
+			  { status: 400 }
+			);
+		  }
+
+		  if (
+			!portfolioVideoThumbnailUrls ||
+			!Array.isArray(portfolioVideoThumbnailUrls) ||
+			portfolioVideoThumbnailUrls.length < 3
+		  ) {
+			return NextResponse.json(
+			  {
+				error: "At least 3 portfolio video thumbnails are required",
+				portfolioThumbnailCount: portfolioVideoThumbnailUrls?.length || 0,
+			  },
+			  { status: 400 }
+			);
+		  }
 
 		// Validate required fields
 		const requiredFields = {
@@ -183,7 +208,9 @@ export async function POST(request: NextRequest) {
 			verifiableIDUrl,
 			profilePictureUrl,
 			aboutMeVideoUrl: aboutMeVideo,
+			aboutMeVideoThumbnailUrl, // NEW
 			portfolioVideoUrls: validPortfolioUrls,
+			portfolioVideoThumbnailUrls,
 			languages: languages || [],
 		};
 

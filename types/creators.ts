@@ -186,4 +186,7 @@ export interface CreatorProfileData {
 	tiktokId?: string;
 	abnNumber?: string | null;
 	aboutMeVideo?: File |  string | null;
+	aboutMeVideoThumbnailUrl?: string | null; 
+	portfolioVideoUrls?: string[] | null;
+	portfolioVideoThumbnailUrls?: string[] | null;
 }

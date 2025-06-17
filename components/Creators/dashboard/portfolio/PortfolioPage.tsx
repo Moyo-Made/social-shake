@@ -1091,4 +1091,3 @@ const CreatorPortfolio = () => {
 };
 
 export default CreatorPortfolio;
-export const dynamic = "force-dynamic";
