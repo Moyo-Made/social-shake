@@ -50,6 +50,7 @@ export default function OrderDetailsPage() {
 			notes: string;
 			needsRevision?: boolean;
 			revisionNotes?: string;
+			uploadProgress: number;
 			savedFile?: {
 				original_filename: string;
 				file_url: string;
@@ -63,7 +64,6 @@ export default function OrderDetailsPage() {
 				file_name?: string;
 				file_size?: number;
 				file_content_type?: string;
-
 			};
 		}[]
 	>([]);
@@ -71,125 +71,131 @@ export default function OrderDetailsPage() {
 	const [processingAction, setProcessingAction] = useState<string | null>(null);
 	const [orderState, setOrderState] = useState<string | null>(null);
 	const [, setSavedDeliverables] = useState<
-	{
-		firestore_id: string;
-		id: string;
-		video_id: number;
-		created_at: string;
-		notes?: string;
-		file_download_url?: string | null;
-		file_name?: string;
-		file_size?: number;
-		file_content_type?: string;
-		status?: string;
-		approval_status?: string;
-		file_exists?: boolean;
-		legacy?: boolean;
-		error?: string;
-		// Legacy fields for backward compatibility
-		file_url?: string;
-		original_filename?: string;
-	}[]
->([]);
+		{
+			firestore_id: string;
+			id: string;
+			video_id: number;
+			created_at: string;
+			notes?: string;
+			file_download_url?: string | null;
+			file_name?: string;
+			file_size?: number;
+			file_content_type?: string;
+			status?: string;
+			approval_status?: string;
+			file_exists?: boolean;
+			legacy?: boolean;
+			error?: string;
+			// Legacy fields for backward compatibility
+			file_url?: string;
+			original_filename?: string;
+		}[]
+	>([]);
 
-const { currentUser } = useAuth();
-const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
+	const { currentUser } = useAuth();
+	const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
 
-// Updated fetch deliverables function
-const fetchDeliverables = async (orderId: string) => {
-	try {
-		const response = await fetch(`/api/orders/${orderId}/deliverables`);
-		if (response.ok) {
-			const data = await response.json();
+	// Updated fetch deliverables function
+	const fetchDeliverables = async (orderId: string) => {
+		try {
+			const response = await fetch(`/api/orders/${orderId}/deliverables`);
+			if (response.ok) {
+				const data = await response.json();
 
-			return data.deliverables || [];
-		} else {
-			console.error('Failed to fetch deliverables:', response.status, response.statusText);
+				return data.deliverables || [];
+			} else {
+				console.error(
+					"Failed to fetch deliverables:",
+					response.status,
+					response.statusText
+				);
+			}
+		} catch (error) {
+			console.error("Error fetching deliverables:", error);
 		}
-	} catch (error) {
-		console.error("Error fetching deliverables:", error);
-	}
-	return [];
-};
+		return [];
+	};
 
-// Updated save deliverable function with chunked upload support
-const saveDeliverable = async (
-	orderId: string,
-	videoId: number,
-	file: File,
-	notes: string = "",
-	onProgress?: (progress: number) => void
-) => {
-	const CHUNK_SIZE = 3 * 1024 * 1024; // 3MB chunks
-	const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-	const fileId = `${Date.now()}_${Math.random().toString(36).substring(2)}`;
+	// Updated save deliverable function with chunked upload support
+	const saveDeliverable = async (
+		orderId: string,
+		videoId: number,
+		file: File,
+		notes: string = "",
+		onProgress?: (progress: number) => void
+	) => {
+		const CHUNK_SIZE = 3 * 1024 * 1024; // 3MB chunks
+		const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+		const fileId = `${Date.now()}_${Math.random().toString(36).substring(2)}`;
 
-	try {
-		// Upload file in chunks
-		for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-			const start = chunkIndex * CHUNK_SIZE;
-			const end = Math.min(start + CHUNK_SIZE, file.size);
-			const chunk = file.slice(start, end);
+		try {
+			// Upload file in chunks
+			for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+				const start = chunkIndex * CHUNK_SIZE;
+				const end = Math.min(start + CHUNK_SIZE, file.size);
+				const chunk = file.slice(start, end);
 
-			// Convert chunk to base64
-			const chunkData = await new Promise<string>((resolve, reject) => {
-				const reader = new FileReader();
-				reader.onload = () => {
-					const result = reader.result as string;
-					// Remove the data URL prefix (e.g., "data:application/octet-stream;base64,")
-					const base64Data = result.split(',')[1];
-					resolve(base64Data);
+				// Convert chunk to base64
+				const chunkData = await new Promise<string>((resolve, reject) => {
+					const reader = new FileReader();
+					reader.onload = () => {
+						const result = reader.result as string;
+						// Remove the data URL prefix (e.g., "data:application/octet-stream;base64,")
+						const base64Data = result.split(",")[1];
+						resolve(base64Data);
+					};
+					reader.onerror = reject;
+					reader.readAsDataURL(chunk);
+				});
+
+				const chunkPayload = {
+					chunkData,
+					fileName: file.name,
+					fileContentType: file.type,
+					chunkIndex,
+					totalChunks,
+					fileId,
+					videoId,
+					notes,
+					status: "content_submitted",
+					fileSize: file.size,
 				};
-				reader.onerror = reject;
-				reader.readAsDataURL(chunk);
-			});
 
-			const chunkPayload = {
-				chunkData,
-				fileName: file.name,
-				fileContentType: file.type,
-				chunkIndex,
-				totalChunks,
-				fileId,
-				videoId,
-				notes,
-				status: "content_submitted",
-				fileSize: file.size
-			};
+				const response = await fetch(
+					`/api/orders/${orderId}/deliverables/upload`,
+					{
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+						},
+						body: JSON.stringify(chunkPayload),
+					}
+				);
 
-			const response = await fetch(`/api/orders/${orderId}/deliverables/upload`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(chunkPayload),
-			});
+				if (!response.ok) {
+					const errorData = await response.json();
+					throw new Error(errorData.error || "Failed to upload chunk");
+				}
 
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || "Failed to upload chunk");
+				const data = await response.json();
+
+				// Update progress
+				if (onProgress) {
+					onProgress(data.progress || 0);
+				}
+
+				// If this is the last chunk and upload is complete
+				if (data.deliverable && data.progress === 100) {
+					return data.deliverable;
+				}
 			}
 
-			const data = await response.json();
-			
-			// Update progress
-			if (onProgress) {
-				onProgress(data.progress || 0);
-			}
-
-			// If this is the last chunk and upload is complete
-			if (data.deliverable && data.progress === 100) {
-				return data.deliverable;
-			}
+			throw new Error("Upload completed but no deliverable returned");
+		} catch (error) {
+			console.error("Error saving deliverable:", error);
+			throw error;
 		}
-
-		throw new Error("Upload completed but no deliverable returned");
-
-	} catch (error) {
-		console.error("Error saving deliverable:", error);
-		throw error;
-	}
-};
+	};
 
 	const getPackageDisplayName = (packageType: string) => {
 		switch (packageType) {
@@ -341,9 +347,15 @@ const saveDeliverable = async (
 					file: null,
 					uploadedAt: null,
 					notes: "",
+					uploadProgress: 0,
 				})
 			);
-			setVideoProgress(initialProgress);
+			setVideoProgress(
+				initialProgress.map((progress) => ({
+					...progress,
+					uploadProgress: 0, // Add default uploadProgress property
+				}))
+			);
 			setWorkStarted(true);
 			setShowStartWorkModal(false);
 
@@ -432,7 +444,6 @@ const saveDeliverable = async (
 					toast.success(
 						"Order marked as delivered successfully! Brand has been notified."
 					);
-
 				} else {
 					const errorData = await response.json();
 					throw new Error(
@@ -536,6 +547,7 @@ const saveDeliverable = async (
 										notes?: string;
 										approval_status?: string;
 										revision_notes?: string;
+										uploadProgress: 0;
 									}) => d.video_id === index + 1
 								);
 
@@ -568,7 +580,12 @@ const saveDeliverable = async (
 								}
 							}
 						);
-						setVideoProgress(initialProgress);
+						setVideoProgress(
+							initialProgress.map((progress) => ({
+								...progress,
+								uploadProgress: 0, // Add default uploadProgress property
+							}))
+						);
 						setWorkStarted(true);
 					}
 				} else {
@@ -1089,7 +1106,8 @@ const saveDeliverable = async (
 											>
 												<div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
 													<h4 className="font-semibold text-gray-900">
-														Script {(typeof index === "number" ? index + 1 : 1)}: {script.title || "Untitled"}
+														Script {typeof index === "number" ? index + 1 : 1}:{" "}
+														{script.title || "Untitled"}
 													</h4>
 												</div>
 												<div className="p-6">
@@ -1463,6 +1481,25 @@ const saveDeliverable = async (
 												</div>
 											</div>
 
+											{video.status === "uploading" && (
+												<div className="mb-4">
+													<div className="flex justify-between items-center mb-2">
+														<span className="text-sm font-medium text-blue-600">
+															Uploading...
+														</span>
+														<span className="text-sm font-medium text-blue-600">
+															{video.uploadProgress || 0}%
+														</span>
+													</div>
+													<div className="w-full bg-gray-200 rounded-full h-2">
+														<div
+															className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+															style={{ width: `${video.uploadProgress || 0}%` }}
+														></div>
+													</div>
+												</div>
+											)}
+
 											{/* Show revision notes if any */}
 											{video.needsRevision && video.revisionNotes && (
 												<div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
@@ -1524,12 +1561,15 @@ const saveDeliverable = async (
 																const file = e.target.files[0];
 
 																// Update UI to show uploading state
-																const newProgress = [...videoProgress];
-																newProgress[index] = {
-																	...video,
-																	status: "uploading",
-																};
-																setVideoProgress(newProgress);
+																setVideoProgress((prevProgress) => {
+																	const newProgress = [...prevProgress];
+																	newProgress[index] = {
+																		...video,
+																		status: "uploading",
+																		uploadProgress: 0,
+																	};
+																	return newProgress;
+																});
 
 																try {
 																	// Save to database
@@ -1537,20 +1577,37 @@ const saveDeliverable = async (
 																		await saveDeliverable(
 																			selectedOrder.id,
 																			video.id,
-																			file
+																			file,
+																			"",
+																			(progress) => {
+																				// FIXED: Use functional update to get current state
+																				setVideoProgress((currentProgress) => {
+																					const updatedProgress = [
+																						...currentProgress,
+																					];
+																					updatedProgress[index] = {
+																						...updatedProgress[index],
+																						uploadProgress: progress,
+																					};
+																					return updatedProgress;
+																				});
+																			}
 																		);
 
 																	// Update progress with success state
-																	newProgress[index] = {
-																		...video,
-																		status: "content_submitted",
-																		file: file,
-																		uploadedAt: new Date(),
-																		needsRevision: false,
-																		revisionNotes: "",
-																		savedFile: savedDeliverable,
-																	};
-																	setVideoProgress(newProgress);
+																	setVideoProgress((prevProgress) => {
+																		const newProgress = [...prevProgress];
+																		newProgress[index] = {
+																			...video,
+																			status: "content_submitted",
+																			file: file,
+																			uploadedAt: new Date(),
+																			needsRevision: false,
+																			revisionNotes: "",
+																			savedFile: savedDeliverable,
+																		};
+																		return newProgress;
+																	});
 
 																	// Update saved deliverables list
 																	setSavedDeliverables((prev) => [
@@ -1561,13 +1618,16 @@ const saveDeliverable = async (
 																	]);
 																} catch (error) {
 																	// Revert to previous state on error
-																	newProgress[index] = {
-																		...video,
-																		status: video.needsRevision
-																			? "revision_requested"
-																			: "pending",
-																	};
-																	setVideoProgress(newProgress);
+																	setVideoProgress((prevProgress) => {
+																		const newProgress = [...prevProgress];
+																		newProgress[index] = {
+																			...video,
+																			status: video.needsRevision
+																				? "revision_requested"
+																				: "pending",
+																		};
+																		return newProgress;
+																	});
 																	console.error(
 																		"Failed to upload deliverable:",
 																		error
@@ -1579,6 +1639,7 @@ const saveDeliverable = async (
 														className="hidden"
 														id={`video-upload-${video.id}`}
 													/>
+
 													<label htmlFor={`video-upload-${video.id}`}>
 														<span className="cursor-pointer inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
 															{video.needsRevision
@@ -1598,7 +1659,7 @@ const saveDeliverable = async (
 														</span>
 													</div>
 													<p className="text-sm text-green-600 mt-1">
-														Uploaded on{" "}
+														Uploaded on x
 														{video.uploadedAt
 															? new Date(video.uploadedAt).toLocaleDateString()
 															: "Not uploaded"}
