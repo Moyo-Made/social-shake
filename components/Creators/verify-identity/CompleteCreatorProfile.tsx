@@ -82,7 +82,6 @@ const CompleteCreatorProfile = () => {
 		fiveVideos: "",
 		bulkVideos: "",
 		bulkVideosNote: "",
-		aiActorPricing: "",
 	});
 
 	const predefinedContentTypes = [
@@ -174,9 +173,7 @@ const CompleteCreatorProfile = () => {
 				bulkVideosNote: profileData.pricing?.bulkVideosNote
 					? String(profileData.pricing.bulkVideosNote)
 					: "",
-				aiActorPricing: profileData.pricing?.aiActorPricing
-					? String(profileData.pricing.aiActorPricing)
-					: "",
+
 			});
 
 			setAboutMeVideo(
@@ -325,7 +322,6 @@ const CompleteCreatorProfile = () => {
 	// Update your useEffect to load languages from context
 	useEffect(() => {
 		if (profileData && Object.keys(profileData).length > 0) {
-			// ... your existing code ...
 
 			// Add this for languages
 			setLanguages(
@@ -335,8 +331,6 @@ const CompleteCreatorProfile = () => {
 					: []
 			);
 
-			// Remove the single language line:
-			// setLanguage(profileData.language || "");
 		}
 	}, [profileData]);
 
@@ -581,7 +575,6 @@ const CompleteCreatorProfile = () => {
 				fiveVideos: parseFloat(updatedPricing.fiveVideos) || 0,
 				bulkVideos: parseFloat(updatedPricing.bulkVideos) || 0,
 				bulkVideosNote: updatedPricing.bulkVideosNote,
-				aiActorPricing: parseFloat(updatedPricing.aiActorPricing) || 0,
 			},
 		});
 

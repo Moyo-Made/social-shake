@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
 	Play,
 	Upload,
@@ -12,12 +12,6 @@ import {
 	Camera,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import {
-	fetchVideoAsFile,
-	generateVideoThumbnail,
-	thumbnailCache,
-} from "@/components/brand/brandProfile/dashboard/creators/VideoComponent";
-import Image from "next/image";
 
 interface PortfolioData {
 	aboutMeVideoUrl: string;
@@ -102,193 +96,56 @@ const CreatorPortfolio = () => {
 		url: string;
 		title: string;
 	} | null>(null);
-	const videoRef = useRef<HTMLVideoElement | null>(null);
-	const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
-	const [isThumbnailLoading, setIsThumbnailLoading] = useState(true);
-	const [isVideoLoading, setIsVideoLoading] = useState(true);
-	const [portfolioThumbnails, setPortfolioThumbnails] = useState<
-		Record<number, string | null>
-	>({
-		0: null,
-		1: null,
-		2: null,
-	});
-	const [portfolioThumbnailLoading, setPortfolioThumbnailLoading] = useState<
-		Record<number, boolean>
-	>({
-		0: true,
-		1: true,
-		2: true,
-	});
-	const [portfolioVideoLoading, setPortfolioVideoLoading] = useState<
-		Record<number, boolean>
-	>({
-		0: true,
-		1: true,
-		2: true,
-	});
-
-	const handlePortfolioVideoClick = (index: number) => {
-		setPortfolioVideoLoading((prev) => ({ ...prev, [index]: true }));
-		setPortfolioThumbnails((prev) => ({ ...prev, [index]: null }));
-	};
-
-	const handlePortfolioVideoLoaded = (index: number) => {
-		setPortfolioVideoLoading((prev) => ({ ...prev, [index]: false }));
-	};
-
-	const handleVideoClick = () => {
-		setIsVideoLoading(true);
-		setThumbnailUrl(null); // Hide thumbnail when user wants to play video
-		if (videoRef.current) {
-			videoRef.current.load();
-		}
-	};
-
-	const handleVideoLoaded = () => {
-		setIsVideoLoading(false);
-	};
-
-	// Generate thumbnail on component mount
-	useEffect(() => {
-		const generateThumbnail = async () => {
-			try {
-				setIsThumbnailLoading(true);
-
-				const cacheKey = portfolioData?.aboutMeVideoUrl || "";
-				if (thumbnailCache.has(cacheKey)) {
-					setThumbnailUrl(thumbnailCache.get(cacheKey));
-					setIsThumbnailLoading(false);
-					return;
-				}
-
-				const videoFile = await fetchVideoAsFile(
-					portfolioData?.aboutMeVideoUrl || ""
-				);
-				const { dataUrl } = await generateVideoThumbnail(videoFile, 2); // Get thumbnail at 2 seconds
-				setThumbnailUrl(dataUrl);
-
-				thumbnailCache.set(cacheKey, dataUrl);
-			} catch (error) {
-				console.error("Failed to generate thumbnail:", error);
-				// Fallback: start loading the actual video if thumbnail fails
-				if (videoRef.current) {
-					videoRef.current.load();
-				}
-			} finally {
-				setIsThumbnailLoading(false);
-			}
-		};
-
-		if (portfolioData?.aboutMeVideoUrl || "") {
-			generateThumbnail();
-		}
-	}, [portfolioData?.aboutMeVideoUrl || ""]);
-
-	// Start loading video in background once thumbnail is ready
-	useEffect(() => {
-		if (thumbnailUrl && videoRef.current) {
-			// Small delay to ensure thumbnail is displayed first
-			const timer = setTimeout(() => {
-				if (videoRef.current) {
-					videoRef.current.load();
-				}
-			}, 100);
-			return () => clearTimeout(timer);
-		}
-	}, [thumbnailUrl]);
-
-	useEffect(() => {
-		const generatePortfolioThumbnails = async () => {
-			if (!portfolioData?.portfolioVideoUrls) return;
-
-			for (let i = 0; i < 3; i++) {
-				const videoUrl = portfolioData.portfolioVideoUrls[i];
-				if (videoUrl) {
-					try {
-						setPortfolioThumbnailLoading((prev) => ({ ...prev, [i]: true }));
-
-						const cacheKey = videoUrl;
-						if (thumbnailCache.has(cacheKey)) {
-							setPortfolioThumbnails((prev) => ({
-								...prev,
-								[i]: thumbnailCache.get(cacheKey),
-							}));
-							setPortfolioThumbnailLoading((prev) => ({ ...prev, [i]: false }));
-							continue;
-						}
-
-						const videoFile = await fetchVideoAsFile(videoUrl);
-						const { dataUrl } = await generateVideoThumbnail(videoFile, 2);
-
-						setPortfolioThumbnails((prev) => ({ ...prev, [i]: dataUrl }));
-						thumbnailCache.set(cacheKey, dataUrl);
-					} catch (error) {
-						console.error(
-							`Failed to generate thumbnail for portfolio video ${i}:`,
-							error
-						);
-					} finally {
-						setPortfolioThumbnailLoading((prev) => ({ ...prev, [i]: false }));
-					}
-				}
-			}
-		};
-
-		generatePortfolioThumbnails();
-	}, [portfolioData?.portfolioVideoUrls]);
 
 	const fetchPortfolioData = async () => {
 		try {
 			setLoading(true);
 			setError(null);
-
+	
 			const userId = currentUser?.uid;
 			if (!userId) {
 				console.log("No user ID available, skipping portfolio fetch");
 				setLoading(false);
 				return;
 			}
-
+	
 			const response = await fetch(`/api/creator/portfolio?userId=${userId}`, {
 				// Add cache control headers
 				headers: {
-					"Cache-Control": "no-cache, no-store, must-revalidate",
-					Pragma: "no-cache",
-					Expires: "0",
-				},
+					'Cache-Control': 'no-cache, no-store, must-revalidate',
+					'Pragma': 'no-cache',
+					'Expires': '0'
+				}
 			});
-
+	
 			if (!response.ok) {
 				throw new Error(
 					`Failed to fetch portfolio data: ${response.status} ${response.statusText}`
 				);
 			}
-
+	
 			const data = await response.json();
 			console.log("Fetched portfolio data:", data);
-
+	
 			const portfolioData: PortfolioData = {
 				aboutMeVideoUrl: data.aboutMeVideoUrl || "",
 				portfolioVideoUrls: Array.isArray(data.portfolioVideoUrls)
-					? data.portfolioVideoUrls.filter(
-							(url: string) => url && url.trim() !== ""
-						) // Filter out empty URLs
+					? data.portfolioVideoUrls.filter((url: string) => url && url.trim() !== "") // Filter out empty URLs
 					: [],
 				userId: data.userId || userId,
 			};
-
+	
 			// Ensure we always have 3 slots for portfolio videos
 			while (portfolioData.portfolioVideoUrls.length < 3) {
 				portfolioData.portfolioVideoUrls.push("");
 			}
-
+	
 			console.log("Processed portfolio data:", portfolioData); // Debug log
 			setPortfolioData(portfolioData);
 		} catch (err) {
 			console.error("Error fetching portfolio data:", err);
 			setError(err instanceof Error ? err.message : "Failed to load portfolio");
-
+	
 			// Set empty portfolio data as fallback
 			setPortfolioData({
 				aboutMeVideoUrl: "",
@@ -621,9 +478,6 @@ const CreatorPortfolio = () => {
 
 					// Force video refresh
 					forceVideoRefresh("about");
-
-					setThumbnailUrl(null);
-					setIsThumbnailLoading(true);
 				} else if (typeof index === "number" && portfolioData) {
 					const newUrls = [...portfolioData.portfolioVideoUrls];
 					while (newUrls.length < 3) {
@@ -650,9 +504,6 @@ const CreatorPortfolio = () => {
 
 					// Force video refresh
 					forceVideoRefresh("portfolio", index);
-
-					setPortfolioThumbnails((prev) => ({ ...prev, [index]: null }));
-					setPortfolioThumbnailLoading((prev) => ({ ...prev, [index]: true }));
 				}
 
 				// Clear success status after 5 seconds
@@ -759,9 +610,6 @@ const CreatorPortfolio = () => {
 		);
 	}
 
-	const isLoading = isThumbnailLoading;
-	const showThumbnail = thumbnailUrl && !isVideoLoading;
-
 	return (
 		<div className="min-h-screen bg-gray-50 p-6">
 			<div className="max-w-6xl mx-auto">
@@ -801,40 +649,16 @@ const CreatorPortfolio = () => {
 						{/* Current About Video */}
 						<div>
 							<h3 className="font-medium text-gray-900 mb-3">Current Video</h3>
-
 							{portfolioData?.aboutMeVideoUrl ? (
 								<div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden group cursor-pointer">
-									{isLoading && (
-										<div
-											id="loading-overlay-about"
-											className="absolute inset-0 bg-gray-200 flex items-center justify-center rounded-lg z-20"
-										>
-											<div className="bg-white bg-opacity-90 rounded-full p-3">
-												<Loader className="w-6 h-6 text-orange-500 animate-spin" />
-											</div>
-										</div>
-									)}
-
-									{/* Thumbnail Image - shown while video loads in background */}
-									{showThumbnail && (
-										<Image
-											src={thumbnailUrl}
-											alt="Video thumbnail"
-											width={200}
-											height={250}
-											className="absolute inset-0 w-full h-full object-cover rounded-lg z-10"
-											onClick={handleVideoClick}
-										/>
-									)}
 									<video
 										key={`about-${videoKeys.about}-${portfolioData.aboutMeVideoUrl}`}
 										className="w-full h-full object-cover"
 										preload="metadata"
 										muted
-										onLoadedData={handleVideoLoaded}
 										onError={(e) => {
 											console.error("Video load error:", e);
-											setIsVideoLoading(false); // Stop loading on error
+											// You could add retry logic here or show an error state
 										}}
 										onLoadStart={() => {
 											console.log(
@@ -1052,40 +876,16 @@ const CreatorPortfolio = () => {
 									{/* Current Video */}
 									{hasVideo ? (
 										<div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden group cursor-pointer">
-											{portfolioThumbnailLoading[index] && (
-												<div className="absolute inset-0 bg-gray-200 flex items-center justify-center rounded-lg z-20">
-													<div className="bg-white bg-opacity-90 rounded-full p-3">
-														<Loader className="w-6 h-6 text-orange-500 animate-spin" />
-													</div>
-												</div>
-											)}
-
-											{portfolioThumbnails[index] &&
-												!portfolioVideoLoading[index] && (
-													<Image
-														src={portfolioThumbnails[index]}
-														alt={`Portfolio video ${index + 1} thumbnail`}
-														width={200}
-														height={250}
-														className="absolute inset-0 w-full h-full object-cover rounded-lg z-10"
-														onClick={() => handlePortfolioVideoClick(index)}
-													/>
-												)}
 											<video
 												key={`portfolio-${index}-${videoKeys.portfolio[index]}-${portfolioData.portfolioVideoUrls[index]}`}
 												className="w-full h-full object-cover"
 												preload="metadata"
 												muted
-												onLoadedData={() => handlePortfolioVideoLoaded(index)}
 												onError={(e) => {
 													console.error(
 														`Portfolio video ${index} load error:`,
 														e
 													);
-													setPortfolioVideoLoading((prev) => ({
-														...prev,
-														[index]: false,
-													}));
 												}}
 												onLoadStart={() => {
 													console.log(
@@ -1254,7 +1054,7 @@ const CreatorPortfolio = () => {
 				</div>
 			</div>
 
-			{/* Full Screen Video Modal  */}
+			{/* Full Screen Video Modal - UPDATED with key prop */}
 			{selectedVideo && (
 				<div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
 					<div className="relative w-full max-w-4xl max-h-full">
