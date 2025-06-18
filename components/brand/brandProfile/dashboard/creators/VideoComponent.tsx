@@ -49,6 +49,8 @@ const generateVideoThumbnail = async (
   });
 };
 
+const thumbnailCache = new Map();
+
 // Helper function to fetch video as File from URL
 const fetchVideoAsFile = async (url: string): Promise<File> => {
   const response = await fetch(url);
@@ -77,9 +79,20 @@ const VideoComponent = ({ creator, onClick }: VideoComponentProps) => {
     const generateThumbnail = async () => {
       try {
         setIsThumbnailLoading(true);
+
+        const cacheKey = creator.aboutMeVideoUrl;
+        if (thumbnailCache.has(cacheKey)) {
+          setThumbnailUrl(thumbnailCache.get(cacheKey));
+          setIsThumbnailLoading(false);
+          return;
+        }
+
         const videoFile = await fetchVideoAsFile(creator.aboutMeVideoUrl);
         const { dataUrl } = await generateVideoThumbnail(videoFile, 2); // Get thumbnail at 2 seconds
         setThumbnailUrl(dataUrl);
+
+        thumbnailCache.set(cacheKey, dataUrl);
+        
       } catch (error) {
         console.error('Failed to generate thumbnail:', error);
         // Fallback: start loading the actual video if thumbnail fails
