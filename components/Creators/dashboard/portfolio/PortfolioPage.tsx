@@ -1,11 +1,6 @@
 "use client";
 
-import React, {
-	useState,
-	useEffect,
-	useRef,
-	useCallback,
-} from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
 	Play,
 	Upload,
@@ -18,6 +13,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import {
+	fetchVideoAsFile,
+	generateVideoThumbnail,
 	thumbnailCache,
 } from "@/components/brand/brandProfile/dashboard/creators/VideoComponent";
 import Image from "next/image";
@@ -130,165 +127,6 @@ const CreatorPortfolio = () => {
 		1: true,
 		2: true,
 	});
-	const [preloadedVideos, setPreloadedVideos] = useState<Set<string>>(
-		new Set()
-	);
-	const [optimizedThumbnails, setOptimizedThumbnails] = useState<
-		Record<string, string>
-	>({});
-
-	const generateOptimizedThumbnail = useCallback(async (
-		videoUrl: string, 
-		timePosition = THUMBNAIL_TIME_POSITION
-	): Promise<string | null> => {
-		const cacheKey = `${videoUrl}-${timePosition}`;
-		
-		// Check if we already have an optimized thumbnail
-		if (optimizedThumbnails[cacheKey]) {
-			return optimizedThumbnails[cacheKey];
-		}
-		
-		// Check cache first
-		if (thumbnailCache.has(cacheKey)) {
-			const cached = thumbnailCache.get(cacheKey);
-			setOptimizedThumbnails(prev => ({ ...prev, [cacheKey]: cached }));
-			return cached;
-		}
-	
-		try {
-			// Create video element for thumbnail generation
-			const video = document.createElement('video');
-			video.crossOrigin = 'anonymous';
-			video.muted = true;
-			video.preload = 'metadata';
-			
-			return new Promise((resolve) => {
-				let resolved = false;
-				
-				const cleanup = () => {
-					video.removeEventListener('loadedmetadata', onLoadedMetadata);
-					video.removeEventListener('error', onError);
-					video.removeEventListener('timeupdate', onTimeUpdate);
-					if (video.src) {
-						URL.revokeObjectURL(video.src);
-					}
-				};
-	
-				const onLoadedMetadata = () => {
-					if (resolved) return;
-					video.currentTime = Math.min(timePosition, video.duration - 0.1);
-				};
-	
-				const onTimeUpdate = () => {
-					if (resolved || video.currentTime < timePosition - 0.5) return;
-					
-					try {
-						const canvas = document.createElement('canvas');
-						const ctx = canvas.getContext('2d');
-						
-						// Optimize canvas size for faster processing
-						const aspectRatio = video.videoWidth / video.videoHeight;
-						canvas.width = Math.min(320, video.videoWidth); // Max width 320px
-						canvas.height = canvas.width / aspectRatio;
-						
-						ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
-						
-						// Generate optimized thumbnail with reduced quality
-						const dataUrl = canvas.toDataURL('image/jpeg', THUMBNAIL_QUALITY);
-						
-						// Cache the result
-						thumbnailCache.set(cacheKey, dataUrl);
-						setOptimizedThumbnails(prev => ({ ...prev, [cacheKey]: dataUrl }));
-						
-						resolved = true;
-						cleanup();
-						resolve(dataUrl);
-					} catch (error) {
-						console.error('Canvas error:', error);
-						resolved = true;
-						cleanup();
-						resolve(null);
-					}
-				};
-	
-				const onError = () => {
-					console.error('Video load error for thumbnail');
-					resolved = true;
-					cleanup();
-					resolve(null);
-				};
-	
-				// Set timeout for thumbnail generation
-				setTimeout(() => {
-					if (!resolved) {
-						resolved = true;
-						cleanup();
-						resolve(null);
-					}
-				}, THUMBNAIL_TIMEOUT);
-	
-				video.addEventListener('loadedmetadata', onLoadedMetadata);
-				video.addEventListener('error', onError);
-				video.addEventListener('timeupdate', onTimeUpdate);
-				
-				video.src = videoUrl;
-			});
-		} catch (error) {
-			console.error('Thumbnail generation error:', error);
-			return null;
-		}
-	}, [optimizedThumbnails]);
-
-	const preloadVideo = useCallback((videoUrl: string) => {
-		if (!videoUrl || preloadedVideos.has(videoUrl)) return;
-		
-		const video = document.createElement('video');
-		video.preload = 'metadata';
-		video.muted = true;
-		
-		const onCanPlay = () => {
-			setPreloadedVideos(prev => new Set([...prev, videoUrl]));
-			video.removeEventListener('canplaythrough', onCanPlay);
-		};
-		
-		video.addEventListener('canplaythrough', onCanPlay);
-		video.src = videoUrl;
-	}, [preloadedVideos]);
-
-	const generateThumbnailsInBatches = useCallback(async (videoUrls: string[]) => {
-		const validUrls = videoUrls.filter(url => url && url.trim() !== '');
-		if (validUrls.length === 0) return;
-	
-		// Process thumbnails in smaller batches to avoid overwhelming the browser
-		const batchSize = 2;
-		for (let i = 0; i < validUrls.length; i += batchSize) {
-			const batch = validUrls.slice(i, i + batchSize);
-			
-			const thumbnailPromises = batch.map(async (url, index) => {
-				try {
-					const actualIndex = i + index;
-					setPortfolioThumbnailLoading(prev => ({ ...prev, [actualIndex]: true }));
-					
-					const thumbnail = await generateOptimizedThumbnail(url);
-					if (thumbnail) {
-						setPortfolioThumbnails(prev => ({ ...prev, [actualIndex]: thumbnail }));
-					}
-				} catch (error) {
-					console.error(`Batch thumbnail error for ${url}:`, error);
-				} finally {
-					const actualIndex = i + index;
-					setPortfolioThumbnailLoading(prev => ({ ...prev, [actualIndex]: false }));
-				}
-			});
-	
-			await Promise.allSettled(thumbnailPromises);
-			
-			// Small delay between batches
-			if (i + batchSize < validUrls.length) {
-				await new Promise(resolve => setTimeout(resolve, 100));
-			}
-		}
-	}, [generateOptimizedThumbnail]);
 
 	const handlePortfolioVideoClick = (index: number) => {
 		setPortfolioVideoLoading((prev) => ({ ...prev, [index]: true }));
@@ -312,34 +150,45 @@ const CreatorPortfolio = () => {
 	};
 
 	const THUMBNAIL_TIMEOUT = 3000; // 3 seconds max wait for thumbnail
-	const THUMBNAIL_QUALITY = 0.7; // Reduced quality for faster loading
-const PRELOAD_DELAY = 2000; // Delay before preloading videos
-const THUMBNAIL_TIME_POSITION = 1; // Generate thumbnail at 1 second instead of 2
 
 	// Generate thumbnail on component mount
 	useEffect(() => {
-		const generateAboutThumbnail = async () => {
-			if (!portfolioData?.aboutMeVideoUrl) return;
-			
+		const generateThumbnail = async () => {
 			try {
 				setIsThumbnailLoading(true);
-				
-				const thumbnail = await generateOptimizedThumbnail(portfolioData.aboutMeVideoUrl);
-				if (thumbnail) {
-					setThumbnailUrl(thumbnail);
-					
-					// Start preloading the video after thumbnail is ready
-					setTimeout(() => {
-						preloadVideo(portfolioData.aboutMeVideoUrl);
-					}, PRELOAD_DELAY);
-				} else {
-					// Fallback: start loading video immediately
+	
+				const cacheKey = portfolioData?.aboutMeVideoUrl || "";
+				if (thumbnailCache.has(cacheKey)) {
+					setThumbnailUrl(thumbnailCache.get(cacheKey));
+					setIsThumbnailLoading(false);
+					return;
+				}
+	
+				// Set a timeout to fallback after 3 seconds
+				const timeoutPromise = new Promise((_, reject) => 
+					setTimeout(() => reject(new Error('Thumbnail generation timeout')), THUMBNAIL_TIMEOUT)
+				);
+	
+				const thumbnailPromise = (async () => {
+					const videoFile = await fetchVideoAsFile(portfolioData?.aboutMeVideoUrl || "");
+					const { dataUrl } = await generateVideoThumbnail(videoFile, 2);
+					return dataUrl;
+				})();
+	
+				try {
+					const dataUrl = await Promise.race([thumbnailPromise, timeoutPromise]);
+					setThumbnailUrl(dataUrl as string);
+					thumbnailCache.set(cacheKey, dataUrl);
+				} catch {
+					console.log("Thumbnail generation failed or timed out, showing video directly");
+					// Fallback: start loading the actual video immediately
 					if (videoRef.current) {
 						videoRef.current.load();
 					}
 				}
 			} catch (error) {
-				console.error("About thumbnail error:", error);
+				console.error("Failed to generate thumbnail:", error);
+				// Fallback: start loading the actual video if thumbnail fails
 				if (videoRef.current) {
 					videoRef.current.load();
 				}
@@ -348,67 +197,76 @@ const THUMBNAIL_TIME_POSITION = 1; // Generate thumbnail at 1 second instead of 
 			}
 		};
 	
-		generateAboutThumbnail();
-	}, [portfolioData?.aboutMeVideoUrl, generateOptimizedThumbnail, preloadVideo]);
+		if (portfolioData?.aboutMeVideoUrl) {
+			generateThumbnail();
+		}
+	}, [portfolioData?.aboutMeVideoUrl]);
+
+	// Start loading video in background once thumbnail is ready
+	useEffect(() => {
+		if (thumbnailUrl && videoRef.current) {
+			// Small delay to ensure thumbnail is displayed first
+			const timer = setTimeout(() => {
+				if (videoRef.current) {
+					videoRef.current.load();
+				}
+			}, 100);
+			return () => clearTimeout(timer);
+		}
+	}, [thumbnailUrl]);
 
 	useEffect(() => {
-		if (!portfolioData?.portfolioVideoUrls) return;
-		
-		// Generate thumbnails in batches
-		generateThumbnailsInBatches(portfolioData.portfolioVideoUrls);
-		
-		// Preload videos after a delay
-		setTimeout(() => {
-			portfolioData.portfolioVideoUrls.forEach(url => {
-				if (url) preloadVideo(url);
-			});
-		}, PRELOAD_DELAY);
-	}, [portfolioData?.portfolioVideoUrls, generateThumbnailsInBatches, preloadVideo]);
-
-	const getOptimizedVideoSource = useCallback((url: string) => {
-		if (!url) return '';
-		
-		// Add cache busting only when necessary
-		const cacheBuster = preloadedVideos.has(url) ? '' : `?t=${Date.now()}`;
-		return `${url}${cacheBuster}`;
-	}, [preloadedVideos]);
-
-	useEffect(() => {
-		const observer = new IntersectionObserver(
-			(entries) => {
-				entries.forEach((entry) => {
-					if (entry.isIntersecting) {
-						const videoElement = entry.target as HTMLVideoElement;
-						const src = videoElement.getAttribute('data-src');
-						if (src && !videoElement.src) {
-							videoElement.src = src;
-							videoElement.load();
-							observer.unobserve(videoElement);
-						}
+		const generatePortfolioThumbnails = async () => {
+			if (!portfolioData?.portfolioVideoUrls) return;
+	
+			const thumbnailPromises = portfolioData.portfolioVideoUrls.map(async (videoUrl, i) => {
+				if (!videoUrl) return;
+	
+				try {
+					setPortfolioThumbnailLoading((prev) => ({ ...prev, [i]: true }));
+	
+					const cacheKey = videoUrl;
+					if (thumbnailCache.has(cacheKey)) {
+						setPortfolioThumbnails((prev) => ({
+							...prev,
+							[i]: thumbnailCache.get(cacheKey),
+						}));
+						setPortfolioThumbnailLoading((prev) => ({ ...prev, [i]: false }));
+						return;
 					}
-				});
-			},
-			{ threshold: 0.1 }
-		);
 	
-		// Observe all video elements
-		const videos = document.querySelectorAll('[data-src]');
-		videos.forEach(video => observer.observe(video));
+					// Set timeout for each thumbnail
+					const timeoutPromise = new Promise((_, reject) => 
+						setTimeout(() => reject(new Error('Thumbnail timeout')), THUMBNAIL_TIMEOUT)
+					);
 	
-		return () => observer.disconnect();
-	}, []);
-
-	useEffect(() => {
-		return () => {
-			// Cleanup object URLs when component unmounts
-			Object.values(optimizedThumbnails).forEach(url => {
-				if (url.startsWith('blob:')) {
-					URL.revokeObjectURL(url);
+					const thumbnailPromise = (async () => {
+						const videoFile = await fetchVideoAsFile(videoUrl);
+						const { dataUrl } = await generateVideoThumbnail(videoFile, 2);
+						return dataUrl;
+					})();
+	
+					try {
+						const dataUrl = await Promise.race([thumbnailPromise, timeoutPromise]);
+						setPortfolioThumbnails((prev) => ({ ...prev, [i]: dataUrl as string | null }));
+						thumbnailCache.set(cacheKey, dataUrl);
+					} catch  {
+						console.log(`Thumbnail generation timed out for portfolio video ${i}`);
+						// Don't show error, just proceed without thumbnail
+					}
+				} catch (error) {
+					console.error(`Failed to generate thumbnail for portfolio video ${i}:`, error);
+				} finally {
+					setPortfolioThumbnailLoading((prev) => ({ ...prev, [i]: false }));
 				}
 			});
-		};
-	}, [optimizedThumbnails]);
 	
+			// Process all thumbnails concurrently but don't wait for all to complete
+			Promise.allSettled(thumbnailPromises);
+		};
+	
+		generatePortfolioThumbnails();
+	}, [portfolioData?.portfolioVideoUrls]);
 
 	const fetchPortfolioData = async () => {
 		try {
@@ -999,31 +857,32 @@ const THUMBNAIL_TIME_POSITION = 1; // Generate thumbnail at 1 second instead of 
 										/>
 									)}
 									<video
-	key={`about-${videoKeys.about}-${portfolioData.aboutMeVideoUrl}`}
-	ref={videoRef}
-	className="w-full h-full object-cover"
-	preload={preloadedVideos.has(portfolioData.aboutMeVideoUrl) ? "auto" : "metadata"}
-	muted
-	playsInline // Important for mobile optimization
-	onLoadedData={handleVideoLoaded}
-	onError={(e) => {
-		console.error("Video load error:", e);
-		setIsVideoLoading(false);
-	}}
-	onLoadStart={() => {
-		console.log("Video load started:", portfolioData.aboutMeVideoUrl);
-	}}
->
-	<source
-		src={getOptimizedVideoSource(portfolioData.aboutMeVideoUrl)}
-		type="video/mp4"
-	/>
-	<source
-		src={getOptimizedVideoSource(portfolioData.aboutMeVideoUrl)}
-		type="video/mov"
-	/>
-	Your browser does not support the video tag.
-</video>
+										key={`about-${videoKeys.about}-${portfolioData.aboutMeVideoUrl}`}
+										className="w-full h-full object-cover"
+										preload="metadata"
+										muted
+										onLoadedData={handleVideoLoaded}
+										onError={(e) => {
+											console.error("Video load error:", e);
+											setIsVideoLoading(false); // Stop loading on error
+										}}
+										onLoadStart={() => {
+											console.log(
+												"Video load started:",
+												portfolioData.aboutMeVideoUrl
+											);
+										}}
+									>
+										<source
+											src={`${portfolioData.aboutMeVideoUrl}?t=${Date.now()}`}
+											type="video/mp4"
+										/>
+										<source
+											src={`${portfolioData.aboutMeVideoUrl}?t=${Date.now()}`}
+											type="video/mov"
+										/>
+										Your browser does not support the video tag.
+									</video>
 									<div
 										className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"
 										onClick={() =>
@@ -1243,30 +1102,38 @@ const THUMBNAIL_TIME_POSITION = 1; // Generate thumbnail at 1 second instead of 
 													/>
 												)}
 											<video
-	key={`portfolio-${index}-${videoKeys.portfolio[index]}-${portfolioData.portfolioVideoUrls[index]}`}
-	className="w-full h-full object-cover"
-	preload={preloadedVideos.has(portfolioData.portfolioVideoUrls[index]) ? "auto" : "metadata"}
-	muted
-	playsInline // Important for mobile optimization
-	onLoadedData={() => handlePortfolioVideoLoaded(index)}
-	onError={(e) => {
-		console.error(`Portfolio video ${index} load error:`, e);
-		setPortfolioVideoLoading(prev => ({
-			...prev,
-			[index]: false,
-		}));
-	}}
->
-	<source
-		src={getOptimizedVideoSource(portfolioData.portfolioVideoUrls[index])}
-		type="video/mp4"
-	/>
-	<source
-		src={getOptimizedVideoSource(portfolioData.portfolioVideoUrls[index])}
-		type="video/mov"
-	/>
-	Your browser does not support the video tag.
-</video>
+												key={`portfolio-${index}-${videoKeys.portfolio[index]}-${portfolioData.portfolioVideoUrls[index]}`}
+												className="w-full h-full object-cover"
+												preload="metadata"
+												muted
+												onLoadedData={() => handlePortfolioVideoLoaded(index)}
+												onError={(e) => {
+													console.error(
+														`Portfolio video ${index} load error:`,
+														e
+													);
+													setPortfolioVideoLoading((prev) => ({
+														...prev,
+														[index]: false,
+													}));
+												}}
+												onLoadStart={() => {
+													console.log(
+														`Portfolio video ${index} load started:`,
+														portfolioData.portfolioVideoUrls[index]
+													);
+												}}
+											>
+												<source
+													src={`${portfolioData.portfolioVideoUrls[index]}?t=${Date.now()}`}
+													type="video/mp4"
+												/>
+												<source
+													src={`${portfolioData.portfolioVideoUrls[index]}?t=${Date.now()}`}
+													type="video/mov"
+												/>
+												Your browser does not support the video tag.
+											</video>
 											<div
 												className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"
 												onClick={() =>
