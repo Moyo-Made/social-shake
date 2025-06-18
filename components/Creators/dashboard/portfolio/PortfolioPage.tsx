@@ -149,43 +149,26 @@ const CreatorPortfolio = () => {
 		setIsVideoLoading(false);
 	};
 
-	const THUMBNAIL_TIMEOUT = 3000; // 3 seconds max wait for thumbnail
-
 	// Generate thumbnail on component mount
 	useEffect(() => {
 		const generateThumbnail = async () => {
 			try {
 				setIsThumbnailLoading(true);
-	
+
 				const cacheKey = portfolioData?.aboutMeVideoUrl || "";
 				if (thumbnailCache.has(cacheKey)) {
 					setThumbnailUrl(thumbnailCache.get(cacheKey));
 					setIsThumbnailLoading(false);
 					return;
 				}
-	
-				// Set a timeout to fallback after 3 seconds
-				const timeoutPromise = new Promise((_, reject) => 
-					setTimeout(() => reject(new Error('Thumbnail generation timeout')), THUMBNAIL_TIMEOUT)
+
+				const videoFile = await fetchVideoAsFile(
+					portfolioData?.aboutMeVideoUrl || ""
 				);
-	
-				const thumbnailPromise = (async () => {
-					const videoFile = await fetchVideoAsFile(portfolioData?.aboutMeVideoUrl || "");
-					const { dataUrl } = await generateVideoThumbnail(videoFile, 2);
-					return dataUrl;
-				})();
-	
-				try {
-					const dataUrl = await Promise.race([thumbnailPromise, timeoutPromise]);
-					setThumbnailUrl(dataUrl as string);
-					thumbnailCache.set(cacheKey, dataUrl);
-				} catch {
-					console.log("Thumbnail generation failed or timed out, showing video directly");
-					// Fallback: start loading the actual video immediately
-					if (videoRef.current) {
-						videoRef.current.load();
-					}
-				}
+				const { dataUrl } = await generateVideoThumbnail(videoFile, 2); // Get thumbnail at 2 seconds
+				setThumbnailUrl(dataUrl);
+
+				thumbnailCache.set(cacheKey, dataUrl);
 			} catch (error) {
 				console.error("Failed to generate thumbnail:", error);
 				// Fallback: start loading the actual video if thumbnail fails
@@ -196,11 +179,11 @@ const CreatorPortfolio = () => {
 				setIsThumbnailLoading(false);
 			}
 		};
-	
-		if (portfolioData?.aboutMeVideoUrl) {
+
+		if (portfolioData?.aboutMeVideoUrl || "") {
 			generateThumbnail();
 		}
-	}, [portfolioData?.aboutMeVideoUrl]);
+	}, [portfolioData?.aboutMeVideoUrl || ""]);
 
 	// Start loading video in background once thumbnail is ready
 	useEffect(() => {
@@ -218,53 +201,40 @@ const CreatorPortfolio = () => {
 	useEffect(() => {
 		const generatePortfolioThumbnails = async () => {
 			if (!portfolioData?.portfolioVideoUrls) return;
-	
-			const thumbnailPromises = portfolioData.portfolioVideoUrls.map(async (videoUrl, i) => {
-				if (!videoUrl) return;
-	
-				try {
-					setPortfolioThumbnailLoading((prev) => ({ ...prev, [i]: true }));
-	
-					const cacheKey = videoUrl;
-					if (thumbnailCache.has(cacheKey)) {
-						setPortfolioThumbnails((prev) => ({
-							...prev,
-							[i]: thumbnailCache.get(cacheKey),
-						}));
-						setPortfolioThumbnailLoading((prev) => ({ ...prev, [i]: false }));
-						return;
-					}
-	
-					// Set timeout for each thumbnail
-					const timeoutPromise = new Promise((_, reject) => 
-						setTimeout(() => reject(new Error('Thumbnail timeout')), THUMBNAIL_TIMEOUT)
-					);
-	
-					const thumbnailPromise = (async () => {
+
+			for (let i = 0; i < 3; i++) {
+				const videoUrl = portfolioData.portfolioVideoUrls[i];
+				if (videoUrl) {
+					try {
+						setPortfolioThumbnailLoading((prev) => ({ ...prev, [i]: true }));
+
+						const cacheKey = videoUrl;
+						if (thumbnailCache.has(cacheKey)) {
+							setPortfolioThumbnails((prev) => ({
+								...prev,
+								[i]: thumbnailCache.get(cacheKey),
+							}));
+							setPortfolioThumbnailLoading((prev) => ({ ...prev, [i]: false }));
+							continue;
+						}
+
 						const videoFile = await fetchVideoAsFile(videoUrl);
 						const { dataUrl } = await generateVideoThumbnail(videoFile, 2);
-						return dataUrl;
-					})();
-	
-					try {
-						const dataUrl = await Promise.race([thumbnailPromise, timeoutPromise]);
-						setPortfolioThumbnails((prev) => ({ ...prev, [i]: dataUrl as string | null }));
+
+						setPortfolioThumbnails((prev) => ({ ...prev, [i]: dataUrl }));
 						thumbnailCache.set(cacheKey, dataUrl);
-					} catch  {
-						console.log(`Thumbnail generation timed out for portfolio video ${i}`);
-						// Don't show error, just proceed without thumbnail
+					} catch (error) {
+						console.error(
+							`Failed to generate thumbnail for portfolio video ${i}:`,
+							error
+						);
+					} finally {
+						setPortfolioThumbnailLoading((prev) => ({ ...prev, [i]: false }));
 					}
-				} catch (error) {
-					console.error(`Failed to generate thumbnail for portfolio video ${i}:`, error);
-				} finally {
-					setPortfolioThumbnailLoading((prev) => ({ ...prev, [i]: false }));
 				}
-			});
-	
-			// Process all thumbnails concurrently but don't wait for all to complete
-			Promise.allSettled(thumbnailPromises);
+			}
 		};
-	
+
 		generatePortfolioThumbnails();
 	}, [portfolioData?.portfolioVideoUrls]);
 
