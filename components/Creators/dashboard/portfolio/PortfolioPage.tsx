@@ -654,7 +654,7 @@ const CreatorPortfolio = () => {
 									<video
 										key={`about-${videoKeys.about}-${portfolioData.aboutMeVideoUrl}`}
 										className="w-full h-full object-cover"
-										preload="metadata"
+										preload="none"
 										muted
 										onError={(e) => {
 											console.error("Video load error:", e);
@@ -879,7 +879,7 @@ const CreatorPortfolio = () => {
 											<video
 												key={`portfolio-${index}-${videoKeys.portfolio[index]}-${portfolioData.portfolioVideoUrls[index]}`}
 												className="w-full h-full object-cover"
-												preload="metadata"
+												preload="none"
 												muted
 												onError={(e) => {
 													console.error(
