@@ -138,7 +138,7 @@ const VideoComponent = ({ creator, onClick }: VideoComponentProps) => {
       className="relative  cursor-pointer rounded-lg overflow-hidden mt-4"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      style={{ width: "260px", height: "250px" }}
+      style={{ width: "310px", height: "250px" }}
     >
       {/* Loading overlay - shown while generating thumbnail */}
       {isLoading && (
