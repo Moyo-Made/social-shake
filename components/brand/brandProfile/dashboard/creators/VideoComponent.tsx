@@ -3,7 +3,7 @@ import Image from "next/image";
 import { useRef, useState, useEffect } from "react";
 
 // Your thumbnail generation function
-const generateVideoThumbnail = async (
+export const generateVideoThumbnail = async (
   videoFile: File,
   timeInSeconds: number = 1
 ): Promise<{ blob: Blob; dataUrl: string }> => {
@@ -49,10 +49,10 @@ const generateVideoThumbnail = async (
   });
 };
 
-const thumbnailCache = new Map();
+export const thumbnailCache = new Map();
 
 // Helper function to fetch video as File from URL
-const fetchVideoAsFile = async (url: string): Promise<File> => {
+export const fetchVideoAsFile = async (url: string): Promise<File> => {
   const response = await fetch(url);
   const blob = await response.blob();
   return new File([blob], 'video.mp4', { type: blob.type || 'video/mp4' });

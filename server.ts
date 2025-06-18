@@ -20,7 +20,7 @@ interface ChatMessage {
 
 interface VerificationUpdate {
 	userId: string;
-	status: 'pending' | 'approved' | 'rejected' | 'info_requested' | 'suspended';
+	status: "pending" | "approved" | "rejected" | "info_requested" | "suspended";
 	rejectionReason?: string;
 	infoRequest?: string;
 	suspensionReason?: string;
@@ -33,51 +33,56 @@ let globalIO: SocketIOServer;
 app.prepare().then(() => {
 	const server = createServer((req, res) => {
 		const parsedUrl = parse(req.url || "", true);
-		
+
 		// Handle our custom broadcast endpoint
-		if (req.url === '/api/broadcast-verification' && req.method === 'POST') {
-			let body = '';
-			
-			req.on('data', chunk => {
+		if (req.url === "/api/broadcast-verification" && req.method === "POST") {
+			let body = "";
+
+			req.on("data", (chunk) => {
 				body += chunk.toString();
 			});
-			
-			req.on('end', async () => {
+
+			req.on("end", async () => {
 				try {
 					const data = JSON.parse(body);
 					const { userId, event, data: eventData } = data;
-					
-					if (event === 'verification-status-update' && userId && eventData) {
+
+					if (event === "verification-status-update" && userId && eventData) {
 						const verificationUpdate: VerificationUpdate = {
 							userId,
 							status: eventData.status,
 							rejectionReason: eventData.rejectionReason,
 							infoRequest: eventData.infoRequest,
 							suspensionReason: eventData.suspensionReason,
-							updatedAt: eventData.updatedAt
+							updatedAt: eventData.updatedAt,
 						};
-						
-						const result = await broadcastVerificationUpdate(verificationUpdate);
-						
-						res.writeHead(200, { 'Content-Type': 'application/json' });
+
+						const result =
+							await broadcastVerificationUpdate(verificationUpdate);
+
+						res.writeHead(200, { "Content-Type": "application/json" });
 						res.end(JSON.stringify(result));
 					} else {
-						res.writeHead(400, { 'Content-Type': 'application/json' });
-						res.end(JSON.stringify({ success: false, error: 'Invalid request data' }));
+						res.writeHead(400, { "Content-Type": "application/json" });
+						res.end(
+							JSON.stringify({ success: false, error: "Invalid request data" })
+						);
 					}
 				} catch (error) {
-					console.error('Error processing broadcast request:', error);
-					res.writeHead(500, { 'Content-Type': 'application/json' });
-					res.end(JSON.stringify({ 
-						success: false, 
-						error: error instanceof Error ? error.message : 'Unknown error' 
-					}));
+					console.error("Error processing broadcast request:", error);
+					res.writeHead(500, { "Content-Type": "application/json" });
+					res.end(
+						JSON.stringify({
+							success: false,
+							error: error instanceof Error ? error.message : "Unknown error",
+						})
+					);
 				}
 			});
-			
+
 			return;
 		}
-		
+
 		// Handle Next.js requests
 		handle(req, res, parsedUrl);
 	});
@@ -214,6 +219,31 @@ app.prepare().then(() => {
 				// Emit the new message to all users in the conversation
 				io.to(conversationId).emit("new-message", messageData);
 
+				// Check if this is the first message in the conversation
+				const messagesSnapshot = await conversationRef
+					.collection("messages")
+					.get();
+				const isFirstMessage = messagesSnapshot.size === 1; // Since we just added one
+
+				// Emit the new message to all users in the conversation
+				io.to(conversationId).emit("new-message", {
+					...messageData,
+					isNewConversation: isFirstMessage, // Add this flag
+				});
+
+				// If it's a new conversation, also emit a conversation-created event
+				if (isFirstMessage) {
+					// Emit to all participants
+					conversationData?.participants.forEach((participantId: string) => {
+						io.to(`user-${participantId}`).emit("conversation-created", {
+							conversationId,
+							participants: conversationData.participants,
+							lastMessage: content,
+							createdAt: clientTimestamp,
+						});
+					});
+				}
+
 				// For each participant, emit updated unread counts
 				if (conversationData && conversationData.participants) {
 					for (const participantId of conversationData.participants) {
@@ -281,36 +311,41 @@ app.prepare().then(() => {
 		);
 
 		// Handle creator subscription
-		socket.on('subscribe-creator-notifications', (creatorId) => {
+		socket.on("subscribe-creator-notifications", (creatorId) => {
 			socket.join(`creator-${creatorId}`);
 			console.log(`Creator ${creatorId} subscribed to notifications`);
 		});
-	
+
 		// Handle brand sending notification
-		socket.on('send-delivery-notification', (data) => {
+		socket.on("send-delivery-notification", (data) => {
 			const { creatorId, ...notificationData } = data;
-			
+
 			// Emit to specific creator
-			io.to(`creator-${creatorId}`).emit('delivery-status-notification', notificationData);
-			
-			console.log(`Notification sent to creator ${creatorId}:`, notificationData);
+			io.to(`creator-${creatorId}`).emit(
+				"delivery-status-notification",
+				notificationData
+			);
+
+			console.log(
+				`Notification sent to creator ${creatorId}:`,
+				notificationData
+			);
 		});
 
 		// When brand users connect, they should join their room
-		socket.on('join-brand-room', (brandUserId) => {
+		socket.on("join-brand-room", (brandUserId) => {
 			socket.join(`brand-${brandUserId}`);
-		  });
-		  
-		  // When creators connect, they might join creator rooms
-		  socket.on('join-creator-room', (creatorId) => {
-			socket.join(`creator-${creatorId}`);
-		  });
+		});
 
-		  socket.on("delivery-status-updated", (data) => {
+		// When creators connect, they might join creator rooms
+		socket.on("join-creator-room", (creatorId) => {
+			socket.join(`creator-${creatorId}`);
+		});
+
+		socket.on("delivery-status-updated", (data) => {
 			// Broadcast to all users subscribed to this project
 			socket.broadcast.emit("delivery-status-updated", data);
 		});
-	
 
 		socket.on("disconnect", () => {
 			console.log("Client disconnected:", socket.id);
@@ -348,7 +383,7 @@ app.prepare().then(() => {
 	async function emitCurrentVerificationStatus(userId: string) {
 		try {
 			console.log(`Fetching verification status for userId: ${userId}`);
-			
+
 			// Query by userId field, not document ID
 			const verificationQuery = await db
 				.collection("creator_verifications")
@@ -360,18 +395,29 @@ app.prepare().then(() => {
 			if (!verificationQuery.empty) {
 				const verificationDoc = verificationQuery.docs[0];
 				const data = verificationDoc.data();
-				
+
 				const statusUpdate = {
 					status: data?.status || "pending",
 					rejectionReason: data?.rejectionReason || null,
 					infoRequest: data?.infoRequest || null,
 					suspensionReason: data?.suspensionReason || null,
-					updatedAt: data?.updatedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+					updatedAt:
+						data?.updatedAt?.toDate?.()?.toISOString() ||
+						new Date().toISOString(),
 				};
 
-				io.to(`user-${userId}`).emit("verification-status-update", statusUpdate);
-				io.to(`verification-${userId}`).emit("verification-status-update", statusUpdate);
-				console.log(`Emitted current verification status for user ${userId}:`, statusUpdate);
+				io.to(`user-${userId}`).emit(
+					"verification-status-update",
+					statusUpdate
+				);
+				io.to(`verification-${userId}`).emit(
+					"verification-status-update",
+					statusUpdate
+				);
+				console.log(
+					`Emitted current verification status for user ${userId}:`,
+					statusUpdate
+				);
 			} else {
 				console.log(`No verification found for userId: ${userId}`);
 				// Emit a default status
@@ -382,7 +428,10 @@ app.prepare().then(() => {
 					suspensionReason: null,
 					updatedAt: new Date().toISOString(),
 				};
-				io.to(`user-${userId}`).emit("verification-status-update", defaultStatus);
+				io.to(`user-${userId}`).emit(
+					"verification-status-update",
+					defaultStatus
+				);
 			}
 		} catch (error) {
 			console.error("Error emitting verification status:", error);
@@ -392,8 +441,12 @@ app.prepare().then(() => {
 	// FIXED: Function to broadcast verification status updates
 	async function broadcastVerificationUpdate(update: VerificationUpdate) {
 		try {
-			const { userId, status, rejectionReason, infoRequest, suspensionReason } = update;
-			console.log(`Broadcasting verification update for userId: ${userId}`, update);
+			const { userId, status, rejectionReason, infoRequest, suspensionReason } =
+				update;
+			console.log(
+				`Broadcasting verification update for userId: ${userId}`,
+				update
+			);
 
 			// First, find the verification document by userId
 			const verificationQuery = await db
@@ -424,30 +477,43 @@ app.prepare().then(() => {
 			if (suspensionReason) updateData.suspensionReason = suspensionReason;
 
 			// Clear previous reason fields based on new status
-			if (status !== 'rejected') updateData.rejectionReason = FieldValue.delete();
-			if (status !== 'info_requested') updateData.infoRequest = FieldValue.delete();
-			if (status !== 'suspended') updateData.suspensionReason = FieldValue.delete();
+			if (status !== "rejected")
+				updateData.rejectionReason = FieldValue.delete();
+			if (status !== "info_requested")
+				updateData.infoRequest = FieldValue.delete();
+			if (status !== "suspended")
+				updateData.suspensionReason = FieldValue.delete();
 
 			await verificationRef.update(updateData);
 
 			// Prepare data for real-time broadcast
 			const broadcastData = {
 				status,
-				rejectionReason: status === 'rejected' ? rejectionReason : null,
-				infoRequest: status === 'info_requested' ? infoRequest : null,
-				suspensionReason: status === 'suspended' ? suspensionReason : null,
+				rejectionReason: status === "rejected" ? rejectionReason : null,
+				infoRequest: status === "info_requested" ? infoRequest : null,
+				suspensionReason: status === "suspended" ? suspensionReason : null,
 				updatedAt: new Date().toISOString(),
 			};
 
 			// Emit to both user-specific room and verification-specific room
-			globalIO.to(`user-${userId}`).emit("verification-status-update", broadcastData);
-			globalIO.to(`verification-${userId}`).emit("verification-status-update", broadcastData);
+			globalIO
+				.to(`user-${userId}`)
+				.emit("verification-status-update", broadcastData);
+			globalIO
+				.to(`verification-${userId}`)
+				.emit("verification-status-update", broadcastData);
 
-			console.log(`Successfully broadcasted verification update for user ${userId}:`, broadcastData);
+			console.log(
+				`Successfully broadcasted verification update for user ${userId}:`,
+				broadcastData
+			);
 			return { success: true, data: broadcastData };
 		} catch (error) {
-			console.error('Error broadcasting verification update:', error);
-			return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+			console.error("Error broadcasting verification update:", error);
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : "Unknown error",
+			};
 		}
 	}
 

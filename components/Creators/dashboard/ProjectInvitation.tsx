@@ -53,7 +53,10 @@ const ProjectInvitationsSection: React.FC<ProjectInvitationsSectionProps> = ({
 	);
 
 	// Fetch project details
-	const fetchProjectDetails = async (projectId: string) => {
+	const fetchProjectDetails = async (
+		projectId: string,
+		currentCreatorId?: string
+	) => {
 		setLoadingDetails(true);
 		try {
 			const response = await fetch(`/api/projects/${projectId}/details`);
@@ -63,10 +66,40 @@ const ProjectInvitationsSection: React.FC<ProjectInvitationsSectionProps> = ({
 				throw new Error(data.error || "Failed to fetch project details");
 			}
 
-			// The issue is here - you need to access data.data, not data.project
 			if (data.success && data.exists && data.data) {
-				// Transform the API response to match your ProjectDetails interface
 				const projectData = data.data;
+
+				// Get the current creator's payment info if creatorId is provided
+				let creatorPayment = null;
+				let compensationAmount = 0;
+				let paymentType = "Per creator";
+
+				if (currentCreatorId && projectData.creatorPricing.creatorPayments) {
+					creatorPayment =
+						projectData.creatorPricing.creatorPayments[currentCreatorId];
+
+					if (creatorPayment) {
+						compensationAmount = creatorPayment.totalAmount;
+						paymentType = `Per video (${creatorPayment.videosOrdered} video${creatorPayment.videosOrdered > 1 ? "s" : ""})`;
+
+					} else {
+						// If creator payment not found, try to find creator in selectedCreators
+						const selectedCreator =
+							projectData.creatorPricing.selectedCreators?.find(
+								(creator: { id: string }) => creator.id === currentCreatorId
+							);
+
+						if (selectedCreator) {
+							// Calculate based on videos per creator and pricing tier
+							const videosPerCreator =
+								projectData.creatorPricing.videosPerCreator || 1;
+							compensationAmount =
+								selectedCreator.pricing.oneVideo * videosPerCreator;
+							paymentType = `Per video (${videosPerCreator} video${videosPerCreator > 1 ? "s" : ""})`;
+						}
+						// No fallback - if creator not found, compensationAmount remains 0
+					}
+				}
 
 				const transformedProject: ProjectDetails = {
 					id: projectData.projectId,
@@ -83,23 +116,23 @@ const ProjectInvitationsSection: React.FC<ProjectInvitationsSectionProps> = ({
 							: []),
 					],
 					deliverables: [
-						`${projectData.creatorPricing.totalVideos} video(s)`,
+						`${creatorPayment ? creatorPayment.videosOrdered : projectData.creatorPricing.videosPerCreator || 1} video(s)`,
 						`${projectData.projectRequirements.duration} duration`,
 						`${projectData.projectRequirements.aspectRatio} format`,
 					],
 					timeline: {
 						startDate: projectData.createdAt,
-						endDate: projectData.updatedAt, // You might want to calculate this based on project duration
+						endDate: projectData.updatedAt,
 						duration: projectData.projectRequirements.duration,
 					},
 					budget: {
-						amount: projectData.creatorPricing.totalAmount,
-						currency: "$", // Assuming USD, you might want to make this dynamic
-						paymentType: "Per project",
+						amount: compensationAmount,
+						currency: "$",
+						paymentType: paymentType,
 					},
 					brand: {
 						name: projectData.brandInfo.brandName,
-						logo: undefined, // No logo in the API response
+						logo: undefined,
 					},
 					categories: [projectData.projectDetails.projectType],
 					targetAudience: `${projectData.creatorPricing.ageGroup} ${projectData.creatorPricing.gender}`,
@@ -199,10 +232,10 @@ const ProjectInvitationsSection: React.FC<ProjectInvitationsSectionProps> = ({
 
 	const handleViewProject = async (
 		projectId: string,
-		notificationId: string
+		notificationId: string,
 	) => {
 		setShowDetailsModal(notificationId);
-		await fetchProjectDetails(projectId);
+		await fetchProjectDetails(projectId, currentUser?.uid);
 	};
 
 	// Format time ago
@@ -376,14 +409,16 @@ const ProjectInvitationsSection: React.FC<ProjectInvitationsSectionProps> = ({
 					if (currentInvitation?.projectId) {
 						handleAccept(showDetailsModal!, currentInvitation.projectId);
 					}
-				} }
+				}}
 				onReject={() => {
 					if (currentInvitation?.projectId) {
 						handleReject(showDetailsModal!, currentInvitation.projectId);
 					}
-				} }
+				}}
 				processingAccept={processingAction === `accept-${showDetailsModal}`}
-				processingReject={processingAction === `reject-${showDetailsModal}`} notification={null}			/>
+				processingReject={processingAction === `reject-${showDetailsModal}`}
+				notification={null}
+			/>
 		</div>
 	);
 };

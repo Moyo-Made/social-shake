@@ -1194,7 +1194,7 @@ const CompleteCreatorProfile = () => {
 							</p>
 						</div>
 
-						<div>
+						{/* <div>
 							<Label className="text-sm font-medium text-gray-700">
 								AI Actors (Price per usage)
 							</Label>
@@ -1210,7 +1210,7 @@ const CompleteCreatorProfile = () => {
 									className="pl-7"
 								/>
 							</div>
-						</div>
+						</div> */}
 					</div>
 				</Card>
 			</div>

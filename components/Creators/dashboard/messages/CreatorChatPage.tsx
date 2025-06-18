@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
 	Search,
 	Send,
@@ -29,16 +29,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { commonEmojis } from "@/types/emojis";
 
-type Message = {
-	id: string;
-	sender: string;
-	content: string;
-	timestamp: any;
-	date?: string;
-	showAvatar?: boolean;
-	isPinned?: boolean;
-};
-
 const CreatorChatPage = () => {
 	const { currentUser } = useAuth();
 	const searchParams = useSearchParams();
@@ -48,22 +38,32 @@ const CreatorChatPage = () => {
 	const { setTotalUnreadCount } = useNotifications();
 
 	// Use messaging context
-	const { users, brandProfiles, loading, setUsers, setConversations } =
-		useMessaging();
+	const {
+		users,
+		messages,
+		selectedConversation,
+		sortOption,
+		searchQuery,
+		loading,
+		brandProfiles,
+		setMessages,
+		setSelectedConversation,
+		setSearchQuery,
+		handleSelectConversation,
+		handleSortChange,
+		fetchInitialMessages,
+		refreshConversations,
+		setUsers,
+		setConversations,
+	} = useMessaging();
 
-	// Local state for component-specific functionality
-	const [sortOption, setSortOption] = useState("Newest");
+	// Local state for component-specific functionality only
 	const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 	const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const emojiPickerRef = useRef<HTMLDivElement>(null);
 	const [showMobileSidebar, setShowMobileSidebar] = useState(false);
-	const [selectedConversation, setSelectedConversation] = useState<
-		string | null
-	>(conversationIdFromUrl);
-	const [messages, setMessages] = useState<Message[]>([]);
 	const [messageInput, setMessageInput] = useState("");
-	const [searchQuery, setSearchQuery] = useState("");
 	const [sendingMessage, setSendingMessage] = useState(false);
 	const [userLoadingStates, setUserLoadingStates] = useState<{
 		[key: string]: boolean;
@@ -110,6 +110,46 @@ const CreatorChatPage = () => {
 	}, []);
 
 	useEffect(() => {
+		const refreshParam = searchParams.get("refresh");
+		if (refreshParam && conversationIdFromUrl) {
+			// This indicates a new conversation was just created
+			refreshConversations();
+
+			// Clean up the URL by removing the refresh parameter
+			const newUrl = new URL(window.location.href);
+			newUrl.searchParams.delete("refresh");
+			router.replace(newUrl.pathname + newUrl.search, { scroll: false });
+		}
+	}, [searchParams, conversationIdFromUrl, refreshConversations, router]);
+
+	// Set initial conversation from URL
+	useEffect(() => {
+		if (
+			conversationIdFromUrl &&
+			conversationIdFromUrl !== selectedConversation
+		) {
+			// Check if this conversation exists in our current list
+			const conversationExists = users.some(
+				(user) => user.conversationId === conversationIdFromUrl
+			);
+
+			if (!conversationExists) {
+				// This might be a new conversation, refresh the list first
+				refreshConversations().then(() => {
+					setSelectedConversation(conversationIdFromUrl);
+				});
+			} else {
+				setSelectedConversation(conversationIdFromUrl);
+			}
+		}
+	}, [
+		conversationIdFromUrl,
+		selectedConversation,
+		setSelectedConversation,
+		users,
+		refreshConversations,
+	]);
+	useEffect(() => {
 		// If no users, consider profiles "loaded" since there's nothing to load
 		if (users.length === 0) {
 			setBrandProfilesLoaded(true);
@@ -128,32 +168,8 @@ const CreatorChatPage = () => {
 		}
 	}, [users, brandProfiles]);
 
-	const handleSortChange = (option: "Newest" | "Oldest") => {
-		setSortOption(option);
-
-		// Resort users based on the selected option
-		setUsers((prevUsers) => {
-			const sortedUsers = [...prevUsers];
-
-			sortedUsers.sort((a, b) => {
-				// Use timestamp field which contains the numeric timestamp for reliable sorting
-				const timeA = a.timestamp || 0;
-				const timeB = b.timestamp || 0;
-
-				// Sort based on selected option
-				if (option === "Newest") {
-					return timeB - timeA; // Newest first (descending)
-				} else {
-					return timeA - timeB; // Oldest first (ascending)
-				}
-			});
-
-			return sortedUsers;
-		});
-	};
-
 	// Fetch total unread message count
-	const fetchTotalUnreadCount = async () => {
+	const fetchTotalUnreadCount = useCallback(async () => {
 		if (!currentUser) return;
 
 		try {
@@ -191,7 +207,7 @@ const CreatorChatPage = () => {
 			// Set to 0 in case of error to avoid undefined
 			setTotalUnreadCount(0);
 		}
-	};
+	}, [currentUser, setTotalUnreadCount, setUsers]);
 
 	// Mark messages as read using socket
 	const markMessagesAsReadSocket = (convId: string) => {
@@ -288,6 +304,12 @@ const CreatorChatPage = () => {
 				return newMessages;
 			});
 
+			// NEW: If this is a new conversation, refresh the conversations list
+			if (message.isNewConversation) {
+				console.log("New conversation detected, refreshing conversations...");
+				refreshConversations();
+			}
+
 			// Scroll to bottom
 			setTimeout(() => {
 				if (scrollAreaRef.current) {
@@ -378,9 +400,23 @@ const CreatorChatPage = () => {
 			}
 		};
 
+		// NEW: Listen for conversation creation
+		const handleConversationCreated = (data: any) => {
+			console.log("New conversation created:", data);
+
+			// Refresh conversations to include the new one
+			refreshConversations();
+
+			// If this is a conversation the current user is part of, refresh unread counts
+			if (data.participants && data.participants.includes(currentUser?.uid)) {
+				fetchTotalUnreadCount();
+			}
+		};
+
 		socket.on("new-message", handleNewMessage);
 		socket.on("conversation-updated", handleConversationUpdated);
 		socket.on("unread-counts-update", handleUnreadCountsUpdate);
+		socket.on("conversation-created", handleConversationCreated);
 
 		// Clean up when unmounting
 		return () => {
@@ -388,6 +424,7 @@ const CreatorChatPage = () => {
 			socket.off("new-message", handleNewMessage);
 			socket.off("conversation-updated", handleConversationUpdated);
 			socket.off("unread-counts-update", handleUnreadCountsUpdate);
+			socket.off("conversation-created", handleConversationCreated);
 		};
 	}, [
 		selectedConversation,
@@ -398,77 +435,17 @@ const CreatorChatPage = () => {
 		setUsers,
 		setConversations,
 		setTotalUnreadCount,
+		setMessages,
+		refreshConversations,
+		fetchTotalUnreadCount,
 	]);
 
-	// Initial fetch of messages when first loading a conversation
+	// Initial fetch of messages when conversation changes
 	useEffect(() => {
-		if (!selectedConversation || !currentUser) return;
-
-		const fetchInitialMessages = async () => {
-			try {
-				const response = await fetch(
-					`/api/messages?conversationId=${selectedConversation}`
-				);
-
-				if (!response.ok) {
-					throw new Error("Failed to fetch messages");
-				}
-
-				const data = await response.json();
-
-				// Process messages
-				const processedMessages: Message[] = [];
-				let currentDate = "";
-
-				data.messages.forEach((msg: any, index: number) => {
-					// Format the timestamp
-					let formattedDate = "";
-					if (msg.timestamp) {
-						const date = new Date(msg.timestamp);
-						formattedDate = date.toLocaleDateString();
-					}
-
-					if (formattedDate && formattedDate !== currentDate) {
-						currentDate = formattedDate;
-
-						// Add date marker
-						if (index > 0) {
-							processedMessages.push({
-								id: `date-${currentDate}`,
-								sender: "system",
-								content: currentDate,
-								timestamp: null,
-								date: currentDate,
-							});
-						}
-					}
-
-					processedMessages.push({
-						id: msg.id,
-						sender: msg.sender || "unknown",
-						content: msg.content || "",
-						timestamp: msg.timestamp ? new Date(msg.timestamp) : null,
-						date: formattedDate,
-						showAvatar: msg.sender !== currentUser.uid,
-					});
-				});
-
-				setMessages(processedMessages);
-
-				// Scroll to bottom after messages load
-				setTimeout(() => {
-					if (scrollAreaRef.current) {
-						const scrollArea = scrollAreaRef.current;
-						scrollArea.scrollTop = scrollArea.scrollHeight;
-					}
-				}, 100);
-			} catch (error) {
-				console.error("Error fetching messages:", error);
-			}
-		};
-
-		fetchInitialMessages();
-	}, [selectedConversation, currentUser]);
+		if (selectedConversation) {
+			fetchInitialMessages(selectedConversation);
+		}
+	}, [selectedConversation, fetchInitialMessages]);
 
 	// Fetch total unread count on component mount
 	useEffect(() => {
@@ -479,7 +456,7 @@ const CreatorChatPage = () => {
 	const selectedUser =
 		users.find((u) => u.conversationId === selectedConversation) || null;
 
-	// Handle sending a new message using the API endpoint
+	// Handle sending a new message using the socket
 	const handleSendMessage = async () => {
 		if (
 			(!messageInput.trim() && selectedFiles.length === 0) ||
@@ -520,14 +497,10 @@ const CreatorChatPage = () => {
 		}
 	};
 
-	// Handle conversation selection
-	const handleSelectConversation = (conversationId: string) => {
-		// If clicking the same conversation that's already selected, don't clear messages
-		if (selectedConversation !== conversationId) {
-			setMessages([]); // Clear messages only when switching to a different conversation
-		}
-
-		setSelectedConversation(conversationId);
+	// Handle conversation selection - use context method
+	const handleConversationSelect = (conversationId: string) => {
+		// Use the context method
+		handleSelectConversation(conversationId);
 
 		// Mark messages as read using socket
 		markMessagesAsReadSocket(conversationId);
@@ -536,6 +509,9 @@ const CreatorChatPage = () => {
 		router.push(`/creator/dashboard/messages?conversation=${conversationId}`, {
 			scroll: false,
 		});
+
+		// Close mobile sidebar
+		setShowMobileSidebar(false);
 	};
 
 	// Filter users based on search query
@@ -648,9 +624,8 @@ const CreatorChatPage = () => {
 								}`}
 								onClick={() => {
 									if (user.conversationId) {
-										handleSelectConversation(user.conversationId);
+										handleConversationSelect(user.conversationId);
 									}
-									setShowMobileSidebar(false);
 								}}
 							>
 								<div className="relative flex-shrink-0">

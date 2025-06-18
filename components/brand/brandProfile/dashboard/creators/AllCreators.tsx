@@ -907,7 +907,7 @@ const CreatorMarketplace = () => {
 										</div>
 									</div>
 
-									<div className="mt-8 bg-[#FFF4EE] p-4 rounded-lg">
+									{/* <div className="mt-8 bg-[#FFF4EE] p-4 rounded-lg">
 										<div className="flex gap-2 justify-center items-center mb-4 bg-white rounded-lg px-4 py-2">
 											<Image
 												src="/icons/ai-actor.svg"
@@ -926,7 +926,7 @@ const CreatorMarketplace = () => {
 													: "N/A"}
 											</span>
 										</div>
-									</div>
+									</div> */}
 								</CardContent>
 
 								<CardFooter>
@@ -1386,7 +1386,7 @@ const CreatorMarketplace = () => {
 									</div>
 								</div>
 
-								<div className="mt-8 bg-[#FFF4EE] p-4 rounded-lg">
+								{/* <div className="mt-8 bg-[#FFF4EE] p-4 rounded-lg">
 									<div className="flex justify-center gap-2 items-center mb-4 bg-white rounded-lg px-4 py-2">
 										<Image
 											src="/icons/ai-actor.svg"
@@ -1405,7 +1405,7 @@ const CreatorMarketplace = () => {
 												: "N/A"}
 										</span>
 									</div>
-								</div>
+								</div> */}
 							</CardContent>
 
 							<CardFooter>
