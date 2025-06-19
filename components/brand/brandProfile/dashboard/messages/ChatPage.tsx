@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
 	Search,
 	Send,
@@ -46,6 +46,7 @@ const ChatPage = () => {
 		sortOption,
 		searchQuery,
 		loading,
+		setUsers,
 		setMessages,
 		setSelectedConversation,
 		setSearchQuery,
@@ -55,6 +56,7 @@ const ChatPage = () => {
 		handleImageLoadStart,
 		fetchInitialMessages,
 		refreshConversations,
+		setConversations,
 	} = useMessaging();
 
 	// Local state for chat-specific functionality
@@ -156,7 +158,7 @@ const ChatPage = () => {
 	]);
 
 	// Fetch total unread count
-	const fetchTotalUnreadCount = async () => {
+	const fetchTotalUnreadCount = useCallback(async () => {
 		if (!currentUser) return;
 
 		try {
@@ -168,12 +170,33 @@ const ChatPage = () => {
 			}
 
 			const data = await response.json();
+
+			// Update the context with the total unread count
 			setTotalUnreadCount(data.totalUnread || 0);
+
+			// Update individual conversation counts if provided
+			if (data.conversationCounts) {
+				setUsers((prev) =>
+					prev.map((user) => {
+						if (
+							user.conversationId &&
+							data.conversationCounts[user.conversationId] !== undefined
+						) {
+							return {
+								...user,
+								unreadCount: data.conversationCounts[user.conversationId],
+							};
+						}
+						return user;
+					})
+				);
+			}
 		} catch (error) {
 			console.error("Error fetching notification count:", error);
+			// Set to 0 in case of error to avoid undefined
 			setTotalUnreadCount(0);
 		}
-	};
+	}, [currentUser, setTotalUnreadCount, setUsers]);
 
 	// Mark messages as read via socket
 	const markMessagesAsReadSocket = (convId: string) => {
@@ -210,8 +233,10 @@ const ChatPage = () => {
 
 		const handleNewMessage = (message: any) => {
 			setMessages((prev) => {
+				// Check if we already have this message (to prevent duplicates)
 				if (prev.some((m) => m.id === message.id)) return prev;
 
+				// Check if we need to add a date separator
 				const messageDate = new Date(message.timestamp).toLocaleDateString();
 				const lastMessage = prev[prev.length - 1];
 				const lastMessageDate = lastMessage?.timestamp
@@ -219,6 +244,21 @@ const ChatPage = () => {
 					: null;
 
 				const newMessages = [...prev];
+
+				// If this message is from another user
+				if (message.sender !== currentUser?.uid) {
+					// Update the unread count for this specific conversation
+					setUsers((prevUsers) =>
+						prevUsers.map((user) =>
+							user.conversationId === message.conversationId
+								? { ...user, unreadCount: (user.unreadCount || 0) + 1 }
+								: user
+						)
+					);
+
+					// Update total unread count
+					setTotalUnreadCount((prev) => (prev || 0) + 1);
+				}
 
 				// Add date separator if needed
 				if (lastMessageDate && messageDate !== lastMessageDate) {
@@ -231,6 +271,7 @@ const ChatPage = () => {
 					});
 				}
 
+				// Add the new message
 				newMessages.push({
 					id: message.id,
 					sender: message.sender,
@@ -242,19 +283,58 @@ const ChatPage = () => {
 				return newMessages;
 			});
 
+			// NEW: If this is a new conversation, refresh the conversations list
+			if (message.isNewConversation) {
+				console.log("New conversation detected, refreshing conversations...");
+				refreshConversations();
+			}
+
 			// Scroll to bottom
 			setTimeout(() => {
 				if (scrollAreaRef.current) {
-					scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+					const scrollArea = scrollAreaRef.current;
+					scrollArea.scrollTop = scrollArea.scrollHeight;
 				}
 			}, 100);
 		};
 
-		// Other socket event handlers...
-		const handleConversationUpdated = () => {
-			// Refresh conversations when updated
-			refreshConversations();
-			fetchTotalUnreadCount();
+		const handleConversationUpdated = (data: any) => {
+			// Update conversations list with updated unread counts
+			setConversations((prev) =>
+				prev.map((conv) =>
+					conv.id === data.conversationId
+						? {
+								...conv,
+								lastMessage: data.lastMessage,
+								updatedAt: new Date(data.updatedAt),
+								unreadCounts: data.unreadCounts || conv.unreadCounts,
+							}
+						: conv
+				)
+			);
+
+			// Update users list with updated unread counts
+			setUsers((prev) =>
+				prev.map((user) => {
+					if (user.conversationId === data.conversationId) {
+						const newUnreadCount =
+							data.unreadCounts && currentUser
+								? data.unreadCounts[currentUser.uid] || 0
+								: user.unreadCount || 0;
+
+						return {
+							...user,
+							lastMessage: data.lastMessage,
+							time: new Date(data.updatedAt).toLocaleTimeString([], {
+								hour: "2-digit",
+								minute: "2-digit",
+							}),
+							unreadCount: newUnreadCount,
+						};
+					}
+					return user;
+				})
+			);
 		};
 
 		const handleUnreadCountsUpdate = (data: any) => {
@@ -262,6 +342,18 @@ const ChatPage = () => {
 
 			if (typeof data.totalUnread === "number") {
 				setTotalUnreadCount(data.totalUnread);
+			}
+		};
+
+		const handleConversationCreated = (data: any) => {
+			console.log("New conversation created:", data);
+
+			// Refresh conversations to include the new one
+			refreshConversations();
+
+			// If this is a conversation the current user is part of, refresh unread counts
+			if (data.participants && data.participants.includes(currentUser?.uid)) {
+				fetchTotalUnreadCount();
 			}
 		};
 
@@ -274,6 +366,7 @@ const ChatPage = () => {
 			socket.off("new-message", handleNewMessage);
 			socket.off("conversation-updated", handleConversationUpdated);
 			socket.off("unread-counts-update", handleUnreadCountsUpdate);
+			socket.off("conversation-created", handleConversationCreated);
 		};
 	}, [
 		selectedConversation,
@@ -281,9 +374,12 @@ const ChatPage = () => {
 		currentUser,
 		joinConversation,
 		leaveConversation,
+		setUsers,
+		setConversations,
+		setTotalUnreadCount,
 		setMessages,
 		refreshConversations,
-		setTotalUnreadCount,
+		fetchTotalUnreadCount,
 	]);
 
 	// Fetch initial messages when conversation changes
@@ -292,6 +388,11 @@ const ChatPage = () => {
 			fetchInitialMessages(selectedConversation);
 		}
 	}, [selectedConversation, currentUser, fetchInitialMessages]);
+
+
+		useEffect(() => {
+			fetchTotalUnreadCount();
+		}, [currentUser]);
 
 	// Auto-scroll to bottom when messages change
 	useEffect(() => {
@@ -343,15 +444,16 @@ const ChatPage = () => {
 
 	// Handle conversation selection with context method
 	const handleConversationSelect = (conversationId: string) => {
+		// Only update URL if it's different from current
+		if (conversationIdFromUrl !== conversationId) {
+			router.push(`/brand/dashboard/messages?conversation=${conversationId}`, {
+				scroll: false,
+			});
+		}
+
 		handleSelectConversation(conversationId);
 		markMessagesAsReadSocket(conversationId);
 
-		// Update URL
-		router.push(`/brand/dashboard/messages?conversation=${conversationId}`, {
-			scroll: false,
-		});
-
-		// Close sidebar on mobile
 		if (window.innerWidth < 768) {
 			setShowSidebar(false);
 		}
@@ -509,14 +611,13 @@ const ChatPage = () => {
 														{user.creatorProfile?.displayName || user.name}
 													</p>
 												)}
-												{(user.unreadCount ?? 0) > 0 &&
-													!imageLoadingStates[user.id] && (
-														<span className="bg-orange-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center flex-shrink-0 font-medium shadow-sm">
-															{(user.unreadCount ?? 0) > 9
-																? "9+"
-																: (user.unreadCount ?? 0)}
-														</span>
-													)}
+												{(user.unreadCount ?? 0) > 0 && (
+													<span className="bg-orange-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center flex-shrink-0 font-medium shadow-sm">
+														{(user.unreadCount ?? 0) > 9
+															? "9+"
+															: (user.unreadCount ?? 0)}
+													</span>
+												)}
 											</div>
 											{imageLoadingStates[user.id] ? (
 												<div className="h-3 bg-gray-200 animate-pulse rounded w-8 sm:w-10 flex-shrink-0 ml-2" />

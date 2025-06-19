@@ -263,11 +263,8 @@ const CreatorChatPage = () => {
 
 				const newMessages = [...prev];
 
-				// If this message is from another user and it's not in the currently selected conversation
-				if (
-					message.sender !== currentUser?.uid &&
-					message.conversationId !== selectedConversation
-				) {
+				// If this message is from another user
+				if (message.sender !== currentUser?.uid) {
 					// Update the unread count for this specific conversation
 					setUsers((prevUsers) =>
 						prevUsers.map((user) =>
