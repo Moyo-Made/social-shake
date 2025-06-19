@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
-	Play,
 	Upload,
 	X,
 	Loader,
@@ -36,11 +35,67 @@ const CreatorPortfolio = () => {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
-	// Add a key state to force video re-renders
-	const [videoKeys, setVideoKeys] = useState({
-		about: 0,
-		portfolio: [0, 0, 0],
+	const [visibleVideos, setVisibleVideos] = useState({
+		about: false,
+		portfolio: [false, false, false],
 	});
+
+	const [loadedVideos, setLoadedVideos] = useState({
+		about: false,
+		portfolio: [false, false, false],
+	});
+
+	// Add refs for each video container
+	const aboutVideoRef = useRef<HTMLDivElement>(null);
+	const portfolioRefs = [
+		useRef<HTMLDivElement>(null),
+		useRef<HTMLDivElement>(null),
+		useRef<HTMLDivElement>(null),
+	];
+
+	// Add intersection observers
+	useEffect(() => {
+		const observers: IntersectionObserver[] = [];
+
+		// About video observer
+		if (aboutVideoRef.current) {
+			const observer = new IntersectionObserver(
+				([entry]) => {
+					if (entry.isIntersecting) {
+						setVisibleVideos((prev) => ({ ...prev, about: true }));
+						observer.disconnect();
+					}
+				},
+				{ threshold: 0.1, rootMargin: "50px" }
+			);
+			observer.observe(aboutVideoRef.current);
+			observers.push(observer);
+		}
+
+		// Portfolio video observers
+		portfolioRefs.forEach((ref, index) => {
+			if (ref.current) {
+				const observer = new IntersectionObserver(
+					([entry]) => {
+						if (entry.isIntersecting) {
+							setVisibleVideos((prev) => ({
+								...prev,
+								portfolio: prev.portfolio.map((visible, i) =>
+									i === index ? true : visible
+								),
+							}));
+							observer.disconnect();
+						}
+					},
+					{ threshold: 0.1, rootMargin: "50px" }
+				);
+				observer.observe(ref.current);
+				observers.push(observer);
+			}
+		});
+
+		return () => observers.forEach((observer) => observer.disconnect());
+	}, [portfolioData]);
 
 	const { currentUser } = useAuth();
 
@@ -101,51 +156,53 @@ const CreatorPortfolio = () => {
 		try {
 			setLoading(true);
 			setError(null);
-	
+
 			const userId = currentUser?.uid;
 			if (!userId) {
 				console.log("No user ID available, skipping portfolio fetch");
 				setLoading(false);
 				return;
 			}
-	
+
 			const response = await fetch(`/api/creator/portfolio?userId=${userId}`, {
 				// Add cache control headers
 				headers: {
-					'Cache-Control': 'no-cache, no-store, must-revalidate',
-					'Pragma': 'no-cache',
-					'Expires': '0'
-				}
+					"Cache-Control": "no-cache, no-store, must-revalidate",
+					Pragma: "no-cache",
+					Expires: "0",
+				},
 			});
-	
+
 			if (!response.ok) {
 				throw new Error(
 					`Failed to fetch portfolio data: ${response.status} ${response.statusText}`
 				);
 			}
-	
+
 			const data = await response.json();
 			console.log("Fetched portfolio data:", data);
-	
+
 			const portfolioData: PortfolioData = {
 				aboutMeVideoUrl: data.aboutMeVideoUrl || "",
 				portfolioVideoUrls: Array.isArray(data.portfolioVideoUrls)
-					? data.portfolioVideoUrls.filter((url: string) => url && url.trim() !== "") // Filter out empty URLs
+					? data.portfolioVideoUrls.filter(
+							(url: string) => url && url.trim() !== ""
+						) // Filter out empty URLs
 					: [],
 				userId: data.userId || userId,
 			};
-	
+
 			// Ensure we always have 3 slots for portfolio videos
 			while (portfolioData.portfolioVideoUrls.length < 3) {
 				portfolioData.portfolioVideoUrls.push("");
 			}
-	
+
 			console.log("Processed portfolio data:", portfolioData); // Debug log
 			setPortfolioData(portfolioData);
 		} catch (err) {
 			console.error("Error fetching portfolio data:", err);
 			setError(err instanceof Error ? err.message : "Failed to load portfolio");
-	
+
 			// Set empty portfolio data as fallback
 			setPortfolioData({
 				aboutMeVideoUrl: "",
@@ -211,23 +268,6 @@ const CreatorPortfolio = () => {
 					selectedFile: file,
 					error: null,
 				},
-			}));
-		}
-	};
-
-	// Force video refresh by updating keys and clearing cache
-	const forceVideoRefresh = (type: "about" | "portfolio", index?: number) => {
-		if (type === "about") {
-			setVideoKeys((prev) => ({
-				...prev,
-				about: prev.about + 1,
-			}));
-		} else if (typeof index === "number") {
-			setVideoKeys((prev) => ({
-				...prev,
-				portfolio: prev.portfolio.map((key, i) =>
-					i === index ? key + 1 : key
-				),
 			}));
 		}
 	};
@@ -475,9 +515,6 @@ const CreatorPortfolio = () => {
 						uploadStatus: "Upload completed successfully!",
 						uploadId: null,
 					});
-
-					// Force video refresh
-					forceVideoRefresh("about");
 				} else if (typeof index === "number" && portfolioData) {
 					const newUrls = [...portfolioData.portfolioVideoUrls];
 					while (newUrls.length < 3) {
@@ -501,9 +538,6 @@ const CreatorPortfolio = () => {
 							uploadId: null,
 						},
 					}));
-
-					// Force video refresh
-					forceVideoRefresh("portfolio", index);
 				}
 
 				// Clear success status after 5 seconds
@@ -650,49 +684,50 @@ const CreatorPortfolio = () => {
 						<div>
 							<h3 className="font-medium text-gray-900 mb-3">Current Video</h3>
 							{portfolioData?.aboutMeVideoUrl ? (
-								<div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden group cursor-pointer">
-									<video
-										key={`about-${videoKeys.about}-${portfolioData.aboutMeVideoUrl}`}
-										className="w-full h-full object-cover"
-										preload="none"
-										muted
-										onError={(e) => {
-											console.error("Video load error:", e);
-											// You could add retry logic here or show an error state
-										}}
-										onLoadStart={() => {
-											console.log(
-												"Video load started:",
-												portfolioData.aboutMeVideoUrl
-											);
-										}}
-									>
-										<source
-											src={`${portfolioData.aboutMeVideoUrl}?t=${Date.now()}`}
-											type="video/mp4"
-										/>
-										<source
-											src={`${portfolioData.aboutMeVideoUrl}?t=${Date.now()}`}
-											type="video/mov"
-										/>
-										Your browser does not support the video tag.
-									</video>
-									<div
-										className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-										onClick={() =>
-											setSelectedVideo({
-												url: portfolioData.aboutMeVideoUrl,
-												title: "About Me Video",
-											})
-										}
-									>
-										<div className="w-12 h-12 bg-white bg-opacity-90 rounded-full flex items-center justify-center">
-											<Play
-												className="w-5 h-5 text-orange-500 ml-1"
-												fill="currentColor"
-											/>
+								<div
+									ref={aboutVideoRef}
+									className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden group cursor-pointer"
+								>
+									{!visibleVideos.about && (
+										<div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+											<div className="bg-white bg-opacity-80 rounded-full p-2">
+												<Loader className="w-5 h-5 text-orange-500 animate-spin" />
+											</div>
 										</div>
-									</div>
+									)}
+
+									{visibleVideos.about && (
+										<video
+											className="w-full h-full object-cover"
+											preload="metadata"
+											playsInline
+											crossOrigin="anonymous"
+											controls={false}
+											disablePictureInPicture
+											webkit-playsinline="true"
+											x5-playsinline="true"
+											// Add these Safari-specific attributes
+											style={{
+												opacity: loadedVideos.about ? 1 : 0,
+												transition: "opacity 0.3s ease-in-out",
+											}}
+											onCanPlay={() =>
+												setLoadedVideos((prev) => ({ ...prev, about: true }))
+											}
+											onError={(e) => console.error("Video load error:", e)}
+										>
+											<source
+												src={portfolioData.aboutMeVideoUrl}
+												type="video/mp4"
+											/>
+											<source
+												src={portfolioData.aboutMeVideoUrl}
+												type="video/mov"
+											/>
+										</video>
+									)}
+
+									{/* Play button overlay */}
 								</div>
 							) : (
 								<div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
@@ -875,51 +910,47 @@ const CreatorPortfolio = () => {
 
 									{/* Current Video */}
 									{hasVideo ? (
-										<div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden group cursor-pointer">
-											<video
-												key={`portfolio-${index}-${videoKeys.portfolio[index]}-${portfolioData.portfolioVideoUrls[index]}`}
-												className="w-full h-full object-cover"
-												preload="none"
-												muted
-												onError={(e) => {
-													console.error(
-														`Portfolio video ${index} load error:`,
-														e
-													);
-												}}
-												onLoadStart={() => {
-													console.log(
-														`Portfolio video ${index} load started:`,
-														portfolioData.portfolioVideoUrls[index]
-													);
-												}}
-											>
-												<source
-													src={`${portfolioData.portfolioVideoUrls[index]}?t=${Date.now()}`}
-													type="video/mp4"
-												/>
-												<source
-													src={`${portfolioData.portfolioVideoUrls[index]}?t=${Date.now()}`}
-													type="video/mov"
-												/>
-												Your browser does not support the video tag.
-											</video>
-											<div
-												className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-												onClick={() =>
-													setSelectedVideo({
-														url: portfolioData.portfolioVideoUrls[index],
-														title: `Portfolio Video ${index + 1}`,
-													})
-												}
-											>
-												<div className="w-12 h-12 bg-white bg-opacity-90 rounded-full flex items-center justify-center">
-													<Play
-														className="w-5 h-5 text-orange-500 ml-1"
-														fill="currentColor"
-													/>
+										// Similar pattern for each portfolio video:
+										<div
+											ref={portfolioRefs[index]}
+											className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden group cursor-pointer"
+										>
+											{!visibleVideos.portfolio[index] && (
+												<div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+													<div className="bg-white bg-opacity-80 rounded-full p-2">
+														<Loader className="w-4 h-4 text-orange-500 animate-spin" />
+													</div>
 												</div>
-											</div>
+											)}
+
+											{visibleVideos.portfolio[index] && (
+												<video
+													className="w-full h-full object-cover"
+													preload="metadata"
+													muted
+													style={{
+														opacity: loadedVideos.portfolio[index] ? 1 : 0,
+														transition: "opacity 0.3s ease-in-out",
+													}}
+													onCanPlay={() =>
+														setLoadedVideos((prev) => ({
+															...prev,
+															portfolio: prev.portfolio.map((loaded, i) =>
+																i === index ? true : loaded
+															),
+														}))
+													}
+												>
+													<source
+														src={portfolioData.portfolioVideoUrls[index]}
+														type="video/mp4"
+													/>
+													<source
+														src={portfolioData.portfolioVideoUrls[index]}
+														type="video/mov"
+													/>
+												</video>
+											)}
 										</div>
 									) : (
 										<div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
@@ -1067,7 +1098,6 @@ const CreatorPortfolio = () => {
 
 						<div className="bg-black rounded-lg overflow-hidden">
 							<video
-								key={`modal-${selectedVideo.url}`} // Force re-render with key
 								className="w-full h-auto max-h-[80vh]"
 								controls
 								autoPlay

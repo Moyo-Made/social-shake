@@ -1,8 +1,13 @@
 [
 	{
 	  "origin": ["http://localhost:3000", "https://social-shake.vercel.app/"],
-	  "method": ["GET", "HEAD", "PUT", "POST", "DELETE"],
+	  "method": ["GET", "HEAD", "PUT", "POST", "DELETE", "OPTIONS"],
 	  "maxAgeSeconds": 3600,
-	  "responseHeader": ["Content-Type", "Access-Control-Allow-Origin", "Range"]
+	  "responseHeader": ["Content-Type", 
+      "Content-Range", 
+      "Accept-Ranges", 
+      "Content-Length",
+      "Access-Control-Allow-Origin",
+      "Range"]
 	}
   ]
