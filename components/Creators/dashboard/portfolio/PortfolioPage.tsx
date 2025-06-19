@@ -57,22 +57,36 @@ const CreatorPortfolio = () => {
 	useEffect(() => {
 		const observers: IntersectionObserver[] = [];
 
-		// About video observer
+		// About video observer with Safari optimizations
 		if (aboutVideoRef.current) {
 			const observer = new IntersectionObserver(
 				([entry]) => {
 					if (entry.isIntersecting) {
 						setVisibleVideos((prev) => ({ ...prev, about: true }));
+
+						// Give Safari a moment to process
+						setTimeout(() => {
+							const video = aboutVideoRef.current?.querySelector("video");
+							if (video && portfolioData?.aboutMeVideoUrl) {
+								video.load(); // Ensure video loads in Safari
+							}
+						}, 50);
+
 						observer.disconnect();
 					}
 				},
-				{ threshold: 0.1, rootMargin: "50px" }
+				{
+					threshold: 0.1,
+					rootMargin: "50px",
+					// Safari performance improvement
+					root: null,
+				}
 			);
 			observer.observe(aboutVideoRef.current);
 			observers.push(observer);
 		}
 
-		// Portfolio video observers
+		// Portfolio video observers with Safari optimizations
 		portfolioRefs.forEach((ref, index) => {
 			if (ref.current) {
 				const observer = new IntersectionObserver(
@@ -84,10 +98,23 @@ const CreatorPortfolio = () => {
 									i === index ? true : visible
 								),
 							}));
+
+							// Give Safari a moment to process
+							setTimeout(() => {
+								const video = ref.current?.querySelector("video");
+								if (video && portfolioData?.portfolioVideoUrls[index]) {
+									video.load(); // Ensure video loads in Safari
+								}
+							}, 50);
+
 							observer.disconnect();
 						}
 					},
-					{ threshold: 0.1, rootMargin: "50px" }
+					{
+						threshold: 0.1,
+						rootMargin: "50px",
+						root: null,
+					}
 				);
 				observer.observe(ref.current);
 				observers.push(observer);
