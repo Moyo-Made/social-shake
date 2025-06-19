@@ -9,6 +9,7 @@ import {
 	AlertCircle,
 	Video,
 	Camera,
+	Play,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -714,6 +715,13 @@ const CreatorPortfolio = () => {
 								<div
 									ref={aboutVideoRef}
 									className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden group cursor-pointer"
+									onClick={() =>
+										portfolioData?.aboutMeVideoUrl &&
+										setSelectedVideo({
+											url: portfolioData.aboutMeVideoUrl,
+											title: "About Me Video",
+										})
+									}
 								>
 									{!visibleVideos.about && (
 										<div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
@@ -755,6 +763,13 @@ const CreatorPortfolio = () => {
 									)}
 
 									{/* Play button overlay */}
+									{loadedVideos.about && (
+										<div className="absolute inset-0 bg-black bg-opacity-30 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+											<div className="bg-white bg-opacity-90 rounded-full p-3 transform scale-100 group-hover:scale-110 transition-transform duration-200">
+												<Play className="w-6 h-6 text-orange-500 ml-0.5" fill="currentColor" />
+											</div>
+										</div>
+									)}
 								</div>
 							) : (
 								<div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
@@ -941,6 +956,13 @@ const CreatorPortfolio = () => {
 										<div
 											ref={portfolioRefs[index]}
 											className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden group cursor-pointer"
+											onClick={() =>
+												portfolioData?.portfolioVideoUrls[index] &&
+												setSelectedVideo({
+													url: portfolioData.portfolioVideoUrls[index],
+													title: `Portfolio Video ${index + 1}`,
+												})
+											}
 										>
 											{!visibleVideos.portfolio[index] && (
 												<div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
@@ -977,6 +999,15 @@ const CreatorPortfolio = () => {
 														type="video/mov"
 													/>
 												</video>
+											)}
+
+											{/* Play button overlay */}
+											{loadedVideos.portfolio[index] && (
+												<div className="absolute inset-0 bg-black bg-opacity-30 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+													<div className="bg-white bg-opacity-90 rounded-full p-2 transform scale-100 group-hover:scale-110 transition-transform duration-200">
+														<Play className="w-4 h-4 text-orange-600 ml-0.5" fill="currentColor" />
+													</div>
+												</div>
 											)}
 										</div>
 									) : (
