@@ -71,7 +71,11 @@ interface Deliverable {
 	status: string;
 	created_at: string;
 	creator_id: string;
-	approval_status?: "pending" | "approved" | "needs_revision" | "revision_requested";
+	approval_status?:
+		| "pending"
+		| "approved"
+		| "needs_revision"
+		| "revision_requested";
 	metadata?: {
 		upload_timestamp: number;
 		file_extension: string;
@@ -129,7 +133,7 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 	// Add this function to check if package should be collapsed
 	const shouldCollapsePackage = (order: DeliveredOrder) => {
 		return order.deliverables_count > 1;
-	}
+	};
 
 	// function to approve all videos in a package
 	const handleApproveAll = async (order: DeliveredOrder) => {
@@ -234,27 +238,34 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 			// Reset video state
 			video.currentTime = 0;
 
-			// Load the video
+			// Load the video explicitly for Safari
 			video.load();
 
 			// Add error handling
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const handleVideoError = (e: any) => {
+			const handleVideoError = (e: Event) => {
+				const videoElement = e.target as HTMLVideoElement;
 				console.error("Video error event:", e);
-				console.error("Video error code:", video.error?.code);
-				console.error("Video error message:", video.error?.message);
-
+				console.error("Video error code:", videoElement.error?.code);
+				console.error("Video error message:", videoElement.error?.message);
 
 				toast.error(
-					`Video loading failed: ${video.error?.message || "Unknown error"}`
+					`Video loading failed: ${videoElement.error?.message || "Unknown error"}`
 				);
 			};
 
 			const handleVideoLoad = () => {
+				// Video loaded successfully
+				console.log("Video loaded successfully");
 			};
 
 			video.addEventListener("error", handleVideoError);
 			video.addEventListener("loadeddata", handleVideoLoad);
+
+			// Cleanup
+			return () => {
+				video.removeEventListener("error", handleVideoError);
+				video.removeEventListener("loadeddata", handleVideoLoad);
+			};
 		}
 	}, [isPreviewOpen, selectedDeliverable]);
 
@@ -318,7 +329,7 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 				toast.error("Payment ID not found for this order");
 				return;
 			}
-			
+
 			const paymentResponse = await fetch("/api/payments/approve-video", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -371,26 +382,26 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 	// function to handle the actual revision submission
 	const handleRevisionSubmit = async (revisionNotes: string) => {
 		if (!selectedRevisionDeliverable) return;
-	
+
 		const { deliverable, order } = selectedRevisionDeliverable;
 		setIsSubmittingRevision(true);
-	
+
 		try {
 			const paymentId = order.payment_id;
-	
+
 			if (!paymentId) {
 				toast.error("Payment ID not found for this order");
 				return;
 			}
-	
+
 			const deliverableId = deliverable.firestore_id || deliverable.id;
-			
+
 			if (!deliverableId) {
 				console.error("No deliverable ID found in:", deliverable);
 				toast.error("Deliverable ID not found");
 				return;
 			}
-	
+
 			const requestPayload = {
 				paymentId: paymentId,
 				action: "request_review",
@@ -399,30 +410,32 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 				revisionNotes: revisionNotes,
 				keepInCollection: true, // NEW: Flag to keep in collection
 			};
-	
+
 			const response = await fetch("/api/payments/request-review", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(requestPayload),
 			});
-	
+
 			if (!response.ok) {
 				const errorData = await response.json();
 				console.error("Error response:", errorData);
 				throw new Error(errorData.error || "Failed to request revision");
 			}
-	
+
 			const result = await response.json();
 			console.log("Revision request result:", result);
-	
+
 			// Refetch to get updated status
 			await refetchDeliveredOrders();
-	
+
 			// Close modal and reset state
 			setIsRevisionModalOpen(false);
 			setSelectedRevisionDeliverable(null);
-	
-			toast.success("Revision requested! The video will remain here until a new version is submitted.");
+
+			toast.success(
+				"Revision requested! The video will remain here until a new version is submitted."
+			);
 		} catch (error) {
 			console.error("Revision request error:", error);
 			if (error instanceof Error) {
@@ -527,14 +540,14 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 			case "approved":
 				return "bg-green-100 text-green-800 border-green-200";
 			case "needs_revision":
-			case "revision_requested": 
+			case "revision_requested":
 				return "bg-orange-100 text-orange-800 border-orange-200";
 			case "pending":
 			default:
 				return "bg-yellow-100 text-yellow-800 border-yellow-200";
 		}
 	};
-	
+
 	const getApprovalStatusText = (status?: string) => {
 		switch (status) {
 			case "completed":
@@ -737,11 +750,10 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 								const approvedCount = order.deliverables.filter(
 									(d) => d.approval_status === "approved"
 								).length;
-								
+
 								const pendingCount = order.deliverables.filter(
-									(d) => d.approval_status !== "approved" 
+									(d) => d.approval_status !== "approved"
 								).length;
-								
 
 								return (
 									<div
@@ -878,12 +890,31 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 														>
 															{/* Video Preview */}
 															<div className="relative aspect-video bg-gradient-to-br from-gray-900 to-gray-800">
-																{deliverable.file_content_type && deliverable.file_content_type.startsWith("video/") ? (
+																{deliverable.file_content_type &&
+																deliverable.file_content_type.startsWith(
+																	"video/"
+																) ? (
 																	<>
 																		<video
 																			className="w-full h-full object-cover"
 																			src={deliverable.file_download_url}
 																			preload="metadata"
+																			playsInline
+																			muted
+																			// Add these new props for better preview
+																			poster="" // This will be set programmatically
+																			onLoadedMetadata={(e) => {
+																				// Set current time to get a frame for preview
+																				const video =
+																					e.target as HTMLVideoElement;
+																				video.currentTime = 1; // Seek to 1 second for preview
+																			}}
+																			onError={(e) => {
+																				console.error(
+																					"Video preview error:",
+																					e
+																				);
+																			}}
 																		/>
 																		<div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity duration-200">
 																			<Button
@@ -964,8 +995,7 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 																					</span>
 																				</div>
 																				<p className="text-xs text-green-600 mt-1">
-																					Full amount will be sent to{" "}
-																					{order.creator?.name}
+																					Full amount will be sent to the creator
 																				</p>
 																			</div>
 																		)}
@@ -1053,6 +1083,15 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 																				className="w-full h-full object-cover"
 																				src={deliverable.file_download_url}
 																				preload="metadata"
+																				playsInline
+																				muted
+																				data-video-id={deliverable.firestore_id}
+																				onError={(e) => {
+																					console.error(
+																						"Video preview error:",
+																						e
+																					);
+																				}}
 																			/>
 																			<div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity duration-200">
 																				<Button
@@ -1110,7 +1149,6 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 																	)}
 
 																	{/* Individual Video Action Buttons */}
-																	{/* Individual Video Action Buttons - Replace existing buttons section */}
 																	<div className="flex gap-2">
 																		{deliverable.approval_status !==
 																			"approved" && (
@@ -1167,26 +1205,25 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 			{/* Enhanced Preview Modal */}
 			{isPreviewOpen && selectedOrder && selectedDeliverable && (
 				<div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-					<div className="bg-white rounded-xl max-w-3xl w-full max-h-[95vh] overflow-auto shadow-2xl">
+					<div className="bg-white rounded-xl max-w-2xl w-full max-h-[95vh] overflow-auto shadow-2xl">
 						<div className="p-6">
 							{/* Modal Header */}
 							<div className="flex justify-between items-start mb-6">
 								<div>
-									<h3 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-										<div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-											<Package size={20} className="text-orange-600" />
+									<h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+										<div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+											<Package size={16} className="text-orange-600" />
 										</div>
 										Order #{selectedOrder.id}
 									</h3>
-									<p className="text-gray-600 mt-2 text-lg">
-										Video {selectedDeliverable.video_id}:{" "}
-										{selectedDeliverable.file_name}
+									<p className="text-gray-600 mt-2 text-base font-medium">
+										Video {selectedDeliverable.video_id}
 									</p>
 									{selectedOrder.creator && (
 										<div className="flex items-center gap-2 text-gray-600 mt-2">
 											<User size={16} />
-											<span className="font-medium">
-												{selectedOrder.creator.name}
+											<span className="font-normal">
+												{selectedOrder.creator.email}
 											</span>
 										</div>
 									)}
@@ -1224,10 +1261,12 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 										className="w-full h-full"
 										preload="metadata"
 										playsInline
-										crossOrigin="anonymous"
 										onError={(e) => {
 											console.error("Video loading error:", e);
-											console.error("Video URL:", selectedDeliverable.file_download_url);
+											console.error(
+												"Video URL:",
+												selectedDeliverable.file_download_url
+											);
 											console.error(
 												"Video type:",
 												selectedDeliverable.file_content_type
@@ -1236,7 +1275,6 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 												"Failed to load video. Please check the video URL or format."
 											);
 										}}
-								
 									>
 										Your browser does not support the video tag.
 									</video>
@@ -1287,7 +1325,7 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 									</div>
 								</div>
 
-								{selectedDeliverable.approval_status !== "approved" && (
+								{/* {selectedDeliverable.approval_status !== "approved" && (
 									<div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
 										<div className="flex items-center justify-between">
 											<span className="text-sm text-green-800">
@@ -1298,7 +1336,7 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 											</span>
 										</div>
 									</div>
-								)}
+								)} */}
 
 								<div className="flex gap-3">
 									<Button
@@ -1316,7 +1354,7 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 												}
 												className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2"
 											>
-												<MessageSquare size={16} />
+												{/* <MessageSquare size={16} /> */}
 												Request Revision
 											</Button>
 											<Button
@@ -1324,7 +1362,7 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 												className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
 											>
 												<ThumbsUp size={16} />
-												Approve
+												Approve ${selectedOrder.total_price}
 											</Button>
 										</>
 									)}
