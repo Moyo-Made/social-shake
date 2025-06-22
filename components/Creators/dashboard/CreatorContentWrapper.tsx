@@ -1,9 +1,7 @@
 "use client";
 
 import { ReactNode, useState, useEffect } from "react";
-import { useCreatorProfile } from "@/hooks/useCreatorProfile";
-import { useRef } from "react";
-import io, { Socket } from "socket.io-client";
+import { useCreatorStatus } from "@/context/CreatorStatusContext";
 import {
 	Clock,
 	AlertTriangle,
@@ -22,135 +20,45 @@ interface CreatorContentWrapperProps {
 }
 
 export default function CreatorContentWrapper({
-	userId,
 	children,
 	pageType = "dashboard",
 }: CreatorContentWrapperProps) {
-	const [showApprovedMessage, setShowApprovedMessage] = useState(false);
-	const [hasShownToast, setHasShownToast] = useState(false);
-	const socketRef = useRef<Socket | null>(null);
 	const [showApprovedModal, setShowApprovedModal] = useState(false);
-	const [, setHasShownModal] = useState(false);
-	const previousStatusRef = useRef<string | null>(null);
-	const [realTimeStatus, setRealTimeStatus] = useState<{
-		status: string;
-		rejectionReason?: string;
-		infoRequest?: string;
-		suspensionReason?: string;
-		updatedAt: string;
-	} | null>(null);
+	const [hasShownToast, setHasShownToast] = useState(false);
 
-	// Use the hook with complete profile data access (as fallback)
-	const { creatorProfile, loading, error } = useCreatorProfile("view");
+	const { creatorStatus, realTimeStatus, loading } = useCreatorStatus();
 
+	// Listen for approval events from the context
 	useEffect(() => {
-		if (!userId) return;
-
-		 // Initialize socket connection to your Render server
-		 const socket = io(process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || "http://localhost:3001", {
-			transports: ["polling", "websocket"],
-		});
-	
-		socketRef.current = socket;
-		socketRef.current = socket;
-
-		socket.on("connect", () => {
-			console.log("Connected to socket server");
-			socket.emit("subscribe-user", userId);
-			socket.emit("subscribe-verification", userId);
-		});
-
-		socket.on(
-			"verification-status-update",
-			(data: {
-				status: string;
-				rejectionReason?: string;
-				infoRequest?: string;
-				suspensionReason?: string;
-				updatedAt: string;
-			}) => {
-				const { status } = data;
-				const previousStatus = previousStatusRef.current;
-
-				// Update real-time status
-				setRealTimeStatus(data);
-
-				// Check if status changed to approved
-				if (
-					previousStatus &&
-					previousStatus !== "approved" &&
-					status.toLowerCase() === "approved"
-				) {
-					setShowApprovedMessage(true);
-					setShowApprovedModal(true);
-				}
-
-				// Update previous status
-				previousStatusRef.current = status.toLowerCase();
+		const handleApproval = () => {
+			setShowApprovedModal(true);
+			if (!hasShownToast) {
+				toast.success(
+					<div className="flex items-center">
+						<span className="text-white">Creator Profile Approved!</span>
+					</div>
+				);
+				setHasShownToast(true);
 			}
-		);
-
-		// Cleanup on unmount
-		return () => {
-			if (socket.connected) {
-				socket.disconnect();
-			}
-			socketRef.current = null;
 		};
-	}, [userId]);
 
-	// Get verification status from WebSocket first, then fall back to profile hook
-	const getCreatorStatus = (): string => {
-		// Use real-time status first if available
-		if (realTimeStatus?.status) {
-			console.log("Using real-time status:", realTimeStatus.status);
-			return realTimeStatus.status.toLowerCase();
-		}
+		window.addEventListener(
+			"creator-approved",
+			handleApproval as EventListener
+		);
+		return () => {
+			window.removeEventListener(
+				"creator-approved",
+				handleApproval as EventListener
+			);
+		};
+	}, [hasShownToast]);
 
-		// Fall back to profile hook data
-		if (error) {
-			console.log("Profile error, returning error status");
-			return "error";
-		}
-
-		if (!creatorProfile) {
-			console.log("No creator profile, returning missing status");
-			return "missing";
-		}
-
-		const status =
-			creatorProfile?.status ||
-			creatorProfile?.verificationStatus ||
-			(creatorProfile?.profileData?.status as string);
-
-		console.log("Creator Profile Status from hook:", status);
-		console.log("Full creator profile:", creatorProfile);
-
-		return status?.toLowerCase() || "pending";
-	};
-
-	
-
-	// Close modal handler
 	const closeModal = () => {
 		setShowApprovedModal(false);
-		setHasShownModal(true);
 	};
 
-	// Show approval toast only once
-	useEffect(() => {
-		if (showApprovedMessage && !hasShownToast) {
-			toast.success(
-				<div className="flex items-center">
-					<span className="text-white">Creator Profile Approved!</span>
-				</div>
-			);
-			setHasShownToast(true);
-		}
-	}, [showApprovedMessage, hasShownToast]);
-
-	// Show loading while either the profile hook or WebSocket is loading
-	if (loading && !realTimeStatus) {
+	if (loading) {
 		return (
 			<div className="flex justify-center items-center h-64">
 				<div className="w-8 h-8 border-t-2 border-b-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
@@ -158,7 +66,6 @@ export default function CreatorContentWrapper({
 		);
 	}
 
-	// Get page-specific text based on pageType
 	const getPageTypeText = (
 		pageType: "dashboard" | "contests" | "projects" | "portfolio"
 	) => {
@@ -174,50 +81,35 @@ export default function CreatorContentWrapper({
 		}
 	};
 
-	const creatorStatus = getCreatorStatus();
-	console.log("Final creator status:", creatorStatus);
-
 	// Approval Modal Component
 	const ApprovalModal = () => {
 		if (!showApprovedModal) return null;
 
 		return (
 			<div className="fixed inset-0 z-50 flex items-center justify-center">
-				{/* Black overlay */}
 				<div
 					className="absolute inset-0 bg-black bg-opacity-75"
 					onClick={closeModal}
 				/>
-
-				{/* Modal content */}
 				<div className="relative bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 text-center">
-					{/* Close button */}
 					<button
 						onClick={closeModal}
 						className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
 					>
 						<X className="h-6 w-6" />
 					</button>
-
-					{/* Success icon */}
 					<div className="flex justify-center mb-6">
 						<div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
 							<CheckCircle className="h-12 w-12 text-green-600" />
 						</div>
 					</div>
-
-					{/* Title */}
 					<h2 className="text-2xl font-bold text-gray-900 mb-4">
 						Account Verified Successfully
 					</h2>
-
-					{/* Description */}
 					<p className="text-gray-600 mb-6 leading-relaxed">
 						Your profile is now active. You can start exploring your dashboard
 						and apply for brand projects.
 					</p>
-
-					{/* Action buttons */}
 					<div className="flex flex-col sm:flex-row gap-3 justify-center px-6">
 						<Button
 							className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg"
@@ -240,11 +132,12 @@ export default function CreatorContentWrapper({
 		);
 	};
 
-	// Show the appropriate message based on creator status
+	// Show appropriate message based on creator status
 	if (creatorStatus !== "approved") {
 		return (
 			<div className="w-full max-w-2xl mx-auto">
 				<div className="mt-10 md:mt-20 bg-white border rounded-lg shadow-sm p-8 text-center">
+					{/* All your existing status UI components remain the same */}
 					{(creatorStatus === "not_submitted" ||
 						creatorStatus === "missing") && (
 						<div className="max-w-md mx-auto">
@@ -259,7 +152,9 @@ export default function CreatorContentWrapper({
 								{getPageTypeText(pageType)}.
 							</p>
 							<Link href="/creator/verify-identity">
-								<Button className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white">Complete Creator Profile</Button>
+								<Button className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white">
+									Complete Creator Profile
+								</Button>
 							</Link>
 						</div>
 					)}
@@ -308,7 +203,10 @@ export default function CreatorContentWrapper({
 								{getPageTypeText(pageType)}.
 							</p>
 							<Link href="/creator/dashboard/settings">
-								<Button variant="destructive" className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white">
+								<Button
+									variant="destructive"
+									className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white"
+								>
 									Edit Creator Profile
 								</Button>
 							</Link>
@@ -355,10 +253,12 @@ export default function CreatorContentWrapper({
 								Please contact support for assistance.
 							</p>
 							<Link href="/contact-us">
-								
-							<Button variant="outline" className="px-6 py-2 bg-gray-900 text-white hover:bg-gray-800">
-								Contact Support
-							</Button>
+								<Button
+									variant="outline"
+									className="px-6 py-2 bg-gray-900 text-white hover:bg-gray-800"
+								>
+									Contact Support
+								</Button>
 							</Link>
 						</div>
 					)}
@@ -391,8 +291,6 @@ export default function CreatorContentWrapper({
 		);
 	}
 
-	// If creator is approved, show the content
-	console.log("Creator is approved, showing children");
 	return (
 		<div className="w-full">
 			{children}

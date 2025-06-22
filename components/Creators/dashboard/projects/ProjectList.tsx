@@ -13,16 +13,16 @@ import {
 import SearchBar from "../contests/SearchBar";
 import ProjectCard from "./ProjectCard";
 import { ProjectFormData } from "@/types/contestFormData";
+import { useQuery } from "@tanstack/react-query";
 
 export default function ProjectList() {
-	const { currentUser } = useAuth();
+	const { currentUser, isLoading: authLoading } = useAuth();
 	const [projects, setProjects] = useState<ProjectFormData[]>([]);
 	const [filteredProjects, setFilteredProjects] = useState<ProjectFormData[]>(
 		[]
 	);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [activeTab, setActiveTab] = useState("All Projects");
-	const [isLoading, setIsLoading] = useState(true);
 	const [sortOption, setSortOption] = useState("latest");
 
 	// Counts for each tab
@@ -38,35 +38,66 @@ export default function ProjectList() {
 			.length,
 	};
 
-	useEffect(() => {
-		const fetchProjects = async () => {
-			// Only fetch if we have a user
-			if (!currentUser) {
-				setIsLoading(false); // Stop loading if no user
-				return;
+	const { 
+		data: projectsData, 
+		isLoading, 
+		error, 
+		refetch,
+		isFetching,
+		isSuccess
+	} = useQuery({
+		queryKey: ["user-projects", currentUser?.uid],
+		queryFn: async () => {
+			if (!currentUser?.uid) {
+				throw new Error("User not authenticated");
 			}
 
-			setIsLoading(true);
-			try {
-				const userId = currentUser.uid;
-				console.log("Fetching projects for user ID:", userId);
-				const response = await fetch(`/api/user-projects?userId=${userId}`);
-				console.log("Response status:", response);
-				if (!response.ok) {
-					throw new Error("Failed to fetch projects");
+			const response = await fetch(
+				`/api/user-projects?userId=${currentUser.uid}`,
+				{
+					headers: {
+						'Cache-Control': 'no-cache',
+					},
 				}
-				const data = await response.json();
-				console.log("API response:", data);
-				setProjects(data.projects);
-			} catch (error) {
-				console.error("Error fetching projects:", error);
-			} finally {
-				setIsLoading(false);
+			);
+			
+			if (!response.ok) {
+				throw new Error(`Failed to fetch projects: ${response.statusText}`);
 			}
-		};
+			
+			const data = await response.json();
+			return data;
+		},
+		enabled: !authLoading && !!currentUser?.uid,
+		staleTime: 0, // Always consider data stale
+		refetchOnMount: true, // Always refetch when component mounts
+		refetchOnWindowFocus: false, // Don't refetch on window focus
+		retry: (failureCount, error) => {
+			// Retry up to 3 times, but not for auth errors
+			if (error.message.includes("not authenticated")) {
+				return false;
+			}
+			return failureCount < 3;
+		},
+		retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+	});
 
-		fetchProjects();
-	}, [currentUser]);
+	// Update state when data changes
+	useEffect(() => {
+		if (projectsData?.projects) {
+			setProjects(projectsData.projects);
+		} else if (projectsData && !projectsData.projects) {
+			// Handle case where API returns success but no projects array
+			setProjects([]);
+		}
+	}, [projectsData]);
+
+	// Force refetch when user changes (handles navigation scenarios)
+	useEffect(() => {
+		if (currentUser?.uid && !isLoading && !isFetching) {
+			refetch();
+		}
+	}, [currentUser?.uid, refetch, isLoading, isFetching]);
 
 	useEffect(() => {
 		let filtered = [...projects];
@@ -90,79 +121,74 @@ export default function ProjectList() {
 		if (searchQuery) {
 			filtered = filtered.filter(
 				(project) =>
-					project.projectDetails.projectName
-						.toLowerCase()
+					project.projectDetails?.projectName
+						?.toLowerCase()
 						.includes(searchQuery.toLowerCase()) ||
-					project.projectDetails.projectDescription
+					project.projectDetails?.projectDescription
+						?.toLowerCase()
 						.includes(searchQuery.toLowerCase())
 			);
 		}
 
 		// Sort the projects based on the selected option
-		switch (sortOption) {
-			case "latest":
-				filtered.sort((a, b) => {
-					const dateA =
-						a.createdAt &&
-						typeof a.createdAt === "object" &&
-						"_seconds" in a.createdAt
-							? new Date(a.createdAt._seconds * 1000)
-							: new Date(a.createdAt || 0);
-					const dateB =
-						b.createdAt &&
-						typeof b.createdAt === "object" &&
-						"_seconds" in b.createdAt
-							? new Date(b.createdAt._seconds * 1000)
-							: new Date(b.createdAt || 0);
-					return dateB.getTime() - dateA.getTime(); // Newest first
-				});
-				break;
-			case "oldest":
-				filtered.sort((a, b) => {
-					const dateA =
-						a.createdAt &&
-						typeof a.createdAt === "object" &&
-						"_seconds" in a.createdAt
-							? new Date(a.createdAt._seconds * 1000)
-							: new Date(a.createdAt || 0);
-					const dateB =
-						b.createdAt &&
-						typeof b.createdAt === "object" &&
-						"_seconds" in b.createdAt
-							? new Date(b.createdAt._seconds * 1000)
-							: new Date(b.createdAt || 0);
-					return dateA.getTime() - dateB.getTime(); // Oldest first
-				});
-				break;
-			case "popular":
-				filtered.sort((a, b) => {
-					// Sort by applicants count or views if available
+		const sortProjects = (a: ProjectFormData, b: ProjectFormData) => {
+			const getDate = (project: ProjectFormData) => {
+				if (project.createdAt && typeof project.createdAt === "object" && "_seconds" in project.createdAt) {
+					return new Date(project.createdAt._seconds * 1000);
+				}
+				return new Date(project.createdAt || 0);
+			};
+
+			switch (sortOption) {
+				case "latest":
+					return getDate(b).getTime() - getDate(a).getTime();
+				case "oldest":
+					return getDate(a).getTime() - getDate(b).getTime();
+				case "popular":
 					const popularityA = a.applicantsCount || a.views || 0;
 					const popularityB = b.applicantsCount || b.views || 0;
-					return popularityB - popularityA; // Higher count first
-				});
-				break;
-			default:
-				// Default to latest if no valid option is selected
-				filtered.sort((a, b) => {
-					const dateA =
-						a.createdAt &&
-						typeof a.createdAt === "object" &&
-						"_seconds" in a.createdAt
-							? new Date(a.createdAt._seconds * 1000)
-							: new Date(a.createdAt || 0);
-					const dateB =
-						b.createdAt &&
-						typeof b.createdAt === "object" &&
-						"_seconds" in b.createdAt
-							? new Date(b.createdAt._seconds * 1000)
-							: new Date(b.createdAt || 0);
-					return dateB.getTime() - dateA.getTime();
-				});
-		}
+					return popularityB - popularityA;
+				default:
+					return getDate(b).getTime() - getDate(a).getTime();
+			}
+		};
 
+		filtered.sort(sortProjects);
 		setFilteredProjects(filtered);
-	}, [projects, activeTab, searchQuery, sortOption, currentUser]);
+	}, [projects, activeTab, searchQuery, sortOption]);
+
+	// Show loading while auth is initializing or while we're loading for the first time
+	const isInitialLoading = authLoading || isLoading;
+	
+	if (isInitialLoading) {
+		return (
+			<div className="flex flex-col justify-center items-center h-screen">
+				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+				<div className="text-center mt-2">Loading projects...</div>
+			</div>
+		);
+	}
+
+	// Show error state with retry option
+	if (error && !projects.length) {
+		return (
+			<div className="flex flex-col justify-center items-center h-screen">
+				<div className="text-center">
+					<p className="text-lg text-red-600 mb-2">Failed to load projects</p>
+					<p className="text-sm text-gray-500 mb-4">
+						{error.message || "Something went wrong"}
+					</p>
+					<button
+						onClick={() => refetch()}
+						className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600"
+						disabled={isFetching}
+					>
+						{isFetching ? "Retrying..." : "Try Again"}
+					</button>
+				</div>
+			</div>
+		);
+	}
 
 	const hasProjects = projects.length > 0;
 
@@ -200,12 +226,18 @@ export default function ProjectList() {
 			)}
 
 			<div className="space-y-4 mt-4">
-				{isLoading ? (
-					<div className="flex flex-col justify-center items-center h-screen">
-						<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
-						<div className="text-center">Loading projects...</div>
+				{/* Show loading indicator while fetching but we have existing data */}
+				{/* {isFetching && projects.length > 0 && (
+					<div className="text-center py-2">
+						<div className="inline-flex items-center text-sm text-gray-500">
+							<div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-orange-500 mr-2"></div>
+							Updating projects...
+						</div>
 					</div>
-				) : projects.length === 0 ? (
+				)} */}
+
+				{/* Only show "no projects" message after successful API call */}
+				{isSuccess && projects.length === 0 ? (
 					<div className="text-center py-8">
 						<p className="text-lg text-gray-600">No projects found</p>
 						<p className="text-sm text-gray-500 mt-2">
@@ -213,7 +245,7 @@ export default function ProjectList() {
 							interest
 						</p>
 					</div>
-				) : filteredProjects.length === 0 ? (
+				) : isSuccess && filteredProjects.length === 0 && projects.length > 0 ? (
 					<div className="text-center py-8">
 						<p className="text-lg text-gray-600">No matching projects found</p>
 						<p className="text-sm text-gray-500 mt-2">

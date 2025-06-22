@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Trash2, Edit, ChevronLeft } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthApi } from "@/hooks/useAuthApi";
 import { Input } from "@/components/ui/input";
 import {
@@ -43,9 +44,6 @@ interface ShippingAddressFormData {
 }
 
 export default function ShippingAddressPage() {
-	const [addresses, setAddresses] = useState<ShippingAddress[]>([]);
-	const [error, setError] = useState<string | null>(null);
-	const [loading, setLoading] = useState(false);
 	const [showForm, setShowForm] = useState(false);
 	const [isEditing, setIsEditing] = useState(false);
 	const [formData, setFormData] = useState<ShippingAddressFormData>({
@@ -64,28 +62,132 @@ export default function ShippingAddressPage() {
 	const [charCount, setCharCount] = useState(0);
 
 	const api = useAuthApi();
+	const queryClient = useQueryClient();
 
-	// Fetch shipping addresses
-	useEffect(() => {
-		const fetchAddresses = async () => {
-			setLoading(true);
+	// Query for fetching shipping addresses
+	const {
+		data: addresses = [],
+		isLoading,
+		error: queryError,
+	} = useQuery({
+		queryKey: ["shipping-addresses"],
+		queryFn: async () => {
 			const { data, error } = await api.get<ShippingAddress[]>(
 				"/api/shipping-addresses"
 			);
-
 			if (error) {
-				setError(
+				throw new Error(
 					"Failed to load shipping addresses. Please ensure you are logged in."
 				);
-			} else if (data) {
-				setAddresses(data);
 			}
-			setLoading(false);
-		};
+			return data || [];
+		},
+	});
 
-		fetchAddresses();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, []);
+	// Mutation for creating a new address
+	const createAddressMutation = useMutation({
+		mutationFn: async (addressData: ShippingAddressFormData) => {
+			const { data, error } = await api.post<ShippingAddress>(
+				"/api/shipping-addresses",
+				addressData as unknown as Record<string, unknown>
+			);
+			if (error) {
+				throw new Error(error || "Failed to add shipping address");
+			}
+			return data;
+		},
+		onSuccess: (newAddress) => {
+			queryClient.setQueryData<ShippingAddress[]>(
+				["shipping-addresses"],
+				(oldData = []) => {
+					if (newAddress?.isDefault) {
+						// If new address is default, update all others to not be default
+						return [
+							...oldData.map((address) => ({ ...address, isDefault: false })),
+							newAddress as ShippingAddress,
+						];
+					}
+					return [...oldData, newAddress as ShippingAddress];
+				}
+			);
+			setShowForm(false);
+		},
+	});
+
+	// Mutation for updating an address
+	const updateAddressMutation = useMutation({
+		mutationFn: async (addressData: ShippingAddressFormData) => {
+			const { error } = await api.put<{ success: boolean }>(
+				`/api/shipping-addresses/${addressData.id}`,
+				addressData as unknown as Record<string, unknown>
+			);
+			if (error) {
+				throw new Error(error || "Failed to update shipping address");
+			}
+			return addressData;
+		},
+		onSuccess: (updatedAddress) => {
+			queryClient.setQueryData<ShippingAddress[]>(
+				["shipping-addresses"],
+				(oldData = []) => {
+					return oldData.map((address) =>
+						address.id === updatedAddress.id
+							? { ...address, ...updatedAddress, id: updatedAddress.id! }
+							: updatedAddress.isDefault
+								? { ...address, isDefault: false }
+								: address
+					);
+				}
+			);
+			setShowForm(false);
+		},
+	});
+
+	// Mutation for making an address default
+	const makeDefaultMutation = useMutation({
+		mutationFn: async (id: string) => {
+			const { error } = await api.put<{ success: boolean }>(
+				`/api/shipping-addresses/${id}/default`,
+				{}
+			);
+			if (error) {
+				throw new Error("Failed to update default address");
+			}
+			return id;
+		},
+		onSuccess: (id) => {
+			queryClient.setQueryData<ShippingAddress[]>(
+				["shipping-addresses"],
+				(oldData = []) => {
+					return oldData.map((address) => ({
+						...address,
+						isDefault: address.id === id,
+					}));
+				}
+			);
+		},
+	});
+
+	// Mutation for deleting an address
+	const deleteAddressMutation = useMutation({
+		mutationFn: async (id: string) => {
+			const { error } = await api.delete<{ success: boolean }>(
+				`/api/shipping-addresses/${id}`
+			);
+			if (error) {
+				throw new Error("Failed to delete address");
+			}
+			return id;
+		},
+		onSuccess: (deletedId) => {
+			queryClient.setQueryData<ShippingAddress[]>(
+				["shipping-addresses"],
+				(oldData = []) => {
+					return oldData.filter((address) => address.id !== deletedId);
+				}
+			);
+		},
+	});
 
 	const handleAddNew = () => {
 		// Reset form data
@@ -101,6 +203,8 @@ export default function ShippingAddressPage() {
 			deliveryInstructions: "",
 			isDefault: false,
 		});
+		setInstruction("");
+		setCharCount(0);
 		setIsEditing(false);
 		setShowForm(true);
 	};
@@ -119,13 +223,17 @@ export default function ShippingAddressPage() {
 			deliveryInstructions: address.deliveryInstructions || "",
 			isDefault: address.isDefault,
 		});
+		setInstruction(address.deliveryInstructions || "");
+		setCharCount((address.deliveryInstructions || "").length);
 		setIsEditing(true);
 		setShowForm(true);
 	};
 
 	const handleCancel = () => {
 		setShowForm(false);
-		setError(null);
+		// Reset mutations errors
+		createAddressMutation.reset();
+		updateAddressMutation.reset();
 	};
 
 	const handleChange = (
@@ -152,107 +260,55 @@ export default function ShippingAddressPage() {
 		if (text.length <= 500) {
 			setInstruction(text);
 			setCharCount(text.length);
+			setFormData((prev) => ({
+				...prev,
+				deliveryInstructions: text,
+			}));
 		}
 	};
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		setLoading(true);
-		setError(null);
+		
+		const dataToSubmit = {
+			...formData,
+			deliveryInstructions: instruction,
+		};
 
-		try {
-			if (isEditing && formData.id) {
-				// Update existing address
-				const { error } = await api.put<{ success: boolean }>(
-					`/api/shipping-addresses/${formData.id}`,
-					formData as unknown as Record<string, unknown>
-				);
-
-				if (error) {
-					throw new Error(error || "Failed to update shipping address");
-				}
-
-				// Update the addresses list
-				setAddresses((prev) =>
-					prev.map((address) =>
-						address.id === formData.id
-							? { ...address, ...formData, id: formData.id }
-							: formData.isDefault
-								? { ...address, isDefault: false }
-								: address
-					)
-				);
-			} else {
-				// Add new address
-				const { data, error } = await api.post<ShippingAddress>(
-					"/api/shipping-addresses",
-					formData as unknown as Record<string, unknown>
-				);
-
-				if (error) {
-					throw new Error(error || "Failed to add shipping address");
-				}
-
-				if (data) {
-					// If the new address is default, update all other addresses
-					if (formData.isDefault) {
-						setAddresses((prev) => [
-							...prev.map((address) => ({ ...address, isDefault: false })),
-							data,
-						]);
-					} else {
-						setAddresses((prev) => [...prev, data]);
-					}
-				}
-			}
-
-			// Hide the form after successful submission
-			setShowForm(false);
-		} catch (err) {
-			console.error("Error saving address:", err);
-			setError(err instanceof Error ? err.message : "An error occurred");
-		} finally {
-			setLoading(false);
-		}
-	};
-
-	const handleMakeDefault = async (id: string) => {
-		const { error } = await api.put<{ success: boolean }>(
-			`/api/shipping-addresses/${id}/default`,
-			{}
-		);
-
-		if (error) {
-			setError("Failed to update default address");
+		if (isEditing) {
+			updateAddressMutation.mutate(dataToSubmit);
 		} else {
-			// Update the local state to reflect the change
-			setAddresses(
-				addresses.map((address) => ({
-					...address,
-					isDefault: address.id === id,
-				}))
-			);
+			createAddressMutation.mutate(dataToSubmit);
 		}
 	};
 
-	const handleDelete = async (id: string) => {
+	const handleMakeDefault = (id: string) => {
+		makeDefaultMutation.mutate(id);
+	};
+
+	const handleDelete = (id: string) => {
 		if (!confirm("Are you sure you want to delete this address?")) {
 			return;
 		}
-
-		const { error } = await api.delete<{ success: boolean }>(
-			`/api/shipping-addresses/${id}`
-		);
-
-		if (error) {
-			setError("Failed to delete address");
-		} else {
-			// Remove the deleted address from the state
-			setAddresses(addresses.filter((address) => address.id !== id));
-		}
+		deleteAddressMutation.mutate(id);
 	};
 
-	if (api.loading && !addresses.length) {
+	// Get current error from active mutation or query
+	const currentError = 
+		queryError?.message ||
+		createAddressMutation.error?.message ||
+		updateAddressMutation.error?.message ||
+		makeDefaultMutation.error?.message ||
+		deleteAddressMutation.error?.message;
+
+	// Check if any mutation is loading
+	const isMutationLoading = 
+		createAddressMutation.isPending ||
+		updateAddressMutation.isPending ||
+		makeDefaultMutation.isPending ||
+		deleteAddressMutation.isPending;
+
+	if (isLoading && !addresses.length) {
 		return (
 			<div className="flex flex-col justify-center items-center h-screen">
 				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
@@ -294,7 +350,7 @@ export default function ShippingAddressPage() {
 						<hr className="my-4" />
 					</div>
 
-					{error && (
+					{currentError && (
 						<div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
 							<div className="flex">
 								<div className="flex-shrink-0">
@@ -311,7 +367,7 @@ export default function ShippingAddressPage() {
 									</svg>
 								</div>
 								<div className="ml-3">
-									<p className="text-sm text-red-700">{error}</p>
+									<p className="text-sm text-red-700">{currentError}</p>
 								</div>
 							</div>
 						</div>
@@ -324,7 +380,7 @@ export default function ShippingAddressPage() {
 									htmlFor="name"
 									className="block text-sm font-medium text-gray-700"
 								>
-									Reciepent Full Name
+									Recipient Full Name
 								</label>
 								<Input
 									type="text"
@@ -474,7 +530,7 @@ export default function ShippingAddressPage() {
 									value={formData.phoneNumber}
 									onChange={handleChange}
 									required
-									className="mt-1 block w-full rounded-mdshadow-sm"
+									className="mt-1 block w-full rounded-md shadow-sm"
 									placeholder="For delivery questions"
 								/>
 							</div>
@@ -555,10 +611,10 @@ export default function ShippingAddressPage() {
 							</button>
 							<button
 								type="submit"
-								disabled={loading}
-								className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-md shadow-sm text-sm focus:outline-none "
+								disabled={isMutationLoading}
+								className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-md shadow-sm text-sm focus:outline-none disabled:opacity-50"
 							>
-								{loading
+								{isMutationLoading
 									? "Saving..."
 									: isEditing
 										? "Update Address"
@@ -570,9 +626,9 @@ export default function ShippingAddressPage() {
 			) : (
 				// List view
 				<>
-					{error && (
+					{currentError && (
 						<div className="p-4 mb-4 text-red-500 bg-red-50 rounded-md">
-							{error}
+							{currentError}
 						</div>
 					)}
 
@@ -615,12 +671,14 @@ export default function ShippingAddressPage() {
 											<button
 												onClick={() => handleEdit(address)}
 												className="text-gray-600 hover:text-gray-900"
+												disabled={isMutationLoading}
 											>
 												<Edit size={20} />
 											</button>
 											<button
 												onClick={() => handleDelete(address.id)}
 												className="text-gray-600 hover:text-red-600"
+												disabled={isMutationLoading}
 											>
 												<Trash2 size={20} />
 											</button>
@@ -646,9 +704,12 @@ export default function ShippingAddressPage() {
 										<div className="mt-4">
 											<button
 												onClick={() => handleMakeDefault(address.id)}
-												className="text-gray-600 border border-gray-300 rounded-md px-4 py-2 text-sm hover:bg-gray-50"
+												className="text-gray-600 border border-gray-300 rounded-md px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+												disabled={isMutationLoading}
 											>
-												Make Default
+												{makeDefaultMutation.isPending && makeDefaultMutation.variables === address.id
+													? "Setting as default..."
+													: "Make Default"}
 											</button>
 										</div>
 									)}

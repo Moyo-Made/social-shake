@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
@@ -12,6 +12,7 @@ import { getProjectStatusInfo } from "@/types/projects";
 import CreatorSubmissionTab from "./CreatorSubmissionTab";
 import ProjectAnalytics from "./ProjectAnalytics";
 import DeliveryTracking from "./ProductDeliveryTracking";
+import { useQuery } from "@tanstack/react-query";
 
 interface ProjectDetailPageProps {
 	projectId: string;
@@ -19,38 +20,25 @@ interface ProjectDetailPageProps {
 	contestId: string;
 }
 const ManageProjects = ({ projectId, contestId }: ProjectDetailPageProps) => {
-	//   const router = useRouter();
-	const [project, setProject] = useState<ProjectFormData | null>(null);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
+	// Replace the current useEffect with:
+	const {
+		data: project,
+		isLoading: loading,
+		error,
+	} = useQuery({
+		queryKey: ["project", projectId],
+		queryFn: async () => {
+			const projectRef = doc(db, "projects", projectId.toString());
+			const projectSnap = await getDoc(projectRef);
 
-	// const [applications] = useState<unknown[]>([]);
-	// const [submissions] = useState<unknown[]>([]);
-
-	useEffect(() => {
-		const fetchProjectData = async () => {
-			try {
-				setLoading(true);
-				const projectRef = doc(db, "projects", projectId.toString());
-				const projectSnap = await getDoc(projectRef);
-
-				if (projectSnap.exists()) {
-					setProject(projectSnap.data() as ProjectFormData);
-				} else {
-					setError("Project not found");
-				}
-			} catch (err) {
-				console.error("Error fetching project:", err);
-				setError("Failed to load project details");
-			} finally {
-				setLoading(false);
+			if (projectSnap.exists()) {
+				return projectSnap.data() as ProjectFormData;
+			} else {
+				throw new Error("Project not found");
 			}
-		};
-
-		if (projectId) {
-			fetchProjectData();
-		}
-	}, [projectId]);
+		},
+		enabled: !!projectId,
+	});
 
 	if (loading) {
 		return (
@@ -64,11 +52,10 @@ const ManageProjects = ({ projectId, contestId }: ProjectDetailPageProps) => {
 	if (error || !project) {
 		return (
 			<div className="p-8 text-center text-red-500">
-				{error || "Project not available"}
+				{error?.message || "Project not available"}
 			</div>
 		);
 	}
-
 	const { label, color, bgColor, borderColor } = getProjectStatusInfo(
 		project.status
 	);

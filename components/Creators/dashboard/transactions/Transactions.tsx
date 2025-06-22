@@ -36,6 +36,7 @@ import {
 import { generateTransactionReportPDF } from "./GeneratePDFs";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 // Define Transaction type
 type TransactionStatus = "Withdrawn" | "Processing" | "Processed" | "Failed";
@@ -102,148 +103,92 @@ const getStatusIcon = (status: TransactionStatus): React.ReactNode => {
 };
 
 const Transactions: React.FC = () => {
+	const queryClient = useQueryClient();
+	const { currentUser } = useAuth();
+
 	// Transaction state and modals
-	const [transactionModalOpen, setTransactionModalOpen] =
-		useState<boolean>(false);
-	const [selectedTransaction, setSelectedTransaction] =
-		useState<Transaction | null>(null);
+	const [transactionModalOpen, setTransactionModalOpen] = useState<boolean>(false);
+	const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
 	// Withdrawal flow states
-	const [withdrawalModalOpen, setWithdrawalModalOpen] =
-		useState<boolean>(false);
-	const [confirmationModalOpen, setConfirmationModalOpen] =
-		useState<boolean>(false);
+	const [withdrawalModalOpen, setWithdrawalModalOpen] = useState<boolean>(false);
+	const [confirmationModalOpen, setConfirmationModalOpen] = useState<boolean>(false);
 	const [withdrawalInfo, setWithdrawalInfo] = useState<any>(null);
 
 	// Filter states
 	const [searchTerm, setSearchTerm] = useState<string>("");
 	const [typeFilter, setTypeFilter] = useState<string>("");
 	const [statusFilter, setStatusFilter] = useState<string>("");
-	const [date, setDate] = useState<Date | undefined>(undefined); // Changed: Start with no date filter
-	const [dateFilterEnabled, setDateFilterEnabled] = useState<boolean>(false); // New: Track if date filter is active
+	const [date, setDate] = useState<Date | undefined>(undefined);
+	const [dateFilterEnabled, setDateFilterEnabled] = useState<boolean>(false);
 
-	// Loading states
-	const [isLoading, setIsLoading] = useState<boolean>(true);
-	const [isInitializing, setIsInitializing] = useState<boolean>(true);
-	const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-	const [loadingError, setLoadingError] = useState<string | null>(null);
-
-	// Pagination
+	// Pagination and transaction accumulation
 	const [hasMore, setHasMore] = useState<boolean>(false);
 	const [lastId, setLastId] = useState<string | null>(null);
+	const [allTransactions, setAllTransactions] = useState<any[]>([]);
 
-	// Financial data
-	const [availableBalance, setAvailableBalance] = useState<string>("0");
-	const [processingPayments, setProcessingPayments] = useState<string>("0");
-	const [totalEarnings, setTotalEarnings] = useState<string>("0");
-	const [, setInstantAvailable] = useState<string>("0");
-	const [withdrawalDetailsModalOpen, setWithdrawalDetailsModalOpen] =
-		useState<boolean>(false);
-
-	// Transaction data
-	const [transactions, setTransactions] = useState<Transaction[]>([]);
+	// Transaction details
 	const [transactionDetails, setTransactionDetails] = useState<any>(null);
-	const { currentUser } = useAuth();
 	const [stripeAccountId, setStripeAccountId] = useState<string | null>(null);
 	const [stripeConnected, setStripeConnected] = useState(false);
+	const [withdrawalDetailsModalOpen, setWithdrawalDetailsModalOpen] = useState<boolean>(false);
 
-	// Add this useEffect to fetch the stripeAccountId using the same API as StripeConnect
+	// Query for Stripe status
+	const { data: stripeStatus, error: stripeStatusError } = useQuery({
+		queryKey: ['stripeStatus', currentUser?.uid],
+		queryFn: async () => {
+			if (!currentUser?.uid) throw new Error('User not authenticated');
+			
+			const response = await fetch(`/api/creator/stripe-status?userId=${currentUser.uid}`);
+			if (!response.ok) throw new Error('Failed to load Stripe account information');
+			return response.json();
+		},
+		enabled: !!currentUser?.uid,
+		staleTime: 5 * 60 * 1000, // 5 minutes
+		retry: 2,
+	});
+
+	// Update Stripe connection state when query resolves
 	useEffect(() => {
-		const checkStripeStatus = async () => {
-			if (!currentUser?.uid) return;
-
-			try {
-				const response = await fetch(
-					`/api/creator/stripe-status?userId=${currentUser.uid}`
-				);
-				if (response.ok) {
-					const data = await response.json();
-					setStripeConnected(data.connected);
-					setStripeAccountId(data.stripeAccountId || null);
-				} else {
-					setLoadingError("Failed to load Stripe account information");
-				}
-			} catch (error) {
-				console.error("Error fetching Stripe account status:", error);
-				setLoadingError("Failed to load Stripe account information");
-			}
-		};
-
-		checkStripeStatus();
-	}, [currentUser]);
-
-	// Update the existing useEffect to depend on stripeAccountId and stripeConnected
-	useEffect(() => {
-		const initializeData = async () => {
-			if (!currentUser) {
-				setLoadingError("Please log in to view transactions");
-				setIsInitializing(false);
-				return;
-			}
-
-			if (!stripeConnected || !stripeAccountId) {
-				setLoadingError(
-					"Stripe account not connected. Please connect your Stripe account to view transactions."
-				);
-				setIsInitializing(false);
-				return;
-			}
-
-			setIsInitializing(true);
-
-			try {
-				await Promise.all([fetchBalanceData(), fetchTransactions()]);
-			} catch (error) {
-				console.error("Error initializing data:", error);
-				setLoadingError("Failed to load data. Please try again.");
-			} finally {
-				setIsInitializing(false);
-			}
-		};
-
-		// Only initialize when we have currentUser and confirmed Stripe connection
-		if (currentUser && stripeConnected && stripeAccountId) {
-			initializeData();
-		} 
-	}, [currentUser, stripeConnected, stripeAccountId]);
-
-
-	// Fetch balance data from Stripe
-	const fetchBalanceData = async () => {
-		if (!stripeAccountId) return;
-
-		try {
-			const response = await fetch(
-				`/api/stripe/balance?accountId=${stripeAccountId}`
-			);
-
-			if (!response.ok) {
-				throw new Error("Failed to fetch balance data");
-			}
-
-			const data = await response.json();
-			setAvailableBalance(data.availableBalance);
-			setProcessingPayments(data.processingPayments);
-			setTotalEarnings(data.totalEarnings);
-			setInstantAvailable(data.instantAvailable || "0");
-		} catch (error) {
-			console.error("Error fetching balance:", error);
-			setLoadingError("Failed to load balance data. Please try again.");
+		if (stripeStatus) {
+			setStripeConnected(stripeStatus.connected);
+			setStripeAccountId(stripeStatus.stripeAccountId || null);
 		}
-	};
+	}, [stripeStatus]);
 
-	// Fixed: Fetch transactions from Stripe
-	const fetchTransactions = async (resetList = true) => {
-		if (!stripeAccountId) return;
+	// Query for balance data
+	const { 
+		data: balanceData, 
+		isLoading: isBalanceLoading, 
+		error: balanceError 
+	} = useQuery({
+		queryKey: ['balance', stripeAccountId],
+		queryFn: async () => {
+			if (!stripeAccountId) throw new Error('Stripe account ID not available');
+			
+			const response = await fetch(`/api/stripe/balance?accountId=${stripeAccountId}`);
+			if (!response.ok) throw new Error('Failed to fetch balance data');
+			return response.json();
+		},
+		enabled: !!stripeAccountId && stripeConnected,
+		staleTime: 2 * 60 * 1000, // 2 minutes
+		retry: 2,
+	});
 
-		setIsLoading(true);
-		setLoadingError(null);
-
-		try {
+	// Query for transactions with pagination
+	const { 
+		data: transactionsData, 
+		isLoading: isTransactionsLoading, 
+		error: transactionsError,
+	} = useQuery({
+		queryKey: ['transactions', stripeAccountId, typeFilter, dateFilterEnabled ? date : null, lastId],
+		queryFn: async () => {
+			if (!stripeAccountId) throw new Error('Stripe account ID not available');
+			
 			let url = `/api/stripe/transactions?accountId=${stripeAccountId}&limit=25`;
-
+			
 			// Add pagination params if needed
-			if (!resetList && lastId) {
+			if (lastId) {
 				url += `&startingAfter=${lastId}`;
 			}
 
@@ -252,154 +197,79 @@ const Transactions: React.FC = () => {
 				url += `&type=${typeFilter}`;
 			}
 
-			// FIXED: Only add date filter if it's explicitly enabled and date is selected
+			// Add date filter if enabled
 			if (dateFilterEnabled && date) {
 				const timestamp = Math.floor(date.getTime() / 1000);
 				url += `&created=${timestamp}`;
 			}
 
 			const response = await fetch(url);
-
-			if (!response.ok) {
-				throw new Error("Failed to fetch transactions");
-			}
-
+			if (!response.ok) throw new Error('Failed to fetch transactions');
+			
 			const data = await response.json();
+			
+			return data;
+		},
+		enabled: !!stripeAccountId && stripeConnected,
+		staleTime: 1 * 60 * 1000, // 1 minute
+		retry: 2,
+	});
 
-			if (resetList) {
-				setTransactions(data.transactions);
-			} else {
-				setTransactions([...transactions, ...data.transactions]);
-			}
-
-			setHasMore(data.hasMore);
-			setLastId(data.lastId);
-		} catch (error) {
-			console.error("Error fetching transactions:", error);
-			setLoadingError("Failed to load transactions. Please try again.");
-		} finally {
-			setIsLoading(false);
-		}
-	};
-
-	// Fetch transaction details from Stripe
-	// const fetchTransactionDetails = async (transactionId: string) => {
-	// 	if (!stripeAccountId) return null;
-
-	// 	try {
-	// 		const response = await fetch(
-	// 			`/api/stripe/transactions/${transactionId}?accountId=${stripeAccountId}`
-	// 		);
-
-	// 		if (!response.ok) {
-	// 			throw new Error("Failed to fetch transaction details");
-	// 		}
-
-	// 		const data = await response.json();
-	// 		return data.transaction;
-	// 	} catch (error) {
-	// 		console.error("Error fetching transaction details:", error);
-	// 		toast("Failed to load transaction details");
-	// 		return null;
-	// 	}
-	// };
-
-	// FIXED: Refresh data when filters change (but not when date changes unless explicitly enabled)
+	// Update transactions when new data comes in
 	useEffect(() => {
-		if (!isInitializing && stripeAccountId) {
-			fetchTransactions();
+		if (transactionsData?.transactions) {
+			if (lastId) {
+				// If we have a lastId, we're loading more - append to existing transactions
+				setAllTransactions(prev => [...prev, ...transactionsData.transactions]);
+			} else {
+				// If no lastId, this is a fresh load - replace all transactions
+				setAllTransactions(transactionsData.transactions);
+			}
 		}
-	}, [typeFilter, dateFilterEnabled, date]); // Added dateFilterEnabled dependency
+	}, [transactionsData, lastId]);
 
-	// FIXED: Handle date selection
-	const handleDateSelect = (selectedDate: Date | undefined) => {
-		setDate(selectedDate);
-		if (selectedDate) {
-			setDateFilterEnabled(true);
+	// Update pagination state when new data arrives
+	useEffect(() => {
+		if (transactionsData) {
+			setHasMore(transactionsData.hasMore || false);
 		}
-	};
+	}, [transactionsData]);
 
-	// FIXED: Clear date filter
-	const clearDateFilter = () => {
-		setDate(undefined);
-		setDateFilterEnabled(false);
-	};
+	// Reset transactions when filters change
+	useEffect(() => {
+		setAllTransactions([]);
+		setLastId(null);
+		setHasMore(false);
+	}, [typeFilter, statusFilter, dateFilterEnabled, date, searchTerm]);
 
-	const handleExportReport = () => {
-		// Generate the PDF with the current filtered transactions
-		generateTransactionReportPDF(filteredTransactions, {
-			totalEarnings,
-			processingPayments,
-			availableBalance,
-		});
-	};
-
-	// const handleViewTransaction = async (
-	// 	transaction: Transaction
-	// ): Promise<void> => {
-	// 	setSelectedTransaction(transaction);
-
-	// 	// Get full transaction details from Stripe
-	// 	const details = await fetchTransactionDetails(transaction.id);
-	// 	setTransactionDetails(details);
-
-	// 	// Show different modals based on transaction status
-	// 	if (transaction.status === "Withdrawn") {
-	// 		setWithdrawalDetailsModalOpen(true);
-	// 	} else {
-	// 		setTransactionModalOpen(true);
-	// 	}
-	// };
-
-	// Handle initiating withdrawal
-	const handleWithdraw = () => {
-		setWithdrawalModalOpen(true);
-	};
-
-	// Handle withdrawal form submission
-	const handleWithdrawalSubmit = (info: any) => {
-		setWithdrawalInfo(info);
-		setWithdrawalModalOpen(false);
-		setConfirmationModalOpen(true);
-	};
-
-	// Handle withdrawal confirmation - create manual payout via Stripe
-	const handleConfirmWithdrawal = async () => {
-		if (!stripeAccountId) return;
-
-		setConfirmationModalOpen(false);
-		setIsSubmitting(true);
-
-		try {
-			const response = await fetch(
-				`/api/stripe/payouts?accountId=${stripeAccountId}`,
-				{
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-					},
-					body: JSON.stringify({
-						amount: parseFloat(withdrawalInfo.amount),
-						method:
-							withdrawalInfo.paymentMethod === "instant"
-								? "instant"
-								: "standard",
-					}),
-				}
-			);
-
+	// Mutation for withdrawal
+	const withdrawalMutation = useMutation({
+		mutationFn: async (withdrawalData: any) => {
+			if (!stripeAccountId) throw new Error('Stripe account ID not available');
+			
+			const response = await fetch(`/api/stripe/payouts?accountId=${stripeAccountId}`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					amount: parseFloat(withdrawalData.amount),
+					method: withdrawalData.paymentMethod === "instant" ? "instant" : "standard",
+				}),
+			});
+			
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.error || "Failed to process withdrawal");
 			}
-
-			const data = await response.json();
-
-			// Refresh balance and transactions data
-			await Promise.all([fetchBalanceData(), fetchTransactions()]);
-
-			// Show success message
+			
+			return response.json();
+		},
+		onSuccess: (data) => {
+			// Invalidate and refetch related queries
+			queryClient.invalidateQueries({ queryKey: ['balance'] });
+			queryClient.invalidateQueries({ queryKey: ['transactions'] });
+			
 			toast("Your withdrawal has been submitted successfully");
+			setConfirmationModalOpen(false);
 
 			// Create a transaction object for the modal
 			const newTransaction: Transaction = {
@@ -423,26 +293,77 @@ const Transactions: React.FC = () => {
 			setSelectedTransaction(newTransaction);
 			setTransactionDetails(data.payout);
 			setTransactionModalOpen(true);
-		} catch (error) {
+		},
+		onError: (error) => {
 			console.error("Error processing withdrawal:", error);
-			toast(
-				error instanceof Error ? error.message : "Failed to process withdrawal"
-			);
-		} finally {
-			setIsSubmitting(false);
+			toast(error instanceof Error ? error.message : "Failed to process withdrawal");
+		},
+	});
+
+	// Derived state from queries
+	const transactions = useMemo(() => allTransactions || [], [allTransactions]);
+	const availableBalance = balanceData?.availableBalance || "0";
+	const processingPayments = balanceData?.processingPayments || "0";
+	const totalEarnings = balanceData?.totalEarnings || "0";
+
+	// Loading and error states
+	const isInitializing = isBalanceLoading || isTransactionsLoading;
+	const loadingError = stripeStatusError?.message || balanceError?.message || transactionsError?.message || null;
+
+	// Handle date selection
+	const handleDateSelect = (selectedDate: Date | undefined) => {
+		setDate(selectedDate);
+		if (selectedDate) {
+			setDateFilterEnabled(true);
 		}
 	};
 
-	// Load more transactions
+	// Clear date filter
+	const clearDateFilter = () => {
+		setDate(undefined);
+		setDateFilterEnabled(false);
+	};
+
+	const handleExportReport = () => {
+		// Generate the PDF with the current filtered transactions
+		generateTransactionReportPDF(filteredTransactions, {
+			totalEarnings,
+			processingPayments,
+			availableBalance,
+		});
+	};
+
+	// Handle initiating withdrawal
+	// const handleWithdraw = () => {
+	// 	setWithdrawalModalOpen(true);
+	// };
+
+	// Handle withdrawal form submission
+	const handleWithdrawalSubmit = (info: any) => {
+		setWithdrawalInfo(info);
+		setWithdrawalModalOpen(false);
+		setConfirmationModalOpen(true);
+	};
+
+	// Handle withdrawal confirmation
+	const handleConfirmWithdrawal = () => {
+		if (withdrawalInfo) {
+			withdrawalMutation.mutate(withdrawalInfo);
+		}
+	};
+
+	// Load more transactions for pagination
 	const loadMoreTransactions = () => {
-		if (hasMore && !isLoading) {
-			fetchTransactions(false);
+		if (hasMore && !isTransactionsLoading && allTransactions.length > 0) {
+			const newLastId = allTransactions[allTransactions.length - 1].id;
+			setLastId(newLastId);
+			// The query will automatically refetch when lastId changes due to the queryKey dependency
 		}
 	};
 
 	// Filter transactions based on search, type, and status
 	const filteredTransactions = useMemo(() => {
-		return transactions?.filter((transaction) => {
+		return transactions?.filter((transaction: { description: string; amount: string; type: string; status: string; }) => {
 			// Search term filter (case insensitive)
 			const matchesSearch =
 				searchTerm === "" ||
@@ -467,6 +388,24 @@ const Transactions: React.FC = () => {
 		});
 	}, [searchTerm, typeFilter, statusFilter, transactions]);
 
+	// Show error state if Stripe is not connected
+	if (!stripeConnected && !isInitializing && stripeStatus) {
+		return (
+			<div className="px-4 w-[70rem] mx-auto font-satoshi pt-10">
+				<div className="flex flex-col items-center justify-center py-20">
+					<p className="text-red-500 mb-4 text-center">
+						Stripe account not connected. Please connect your Stripe account to view transactions.
+					</p>
+					<Link href="/settings/payments">
+						<Button className="bg-black text-white">
+							Connect Stripe Account
+						</Button>
+					</Link>
+				</div>
+			</div>
+		);
+	}
+
 	return (
 		<div className="px-4 w-[70rem] mx-auto font-satoshi pt-10">
 			{/* Header with Month Filter and Export/Settings buttons */}
@@ -477,6 +416,7 @@ const Transactions: React.FC = () => {
 							<Button
 								variant="outline"
 								className="flex items-center gap-2 border-gray-300"
+								disabled={isInitializing}
 							>
 								<CalendarIcon className="h-4 w-4" />
 								<span>
@@ -501,13 +441,14 @@ const Transactions: React.FC = () => {
 						</PopoverContent>
 					</Popover>
 					
-					{/* FIXED: Add clear date filter button */}
+					{/* Clear date filter button */}
 					{dateFilterEnabled && (
 						<Button
 							variant="outline"
 							size="sm"
 							onClick={clearDateFilter}
 							className="text-gray-500 hover:text-gray-700"
+							disabled={isInitializing}
 						>
 							Clear Date Filter
 						</Button>
@@ -547,16 +488,16 @@ const Transactions: React.FC = () => {
 							`$${availableBalance}`
 						)}
 					</div>
-					<Button
+					{/* <Button
 						className="mt-2 bg-green-500 hover:bg-green-600 text-white"
 						onClick={handleWithdraw}
-						disabled={isInitializing || parseFloat(availableBalance) <= 0}
+						disabled={isInitializing || parseFloat(availableBalance) <= 0 || withdrawalMutation.isPending}
 					>
-						{isInitializing ? (
+						{withdrawalMutation.isPending ? (
 							<Loader2 className="h-4 w-4 animate-spin mr-2" />
 						) : null}
 						Withdraw
-					</Button>
+					</Button> */}
 				</Card>
 
 				<Card className="p-6 flex flex-col gap-1">
@@ -632,21 +573,23 @@ const Transactions: React.FC = () => {
 
 			{/* Transactions List */}
 			<div className="mb-6">
-				{isInitializing ? (
+				{isInitializing && allTransactions.length === 0 ? (
 					<div className="flex flex-col items-center justify-center py-10">
 						<Loader2 className="h-8 w-8 animate-spin text-gray-400 mb-2" />
-						<p className="text-gray-500">Initializing transaction data...</p>
+						<p className="text-gray-500">Loading transaction data...</p>
 					</div>
 				) : loadingError ? (
 					<div className="flex flex-col items-center justify-center py-10">
 						<p className="text-red-500 mb-2">{loadingError}</p>
-						<Button variant="outline" onClick={() => fetchTransactions()}>
+						<Button 
+							variant="outline" 
+							onClick={() => {
+								queryClient.invalidateQueries({ queryKey: ['balance'] });
+								queryClient.invalidateQueries({ queryKey: ['transactions'] });
+							}}
+						>
 							Try Again
 						</Button>
-					</div>
-				) : isLoading && transactions.length === 0 ? (
-					<div className="flex justify-center py-10">
-						<Loader2 className="h-8 w-8 animate-spin text-gray-400" />
 					</div>
 				) : filteredTransactions.length === 0 ? (
 					<div className="flex flex-col items-center justify-center py-10">
@@ -676,11 +619,10 @@ const Transactions: React.FC = () => {
 									<th className="px-6 py-3 text-left font-medium">Date</th>
 									<th className="px-6 py-3 text-left font-medium">Status</th>
 									<th className="px-6 py-3 text-left font-medium">Amount</th>
-									
 								</tr>
 							</thead>
 							<tbody className="divide-y">
-								{filteredTransactions.map((transaction) => (
+								{filteredTransactions.map((transaction: { id: React.Key | null | undefined; description: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; type: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; date: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; status: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; amount: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; }) => (
 									<tr key={transaction.id} className="bg-white">
 										<td className="px-6 py-4">
 											<div className="font-medium">
@@ -706,15 +648,6 @@ const Transactions: React.FC = () => {
 										<td className="px-6 py-4 font-medium">
 											{transaction.amount}
 										</td>
-										{/* <td className="px-6 py-4 text-right">
-											<Button
-												variant="ghost"
-												className="text-gray-600 hover:text-gray-900"
-												onClick={() => handleViewTransaction(transaction)}
-											>
-												View
-											</Button>
-										</td> */}
 									</tr>
 								))}
 							</tbody>
@@ -723,13 +656,17 @@ const Transactions: React.FC = () => {
 				)}
 
 				{/* Load More Button */}
-				{hasMore && !isLoading && !isInitializing && (
+				{hasMore && !isInitializing && (
 					<div className="flex justify-center mt-4">
 						<Button
 							variant="outline"
 							onClick={loadMoreTransactions}
 							className="border-gray-300"
+							disabled={isTransactionsLoading}
 						>
+							{isTransactionsLoading ? (
+								<Loader2 className="h-4 w-4 animate-spin mr-2" />
+							) : null}
 							Load More
 						</Button>
 					</div>
@@ -767,7 +704,7 @@ const Transactions: React.FC = () => {
 				onClose={() => setConfirmationModalOpen(false)}
 				onConfirm={handleConfirmWithdrawal}
 				withdrawalInfo={withdrawalInfo}
-				isLoading={isSubmitting}
+				isLoading={withdrawalMutation.isPending}
 			/>
 		</div>
 	);

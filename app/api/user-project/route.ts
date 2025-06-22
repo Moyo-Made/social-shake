@@ -17,7 +17,8 @@ export async function GET(request: NextRequest) {
     const applicationsRef = adminDb.collection('project_applications');
     const applicationsQuery = applicationsRef
       .where('userId', '==', userId)
-      .where('status', '==', 'approved'); // Only get approved applications
+      .where('status', '==', 'approved') // Only get approved applications
+      .limit(5); // Limit to 5 projects for performance
     
     const applicationsSnapshot = await applicationsQuery.get();
     

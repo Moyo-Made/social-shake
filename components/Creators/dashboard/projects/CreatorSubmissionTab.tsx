@@ -12,7 +12,7 @@ import SparkCodeModal from "@/components/Creators/dashboard/projects/SparkCodeMo
 import Link from "next/link";
 import TikTokLinkModal from "./TikTokLinkModal";
 import AffiliateLinkModal from "./AffiliateLinkModal";
-import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 interface ProjectSubmissionsProps {
 	projectFormData: ProjectFormData;
@@ -33,7 +33,6 @@ export default function CreatorSubmissionTab({
 	const [submissionsList, setSubmissionsList] = useState<CreatorSubmission[]>(
 		[]
 	);
-	const [isLoading, setIsLoading] = useState(true);
 	const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
 	const [, setCurrentParticipantCount] = useState<number>(0);
 	const [projectData, setProjectData] = useState<ProjectFormData | null>(null);
@@ -62,7 +61,7 @@ export default function CreatorSubmissionTab({
 	// Fetch submissions via API endpoint when component mounts
 	useEffect(() => {
 		if (currentUser && projectId) {
-			fetchSubmissions();
+			refetchSubmissions();
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [currentUser, projectId]);
@@ -234,6 +233,7 @@ export default function CreatorSubmissionTab({
 		};
 
 		fetchAffiliateLink();
+	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [submissionsList.length]);
 
 	// Fetch spark codes for submissions that need them
@@ -314,94 +314,88 @@ export default function CreatorSubmissionTab({
 		};
 
 		fetchSparkCodes();
+	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [submissionsList.length, fetchingSparkCodes]);
 
-	const fetchSubmissions = async () => {
-		try {
-			setIsLoading(true);
+	const queryClient = useQueryClient();
 
-			// Use the API endpoint to fetch submissions
-			const response = await fetch(
-				`/api/project-submissions?userId=${currentUser?.uid}&projectId=${projectId}`
-			);
+const { data: submissionsData, isLoading, refetch: refetchSubmissions } = useQuery({
+  queryKey: ['project-submissions', currentUser?.uid, projectId],
+  queryFn: async () => {
+    const response = await fetch(
+      `/api/project-submissions?userId=${currentUser?.uid}&projectId=${projectId}`
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Error fetching submissions: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    // Transform the data as before
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const submissions = data.submissions.map((submission: any, index: number) => {
+      const timestamp = submission.createdAt ? new Date(submission.createdAt) : new Date();
+      const formattedDate = new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric", 
+        year: "numeric",
+      }).format(timestamp);
 
-			if (!response.ok) {
-				throw new Error(`Error fetching submissions: ${response.status}`);
-			}
+      return {
+        id: submission.id,
+        videoNumber: index + 1,
+        status: submission.status || "pending",
+        videoUrl: submission.videoUrl,
+        note: submission.note || "",
+        revisionNumber: 0,
+        createdAt: formattedDate,
+        updatedAt: submission.updatedAt || formattedDate,
+        sparkCode: submission.sparkCode || "",
+        tiktokLink: submission.tiktokLink || "",
+      };
+    });
+    
+    return { submissions };
+  },
+  enabled: !!currentUser && !!projectId,
+});
 
-			const data = await response.json();
+const approveSubmissionMutation = useMutation({
+	mutationFn: async (submissionId: string) => {
+	  const response = await fetch(`/api/project-submissions/${submissionId}`, {
+		method: "PATCH",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+		  status: "approved",
+		  userId: currentUser?.uid,
+		}),
+	  });
+	  
+	  if (!response.ok) {
+		throw new Error(`Failed to approve submission: ${response.status}`);
+	  }
+	  
+	  return response.json();
+	},
+	onSuccess: () => {
+	  queryClient.invalidateQueries({ queryKey: ['project-submissions'] });
+	  setOpenApproveDialog(false);
+	},
+  });
 
-			// Transform the API response to match the expected submission format
-			const submissions: CreatorSubmission[] = data.submissions.map(
-				(submission: CreatorSubmission, index: number) => {
-					// Convert server timestamp to readable date format if needed
-					const timestamp = submission.createdAt
-						? new Date(submission.createdAt)
-						: new Date();
-					const formattedDate = new Intl.DateTimeFormat("en-US", {
-						month: "short",
-						day: "numeric",
-						year: "numeric",
-					}).format(timestamp);
+// Update local state when data changes
+useEffect(() => {
+  if (submissionsData?.submissions) {
+    setSubmissionsList(submissionsData.submissions);
+  }
+}, [submissionsData]);
 
-					return {
-						id: submission.id,
-						videoNumber: index + 1,
-						status: submission.status || "pending",
-						videoUrl: submission.videoUrl,
-						note: submission.note || "",
-						revisionNumber: 0,
-						createdAt: formattedDate,
-						updatedAt: submission.updatedAt || formattedDate,
-						sparkCode: submission.sparkCode || "",
-						tiktokLink: submission.tiktokLink || "",
-					};
-				}
-			);
-
-			setSubmissionsList(submissions);
-		} catch (error) {
-			console.error("Error fetching submissions:", error);
-		} finally {
-			setIsLoading(false);
-		}
-	};
-
-	const handleApprove = async () => {
-		if (currentSubmission) {
-			try {
-				// Use API endpoint to update submission status
-				const response = await fetch(
-					`/api/project-submissions/${currentSubmission.id}`,
-					{
-						method: "PATCH",
-						headers: {
-							"Content-Type": "application/json",
-						},
-						body: JSON.stringify({
-							status: "approved",
-							userId: currentUser?.uid,
-						}),
-					}
-				);
-
-				if (!response.ok) {
-					throw new Error(`Failed to approve submission: ${response.status}`);
-				}
-
-				// Update local state
-				const updatedSubmissions = submissionsList.map((sub) =>
-					sub.id === currentSubmission.id ? { ...sub, status: "approved" } : sub
-				);
-
-				setSubmissionsList(updatedSubmissions as CreatorSubmission[]);
-				setOpenApproveDialog(false);
-				console.log(`Submission ${currentSubmission.id} approved successfully`);
-			} catch (error) {
-				console.error("Error approving submission:", error);
-			}
-		}
-	};
+const handleApprove = async () => {
+	if (currentSubmission) {
+	  approveSubmissionMutation.mutate(currentSubmission.id);
+	}
+  };
 
 	const openProjectModal = () => {
 		setIsProjectModalOpen(true);
@@ -418,14 +412,6 @@ export default function CreatorSubmissionTab({
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		newSubmissionData?: any
 	) => {
-		// Check if adding this submission would exceed the limit
-		if (submissionsList.length >= totalVideos) {
-			console.warn("Cannot submit more videos - limit reached");
-			toast.error(
-				"You have reached the maximum number of submissions for this project."
-			);
-			return;
-		}
 
 		// Update participant count
 		setCurrentParticipantCount(newParticipantCount);
@@ -478,7 +464,7 @@ export default function CreatorSubmissionTab({
 
 		// Refresh submissions after a short delay to ensure backend consistency
 		setTimeout(() => {
-			fetchSubmissions();
+			refetchSubmissions();
 		}, 1000);
 	};
 
@@ -820,7 +806,7 @@ export default function CreatorSubmissionTab({
 										throw new Error("Failed to submit tiktok link");
 									}
 									// Refresh submissions after successful submission
-									await fetchSubmissions();
+									await refetchSubmissions();
 									setIsTiktokLinkModalOpen(false);
 								} catch (error) {
 									console.error("Error submitting tiktok link:", error);
@@ -865,7 +851,7 @@ export default function CreatorSubmissionTab({
 									}
 
 									// Refresh submissions after successful submission
-									await fetchSubmissions();
+									await refetchSubmissions();
 									setIsSparkCodeModalOpen(false);
 								} catch (error) {
 									console.error("Error submitting spark code:", error);

@@ -5,10 +5,42 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 	apiVersion: "2025-03-31.basil",
 });
 
+// Helper function to fetch all balance transactions with pagination
+async function fetchAllBalanceTransactions(accountId: string) {
+	const allTransactions: Stripe.BalanceTransaction[] = [];
+	let hasMore = true;
+	let startingAfter: string | undefined = undefined;
+
+	while (hasMore) {
+		const params: Stripe.BalanceTransactionListParams = {
+			limit: 100, // Maximum per request
+		};
+
+		if (startingAfter) {
+			params.starting_after = startingAfter;
+		}
+
+		const response = await stripe.balanceTransactions.list(
+			params,
+			{ stripeAccount: accountId }
+		);
+
+		allTransactions.push(...response.data);
+		hasMore = response.has_more;
+		
+		if (hasMore && response.data.length > 0) {
+			startingAfter = response.data[response.data.length - 1].id;
+		}
+	}
+
+	return allTransactions;
+}
+
 export async function GET(request: NextRequest) {
 	try {
 		const { searchParams } = new URL(request.url);
 		const accountId = searchParams.get("accountId");
+		const skipTransactionCalculation = searchParams.get("skipTransactions") === 'true';
 
 		if (!accountId) {
 			return NextResponse.json(
@@ -22,11 +54,7 @@ export async function GET(request: NextRequest) {
 			stripeAccount: accountId,
 		});
 
-		console.log("Raw balance data:", JSON.stringify(balance, null, 2));
-
-		// Fixed calculations section of your code:
-
-		// Calculate current balances
+		// Calculate current balances (in cents)
 		const availableBalance = balance.available.reduce(
 			(sum, item) => sum + item.amount,
 			0
@@ -39,18 +67,38 @@ export async function GET(request: NextRequest) {
 			balance.instant_available?.reduce((sum, item) => sum + item.amount, 0) ||
 			0;
 
-		// Fetch ALL balance transactions
-		const allBalanceTransactions = await stripe.balanceTransactions.list(
-			{
-				limit: 100,
-			},
-			{
-				stripeAccount: accountId,
-			}
-		);
+		// Basic response with current balances
+		const basicResponse = {
+			availableBalance: (availableBalance / 100).toFixed(2),
+			processingPayments: (pendingBalance / 100).toFixed(2),
+			instantAvailable: (instantAvailable / 100).toFixed(2),
+			currency: balance.available[0]?.currency || 
+					  balance.pending[0]?.currency || 
+					  "usd",
+			lastUpdated: new Date().toISOString(),
+		};
 
+		// If we want to skip heavy calculations (for quick balance checks)
+		if (skipTransactionCalculation) {
+			return NextResponse.json({
+				...basicResponse,
+				totalEarnings: "0.00", // Will be calculated separately
+				totalPayouts: "0.00",
+				breakdown: {
+					totalEarningsAvailable: "0.00",
+					totalEarningsPending: "0.00",
+				},
+				transactionCount: 0,
+			});
+		}
 
-		const totalEarningsAvailable = allBalanceTransactions.data
+		// Fetch ALL balance transactions with pagination
+		console.log("Fetching all balance transactions...");
+		const allBalanceTransactions = await fetchAllBalanceTransactions(accountId);
+		console.log(`Fetched ${allBalanceTransactions.length} total transactions`);
+
+		// Calculate lifetime earnings from successful charges
+		const totalEarningsAvailable = allBalanceTransactions
 			.filter(
 				(txn) =>
 					(txn.type === "payment" || txn.type === "charge") &&
@@ -59,7 +107,7 @@ export async function GET(request: NextRequest) {
 			)
 			.reduce((sum, txn) => sum + txn.net, 0);
 
-		const totalEarningsPending = allBalanceTransactions.data
+		const totalEarningsPending = allBalanceTransactions
 			.filter(
 				(txn) =>
 					(txn.type === "payment" || txn.type === "charge") &&
@@ -70,39 +118,22 @@ export async function GET(request: NextRequest) {
 
 		const totalEarnings = totalEarningsAvailable + totalEarningsPending;
 
-		
-		const pendingPayouts = availableBalance;
-
-		// PROCESSING PAYMENTS = Pending balance (payments still being processed)
-		const processingPayments = pendingBalance;
-
-		// Total payouts already sent to bank
-		const totalPayouts = allBalanceTransactions.data
+		// Calculate total payouts already sent to bank
+		const totalPayouts = allBalanceTransactions
 			.filter((txn) => txn.type === "payout" && txn.status === "available")
 			.reduce((sum, txn) => sum + Math.abs(txn.net), 0);
 
 		return NextResponse.json({
-			// Current balances
-			availableBalance: (availableBalance / 100).toFixed(2), // Money ready to payout
-			processingPayments: (processingPayments / 100).toFixed(2),
-			pendingPayouts: (pendingPayouts / 100).toFixed(2), 
-			instantAvailable: (instantAvailable / 100).toFixed(2),
-
-			// Lifetime totals
-			totalEarnings: (totalEarnings / 100).toFixed(2), 
-			totalPayouts: (totalPayouts / 100).toFixed(2), // Money already sent to bank
-
-			// Breakdown
-			totalEarningsAvailable: (totalEarningsAvailable / 100).toFixed(2),
-			totalEarningsPending: (totalEarningsPending / 100).toFixed(2),
-
-			currency:
-				balance.available[0]?.currency || balance.pending[0]?.currency || "aud",
-
-			// Recent activity
-			recentCharges: [], 
-			recentPayouts: [],
+			...basicResponse,
+			totalEarnings: (totalEarnings / 100).toFixed(2),
+			totalPayouts: (totalPayouts / 100).toFixed(2),
+			breakdown: {
+				totalEarningsAvailable: (totalEarningsAvailable / 100).toFixed(2),
+				totalEarningsPending: (totalEarningsPending / 100).toFixed(2),
+			},
+			transactionCount: allBalanceTransactions.length,
 		});
+
 	} catch (error) {
 		console.error("Error fetching balance:", error);
 		return NextResponse.json(

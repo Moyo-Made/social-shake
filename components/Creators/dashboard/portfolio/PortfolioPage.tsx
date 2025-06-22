@@ -12,6 +12,7 @@ import {
 	Play,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface PortfolioData {
 	aboutMeVideoUrl: string;
@@ -30,12 +31,6 @@ interface UploadState {
 }
 
 const CreatorPortfolio = () => {
-	const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(
-		null
-	);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-
 	const [visibleVideos, setVisibleVideos] = useState({
 		about: false,
 		portfolio: [false, false, false],
@@ -54,6 +49,111 @@ const CreatorPortfolio = () => {
 		useRef<HTMLDivElement>(null),
 	];
 
+	const { currentUser } = useAuth();
+
+	// Chunked upload constants
+	const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
+	const CHUNK_SIZE = 1 * 1024 * 1024; // 1MB chunks
+
+	// Upload states for each video slot
+	const [aboutVideoUpload, setAboutVideoUpload] = useState<UploadState>({
+		isUploading: false,
+		progress: 0,
+		error: null,
+		preview: null,
+		selectedFile: null,
+		uploadStatus: "",
+		uploadId: null,
+	});
+
+	const [portfolioUploads, setPortfolioUploads] = useState<
+		Record<number, UploadState>
+	>({
+		0: {
+			isUploading: false,
+			progress: 0,
+			error: null,
+			preview: null,
+			selectedFile: null,
+			uploadStatus: "",
+			uploadId: null,
+		},
+		1: {
+			isUploading: false,
+			progress: 0,
+			error: null,
+			preview: null,
+			selectedFile: null,
+			uploadStatus: "",
+			uploadId: null,
+		},
+		2: {
+			isUploading: false,
+			progress: 0,
+			error: null,
+			preview: null,
+			selectedFile: null,
+			uploadStatus: "",
+			uploadId: null,
+		},
+	});
+
+	// Selected video for full screen viewing
+	const [selectedVideo, setSelectedVideo] = useState<{
+		url: string;
+		title: string;
+	} | null>(null);
+
+	const queryClient = useQueryClient();
+
+	const {
+		data: portfolioData,
+		isLoading: loading,
+		error,
+	} = useQuery({
+		queryKey: ["portfolio", currentUser?.uid],
+		queryFn: async () => {
+			if (!currentUser?.uid) return null;
+
+			const response = await fetch(
+				`/api/creator/portfolio?userId=${currentUser.uid}`,
+				{
+					headers: {
+						"Cache-Control": "no-cache, no-store, must-revalidate",
+						Pragma: "no-cache",
+						Expires: "0",
+					},
+				}
+			);
+
+			if (!response.ok) {
+				throw new Error(
+					`Failed to fetch portfolio data: ${response.status} ${response.statusText}`
+				);
+			}
+
+			const data = await response.json();
+
+			const portfolioData: PortfolioData = {
+				aboutMeVideoUrl: data.aboutMeVideoUrl || "",
+				portfolioVideoUrls: Array.isArray(data.portfolioVideoUrls)
+					? data.portfolioVideoUrls.filter(
+							(url: string) => url && url.trim() !== ""
+						)
+					: [],
+				userId: data.userId || currentUser.uid,
+			};
+
+			while (portfolioData.portfolioVideoUrls.length < 3) {
+				portfolioData.portfolioVideoUrls.push("");
+			}
+
+			return portfolioData;
+		},
+		enabled: !!currentUser?.uid,
+		staleTime: 5 * 60 * 1000, // 5 minutes
+		gcTime: 10 * 60 * 1000, // 10 minutes
+	});
 	// Add intersection observers
 	useEffect(() => {
 		const observers: IntersectionObserver[] = [];
@@ -124,130 +224,6 @@ const CreatorPortfolio = () => {
 
 		return () => observers.forEach((observer) => observer.disconnect());
 	}, [portfolioData]);
-
-	const { currentUser } = useAuth();
-
-	// Chunked upload constants
-	const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
-	const CHUNK_SIZE = 1 * 1024 * 1024; // 1MB chunks
-
-	// Upload states for each video slot
-	const [aboutVideoUpload, setAboutVideoUpload] = useState<UploadState>({
-		isUploading: false,
-		progress: 0,
-		error: null,
-		preview: null,
-		selectedFile: null,
-		uploadStatus: "",
-		uploadId: null,
-	});
-
-	const [portfolioUploads, setPortfolioUploads] = useState<
-		Record<number, UploadState>
-	>({
-		0: {
-			isUploading: false,
-			progress: 0,
-			error: null,
-			preview: null,
-			selectedFile: null,
-			uploadStatus: "",
-			uploadId: null,
-		},
-		1: {
-			isUploading: false,
-			progress: 0,
-			error: null,
-			preview: null,
-			selectedFile: null,
-			uploadStatus: "",
-			uploadId: null,
-		},
-		2: {
-			isUploading: false,
-			progress: 0,
-			error: null,
-			preview: null,
-			selectedFile: null,
-			uploadStatus: "",
-			uploadId: null,
-		},
-	});
-
-	// Selected video for full screen viewing
-	const [selectedVideo, setSelectedVideo] = useState<{
-		url: string;
-		title: string;
-	} | null>(null);
-
-	const fetchPortfolioData = async () => {
-		try {
-			setLoading(true);
-			setError(null);
-
-			const userId = currentUser?.uid;
-			if (!userId) {
-				console.log("No user ID available, skipping portfolio fetch");
-				setLoading(false);
-				return;
-			}
-
-			const response = await fetch(`/api/creator/portfolio?userId=${userId}`, {
-				// Add cache control headers
-				headers: {
-					"Cache-Control": "no-cache, no-store, must-revalidate",
-					Pragma: "no-cache",
-					Expires: "0",
-				},
-			});
-
-			if (!response.ok) {
-				throw new Error(
-					`Failed to fetch portfolio data: ${response.status} ${response.statusText}`
-				);
-			}
-
-			const data = await response.json();
-			console.log("Fetched portfolio data:", data);
-
-			const portfolioData: PortfolioData = {
-				aboutMeVideoUrl: data.aboutMeVideoUrl || "",
-				portfolioVideoUrls: Array.isArray(data.portfolioVideoUrls)
-					? data.portfolioVideoUrls.filter(
-							(url: string) => url && url.trim() !== ""
-						) // Filter out empty URLs
-					: [],
-				userId: data.userId || userId,
-			};
-
-			// Ensure we always have 3 slots for portfolio videos
-			while (portfolioData.portfolioVideoUrls.length < 3) {
-				portfolioData.portfolioVideoUrls.push("");
-			}
-
-			console.log("Processed portfolio data:", portfolioData); // Debug log
-			setPortfolioData(portfolioData);
-		} catch (err) {
-			console.error("Error fetching portfolio data:", err);
-			setError(err instanceof Error ? err.message : "Failed to load portfolio");
-
-			// Set empty portfolio data as fallback
-			setPortfolioData({
-				aboutMeVideoUrl: "",
-				portfolioVideoUrls: ["", "", ""],
-				userId: currentUser?.uid || "",
-			});
-		} finally {
-			setLoading(false);
-		}
-	};
-
-	// Fetch portfolio data
-	useEffect(() => {
-		if (currentUser?.uid) {
-			fetchPortfolioData();
-		}
-	}, [currentUser?.uid]);
 
 	// Validate video file
 	const validateVideoFile = (file: File) => {
@@ -529,8 +505,10 @@ const CreatorPortfolio = () => {
 
 				// Update portfolio data with new URL
 				if (type === "about") {
-					setPortfolioData((prev) =>
-						prev ? { ...prev, aboutMeVideoUrl: serverUrl } : null
+					queryClient.setQueryData(
+						["portfolio", currentUser?.uid],
+						(oldData: PortfolioData | null) =>
+							oldData ? { ...oldData, aboutMeVideoUrl: serverUrl } : null
 					);
 
 					// Clear upload state properly
@@ -549,8 +527,10 @@ const CreatorPortfolio = () => {
 						newUrls.push("");
 					}
 					newUrls[index] = serverUrl;
-					setPortfolioData((prev) =>
-						prev ? { ...prev, portfolioVideoUrls: newUrls } : null
+					queryClient.setQueryData(
+						["portfolio", currentUser?.uid],
+						(oldData: PortfolioData | null) =>
+							oldData ? { ...oldData, portfolioVideoUrls: newUrls } : null
 					);
 
 					// Clear upload state properly
@@ -660,9 +640,15 @@ const CreatorPortfolio = () => {
 					<h3 className="text-lg font-semibold text-gray-900 mb-2">
 						Error Loading Portfolio
 					</h3>
-					<p className="text-gray-600 mb-4">{error}</p>
+					<p className="text-gray-600 mb-4">
+						{error instanceof Error ? error.message : String(error)}
+					</p>
 					<button
-						onClick={fetchPortfolioData}
+						onClick={() =>
+							queryClient.invalidateQueries({
+								queryKey: ["portfolio", currentUser?.uid],
+							})
+						}
 						className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
 					>
 						Try Again
@@ -766,7 +752,10 @@ const CreatorPortfolio = () => {
 									{loadedVideos.about && (
 										<div className="absolute inset-0 bg-black bg-opacity-30 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
 											<div className="bg-white bg-opacity-90 rounded-full p-3 transform scale-100 group-hover:scale-110 transition-transform duration-200">
-												<Play className="w-6 h-6 text-orange-500 ml-0.5" fill="currentColor" />
+												<Play
+													className="w-6 h-6 text-orange-500 ml-0.5"
+													fill="currentColor"
+												/>
 											</div>
 										</div>
 									)}
@@ -1005,7 +994,10 @@ const CreatorPortfolio = () => {
 											{loadedVideos.portfolio[index] && (
 												<div className="absolute inset-0 bg-black bg-opacity-30 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
 													<div className="bg-white bg-opacity-90 rounded-full p-2 transform scale-100 group-hover:scale-110 transition-transform duration-200">
-														<Play className="w-4 h-4 text-orange-600 ml-0.5" fill="currentColor" />
+														<Play
+															className="w-4 h-4 text-orange-600 ml-0.5"
+															fill="currentColor"
+														/>
 													</div>
 												</div>
 											)}

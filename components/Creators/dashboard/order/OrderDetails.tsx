@@ -5,8 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
-import { OrderData } from "@/types/order";
-import { BrandProfile } from "@/types/user";
 import {
 	Clock,
 	DollarSign,
@@ -29,14 +27,12 @@ import {
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect, Key } from "react";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 export default function OrderDetailsPage() {
 	const params = useParams();
 	const router = useRouter();
 	const orderId = params.orderId as string;
-	const [selectedOrder, setSelectedOrder] = useState<OrderData | null>(null);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
 	const [activeTab, setActiveTab] = useState("overview");
 	const [showRejectModal, setShowRejectModal] = useState(false);
 	const [rejectReason, setRejectReason] = useState("");
@@ -70,30 +66,126 @@ export default function OrderDetailsPage() {
 	const [workStarted, setWorkStarted] = useState(false);
 	const [processingAction, setProcessingAction] = useState<string | null>(null);
 	const [orderState, setOrderState] = useState<string | null>(null);
-	const [, setSavedDeliverables] = useState<
-		{
-			firestore_id: string;
-			id: string;
-			video_id: number;
-			created_at: string;
-			notes?: string;
-			file_download_url?: string | null;
-			file_name?: string;
-			file_size?: number;
-			file_content_type?: string;
-			status?: string;
-			approval_status?: string;
-			file_exists?: boolean;
-			legacy?: boolean;
-			error?: string;
-			// Legacy fields for backward compatibility
-			file_url?: string;
-			original_filename?: string;
-		}[]
-	>([]);
 
 	const { currentUser } = useAuth();
-	const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
+	const queryClient = useQueryClient();
+
+
+	// Main order query
+const { data: orderData, isLoading: loading, error } = useQuery({
+	queryKey: ['order', orderId],
+	queryFn: async () => {
+	  const response = await fetch(`/api/orders/${orderId}`);
+	  if (!response.ok) {
+		throw new Error(`Error fetching order: ${response.statusText}`);
+	  }
+	  return response.json();
+	},
+	enabled: !!orderId,
+  });
+  
+  // Deliverables query
+  const { data: deliverables = [] } = useQuery({
+	queryKey: ['deliverables', orderId],
+	queryFn: () => fetchDeliverables(orderId),
+	enabled: !!orderId,
+  });
+  
+  // Brand profile query
+  const { data: brandProfile } = useQuery({
+	queryKey: ['brandProfile', orderData?.order?.userId],
+	queryFn: async () => {
+	  if (!orderData?.order?.userId) return null;
+	  const response = await fetch(`/api/admin/brand-approval?userId=${orderData.order.userId}`);
+	  if (response.ok) {
+		const data = await response.json();
+		return data.profile;
+	  }
+	  return null;
+	},
+	enabled: !!orderData?.order?.userId,
+  });
+
+  // Extract the order for easier access
+const selectedOrder = orderData?.order ? {
+	...orderData.order,
+	videoCount: orderData.order.video_count,
+	totalPrice: orderData.order.total_price,
+	packageType: orderData.order.package_type,
+	scriptChoice: orderData.order.script_choice,
+	brandName: orderData.order.brandName || "Brand Name",
+	deadline: orderData.order.projectBriefData?.timeline?.finalDeadline,
+	scriptFormData: orderData.order.scriptFormData,
+	projectBriefData: orderData.order.projectBriefData,
+  } : null;
+
+  // Accept order mutation
+const acceptOrderMutation = useMutation({
+	mutationFn: async (orderId: string) => {
+	  const response = await fetch(`/api/orders/${orderId}/approve`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+	  });
+	  if (!response.ok) throw new Error("Failed to accept order");
+	  return response.json();
+	},
+	onSuccess: () => {
+	  queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+	  setOrderState("in_progress");
+	},
+  });
+
+  // Reject order mutation
+const rejectOrderMutation = useMutation({
+	mutationFn: async ({ orderId, reason }: { orderId: string; reason: string }) => {
+	  const response = await fetch(`/api/orders/${orderId}/reject`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ reason }),
+	  });
+	  if (!response.ok) throw new Error("Failed to reject order");
+	  return response.json();
+	},
+	onSuccess: () => {
+	  queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+	  setOrderState("rejected");
+	  setShowRejectModal(false);
+	  setRejectReason("");
+	},
+  });
+  
+  // Mark delivered mutation
+  const markDeliveredMutation = useMutation({
+	mutationFn: async (orderId: string) => {
+	  const completedDeliverableIds = videoProgress
+		.filter((v) => v.status === "content_submitted" && v.savedFile)
+		.map((v) => v.savedFile?.original_filename)
+		.filter(Boolean);
+  
+	  const response = await fetch(`/api/orders/${orderId}/delivered`, {
+		method: "PATCH",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+		  creatorId: selectedOrder?.creatorId,
+		  delivery_message: "All videos have been completed and are ready for review.",
+		  deliverable_ids: completedDeliverableIds,
+		}),
+	  });
+	  
+	  if (!response.ok) {
+		const errorData = await response.json();
+		throw new Error(errorData.error || "Failed to mark order as delivered");
+	  }
+	  return response.json();
+	},
+	onSuccess: () => {
+	  queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+	  toast.success("Order marked as delivered successfully! Brand has been notified.");
+	},
+	onError: (error) => {
+	  toast.error(error instanceof Error ? error.message : "Failed to mark order as delivered");
+	},
+  });
 
 	// Updated fetch deliverables function
 	const fetchDeliverables = async (orderId: string) => {
@@ -272,65 +364,28 @@ export default function OrderDetailsPage() {
 
 	const handleAcceptOrder = async () => {
 		if (selectedOrder) {
-			setProcessingAction(`accept-${selectedOrder.id}`);
-
-			try {
-				const response = await fetch(
-					`/api/orders/${selectedOrder.id}/approve`,
-					{
-						method: "POST",
-						headers: {
-							"Content-Type": "application/json",
-						},
-					}
-				);
-
-				if (response.ok) {
-					setOrderState("in_progress");
-					setSelectedOrder((prev) =>
-						prev ? { ...prev, status: "in_progress" } : null
-					);
-				} else {
-					throw new Error("Failed to accept order");
-				}
-			} catch (error) {
-				console.error("Error accepting order:", error);
-			} finally {
-				setProcessingAction(null);
-			}
+		  setProcessingAction(`accept-${selectedOrder.id}`);
+		  try {
+			await acceptOrderMutation.mutateAsync(selectedOrder.id);
+		  } finally {
+			setProcessingAction(null);
+		  }
 		}
-	};
+	  };
 
-	const handleRejectOrder = async () => {
+	  const handleRejectOrder = async () => {
 		if (selectedOrder && rejectReason.trim()) {
-			setProcessingAction(`reject-${selectedOrder.id}`);
-
-			try {
-				const response = await fetch(`/api/orders/${selectedOrder.id}/reject`, {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-					},
-					body: JSON.stringify({ reason: rejectReason }),
-				});
-
-				if (response.ok) {
-					setOrderState("rejected");
-					setSelectedOrder((prev) =>
-						prev ? { ...prev, status: "rejected" } : null
-					);
-					setShowRejectModal(false);
-					setRejectReason("");
-				} else {
-					throw new Error("Failed to reject order");
-				}
-			} catch (error) {
-				console.error("Error rejecting order:", error);
-			} finally {
-				setProcessingAction(null);
-			}
+		  setProcessingAction(`reject-${selectedOrder.id}`);
+		  try {
+			await rejectOrderMutation.mutateAsync({ 
+			  orderId: selectedOrder.id, 
+			  reason: rejectReason 
+			});
+		  } finally {
+			setProcessingAction(null);
+		  }
 		}
-	};
+	  };
 
 	const handleStartWork = () => {
 		setShowStartWorkModal(true);
@@ -376,25 +431,9 @@ export default function OrderDetailsPage() {
 				);
 
 				if (response.ok) {
-					// Update local state
-					setSelectedOrder((prev) => {
-						if (!prev) return null;
-						return {
-							...prev,
-							status: "active",
-							projectBriefData: prev.projectBriefData, // Ensure required properties are preserved
-							scriptFormData: prev.scriptFormData,
-							scriptChoice: prev.scriptChoice,
-							id: prev.id,
-							userId: prev.userId,
-							creatorId: prev.creatorId,
-							videoCount: prev.videoCount,
-							totalPrice: prev.totalPrice,
-							packageType: prev.packageType,
-							brandName: prev.brandName,
-							deadline: prev.deadline,
-						};
-					});
+					
+					toast.success("Work started successfully! Brand has been notified.");
+					queryClient.invalidateQueries({ queryKey: ['order', selectedOrder.id] });
 				}
 			} catch (error) {
 				console.error("Error starting work:", error);
@@ -404,205 +443,74 @@ export default function OrderDetailsPage() {
 
 	const handleMarkDelivered = async () => {
 		if (selectedOrder) {
-			setProcessingAction(`deliver-${selectedOrder.id}`);
-
-			try {
-				// Get all completed deliverable IDs
-				const completedDeliverableIds = videoProgress
-					.filter((v) => v.status === "content_submitted" && v.savedFile)
-					.map((v) => v.savedFile?.original_filename)
-					.filter(Boolean);
-
-				const response = await fetch(
-					`/api/orders/${selectedOrder.id}/delivered`,
-					{
-						method: "PATCH",
-						headers: {
-							"Content-Type": "application/json",
-						},
-						body: JSON.stringify({
-							creatorId: selectedOrder.creatorId, // Make sure this field exists in your order data
-							delivery_message:
-								"All videos have been completed and are ready for review.",
-							deliverable_ids: completedDeliverableIds,
-						}),
-					}
-				);
-
-				if (response.ok) {
-					const data = await response.json();
-					if (!data.success) {
-						throw new Error(data.error || "Failed to mark order as delivered");
-					}
-
-					// Update local state
-					setSelectedOrder((prev) =>
-						prev ? { ...prev, status: "delivered" } : null
-					);
-
-					// Show success message
-					toast.success(
-						"Order marked as delivered successfully! Brand has been notified."
-					);
-				} else {
-					const errorData = await response.json();
-					throw new Error(
-						errorData.error || "Failed to mark order as delivered"
-					);
-				}
-			} catch (error) {
-				console.error("Error marking order as delivered:", error);
-				toast.error(
-					error instanceof Error
-						? error.message
-						: "Failed to mark order as delivered"
-				);
-			} finally {
-				setProcessingAction(null);
-			}
+		  setProcessingAction(`deliver-${selectedOrder.id}`);
+		  try {
+			await markDeliveredMutation.mutateAsync(selectedOrder.id);
+		  } finally {
+			setProcessingAction(null);
+		  }
 		}
-	};
+	  };
 
-	const fetchBrandProfile = async (userId: string) => {
-		try {
-			const response = await fetch(
-				`/api/admin/brand-approval?userId=${userId}`
+
+	  useEffect(() => {
+		if (orderData?.success && deliverables.length >= 0) {
+		  const order = selectedOrder;
+		  if (!order) return;
+	  
+		  setOrderState(
+			order.status === "accepted" || order.status === "rejected"
+			  ? order.status
+			  : null
+		  );
+	  
+		  // Initialize video progress with saved deliverables and revision status
+		  if (
+			order.status === "active" ||
+			order.status === "in_progress" ||
+			order.status === "revision_requested"
+		  ) {
+			const initialProgress = Array.from(
+			  { length: order.videoCount },
+			  (_, index) => {
+				const savedDeliverable = deliverables.find(
+				  (d: { video_id: number }) => d.video_id === index + 1
+				);
+	  
+				if (savedDeliverable) {
+				  const needsRevision = savedDeliverable.approval_status === "revision_requested";
+				  return {
+					id: index + 1,
+					status: needsRevision ? "revision_requested" : "content_submitted",
+					file: null,
+					uploadedAt: new Date(savedDeliverable.created_at),
+					notes: savedDeliverable.notes || "",
+					needsRevision: needsRevision,
+					revisionNotes: savedDeliverable.revision_notes || "",
+					savedFile: savedDeliverable,
+					uploadProgress: 0,
+				  };
+				} else {
+				  return {
+					id: index + 1,
+					status: "pending",
+					file: null,
+					uploadedAt: null,
+					notes: "",
+					needsRevision: false,
+					revisionNotes: "",
+					savedFile: undefined,
+					uploadProgress: 0,
+				  };
+				}
+			  }
 			);
-
-			if (response.ok) {
-				const data = await response.json();
-				setBrandProfile(data.profile);
-			} else {
-				console.error(
-					"Failed to fetch brand profile, status:",
-					response.status
-				);
-				const errorText = await response.text();
-				console.error("Error response:", errorText);
-
-				// Set error state so user knows what happened
-				setError(
-					`Failed to load brand profile: ${response.status} - ${errorText}`
-				);
-			}
-		} catch (error) {
-			console.error("Error fetching brand profile:", error);
+			setVideoProgress(initialProgress);
+			setWorkStarted(true);
+		  }
 		}
-	};
-
-	useEffect(() => {
-		const fetchOrder = async () => {
-			try {
-				setLoading(true);
-				const response = await fetch(`/api/orders/${orderId}`);
-
-				if (!response.ok) {
-					throw new Error(`Error fetching order: ${response.statusText}`);
-				}
-
-				const data = await response.json();
-
-				if (data.success) {
-					const order = {
-						...data.order,
-						videoCount: data.order.video_count,
-						totalPrice: data.order.total_price,
-						packageType: data.order.package_type,
-						scriptChoice: data.order.script_choice,
-						brandName: data.order.brandName || "Brand Name",
-						deadline: data.order.projectBriefData?.timeline?.finalDeadline,
-						scriptFormData: data.order.scriptFormData,
-						projectBriefData: data.order.projectBriefData,
-					};
-					setSelectedOrder(order);
-					setOrderState(
-						order.status === "accepted" || order.status === "rejected"
-							? order.status
-							: null
-					);
-
-					if (order.userId) {
-						await fetchBrandProfile(order.userId);
-					} else {
-						console.error("No userId found in order data");
-					}
-
-					// Fetch existing deliverables
-					const deliverables = await fetchDeliverables(orderId);
-					setSavedDeliverables(deliverables);
-
-					// Initialize video progress with saved deliverables and revision status
-					if (
-						order.status === "active" ||
-						order.status === "in_progress" ||
-						order.status === "revision_requested"
-					) {
-						const initialProgress = Array.from(
-							{ length: order.videoCount },
-							(_, index) => {
-								const savedDeliverable = deliverables.find(
-									(d: {
-										video_id: number;
-										created_at: string;
-										notes?: string;
-										approval_status?: string;
-										revision_notes?: string;
-										uploadProgress: 0;
-									}) => d.video_id === index + 1
-								);
-
-								if (savedDeliverable) {
-									const needsRevision =
-										savedDeliverable.approval_status === "revision_requested";
-									return {
-										id: index + 1,
-										status: needsRevision
-											? "revision_requested"
-											: "content_submitted",
-										file: null,
-										uploadedAt: new Date(savedDeliverable.created_at),
-										notes: savedDeliverable.notes || "",
-										needsRevision: needsRevision,
-										revisionNotes: savedDeliverable.revision_notes || "",
-										savedFile: savedDeliverable,
-									};
-								} else {
-									return {
-										id: index + 1,
-										status: "pending",
-										file: null,
-										uploadedAt: null,
-										notes: "",
-										needsRevision: false,
-										revisionNotes: "",
-										savedFile: undefined,
-									};
-								}
-							}
-						);
-						setVideoProgress(
-							initialProgress.map((progress) => ({
-								...progress,
-								uploadProgress: 0, // Add default uploadProgress property
-							}))
-						);
-						setWorkStarted(true);
-					}
-				} else {
-					throw new Error(data.error || "Failed to fetch order");
-				}
-			} catch (error) {
-				console.error("Error fetching order:", error);
-				setError(error instanceof Error ? error.message : "Unknown error");
-			} finally {
-				setLoading(false);
-			}
-		};
-
-		if (orderId) {
-			fetchOrder();
-		}
-	}, [orderId]);
+	  // eslint-disable-next-line react-hooks/exhaustive-deps
+	  }, [orderData, deliverables]);
 
 	const handleSendMessageToBrand = async () => {
 		if (!currentUser) {
@@ -667,7 +575,7 @@ export default function OrderDetailsPage() {
 	}
 
 	if (error) {
-		return <div className="p-6 text-center text-red-600">Error: {error}</div>;
+		return <div className="p-6 text-center text-red-600">Error: {error instanceof Error ? error.message : String(error)}</div>;
 	}
 
 	if (!selectedOrder) {
@@ -1609,13 +1517,7 @@ export default function OrderDetailsPage() {
 																		return newProgress;
 																	});
 
-																	// Update saved deliverables list
-																	setSavedDeliverables((prev) => [
-																		...prev.filter(
-																			(d) => d.video_id !== video.id
-																		),
-																		savedDeliverable,
-																	]);
+																	
 																} catch (error) {
 																	// Revert to previous state on error
 																	setVideoProgress((prevProgress) => {

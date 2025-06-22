@@ -77,15 +77,6 @@ const ProjectSubmissionModal: React.FC<ProjectModalProps> = ({
 	];
 
 	useEffect(() => {
-		if (hasReachedLimit) {
-			toast.error(
-				`You have reached the maximum number of submissions (${maxVideos}) for this project.`
-			);
-			onClose();
-		}
-	}, [hasReachedLimit, maxVideos, onClose]);
-
-	useEffect(() => {
 		// Clean up object URLs when component unmounts or when file changes
 		return () => {
 			if (filePreviewUrl) {

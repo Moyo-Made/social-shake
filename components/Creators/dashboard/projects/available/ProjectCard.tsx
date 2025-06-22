@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import Image from "next/image";
 import { ProjectFormData } from "@/types/contestFormData";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { getProjectTypeIcon } from "@/types/projects";
+import { useQuery } from "@tanstack/react-query";
 
 interface BrandProfile {
 	id?: string;
@@ -17,53 +18,35 @@ interface ProjectCardProps {
 	project: ProjectFormData;
 }
 
+const fetchBrandProfile = async (userId: string): Promise<BrandProfile> => {
+	const response = await fetch(`/api/admin/brand-approval?userId=${userId}`);
+	
+	if (response.ok) {
+	  const data = await response.json();
+	  return data;
+	} else {
+	  // Return placeholder for 404 or other errors
+	  return {
+		id: userId,
+		userId: userId,
+		email: "Unknown",
+		brandName: "Unknown Brand",
+		logoUrl: "",
+	  };
+	}
+  };
+
  const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
 	const { projectId, projectDetails, status } = project;
-	const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
-	const [, setBrandEmail] = useState<string>("");
 
-	useEffect(() => {
-		const fetchBrandProfile = async () => {
-			if (!project || !project.userId) return;
-
-			try {
-				// Skip if we already have this brand profile
-				if (brandProfile && brandProfile.userId === project.userId) {
-					return;
-				}
-
-				const response = await fetch(
-					`/api/admin/brand-approval?userId=${project.userId}`
-				);
-
-				if (response.ok) {
-					const data = await response.json();
-					setBrandProfile(data);
-					if (data.email) {
-						setBrandEmail(data.email);
-					}
-				} else {
-					// Handle 404 or other errors by setting a placeholder
-					setBrandProfile({
-						id: project.userId,
-						userId: project.userId,
-						email: "Unknown",
-						brandName: "Unknown Brand",
-						logoUrl: "",
-					});
-				}
-			} catch (error) {
-				console.error(
-					`Error fetching brand profile for userId ${project.userId}:`,
-					error
-				);
-			}
-		};
-
-		if (project) {
-			fetchBrandProfile();
-		}
-	}, [project, brandProfile]);
+	const { data: brandProfile } = useQuery({
+		queryKey: ["brandProfile", project.userId],
+		queryFn: () => fetchBrandProfile(project.userId),
+		enabled: !!project?.userId,
+		staleTime: 10 * 60 * 1000, // 10 minutes - brand profiles don't change often
+		gcTime: 15 * 60 * 1000,
+		refetchOnWindowFocus: false,
+	  });
 
 	const getStatusBadge = () => {
 		switch (status) {

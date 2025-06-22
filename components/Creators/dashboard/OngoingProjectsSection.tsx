@@ -11,7 +11,6 @@ interface UserProject {
 }
 
 export function OngoingProjectsSection({ userId }: { userId: string }) {
-
 	const fetchUserProjects = async (userId: string): Promise<UserProject[]> => {
 		if (!userId) return [];
 
@@ -24,14 +23,14 @@ export function OngoingProjectsSection({ userId }: { userId: string }) {
 		const data = await response.json();
 
 		if (data.success) {
-			return data.projects || []; // Assuming the API returns projects in data.projects
+			return data.data || []; 
 		} else {
 			throw new Error(data.error || "Failed to fetch user projects");
 		}
 	};
 
 	const { data: userProjects = [], isLoading } = useQuery({
-		queryKey: ['user-projects', userId],
+		queryKey: ["user-projects", userId],
 		queryFn: () => fetchUserProjects(userId),
 		enabled: !!userId, // Only run query if userId exists
 	});

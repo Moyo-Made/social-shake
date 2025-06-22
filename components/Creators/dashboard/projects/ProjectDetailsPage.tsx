@@ -8,7 +8,7 @@ interface PageParams {
   project: ProjectFormData;
 }
 
-const ContestDetailsPage = ({ params }: { params: PageParams }) => { 
+const ProjectDetailsPage = ({ params }: { params: PageParams }) => { 
 
   const { projectId, project } = params;
 
@@ -19,4 +19,4 @@ const ContestDetailsPage = ({ params }: { params: PageParams }) => {
   );
 };
 
-export default ContestDetailsPage;
+export default ProjectDetailsPage;

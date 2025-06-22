@@ -1,17 +1,26 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/context/AuthContext";
 import { CheckCircle2, AlertCircle, AlertTriangle } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
+import React from "react";
 
 interface StripeConnectProps {
   userId?: string;
   redirectPath?: string;
   testMode?: boolean;
   onStatusChange?: (status: { connected: boolean; accountId?: string }) => void;
+}
+
+interface StripeStatus {
+  connected: boolean;
+  stripeAccountId?: string;
+  testMode?: boolean;
+  onboardingComplete?: boolean;
 }
 
 const StripeConnect: React.FC<StripeConnectProps> = ({ 
@@ -21,97 +30,149 @@ const StripeConnect: React.FC<StripeConnectProps> = ({
   onStatusChange
 }) => {
   const { currentUser } = useAuth();
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
-  const [stripeConnected, setStripeConnected] = useState(false);
-  const [stripeAccountId, setStripeAccountId] = useState<string | null>(null);
   const [isTestMode, setIsTestMode] = useState(testMode);
-  const [onboardingComplete, setOnboardingComplete] = useState(false);
 
-  useEffect(() => {
-    const checkStripeStatus = async () => {
-      try {
-        const id = userId || currentUser?.uid;
-        if (!id) return;
+  const effectiveUserId = userId || currentUser?.uid;
 
-        const response = await axios.get(`/api/creator/stripe-status?userId=${id}`);
-        if (response.data.connected) {
-          setStripeConnected(true);
-          setStripeAccountId(response.data.stripeAccountId);
-          setIsTestMode(response.data.testMode || testMode);
-          setOnboardingComplete(response.data.onboardingComplete || false);
-          
-          if (onStatusChange) {
-            onStatusChange({ 
-              connected: true, 
-              accountId: response.data.stripeAccountId 
-            });
-          }
-        } else {
-          if (onStatusChange) {
-            onStatusChange({ connected: false });
-          }
-        }
-      } catch (err) {
-        console.error("Error checking Stripe status:", err);
+  // Query for Stripe status
+  const {
+    data: stripeStatus,
+    isLoading: statusLoading,
+    error: statusError
+  } = useQuery<StripeStatus>({
+    queryKey: ['stripe-status', effectiveUserId],
+    queryFn: async () => {
+      if (!effectiveUserId) {
+        throw new Error('No user ID available');
       }
-    };
-
-    checkStripeStatus();
-  }, [currentUser, userId, testMode, onStatusChange]);
-
-  const handleConnectStripe = async () => {
-    try {
-      setLoading(true);
-      setError(null);
       
-      const id = userId || currentUser?.uid;
-      if (!id) {
-        setError("You must be logged in to connect your Stripe account");
-        setLoading(false);
-        return;
+      const response = await axios.get(`/api/creator/stripe-status?userId=${effectiveUserId}`);
+      return {
+        connected: response.data.connected || false,
+        stripeAccountId: response.data.stripeAccountId,
+        testMode: response.data.testMode || testMode,
+        onboardingComplete: response.data.onboardingComplete || false
+      };
+    },
+    enabled: !!effectiveUserId,
+    retry: 1,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
+  });
+
+  // Mutation for creating Stripe account
+  const createStripeMutation = useMutation({
+    mutationFn: async () => {
+      if (!effectiveUserId) {
+        throw new Error("You must be logged in to connect your Stripe account");
       }
 
-      // Create onboarding link
       const response = await axios.post("/api/creator/create-stripe-account", {
-        userId: id,
+        userId: effectiveUserId,
         email: currentUser?.email,
         redirectUrl: `${window.location.origin}${redirectPath}`,
-        testMode: isTestMode // Pass the test mode flag
+        testMode: isTestMode
       });
 
+      return response.data;
+    },
+    onSuccess: (data) => {
       // Redirect to Stripe
-      window.location.href = response.data.url;
+      window.location.href = data.url;
+    },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
+    onError: (err: any) => {
       console.error("Error connecting Stripe:", err);
       setError(err?.response?.data?.message || "Failed to connect with Stripe. Please try again.");
-      setLoading(false);
     }
-  };
+  });
 
-  const handleDashboardAccess = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
+  // Mutation for accessing Stripe dashboard
+  const dashboardMutation = useMutation({
+    mutationFn: async () => {
       const response = await axios.post("/api/creator/stripe-dashboard-link", {
-        userId: userId || currentUser?.uid,
-        stripeAccountId,
-        testMode: isTestMode // Pass the test mode flag
+        userId: effectiveUserId,
+        stripeAccountId: stripeStatus?.stripeAccountId,
+        testMode: isTestMode
       });
-  
+
+      return response.data;
+    },
+    onSuccess: (data) => {
       // Open the Stripe dashboard URL in a new tab
-      window.open(response.data.url, "_blank", "noopener,noreferrer");
-    } catch (err) {
+      window.open(data.url, "_blank", "noopener,noreferrer");
+    },
+    onError: (err) => {
       console.error("Error accessing Stripe dashboard:", err);
       setError("Failed to access Stripe dashboard. Please try again.");
-      setLoading(false);
-    } finally {
-      setLoading(false);
     }
+  });
+
+  // Effect to notify parent component of status changes
+  React.useEffect(() => {
+    if (stripeStatus && onStatusChange) {
+      onStatusChange({
+        connected: stripeStatus.connected,
+        accountId: stripeStatus.stripeAccountId
+      });
+    }
+  }, [stripeStatus, onStatusChange]);
+
+  // Update test mode when stripe status is loaded
+  React.useEffect(() => {
+    if (stripeStatus?.testMode !== undefined) {
+      setIsTestMode(stripeStatus.testMode);
+    }
+  }, [stripeStatus?.testMode]);
+
+  const handleConnectStripe = () => {
+    setError(null);
+    createStripeMutation.mutate();
   };
-  
+
+  const handleDashboardAccess = () => {
+    setError(null);
+    dashboardMutation.mutate();
+  };
+
+  const handleRetryStatus = () => {
+    setError(null);
+    queryClient.invalidateQueries({ queryKey: ['stripe-status', effectiveUserId] });
+  };
+
+  // Show loading state while checking status
+  if (statusLoading) {
+    return (
+      <div className="w-full max-w-md">
+        <div className="flex items-center justify-start p-4">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-500"></div>
+          <span className="ml-2 text-sm text-gray-600">Checking Stripe status...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if status check failed
+  if (statusError && !stripeStatus) {
+    return (
+      <div className="w-full max-w-md">
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Failed to check Stripe status. Please try again.
+          </AlertDescription>
+        </Alert>
+        <Button onClick={handleRetryStatus} variant="outline" className="w-full">
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  const stripeConnected = stripeStatus?.connected || false;
+  const onboardingComplete = stripeStatus?.onboardingComplete || false;
 
   return (
     <div className="w-full max-w-md">
@@ -153,11 +214,10 @@ const StripeConnect: React.FC<StripeConnectProps> = ({
           
           <Button
             onClick={handleDashboardAccess}
-            className="w-full bg-blue-600 hover:bg-blue-700"
-            disabled={loading}
-            
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            disabled={dashboardMutation.isPending}
           >
-            {loading ? "Loading..." : "View Stripe Dashboard"}
+            {dashboardMutation.isPending ? "Loading..." : "View Stripe Dashboard"}
           </Button>
         </div>
       ) : (
@@ -169,10 +229,10 @@ const StripeConnect: React.FC<StripeConnectProps> = ({
           
           <Button
             onClick={handleConnectStripe}
-            className="w-full bg-[#635BFF] hover:bg-[#4F46E5] flex items-center justify-center gap-2"
-            disabled={loading}
+            className="w-full bg-[#635BFF] hover:bg-[#4F46E5] text-white flex items-center justify-center gap-2"
+            disabled={createStripeMutation.isPending}
           >
-            {loading ? (
+            {createStripeMutation.isPending ? (
               "Connecting..."
             ) : (
               <>

@@ -4,22 +4,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { LogIn } from "lucide-react";
 import Link from "next/link";
-import { useAuth } from "@/context/AuthContext"; // Import your useAuth hook
+import { useAuth } from "@/context/AuthContext";
 
 import { ReactNode } from "react";
 
 export default function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { currentUser, isLoading } = useAuth(); 
+  const { currentUser } = useAuth(); 
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
-        <p>Loading...</p>
-      </div>
-    );
-  }
-  
   if (!currentUser) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal } from "react";
 import {
 	PlusIcon,
 	VideoIcon,
@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import VideoPreviewModal from "./VideoPlayerModal";
 import VideoManageModal from "./ManageVideoModal";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 export interface Video {
 	id: string;
@@ -47,9 +48,7 @@ interface ContentLibraryPageProps {
 export default function ContentLibraryPage({
 	userId,
 }: ContentLibraryPageProps) {
-	const [allVideos, setAllVideos] = useState<Video[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
+	const queryClient = useQueryClient()
 	const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 	const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 	const [statusFilter, setStatusFilter] = useState("all");
@@ -68,98 +67,69 @@ export default function ContentLibraryPage({
 		setIsManageModalOpen(true);
 	};
 
-	const handleViewTracked = async (videoId: string) => {
-		try {
-			await fetch(`/api/videos/${videoId}/view`, { method: "POST" });
-			// Update local state to reflect the view increment
-			setAllVideos((prev) =>
-				prev.map((video) =>
-					video.id === videoId ? { ...video, views: video.views + 1 } : video
-				)
-			);
-		} catch (error) {
-			console.error("Error tracking view:", error);
-		}
-	};
+	const trackViewMutation = useMutation({
+		mutationFn: async (videoId: string) => {
+		  await fetch(`/api/videos/${videoId}/view`, { method: "POST" });
+		},
+		onSuccess: () => {
+		  queryClient.invalidateQueries({ queryKey: ['videos', userId] });
+		},
+	  });
+	  
+	  const handleViewTracked = (videoId: string) => {
+		trackViewMutation.mutate(videoId);
+	  };
 
-	const handleVideoUpdate = async (
-		videoId: string,
-		updates: Partial<Video>
-	) => {
-		try {
-			const response = await fetch(`/api/videos/${videoId}`, {
-				method: "PUT",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(updates),
-			});
+	const updateVideoMutation = useMutation({
+		mutationFn: async ({ videoId, updates }: { videoId: string; updates: Partial<Video> }) => {
+		  const response = await fetch(`/api/videos/${videoId}`, {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(updates),
+		  });
+		  if (!response.ok) throw new Error("Failed to update video");
+		  return response.json();
+		},
+		onSuccess: () => {
+		  queryClient.invalidateQueries({ queryKey: ['videos', userId] });
+		},
+	  });
+	  
+	  const handleVideoUpdate = (videoId: string, updates: Partial<Video>) => {
+		updateVideoMutation.mutate({ videoId, updates });
+	  };
 
-			if (!response.ok) {
-				throw new Error("Failed to update video");
-			}
+	  const deleteVideoMutation = useMutation({
+		mutationFn: async (videoId: string) => {
+		  const response = await fetch(`/api/videos/${videoId}`, { method: "DELETE" });
+		  if (!response.ok) throw new Error("Failed to delete video");
+		},
+		onSuccess: () => {
+		  queryClient.invalidateQueries({ queryKey: ['videos', userId] });
+		},
+	  });
+	  
+	  const handleVideoDelete = (videoId: string) => {
+		deleteVideoMutation.mutate(videoId);
+	  };
 
-			// Update local state
-			setAllVideos((prev) =>
-				prev.map((video) =>
-					video.id === videoId ? { ...video, ...updates } : video
-				)
-			);
-		} catch (error) {
-			console.error("Error updating video:", error);
-			throw error;
-		}
-	};
 
-	const handleVideoDelete = async (videoId: string) => {
-		try {
-			const response = await fetch(`/api/videos/${videoId}`, {
-				method: "DELETE",
-			});
-
-			if (!response.ok) {
-				throw new Error("Failed to delete video");
-			}
-
-			// Remove from local state
-			setAllVideos((prev) => prev.filter((video) => video.id !== videoId));
-		} catch (error) {
-			console.error("Error deleting video:", error);
-			throw error;
-		}
-	};
-
-	// Load all videos from API (only once)
-	const fetchVideos = async () => {
-		try {
-			setLoading(true);
-			setError(null);
-
-			const response = await fetch(`/api/videos?userId=${userId}`);
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || "Failed to fetch videos");
-			}
-
-			const data = await response.json();
-			setAllVideos(data.videos);
-		} catch (error) {
-			console.error("Error fetching videos:", error);
-			setError(
-				error instanceof Error ? error.message : "Failed to load videos"
-			);
-		} finally {
-			setLoading(false);
-		}
-	};
-
-	useEffect(() => {
-		if (userId) {
-			fetchVideos();
-		}
-	}, [userId]);
+	const { data: allVideos = [], isLoading: loading, error } = useQuery({
+		queryKey: ['videos', userId],
+		queryFn: async () => {
+		  const response = await fetch(`/api/videos?userId=${userId}`);
+		  if (!response.ok) {
+			const errorData = await response.json();
+			throw new Error(errorData.error || "Failed to fetch videos");
+		  }
+		  const data = await response.json();
+		  return data.videos;
+		},
+		enabled: !!userId,
+	  })
 
 	// Filter videos on the frontend
-	const filteredVideos = allVideos.filter((video) => {
+	const filteredVideos = allVideos.filter((video: { status: string; licenseType: string; }) => {
 		const statusMatch = statusFilter === "all" || video.status === statusFilter;
 		const licenseMatch =
 			licenseFilter === "all" || video.licenseType === licenseFilter;
@@ -168,9 +138,9 @@ export default function ContentLibraryPage({
 
 	// Calculate stats based on ALL videos (not filtered)
 	const totalVideos = allVideos.length;
-	const totalViews = allVideos.reduce((sum, video) => sum + video.views, 0);
+	const totalViews = allVideos.reduce((sum: number, video: { views: number }) => sum + video.views, 0);
 	const totalEarnings = allVideos.reduce(
-		(sum, video) => sum + video.purchases * video.price,
+		(sum: number, video: { purchases: number; price: number; }) => sum + video.purchases * video.price,
 		0
 	);
 
@@ -181,9 +151,8 @@ export default function ContentLibraryPage({
 	};
 
 	const handleUploadSuccess = () => {
-		// Refresh the videos list after successful upload
-		fetchVideos();
-	};
+		queryClient.invalidateQueries({ queryKey: ['videos', userId] });
+	  };
 
 	const clearFilters = () => {
 		setStatusFilter("all");
@@ -210,10 +179,10 @@ export default function ContentLibraryPage({
 					<div className="text-red-600 mb-4">
 						<VideoIcon className="mx-auto h-12 w-12 mb-2" />
 						<p className="text-lg font-semibold">Error Loading Videos</p>
-						<p className="text-sm mt-1">{error}</p>
+						<p className="text-sm mt-1">{error instanceof Error ? error.message : "An unknown error occurred"}</p>
 					</div>
 					<button
-						onClick={fetchVideos}
+						onClick={() => queryClient.invalidateQueries({ queryKey: ['videos', userId] })}
 						className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
 					>
 						Try Again
@@ -388,7 +357,7 @@ export default function ContentLibraryPage({
 									: "space-y-4"
 							}
 						>
-							{filteredVideos.map((video) => (
+							{filteredVideos.map((video: Video) => (
 								<div
 									key={video.id}
 									className="bg-white rounded-lg shadow-sm border overflow-hidden hover:shadow-md transition-shadow"
@@ -460,7 +429,8 @@ export default function ContentLibraryPage({
 										{video.tags && video.tags.length > 0 && (
 											<div className="mb-3">
 												<div className="flex flex-wrap gap-1">
-													{video.tags.slice(0, 3).map((tag, index) => (
+													 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+													{video.tags.slice(0, 3).map((tag: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined, index: Key | null | undefined) => (
 														<span
 															key={index}
 															className="px-2 py-1 bg-gray-100 text-xs text-gray-600 rounded"

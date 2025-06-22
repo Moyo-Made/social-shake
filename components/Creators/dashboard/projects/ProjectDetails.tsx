@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { BookmarkIcon } from "lucide-react";
 import Link from "next/link";
@@ -14,154 +14,152 @@ import { BrandProfile } from "@/types/user";
 import { ProjectStatus } from "@/types/projects";
 import ApplyModal from "./available/ProjectApplyModal";
 import { Button } from "@/components/ui/button";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface ProjectDetailPageProps {
 	projectId: string;
 	project: ProjectFormData;
 }
 
+// Fetch project data
+const fetchProjectData = async (
+	projectId: string
+): Promise<ProjectFormData> => {
+	const contestRef = doc(db, "projects", projectId.toString());
+	const contestSnap = await getDoc(contestRef);
+
+	if (contestSnap.exists()) {
+		return contestSnap.data() as ProjectFormData;
+	} else {
+		throw new Error("Project not found");
+	}
+};
+
+// Fetch brand profile
+const fetchBrandProfile = async (userId: string): Promise<BrandProfile> => {
+	const response = await fetch(`/api/admin/brand-approval?userId=${userId}`);
+
+	if (response.ok) {
+		return await response.json();
+	} else {
+		throw new Error("Error fetching brand profile");
+	}
+};
+
+// Check if applied
+const checkApplicationStatus = async (userId: string, projectId: string) => {
+	const response = await fetch(
+		`/api/projects/check-applied?userId=${userId}&projectId=${projectId}`
+	);
+	if (response.ok) {
+		return await response.json();
+	}
+	throw new Error("Failed to check application status");
+};
+
+// Check if saved
+const checkSavedStatus = async (userId: string, projectId: string) => {
+	const response = await fetch(
+		`/api/projects/check-saved?userId=${userId}&projectId=${projectId}`
+	);
+	if (response.ok) {
+		return await response.json();
+	}
+	throw new Error("Failed to check saved status");
+};
+
+// Toggle saved status
+const toggleSavedStatus = async (data: {
+	userId: string;
+	projectId: string;
+	currentSavedState: boolean;
+	interestId: string | null;
+}) => {
+	const response = await fetch("/api/projects/toggle-saved", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(data),
+	});
+
+	if (response.ok) {
+		return await response.json();
+	}
+	throw new Error("Failed to toggle saved status");
+};
+
 export default function ProjectDetails({
 	projectId,
 	project,
 }: ProjectDetailPageProps) {
 	const { currentUser } = useAuth();
-	const [projectData, setProjectData] = useState<ProjectFormData | null>(
-		project || null
-	);
-	const [loading, setLoading] = useState<boolean>(project ? false : true);
-	const [error, setError] = useState<string | null>(null);
+	const queryClient = useQueryClient();
 	const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
-	const [isSaved, setIsSaved] = useState<boolean>(false);
-	const [saveLoading, setSaveLoading] = useState<boolean>(false);
-	const [interestId, setInterestId] = useState<string | null>(null);
-	const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
-	const [brandLoading, setBrandLoading] = useState<boolean>(true);
-	const [hasApplied, setHasApplied] = useState<boolean>(false);
-	const [, setApplicationCheckComplete] = useState<boolean>(false);
-	const [applicationStatus, setApplicationStatus] = useState<string>("pending");
-	const [, setCurrentParticipantCount] = useState<number>(0);
 
-	// Function to check if user has applied for the project and get application status
-	const checkIfApplied = useCallback(async () => {
-		if (!currentUser?.uid || !projectId) return false;
+	// Project data query
+	const {
+		data: projectData,
+		isLoading: loading,
+		error,
+	} = useQuery({
+		queryKey: ["project", projectId],
+		queryFn: () => fetchProjectData(projectId),
+		enabled: !project && !!projectId, // Only fetch if not passed as prop
+		initialData: project || undefined,
+		staleTime: 5 * 60 * 1000,
+	});
 
-		try {
-			const response = await fetch(
-				`/api/projects/check-applied?userId=${currentUser.uid}&projectId=${projectId}`
-			);
-			if (response.ok) {
-				const data = await response.json();
-				setHasApplied(data.hasApplied);
-				// Store application status if available
-				if (data.applicationStatus) {
-					setApplicationStatus(data.applicationStatus);
-				}
-				setApplicationCheckComplete(true);
-				return data.hasApplied;
-			}
-		} catch (error) {
-			console.error("Error checking contest application status:", error);
-		}
-		return false;
-	}, [currentUser?.uid, projectId]);
+	// Brand profile query
+	const { data: brandProfile, isLoading: brandLoading } = useQuery({
+		queryKey: ["brandProfile", projectData?.userId],
+		queryFn: () => fetchBrandProfile(projectData!.userId),
+		enabled: !!projectData?.userId,
+		staleTime: 10 * 60 * 1000,
+	});
 
-	// Function to check if the project is saved
-	const checkIfSaved = useCallback(async () => {
-		if (!currentUser?.uid || !projectId) return;
+	// Application status query
+	const { data: applicationData } = useQuery({
+		queryKey: ["applicationStatus", currentUser?.uid, projectId],
+		queryFn: () => checkApplicationStatus(currentUser!.uid, projectId),
+		enabled: !!currentUser?.uid && !!projectId,
+		staleTime: 2 * 60 * 1000,
+	});
 
-		try {
-			const response = await fetch(
-				`/api/projects/check-saved?userId=${currentUser.uid}&projectId=${projectId}`
-			);
+	const hasApplied = applicationData?.hasApplied || false;
+	const applicationStatus = applicationData?.applicationStatus || "pending";
 
-			if (response.ok) {
-				const data = await response.json();
-				setIsSaved(data.isSaved);
-				setInterestId(data.interestId);
-			}
-		} catch (error) {
-			console.error("Error checking saved status:", error);
-		}
-	}, [currentUser?.uid, projectId]);
+	// Saved status query
+	const { data: savedData } = useQuery({
+		queryKey: ["savedStatus", currentUser?.uid, projectId],
+		queryFn: () => checkSavedStatus(currentUser!.uid, projectId),
+		enabled: !!currentUser?.uid && !!projectId,
+		staleTime: 2 * 60 * 1000,
+	});
 
-	// Function to toggle saved status
-	const toggleSaved = async () => {
-		if (!currentUser?.uid || !projectId) return;
+	const isSaved = savedData?.isSaved || false;
+	const interestId = savedData?.interestId || null;
 
-		try {
-			setSaveLoading(true);
-
-			const response = await fetch("/api/projects/toggle-saved", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					userId: currentUser.uid,
-					projectId,
-					currentSavedState: isSaved,
-					interestId,
-				}),
+	const toggleSavedMutation = useMutation({
+		mutationFn: toggleSavedStatus,
+		onSuccess: () => {
+			// Invalidate and refetch saved status
+			queryClient.invalidateQueries({
+				queryKey: ["savedStatus", currentUser?.uid, projectId],
 			});
+		},
+	});
 
-			if (response.ok) {
-				const data = await response.json();
-				setIsSaved(data.isSaved);
-				setInterestId(data.isSaved ? data.interestId : null);
-			}
-		} catch (error) {
-			console.error("Error toggling saved status:", error);
-		} finally {
-			setSaveLoading(false);
-		}
+	const toggleSaved = () => {
+		if (!currentUser?.uid || !projectId) return;
+
+		toggleSavedMutation.mutate({
+			userId: currentUser.uid,
+			projectId,
+			currentSavedState: isSaved,
+			interestId,
+		});
 	};
 
-	// Fetch brand profile as soon as we have the project data
-	useEffect(() => {
-		const fetchBrandProfile = async () => {
-			if (!projectData || !projectData.userId) {
-				setBrandLoading(false);
-				return;
-			}
-
-			try {
-				setBrandLoading(true);
-
-				const response = await fetch(
-					`/api/admin/brand-approval?userId=${projectData.userId}`
-				);
-
-				if (response.ok) {
-					const data = await response.json();
-					setBrandProfile(data);
-				} else {
-					console.error("Error fetching brand profile:", response.status);
-				}
-			} catch (error) {
-				console.error("Error in brand profile fetch:", error);
-			} finally {
-				setBrandLoading(false);
-			}
-		};
-
-		fetchBrandProfile();
-	}, [projectData]);
-
-	// If project prop changes, update projectData
-	useEffect(() => {
-		if (project) {
-			setProjectData(project);
-			setLoading(false);
-		}
-	}, [project]);
-
-	// Check if user has applied or saved this project when component mounts
-	useEffect(() => {
-		if (currentUser?.uid && projectId) {
-			checkIfApplied();
-			checkIfSaved(); // Add check for saved status
-		}
-	}, [checkIfApplied, checkIfSaved, currentUser?.uid, projectId]);
+	const saveLoading = toggleSavedMutation.isPending;
 
 	const openApplyModal = () => {
 		setIsApplyModalOpen(true);
@@ -193,85 +191,13 @@ export default function ProjectDetails({
 			: "Not Set";
 	};
 
-	// Only fetch project data if it wasn't passed as a prop
-	useEffect(() => {
-		if (project) return; // Skip if we already have project data from props
-
-		const fetchContestData = async () => {
-			if (!projectId) {
-				setLoading(false);
-				setError("Project ID not found");
-				return;
-			}
-
-			try {
-				setLoading(true);
-				const contestRef = doc(db, "projects", projectId.toString());
-				const contestSnap = await getDoc(contestRef);
-
-				if (contestSnap.exists()) {
-					const data = contestSnap.data() as ProjectFormData;
-					setProjectData(data);
-				} else {
-					setError("Contest not found");
-				}
-
-				setLoading(false);
-			} catch (err) {
-				console.error("Error fetching contest data:", err);
-				setError("Failed to load contest data");
-				setLoading(false);
-			}
-		};
-
-		fetchContestData();
-	}, [projectId, project]);
-
 	// Handle application success
 	const handleApplySuccess = async () => {
-		// Set the user as applied
-		setHasApplied(true);
-	};
-
-	// Check if user has joined or applied to this contest on component mount
-	useEffect(() => {
-		if (currentUser?.uid && projectId) {
-			checkIfApplied();
-		}
-	}, [checkIfApplied, currentUser?.uid, projectId]);
-
-	useEffect(() => {
-		const fetchContestData = async () => {
-			if (!projectId) {
-				setLoading(false);
-				setError("Contest ID not found");
-				return;
-			}
-
-			try {
-				setLoading(true);
-				const contestRef = doc(db, "projects", projectId.toString());
-				const contestSnap = await getDoc(contestRef);
-
-				if (contestSnap.exists()) {
-					const data = contestSnap.data() as ProjectFormData;
-					setProjectData(data);
-					// Initialize the current participant count
-					setCurrentParticipantCount(data.participantsCount || 0);
-				} else {
-					setError("Contest not found");
-				}
-
-				setLoading(false);
-			} catch (err) {
-				console.error("Error fetching contest data:", err);
-				setError("Failed to load contest data");
-				setLoading(false);
-			}
-		};
-
-		fetchContestData();
-	}, [projectId]);
+		// Invalidate application status to refetch
+		queryClient.invalidateQueries({
+		  queryKey: ["applicationStatus", currentUser?.uid, projectId]
+		});
+	  };
 
 	if (loading) {
 		return (
@@ -285,7 +211,7 @@ export default function ProjectDetails({
 	if (error) {
 		return (
 			<div className="container px-4 py-6 max-w-6xl bg-white border border-[#FFD9C3] rounded-lg mx-auto my-5 flex justify-center items-center h-64">
-				<p className="text-red-500">{error}</p>
+				<p className="text-red-500">{error instanceof Error ? error.message : String(error)}</p>
 			</div>
 		);
 	}
@@ -680,8 +606,8 @@ export default function ProjectDetails({
 									<div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-center px-4 py-8 bg-white bg-opacity-80 rounded-lg">
 										<div className="max-w-md">
 											<h2 className="text-base sm:text-base font-bold mb-2 sm:mb-3 text-gray-800">
-												Apply to the project, and once accepted, you&apos;ll unlock
-												full details to get started!
+												Apply to the project, and once accepted, you&apos;ll
+												unlock full details to get started!
 											</h2>
 											<Button
 												onClick={openApplyModal}

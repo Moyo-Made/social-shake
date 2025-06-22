@@ -1,21 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/brand/brandProfile/ProtectedRoute";
 import CreatorContentWrapper from "@/components/Creators/dashboard/CreatorContentWrapper";
 import CreatorDashboard from "@/components/Creators/dashboard/CreatorDashboard";
-import ToastHandler from "@/components/Creators/ToastHandler";
 
 export default function DashboardPage() {
-	const [isLoading, setIsLoading] = useState(true);
-	const { currentUser } = useAuth();
-
-	// Simply use the currentUser directly
-	useEffect(() => {
-		// Just need to set loading to false once we've confirmed auth state
-		setIsLoading(false);
-	}, [currentUser]);
+	const { currentUser, isLoading } = useAuth();
 
 	if (isLoading) {
 		return (
@@ -35,7 +26,7 @@ export default function DashboardPage() {
 
 	return (
 		<CreatorContentWrapper userId={currentUser.uid} pageType="dashboard"> 
-		<ToastHandler />
+		
 			<div className="p-6">
 				<ProtectedRoute>
 					<CreatorDashboard userId={currentUser.uid} />

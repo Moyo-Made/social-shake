@@ -153,6 +153,8 @@ interface CostBreakdown {
 }
 
 export interface ProjectFormData {
+	approvedVideos: number;
+	totalVideos: number;
 	projectName: string;
 	projectTitle: string;
 	brandEmail: string;

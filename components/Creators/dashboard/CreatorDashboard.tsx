@@ -2,6 +2,7 @@ import Image from "next/image";
 import { useEffect } from "react";
 import EmptyContest from "@/components/brand/brandProfile/dashboard/EmptyContest";
 import { OngoingProjectsSection } from "./OngoingProjectsSection";
+import ProjectInvitationsSection from "./ProjectInvitation";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -126,8 +127,7 @@ const LoadingState = () => (
 	</div>
 );
 
-// Create the actual dashboard component separately
-const DashboardContent = ({ userId }: UserDashboardProps) => {
+const CreatorDashboard = ({ userId }: UserDashboardProps) => {
 	const searchParams = useSearchParams();
 
 	// Fetch user data with React Query
@@ -156,10 +156,15 @@ const DashboardContent = ({ userId }: UserDashboardProps) => {
 		enabled: !!userId, // Only run if userId exists
 		staleTime: 5 * 60 * 1000, // 5 minutes
 		gcTime: 10 * 60 * 1000, // 10 minutes
+		// Add these options to improve caching behavior
+		refetchOnWindowFocus: false,
+		refetchOnMount: false,
+		refetchOnReconnect: false,
 	});
 
-	// Combined loading state
-	const loading = userDataLoading || earningsDataLoading;
+	// Combined loading state - only show loading if we don't have cached data
+	const loading =
+		(userDataLoading || earningsDataLoading) && (!userData || !earningsData);
 	const error = userDataError || earningsDataError;
 
 	// Add this useEffect to detect TikTok connection success
@@ -168,14 +173,10 @@ const DashboardContent = ({ userId }: UserDashboardProps) => {
 
 		if (tiktokStatus === "success") {
 			toast.success("TikTok account successfully connected!");
-			const currentUrl = window.location.pathname;
-			window.history.replaceState({}, "", currentUrl);
-		}
-
-		if (tiktokStatus === "error") {
-			toast.error("Failed to connect TikTok account!");
-			const currentUrl = window.location.pathname;
-			window.history.replaceState({}, "", currentUrl);
+			// Use Next.js router instead of direct window manipulation
+			const url = new URL(window.location.href);
+			url.searchParams.delete("tiktok");
+			window.history.replaceState({}, "", url.toString());
 		}
 	}, [searchParams]);
 
@@ -302,14 +303,5 @@ const DashboardContent = ({ userId }: UserDashboardProps) => {
 		</div>
 	);
 };
-
-// Properly use dynamic import for the dashboard component
-import dynamic from "next/dynamic";
-import ProjectInvitationsSection from "./ProjectInvitation";
-
-const CreatorDashboard = dynamic(() => Promise.resolve(DashboardContent), {
-	ssr: false,
-	loading: () => <LoadingState />,
-});
 
 export default CreatorDashboard;

@@ -1,5 +1,5 @@
 
-import ContestDetailsPage from "@/components/Creators/dashboard/projects/ProjectDetailsPage";
+import ProjectDetailsPage from "@/components/Creators/dashboard/projects/ProjectDetailsPage";
 import React from "react";
 
 interface PageProps {
@@ -10,7 +10,7 @@ interface PageProps {
 const Page: React.FC<PageProps> = ({ params }) => {
 	return (
 		<div>
-			<ContestDetailsPage params={params} />
+			<ProjectDetailsPage params={params} />
 		</div>
 	);
 };

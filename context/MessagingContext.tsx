@@ -2,6 +2,7 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
 import { useConversations } from '@/hooks/useMessaging';
 import { MessagingContextType, Conversation as ImportedConversation } from '@/types/messaging';
@@ -54,6 +55,26 @@ interface ExtendedMessagingContextType extends MessagingContextType {
 	sortOption: string;
 	searchQuery: string;
 	
+	// TanStack Query states
+	conversationsQuery: {
+		data: Conversation[] | undefined;
+		isLoading: boolean;
+		error: Error | null;
+		refetch: () => void;
+	};
+	messagesQuery: {
+		data: Message[] | undefined;
+		isLoading: boolean;
+		error: Error | null;
+		refetch: () => void;
+	};
+	brandProfilesQuery: {
+		data: Record<string, BrandProfile> | undefined;
+		isLoading: boolean;
+		error: Error | null;
+		refetch: () => void;
+	};
+	
 	// Actions
 	fetchAllBrandProfiles: (userIds: string[]) => Promise<void>;
 	setUsers: React.Dispatch<React.SetStateAction<User[]>>;
@@ -74,6 +95,64 @@ interface ExtendedMessagingContextType extends MessagingContextType {
 	refreshConversations: () => Promise<void>;
 }
 
+// Query Keys
+export const messagingKeys = {
+	all: ['messaging'] as const,
+	conversations: (userId: string) => [...messagingKeys.all, 'conversations', userId] as const,
+	messages: (conversationId: string) => [...messagingKeys.all, 'messages', conversationId] as const,
+	brandProfiles: (userIds: string[]) => [...messagingKeys.all, 'brandProfiles', userIds.sort()] as const,
+	brandProfile: (userId: string) => [...messagingKeys.all, 'brandProfile', userId] as const,
+};
+
+// API Functions
+const fetchConversations = async (userId: string): Promise<Conversation[]> => {
+	const response = await fetch(`/api/conversations?userId=${userId}`);
+	if (!response.ok) {
+		throw new Error('Failed to fetch conversations');
+	}
+	const data = await response.json();
+	return data.conversations;
+};
+
+const fetchMessages = async (conversationId: string): Promise<any[]> => {
+	const response = await fetch(`/api/messages?conversationId=${conversationId}`);
+	if (!response.ok) {
+		throw new Error('Failed to fetch messages');
+	}
+	const data = await response.json();
+	return data.messages;
+};
+
+const fetchBrandProfile = async (userId: string): Promise<BrandProfile | null> => {
+	try {
+		const response = await fetch(`/api/admin/brand-approval?userId=${userId}`);
+		if (response.ok) {
+			return await response.json();
+		}
+	} catch (error) {
+		console.error(`Error fetching brand profile for userId ${userId}:`, error);
+	}
+	return null;
+};
+
+const fetchBrandProfiles = async (userIds: string[]): Promise<Record<string, BrandProfile>> => {
+	const promises = userIds.map(async (userId) => {
+		const data = await fetchBrandProfile(userId);
+		return { userId, data };
+	});
+
+	const results = await Promise.all(promises);
+	const brandProfiles: Record<string, BrandProfile> = {};
+	
+	results.forEach(({ userId, data }) => {
+		if (data) {
+			brandProfiles[userId] = data;
+		}
+	});
+
+	return brandProfiles;
+};
+
 // Create context with default values
 const MessagingContext = createContext<ExtendedMessagingContextType>({
 	conversations: [],
@@ -87,6 +166,24 @@ const MessagingContext = createContext<ExtendedMessagingContextType>({
 	unreadCount: 0,
 	loading: false,
 	error: null,
+	conversationsQuery: {
+		data: undefined,
+		isLoading: false,
+		error: null,
+		refetch: () => {},
+	},
+	messagesQuery: {
+		data: undefined,
+		isLoading: false,
+		error: null,
+		refetch: () => {},
+	},
+	brandProfilesQuery: {
+		data: undefined,
+		isLoading: false,
+		error: null,
+		refetch: () => {},
+	},
 	startConversation: async () => null,
 	getConversation: async () => null,
 	fetchAllBrandProfiles: async () => {},
@@ -109,6 +206,7 @@ const MessagingContext = createContext<ExtendedMessagingContextType>({
 export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 	const { currentUser } = useAuth();
 	const userId = currentUser?.uid;
+	const queryClient = useQueryClient();
 
 	// State
 	const [brandProfiles, setBrandProfiles] = useState<Record<string, BrandProfile>>({});
@@ -116,67 +214,67 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 	const [conversations, setConversations] = useState<Conversation[]>([]);
 	const [messages, setMessages] = useState<Message[]>([]);
 	const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
-	const [loading, setLoading] = useState(false);
 	const [imageLoadingStates, setImageLoadingStates] = useState<Record<string, boolean>>({});
 	const [sortOption, setSortOption] = useState("Newest");
 	const [searchQuery, setSearchQuery] = useState("");
 	
 	const {
 		unreadCount,
-		error,
+		error: hookError,
 		startConversation,
 		getConversation
 	} = useConversations(userId);
 
-	// Memoized methods
-	const handleImageLoad = useCallback((userId: string) => {
-		setImageLoadingStates((prev) => ({ ...prev, [userId]: false }));
-	}, []);
+	// TanStack Query for conversations
+	const conversationsQuery = useQuery({
+		queryKey: messagingKeys.conversations(userId || ''),
+		queryFn: () => fetchConversations(userId!),
+		enabled: !!userId,
+		staleTime: 30 * 1000, // 30 seconds
+		refetchInterval: 60 * 1000, // Refetch every minute for real-time updates
+	});
 
-	const handleImageLoadStart = useCallback((userId: string) => {
-		setImageLoadingStates((prev) => ({ ...prev, [userId]: true }));
-	}, []);
+	// TanStack Query for messages
+	const messagesQuery = useQuery({
+		queryKey: messagingKeys.messages(selectedConversation || ''),
+		queryFn: () => fetchMessages(selectedConversation!),
+		enabled: !!selectedConversation,
+		staleTime: 10 * 1000, // 10 seconds
+	});
 
-	const handleSortChange = useCallback((option: "Newest" | "Oldest") => {
-		setSortOption(option);
+	// Get user IDs from conversations for brand profiles
+	const userIds = conversationsQuery.data?.map(conv => 
+		conv.participants.find(p => p !== userId) || ''
+	).filter(Boolean) || [];
 
-		setUsers((prevUsers) => {
-			const sortedUsers = [...prevUsers];
-			sortedUsers.sort((a, b) => {
-				const timeA = a.timestamp || 0;
-				const timeB = b.timestamp || 0;
-				return option === "Newest" ? timeB - timeA : timeA - timeB;
-			});
-			return sortedUsers;
-		});
-	}, []);
+	// TanStack Query for brand profiles
+	const brandProfilesQuery = useQuery({
+		queryKey: messagingKeys.brandProfiles(userIds),
+		queryFn: () => fetchBrandProfiles(userIds),
+		enabled: userIds.length > 0,
+		staleTime: 5 * 60 * 1000, // 5 minutes
+	});
 
-	const handleSelectConversation = useCallback((conversationId: string) => {
-		if (selectedConversation !== conversationId) {
-			setMessages([]); // Clear messages when switching conversations
+	// Update local state when queries succeed
+	useEffect(() => {
+		if (conversationsQuery.data) {
+			setConversations(conversationsQuery.data);
 		}
-		setSelectedConversation(conversationId);
-	}, [selectedConversation]);
+	}, [conversationsQuery.data]);
 
-	const fetchInitialMessages = useCallback(async (conversationId: string) => {
-		if (!conversationId || !currentUser) return;
+	useEffect(() => {
+		if (brandProfilesQuery.data) {
+			setBrandProfiles(prev => ({ ...prev, ...brandProfilesQuery.data }));
+		}
+	}, [brandProfilesQuery.data]);
 
-		try {
-			const response = await fetch(
-				`/api/messages?conversationId=${conversationId}`
-			);
-
-			if (!response.ok) {
-				throw new Error("Failed to fetch messages");
-			}
-
-			const data = await response.json();
-
-			// Process messages
+	// Process messages when messagesQuery data changes
+	useEffect(() => {
+		if (messagesQuery.data && currentUser) {
 			const processedMessages: Message[] = [];
 			let currentDate = "";
 
-			data.messages.forEach((msg: any, index: number) => {
+			messagesQuery.data.forEach((msg: any, index: number) => {
 				// Format the timestamp
 				let formattedDate = "";
 				if (msg.timestamp) {
@@ -210,77 +308,13 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 			});
 
 			setMessages(processedMessages);
-		} catch (error) {
-			console.error("Error fetching messages:", error);
 		}
-	}, [currentUser]);
+	}, [messagesQuery.data, currentUser]);
 
-	const fetchAllBrandProfiles = useCallback(async (userIds: string[]) => {
-		try {
-			const promises = userIds.map(async (userId) => {
-				const response = await fetch(
-					`/api/admin/brand-approval?userId=${userId}`
-				);
-				if (response.ok) {
-					const data = await response.json();
-					return { userId, data };
-				}
-				return { userId, data: null };
-			});
-
-			const results = await Promise.all(promises);
-			const newBrandProfiles: Record<string, BrandProfile> = {};
-			
-			results.forEach(({ userId, data }) => {
-				if (data) {
-					newBrandProfiles[userId] = data;
-				}
-			});
-
-			if (Object.keys(newBrandProfiles).length > 0) {
-				setBrandProfiles((prev) => ({ ...prev, ...newBrandProfiles }));
-			}
-		} catch (error) {
-			console.error("Error fetching brand profiles:", error);
-		}
-	}, []);
-
-	const fetchBrandProfile = useCallback(async (userId: string) => {
-		try {
-			const response = await fetch(
-				`/api/admin/brand-approval?userId=${userId}`
-			);
-			if (response.ok) {
-				const data = await response.json();
-				return data;
-			}
-		} catch (error) {
-			console.error(
-				`Error fetching brand profile for userId ${userId}:`,
-				error
-			);
-		}
-		return null;
-	}, []);
-
-	const refreshConversations = useCallback(async () => {
-		if (!currentUser) return;
-
-		try {
-			setLoading(true);
-			const response = await fetch(
-				`/api/conversations?userId=${currentUser.uid}`
-			);
-
-			if (!response.ok) {
-				throw new Error("Failed to fetch conversations");
-			}
-
-			const data = await response.json();
-			setConversations(data.conversations);
-
-			// Process conversations into user format for sidebar
-			const processedUsers = data.conversations.map((conv: Conversation) => {
+	// Process conversations into user format for sidebar
+	useEffect(() => {
+		if (conversationsQuery.data && currentUser) {
+			const processedUsers = conversationsQuery.data.map((conv: Conversation) => {
 				const otherParticipantId = conv.participants.find(
 					(p: string) => p !== currentUser.uid
 				);
@@ -296,11 +330,6 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 					(avatarUrl.startsWith("http") ||
 						(avatarUrl !== "/icons/default-avatar.svg" &&
 							avatarUrl.length > 0));
-
-				// For each user, fetch their brand profile if not already fetched
-				if (otherParticipantId && !brandProfiles[otherParticipantId]) {
-					fetchBrandProfile(otherParticipantId);
-				}
 
 				const unreadCount = conv.unreadCounts?.[currentUser.uid] || 0;
 				const timestamp = conv.updatedAt
@@ -338,43 +367,59 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 			});
 
 			setUsers(processedUsers.filter((user: User) => user.id !== undefined));
-
-			// Fetch brand profiles for new users
-			const userIds = processedUsers
-				.map((user: { id: string }) => user.id)
-				.filter((id: string) => id && !brandProfiles[id]);
-			
-			if (userIds.length > 0) {
-				fetchAllBrandProfiles(userIds);
-			}
-
-			setLoading(false);
-		} catch (error) {
-			console.error("Error fetching conversations:", error);
-			setLoading(false);
 		}
-	}, [currentUser, brandProfiles, fetchBrandProfile, fetchAllBrandProfiles]);
+	}, [conversationsQuery.data, currentUser, brandProfiles]);
 
-	// Initial fetch on mount
-	useEffect(() => {
-		if (currentUser) {
-			refreshConversations();
-		}
-	}, [currentUser]); // Only depend on currentUser, not refreshConversations to avoid infinite loops
+	// Memoized methods
+	const handleImageLoad = useCallback((userId: string) => {
+		setImageLoadingStates((prev) => ({ ...prev, [userId]: false }));
+	}, []);
 
-	// Update users when brand profiles are loaded
-	useEffect(() => {
-		if (Object.keys(brandProfiles).length > 0) {
-			setUsers((prevUsers) =>
-				prevUsers.map((user) => {
-					const brandName = brandProfiles[user.id]?.brandName;
-					return brandName && brandName !== user.name
-						? { ...user, name: brandName }
-						: user;
-				})
-			);
+	const handleImageLoadStart = useCallback((userId: string) => {
+		setImageLoadingStates((prev) => ({ ...prev, [userId]: true }));
+	}, []);
+
+	const handleSortChange = useCallback((option: "Newest" | "Oldest") => {
+		setSortOption(option);
+
+		setUsers((prevUsers) => {
+			const sortedUsers = [...prevUsers];
+			sortedUsers.sort((a, b) => {
+				const timeA = a.timestamp || 0;
+				const timeB = b.timestamp || 0;
+				return option === "Newest" ? timeB - timeA : timeA - timeB;
+			});
+			return sortedUsers;
+		});
+	}, []);
+
+	const handleSelectConversation = useCallback((conversationId: string) => {
+		if (selectedConversation !== conversationId) {
+			setMessages([]); // Clear messages when switching conversations
 		}
-	}, [brandProfiles]);
+		setSelectedConversation(conversationId);
+	}, [selectedConversation]);
+
+	// Legacy methods for backward compatibility
+	const fetchInitialMessages = useCallback(async (conversationId: string) => {
+		// This is now handled by the messagesQuery, but keeping for compatibility
+		if (conversationId !== selectedConversation) {
+			setSelectedConversation(conversationId);
+		}
+		// The query will automatically fetch when selectedConversation changes
+	}, [selectedConversation]);
+
+	const fetchAllBrandProfiles = useCallback(async (userIds: string[]) => {
+		// Invalidate and refetch brand profiles query
+		queryClient.invalidateQueries({
+			queryKey: messagingKeys.brandProfiles(userIds)
+		});
+	}, [queryClient]);
+
+	const refreshConversations = useCallback(async () => {
+		// Refetch conversations
+		await conversationsQuery.refetch();
+	}, [conversationsQuery]);
 
 	// Value to be provided to consumers
 	const value: ExtendedMessagingContextType = {
@@ -387,8 +432,26 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 		sortOption,
 		searchQuery,
 		unreadCount,
-		loading,
-		error,
+		loading: conversationsQuery.isLoading || messagesQuery.isLoading || brandProfilesQuery.isLoading,
+		error: hookError || conversationsQuery.error?.message || messagesQuery.error?.message || brandProfilesQuery.error?.message || null,
+		conversationsQuery: {
+			data: conversationsQuery.data,
+			isLoading: conversationsQuery.isLoading,
+			error: conversationsQuery.error,
+			refetch: conversationsQuery.refetch,
+		},
+		messagesQuery: {
+			data: messagesQuery.data,
+			isLoading: messagesQuery.isLoading,
+			error: messagesQuery.error,
+			refetch: messagesQuery.refetch,
+		},
+		brandProfilesQuery: {
+			data: brandProfilesQuery.data,
+			isLoading: brandProfilesQuery.isLoading,
+			error: brandProfilesQuery.error,
+			refetch: brandProfilesQuery.refetch,
+		},
 		startConversation,
 		getConversation,
 		fetchAllBrandProfiles,

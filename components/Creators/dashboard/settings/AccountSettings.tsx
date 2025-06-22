@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
 	Select,
 	SelectContent,
@@ -27,17 +28,72 @@ interface TabItem {
 	label: string;
 }
 
+// API functions
+const fetchCreatorProfile = async (email: string): Promise<CreatorProfileData> => {
+	const response = await fetch(
+		`/api/creator-profile?email=${encodeURIComponent(email)}`,
+		{
+			method: "GET",
+			headers: {
+				"Content-Type": "application/json",
+			},
+		}
+	);
+
+	if (!response.ok) {
+		const errorText = await response.text();
+		throw new Error("Failed to fetch creator profile: " + errorText);
+	}
+
+	return response.json();
+};
+
+const updateCreatorProfile = async (data: CreatorProfileData & { email: string }): Promise<CreatorProfileData> => {
+	const response = await fetch("/api/creator-profile", {
+		method: "PUT",
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify(data),
+	});
+
+	if (!response.ok) {
+		const errorData = await response.json();
+		throw new Error(errorData.error || "Failed to update profile");
+	}
+
+	return response.json();
+};
+
+const uploadProfilePicture = async (file: File, email: string): Promise<{ logoUrl: string }> => {
+	const uploadData = new FormData();
+	uploadData.append("logo", file);
+	uploadData.append("email", email);
+
+	const response = await fetch(`/api/creator-profile/profile-picture`, {
+		method: "POST",
+		body: uploadData,
+	});
+
+	if (!response.ok) {
+		const errorText = await response.text();
+		try {
+			const errorData = JSON.parse(errorText);
+			throw new Error(errorData.error || "Failed to upload logo");
+		} catch {
+			throw new Error(`Upload failed: ${errorText}`);
+		}
+	}
+
+	return response.json();
+};
+
 const AccountSettings: React.FC = () => {
 	const { currentUser } = useAuth();
+	const queryClient = useQueryClient();
 	const [activeTab, setActiveTab] = useState<string>("account");
-	const [isLoading, setIsLoading] = useState<boolean>(true);
-	const [error, setError] = useState<string | null>(null);
-	const [successMessage, setSuccessMessage] = useState<string | null>(null);
-	const [, setProfileData] = useState<CreatorProfileData | null>(null);
 	const [formData, setFormData] = useState<CreatorProfileData | null>(null);
-
 	const [imagePreview, setImagePreview] = useState<string | null>(null);
-	const [isSaving, setIsSaving] = useState(false);
 	const [charCount, setCharCount] = useState<number>(0);
 	const [contentLinks, setContentLinks] = useState<string[]>([""]);
 
@@ -46,68 +102,75 @@ const AccountSettings: React.FC = () => {
 		{ id: "account", label: "General Settings" },
 		{ id: "shipping-details", label: "Shipping Details" },
 		{ id: "security", label: "Security & Login" },
-		{ id: "payments", label: "Payment & Payouts" },
+		{ id: "payments", label: "Stripe Connect" },
 		{ id: "notifications", label: "Notifications" },
 	];
 
-	useEffect(() => {
-		// Alternative approach - fetch from both endpoints in the frontend
-		const fetchCreatorProfile = async (): Promise<void> => {
-			if (!currentUser?.email) {
-			  console.warn("No user email found");
-			  setIsLoading(false);
-			  return;
-			}
-		  
-			try {
-			  console.log("Fetching creator profile for email:", currentUser.email);
-		  
-			  // Single fetch request for all data
-			  const response = await fetch(
-				`/api/creator-profile?email=${encodeURIComponent(currentUser.email)}`,
-				{
-				  method: "GET",
-				  headers: {
-					"Content-Type": "application/json",
-				  },
-				}
-			  );
-		  
-			  if (!response.ok) {
-				const errorText = await response.text();
-				throw new Error("Failed to fetch creator profile: " + errorText);
-			  }
-		  
-			  const mergedData = await response.json();
-			  console.log("Creator data:", mergedData);
-		  
-			  // Initialize content links array from data
-			  const links = mergedData.contentLinks || [];
-			  setContentLinks(links.length > 0 ? links : [""]);
-		  
-			  // Initialize bio char count
-			  if (mergedData.bio) {
-				setCharCount(mergedData.bio.length);
-			  }
-		  
-			  setProfileData(mergedData);
-			  setFormData(mergedData);
-			} catch (err) {
-			  console.error("Detailed error fetching creator profile:", err);
-			  setError(err instanceof Error ? err.message : "Failed to load profile");
-			} finally {
-			  setIsLoading(false);
-			}
-		  };
+	// Query for fetching creator profile
+	const {
+		data: profileData,
+		isLoading,
+		error: queryError,
+		isError
+	} = useQuery({
+		queryKey: ['creator-profile', currentUser?.email],
+		queryFn: () => fetchCreatorProfile(currentUser!.email),
+		enabled: !!currentUser?.email,
+		staleTime: 5 * 60 * 1000, // 5 minutes
+	});
 
-		fetchCreatorProfile();
-	}, [currentUser]);
+	// Mutation for updating profile
+	const updateProfileMutation = useMutation({
+		mutationFn: updateCreatorProfile,
+		onSuccess: (data) => {
+			// Update the cache with new data
+			queryClient.setQueryData(['creator-profile', currentUser?.email], data);
+			
+			// Dispatch custom event to notify other components
+			window.dispatchEvent(new Event("creator-profile-updated"));
+		},
+		onError: (error) => {
+			console.error("Profile update failed:", error);
+		}
+	});
+
+	// Mutation for uploading profile picture
+	const uploadPictureMutation = useMutation({
+		mutationFn: ({ file, email }: { file: File; email: string }) => 
+			uploadProfilePicture(file, email),
+		onSuccess: (data) => {
+			// Update the current form data with new logo URL
+			setFormData(prev => prev ? { ...prev, logoUrl: data.logoUrl } : null);
+			
+			// Update the cache
+			queryClient.setQueryData(['creator-profile', currentUser?.email], (oldData: CreatorProfileData) => ({
+				...oldData,
+				logoUrl: data.logoUrl
+			}));
+		},
+		onError: (error) => {
+			console.error("Profile picture upload failed:", error);
+		}
+	});
+
+	// Initialize form data when profile data is loaded
+	useEffect(() => {
+		if (profileData) {
+			setFormData(profileData);
+			
+			// Initialize content links
+			const links = profileData.contentLinks || [];
+			setContentLinks(links.length > 0 ? links : [""]);
+			
+			// Initialize bio char count
+			if (profileData.bio) {
+				setCharCount(profileData.bio.length);
+			}
+		}
+	}, [profileData]);
 
 	const handleSelectChange = (value: string) => {
-		setFormData({
-			...formData!,
-			country: value,
-		});
+		setFormData(prev => prev ? { ...prev, country: value } : null);
 	};
 
 	const handleInputChange = (
@@ -115,26 +178,23 @@ const AccountSettings: React.FC = () => {
 	) => {
 		const { name, value } = e.target;
 
-		// Handle nested socialMedia object
 		if (name.startsWith("socialMedia.")) {
 			const socialMediaKey = name.split(".")[1];
-			setFormData((prevFormData) => ({
-				...prevFormData!,
+			setFormData(prev => prev ? {
+				...prev,
 				socialMedia: {
-					...prevFormData?.socialMedia,
+					...prev.socialMedia,
 					[socialMediaKey]: value || "",
 				} as Required<CreatorProfileData>["socialMedia"],
-			}));
+			} : null);
 		} else if (name.startsWith("pricing.")) {
 			const pricingKey = name.split(".")[1];
-			setFormData((prevFormData) => {
-				// Handle the case where prevFormData is null
-				if (!prevFormData) return null;
-
+			setFormData(prev => {
+				if (!prev) return null;
 				return {
-					...prevFormData,
+					...prev,
 					pricing: {
-						...(prevFormData.pricing || {}), // Ensure pricing exists
+						...(prev.pricing || {}),
 						[pricingKey]: pricingKey.includes("Note")
 							? value
 							: value === ""
@@ -143,24 +203,15 @@ const AccountSettings: React.FC = () => {
 					},
 				};
 			});
-		}
-		// Handle all other fields
-		else {
-			setFormData((prevFormData) => ({
-				...prevFormData!,
-				[name]: value,
-			}));
+		} else {
+			setFormData(prev => prev ? { ...prev, [name]: value } : null);
 		}
 	};
 
 	const handleBioChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
 		const text = e.target.value;
-		// Limit to 500 characters
 		if (text.length <= 500) {
-			setFormData((prevFormData) => ({
-				...prevFormData!,
-				bio: text,
-			}));
+			setFormData(prev => prev ? { ...prev, bio: text } : null);
 			setCharCount(text.length);
 		}
 	};
@@ -169,11 +220,7 @@ const AccountSettings: React.FC = () => {
 		const newLinks = [...contentLinks];
 		newLinks[index] = value;
 		setContentLinks(newLinks);
-
-		setFormData((prevFormData) => ({
-			...prevFormData!,
-			contentLinks: newLinks,
-		}));
+		setFormData(prev => prev ? { ...prev, contentLinks: newLinks } : null);
 	};
 
 	const addContentLink = () => {
@@ -184,114 +231,26 @@ const AccountSettings: React.FC = () => {
 		if (contentLinks.length > 1) {
 			const newLinks = contentLinks.filter((_, i) => i !== index);
 			setContentLinks(newLinks);
-
-			setFormData((prevFormData) => ({
-				...prevFormData!,
-				contentLinks: newLinks,
-			}));
+			setFormData(prev => prev ? { ...prev, contentLinks: newLinks } : null);
 		}
 	};
 
 	const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-		if (!e.target.files || !e.target.files[0]) return;
+		if (!e.target.files || !e.target.files[0] || !currentUser?.email) return;
 
-		setError(null);
 		const file = e.target.files[0];
-
-		// Create a preview URL for immediate visual feedback
 		const previewUrl = URL.createObjectURL(file);
 		setImagePreview(previewUrl);
 
-		// Show loading state
-		setIsLoading(true);
-
-		// Verify we have the necessary data
-		if (!currentUser?.email) {
-			setError("User email is required for uploading a logo");
-			setIsLoading(false);
-			return;
-		}
-
-		// Create FormData object with required fields
-		const uploadData = new FormData();
-		uploadData.append("logo", file);
-		uploadData.append("email", currentUser.email);
-
-		try {
-			// Use the dedicated profile picture endpoint instead
-			const response = await fetch(`/api/creator-profile/profile-picture`, {
-				method: "POST",
-				body: uploadData,
-			});
-
-			if (!response.ok) {
-				const errorText = await response.text();
-				console.error("Error response:", errorText);
-
-				try {
-					// Try to parse as JSON if possible
-					const errorData = JSON.parse(errorText);
-					throw new Error(errorData.error || "Failed to upload logo");
-				} catch {
-					// If not JSON, use the raw text
-					throw new Error(`Upload failed: ${errorText}`);
-				}
-			}
-
-			// Get the response data
-			const responseData = await response.json();
-			console.log("Logo upload response:", responseData);
-
-			// Extract the logoUrl from the response
-			const logoUrl = responseData.logoUrl;
-
-			if (logoUrl) {
-				// Update formData with the new logoUrl - this is crucial
-				setFormData((prevFormData) => {
-					if (!prevFormData) return null;
-					return {
-						...prevFormData,
-						logoUrl: logoUrl,
-					};
-				});
-
-				// Also update profileData to ensure it's reflected in the UI
-				setProfileData((prevProfileData) => {
-					if (!prevProfileData) return null;
-					return {
-						...prevProfileData,
-						logoUrl: logoUrl,
-					};
-				});
-
-				setSuccessMessage("Profile picture uploaded successfully");
-			} else {
-				throw new Error("Logo URL not found in response");
-			}
-		} catch (error) {
-			setError(
-				error instanceof Error
-					? error.message
-					: "Failed to upload profile picture. Please try again."
-			);
-			console.error("Error uploading logo:", error);
-		} finally {
-			setIsLoading(false);
-		}
+		uploadPictureMutation.mutate({ file, email: currentUser.email });
 	};
 
-	// Updated handleSaveChanges function to include logoUrl when updating verification data
 	const handleSaveChanges = async () => {
 		if (!formData || !currentUser?.email) return;
 
-		setError(null);
-		setSuccessMessage(null);
-
-		// Make sure socialMedia is properly structured as an object
 		const dataToSend = {
 			...formData,
 			email: currentUser.email,
-			// Ensure socialMedia is an object, not individual dot-notation fields
 			socialMedia: {
 				facebook: formData.socialMedia?.facebook || "",
 				instagram: formData.socialMedia?.instagram || "",
@@ -299,43 +258,10 @@ const AccountSettings: React.FC = () => {
 				youtube: formData.socialMedia?.youtube || "",
 				tiktok: formData.socialMedia?.tiktok || formData.tiktokUrl || "",
 			},
-			// Include content links
 			contentLinks: contentLinks.filter((link) => link.trim().length > 0),
 		};
 
-		try {
-			setIsSaving(true);
-
-			// Use only the creator-profile endpoint
-			const response = await fetch("/api/creator-profile", {
-				method: "PUT",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(dataToSend),
-			});
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || "Failed to update profile");
-			}
-
-			setSuccessMessage("Profile updated successfully");
-			// Update the profile data with the new form data
-			setProfileData({ ...formData });
-
-			// Dispatch custom event to notify other components of the profile update
-			window.dispatchEvent(new Event("creator-profile-updated"));
-
-			// Clear success message after 3 seconds
-			setTimeout(() => {
-				setSuccessMessage(null);
-			}, 3000);
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to update profile");
-		} finally {
-			setIsSaving(false);
-		}
+		updateProfileMutation.mutate(dataToSend);
 	};
 
 	// Clean up object URLs when component unmounts
@@ -347,6 +273,7 @@ const AccountSettings: React.FC = () => {
 		};
 	}, [imagePreview]);
 
+	// Loading state
 	if (isLoading) {
 		return (
 			<div className="flex flex-col justify-center items-center h-screen">
@@ -355,6 +282,9 @@ const AccountSettings: React.FC = () => {
 			</div>
 		);
 	}
+
+	// Error state
+	const error = isError ? (queryError as Error)?.message : null;
 
 	return (
 		<div className="flex min-h-screen w-full">
@@ -394,9 +324,27 @@ const AccountSettings: React.FC = () => {
 							</div>
 						)}
 
-						{successMessage && (
+						{updateProfileMutation.isError && (
+							<div className="bg-red-50 text-red-600 p-3 rounded-md mb-4">
+								{(updateProfileMutation.error as Error)?.message}
+							</div>
+						)}
+
+						{uploadPictureMutation.isError && (
+							<div className="bg-red-50 text-red-600 p-3 rounded-md mb-4">
+								{(uploadPictureMutation.error as Error)?.message}
+							</div>
+						)}
+
+						{updateProfileMutation.isSuccess && (
 							<div className="bg-green-50 text-green-600 p-3 rounded-md mb-4">
-								{successMessage}
+								Profile updated successfully
+							</div>
+						)}
+
+						{uploadPictureMutation.isSuccess && (
+							<div className="bg-green-50 text-green-600 p-3 rounded-md mb-4">
+								Profile picture uploaded successfully
 							</div>
 						)}
 
@@ -429,8 +377,12 @@ const AccountSettings: React.FC = () => {
 											className="hidden"
 											accept="image/png,image/jpeg"
 											onChange={handleLogoUpload}
+											disabled={uploadPictureMutation.isPending}
 										/>
 									</label>
+									{uploadPictureMutation.isPending && (
+										<p className="text-blue-500 text-sm mt-2">Uploading...</p>
+									)}
 									<p className="text-gray-500 text-sm mt-2">
 										Upload a clear, professional photo to help brands recognize
 										you.
@@ -827,36 +779,33 @@ const AccountSettings: React.FC = () => {
 							<Button
 								onClick={handleSaveChanges}
 								className="bg-[#FD5C02] hover:bg-orange-600 text-white px-6"
-								disabled={isSaving}
+								disabled={updateProfileMutation.isPending}
 							>
-								{isSaving ? "Saving..." : "Save Changes"}
+								{updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
 							</Button>
 						</div>
 					</div>
 				)}
 
-				{/* Billing & Payments Tab */}
+				{/* Other tabs remain the same */}
 				{activeTab === "shipping-details" && (
 					<div className="md:w-[50rem] max-w-4xl mx-auto">
 						<ShippingAddressPage />
 					</div>
 				)}
 
-				{/* Project Preference Tab */}
 				{activeTab === "security" && (
 					<div className="md:w-[50rem] max-w-4xl mx-auto">
 						<SecurityPage />
 					</div>
 				)}
 
-				{/* Notifications & Alerts Tab */}
 				{activeTab === "payments" && (
 					<div className="md:w-[50rem] max-w-4xl mx-auto">
 						<PayoutPage />
 					</div>
 				)}
 
-				{/* Security & Privacy Tab */}
 				{activeTab === "notifications" && (
 					<div className="md:w-[50rem] max-w-4xl mx-auto">
 						<NotificationPreferences />

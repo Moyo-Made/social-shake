@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import ProjectCard from "./ProjectCard";
 import { Button } from "@/components/ui/button";
@@ -15,16 +16,20 @@ import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { ProjectFormData } from "@/types/contestFormData";
 
+// API function - keep outside component for reusability
+const fetchProjects = async (): Promise<ProjectFormData[]> => {
+	const response = await fetch("/api/projects");
+
+	if (!response.ok) {
+		throw new Error(`Failed to fetch projects: ${response.statusText}`);
+	}
+
+	const data = await response.json();
+	return data.data || [];
+};
+
 const CreatorProjectDashboard: React.FC = () => {
 	const { currentUser } = useAuth();
-	const [projects, setProjects] = useState<ProjectFormData[]>([]);
-	const [filteredProjects, setFilteredProjects] = useState<ProjectFormData[]>(
-		[]
-	);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-	const [hasMore, setHasMore] = useState(false);
-	const [lastDocId, setLastDocId] = useState<string | null>(null);
 
 	// Search and filter states
 	const [searchQuery, setSearchQuery] = useState("");
@@ -33,58 +38,28 @@ const CreatorProjectDashboard: React.FC = () => {
 	const [sortBy, setSortBy] = useState("newest");
 	const [budgetRange, setBudgetRange] = useState("all");
 
-	const fetchProjects = async (reset = true) => {
-		if (!currentUser?.uid) return;
+	// React Query for fetching projects
+	const {
+		data: projects = [],
+		isLoading,
+		error,
+		refetch,
+		isRefetching,
+	} = useQuery({
+		queryKey: ["projects", currentUser?.uid],
+		queryFn: fetchProjects,
+		enabled: !!currentUser?.uid, // Only run query when user is authenticated
+		staleTime: 5 * 60 * 1000, // 5 minutes - projects change moderately frequently
+		gcTime: 10 * 60 * 1000, // 10 minutes garbage collection time
+		refetchOnWindowFocus: false, // Disable refetch on window focus for better UX
+		retry: 3, // Retry failed requests 3 times
+		retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+	});
 
-		try {
-			setLoading(true);
+	// Memoized filtered and sorted projects
+	const filteredProjects = useMemo(() => {
+		if (!projects.length) return [];
 
-			let url = `/api/projects`;
-			if (!reset && lastDocId) {
-				url += `?startAfter=${lastDocId}`;
-			}
-
-			const response = await fetch(url);
-
-			if (!response.ok) {
-				throw new Error("Failed to fetch projects");
-			}
-
-			const data = await response.json();
-
-			if (reset) {
-				setProjects(data.data);
-			} else {
-				setProjects((prev) => [...prev, ...data.data]);
-			}
-
-			setHasMore(data.pagination.hasMore);
-			setLastDocId(data.pagination.lastDocId);
-			setError(null);
-		} catch (err) {
-			setError("Error loading projects. Please try again.");
-			console.error(err);
-		} finally {
-			setLoading(false);
-		}
-	};
-
-	// Apply filters whenever filter values change
-	useEffect(() => {
-		if (projects.length > 0) {
-			applyFilters();
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [searchQuery, projectType, productType, sortBy, budgetRange, projects]);
-
-	useEffect(() => {
-		if (currentUser?.uid) {
-			fetchProjects();
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [currentUser?.uid]);
-
-	const applyFilters = () => {
 		let result = [...projects];
 
 		// Apply search query filter
@@ -100,13 +75,11 @@ const CreatorProjectDashboard: React.FC = () => {
 				const description = project.projectDetails.projectDescription;
 
 				if (Array.isArray(description)) {
-					// If it's an array, check if any element includes the query
 					descriptionMatch = description.some(
 						(desc) =>
 							typeof desc === "string" && desc.toLowerCase().includes(query)
 					);
 				} else if (typeof description === "string") {
-					// If it's a string, check if it includes the query
 					descriptionMatch = description.toLowerCase().includes(query);
 				}
 
@@ -198,16 +171,20 @@ const CreatorProjectDashboard: React.FC = () => {
 				break;
 		}
 
-		setFilteredProjects(result);
-	};
+		return result;
+	}, [projects, searchQuery, projectType, productType, sortBy, budgetRange]);
 
 	const handleSearch = (e: React.FormEvent) => {
 		e.preventDefault();
-		applyFilters();
+		// No need to do anything here since filtering is handled by useMemo
 	};
 
-	const loadMore = () => {
-		fetchProjects(false);
+	const clearFilters = () => {
+		setSearchQuery("");
+		setProjectType("all");
+		setProductType("all");
+		setSortBy("newest");
+		setBudgetRange("all");
 	};
 
 	const hasAvailableProjects = projects.length > 0;
@@ -216,7 +193,7 @@ const CreatorProjectDashboard: React.FC = () => {
 		<div className="container mx-auto px-4 py-8">
 			{hasAvailableProjects && (
 				<div className="flex flex-col space-y-6">
-					{/* Search and filter section - Matches the layout shown in the image */}
+					{/* Search and filter section */}
 					<div className="grid grid-cols-1 md:grid-cols-5 gap-4">
 						{/* Search input */}
 						<form onSubmit={handleSearch} className="relative md:col-span-1">
@@ -240,7 +217,6 @@ const CreatorProjectDashboard: React.FC = () => {
 									<SelectItem value="UGC Content Only">
 										UGC Content Only
 									</SelectItem>
-
 									<SelectItem value="Creator-Posted UGC">
 										Creator-Posted UGC
 									</SelectItem>
@@ -304,7 +280,8 @@ const CreatorProjectDashboard: React.FC = () => {
 	);
 
 	function renderProjectList() {
-		if (loading && projects.length === 0) {
+		// Initial loading state
+		if (isLoading) {
 			return (
 				<div className="flex flex-col items-center justify-center h-64">
 					<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500" />
@@ -313,37 +290,38 @@ const CreatorProjectDashboard: React.FC = () => {
 			);
 		}
 
+		// Error state
 		if (error) {
 			return (
 				<div className="text-center py-12">
-					<p className="text-red-500">{error}</p>
-					<Button className="mt-4" onClick={() => fetchProjects()}>
-						Try Again
+					<p className="text-red-500 mb-4">
+						{error instanceof Error ? error.message : "Failed to load projects"}
+					</p>
+					<Button onClick={() => refetch()} disabled={isRefetching}>
+						{isRefetching ? (
+							<div className="flex items-center gap-2">
+								<div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white" />
+								Retrying...
+							</div>
+						) : (
+							"Try Again"
+						)}
 					</Button>
 				</div>
 			);
 		}
 
+		// No projects found
 		if (filteredProjects.length === 0) {
 			return (
 				<div className="text-center py-12">
-					<p className="text-gray-500">
+					<p className="text-gray-500 mb-4">
 						{projects.length === 0
 							? "No projects found."
 							: "No projects match your filters."}
 					</p>
 					{projects.length > 0 && (
-						<Button
-							variant="outline"
-							className="mt-4"
-							onClick={() => {
-								setSearchQuery("");
-								setProjectType("all");
-								setProductType("all");
-								setSortBy("newest");
-								setBudgetRange("all");
-							}}
-						>
+						<Button variant="outline" onClick={clearFilters}>
 							Clear Filters
 						</Button>
 					)}
@@ -351,32 +329,24 @@ const CreatorProjectDashboard: React.FC = () => {
 			);
 		}
 
-		if (loading && projects.length > 0) {
-			return (
-				<>
-					<div className="relative">
-						<div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-lg">
-							<div className="flex flex-col items-center">
-								<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500" />
-								<p className="text-gray-500 mt-2">Updating projects...</p>
-							</div>
-						</div>
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mt-6 opacity-50">
-							{filteredProjects.map((project, index) => (
-								<ProjectCard
-									key={project.projectId || `project-${index}`}
-									project={project}
-								/>
-							))}
+		// Projects list with refresh indicator
+		return (
+			<div className="relative">
+				{/* Subtle loading overlay during refetch */}
+				{/* {isRefetching && (
+					<div className="absolute top-0 left-0 right-0 bg-blue-50 border-l-4 border-blue-400 p-2 z-10 rounded">
+						<div className="flex items-center">
+							<div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500 mr-2" />
+							<span className="text-blue-700 text-sm">
+								Refreshing projects...
+							</span>
 						</div>
 					</div>
-				</>
-			);
-		}
+				)} */}
 
-		return (
-			<>
-				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mt-6">
+				<div
+					className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mt-6 ${isRefetching ? "mt-16" : ""}`}
+				>
 					{filteredProjects.map((project, index) => (
 						<ProjectCard
 							key={project.projectId || `project-${index}`}
@@ -384,19 +354,7 @@ const CreatorProjectDashboard: React.FC = () => {
 						/>
 					))}
 				</div>
-
-				{hasMore && (
-					<div className="flex justify-center mt-8">
-						<Button variant="outline" onClick={loadMore} disabled={loading}>
-							{loading ? (
-								<div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary" />
-							) : (
-								"Load More"
-							)}
-						</Button>
-					</div>
-				)}
-			</>
+			</div>
 		);
 	}
 };

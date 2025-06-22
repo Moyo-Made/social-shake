@@ -11,6 +11,7 @@ import { BrandProfile } from "./RenderActionButton";
 import { useAuth } from "@/context/AuthContext";
 import { ProjectFormData } from "@/types/contestFormData";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 // Define types for our API responses
 interface ShippingAddress {
@@ -257,10 +258,7 @@ export default function DeliveryTracking({
 	creatorId: propCreatorId,
 	project,
 }: DeliveryTrackingProps) {
-	const [deliveryData, setDeliveryData] = useState<DeliveryData | null>(null);
-	const [loading, setLoading] = useState(true);
 	const [confirmModalOpen, setConfirmModalOpen] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	const [authCreatorId, setAuthCreatorId] = useState<string>("");
 	const [, setShippingAddress] = useState<ShippingAddress | null>(null);
 	const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
@@ -286,7 +284,6 @@ export default function DeliveryTracking({
 		socketRef.current = socket;
 
 		socket.on("connect", () => {
-			console.log("Creator connected to socket server");
 			// Subscribe to notifications for this creator
 			socket.emit("subscribe-creator-notifications", currentUser.uid);
 		});
@@ -302,7 +299,6 @@ export default function DeliveryTracking({
 				timestamp: string;
 				brandName?: string;
 			}) => {
-				console.log("Received delivery notification:", data);
 
 				// Add to notifications list
 				setNotifications((prev) => [data, ...prev]);
@@ -335,8 +331,7 @@ export default function DeliveryTracking({
 		);
 
 		// Listen for general project notifications
-		socket.on("project-notification", (data: any) => {
-			console.log("Received project notification:", data);
+		socket.on("project-notification", () => {
 			// Handle other project-related notifications
 		});
 
@@ -355,21 +350,14 @@ export default function DeliveryTracking({
 			const projectData = project; // This is the prop passed to the component
 
 			if (!projectData?.userId) {
-				console.log(
-					"No project userId available yet, project data:",
-					projectData
-				);
 				return;
 			}
-
-			console.log("Fetching brand profile for userId:", projectData.userId);
 
 			try {
 				const auth = getAuth();
 				const currentUser = auth.currentUser;
 
 				if (!currentUser) {
-					console.log("No authenticated user");
 					return;
 				}
 
@@ -387,10 +375,8 @@ export default function DeliveryTracking({
 
 				if (response.ok) {
 					const data = await response.json();
-					console.log("Brand profile fetched successfully:", data);
 					setBrandProfile(data);
 				} else {
-					console.log("Brand profile not found, setting default");
 					setBrandProfile({
 						id: projectData.userId,
 						userId: projectData.userId,
@@ -416,6 +402,7 @@ export default function DeliveryTracking({
 		if (project?.userId) {
 			fetchBrandProfile();
 		}
+	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [project?.userId]); // Depend on the prop project
 
 	// Use the prop creatorId if provided, otherwise use the auth creatorId
@@ -444,13 +431,11 @@ export default function DeliveryTracking({
 
 			if (response.ok) {
 				const addresses = await response.json();
-				console.log("Fetched addresses:", addresses);
 
 				const defaultAddress =
 					addresses.find((addr: any) => addr.isDefault) || addresses[0];
 
 				if (defaultAddress) {
-					console.log("Using address:", defaultAddress);
 
 					const addressData = {
 						addressLine1: defaultAddress.addressLine1,
@@ -480,331 +465,261 @@ export default function DeliveryTracking({
 		const unsubscribe = auth.onAuthStateChanged((user) => {
 			if (user) {
 				setAuthCreatorId(user.uid);
-				console.log("Auth user ID set:", user.uid);
 			} else {
 				setAuthCreatorId("");
-				console.log("No authenticated user");
 			}
 		});
 
 		return () => unsubscribe();
 	}, []);
 
-	console.log(
-		"DeliveryTracking component received - propCreatorId:",
-		propCreatorId,
-		"authCreatorId:",
-		authCreatorId,
-		"effectiveCreatorId:",
-		effectiveCreatorId,
-		"projectId:",
-		projectId
-	);
 
-	useEffect(() => {
-		const fetchDeliveryStatus = async () => {
-			// Clear any previous errors
-			setError(null);
+	const queryClient = useQueryClient();
 
-			// Check if we have the required IDs
+	const {
+		data: deliveryData,
+		isLoading: loading,
+		error: queryError,
+		refetch,
+	} = useQuery({
+		queryKey: ["deliveryStatus", effectiveCreatorId, projectId],
+		queryFn: async () => {
 			if (!effectiveCreatorId || !projectId) {
-				console.log("Waiting for required IDs...", {
-					effectiveCreatorId,
-					projectId,
+				throw new Error("Creator ID and Project ID are required");
+			}
+
+			const statusResult = await deliveryApi.getDeliveryStatus(
+				effectiveCreatorId,
+				projectId
+			);
+
+			const fetchedAddress = await fetchShippingAddress();
+
+			if (statusResult) {
+				// Create delivery data structure based on the status from brand API
+				const processedData: DeliveryData = {
+					id: effectiveCreatorId,
+					projectId: projectId,
+					userId: effectiveCreatorId,
+					currentStatus: statusResult.status || "pending_shipment",
+					trackingNumber: statusResult.trackingNumber,
+					shippingAddress: fetchedAddress || {
+						addressLine1: "No address found",
+						city: "N/A",
+						state: "N/A",
+						zipCode: "N/A",
+						country: "N/A",
+					},
+					statusHistory: [],
+					deliveryTime: "4-7 days",
+					productName: "Product Sample",
+					productQuantity: 1,
+					productType: "Sample Product",
+				};
+
+				// Generate status history based on current status
+				const now = Date.now() / 1000;
+				const statusHistory: StatusHistoryItem[] = [];
+
+				// Always add preparation step
+				statusHistory.push({
+					status: "preparation",
+					timestamp: { seconds: now - 86400 * 5 }, // 5 days ago
+					description: "The Brand is preparing your product package",
 				});
 
-				// Only set error if we've waited long enough for auth to resolve
-				if (authCreatorId === "" && !propCreatorId) {
-					// Still waiting for auth, don't show error yet
-					return;
-				}
-
-				if (!projectId) {
-					setError("Project ID is required");
-					setLoading(false);
-					return;
-				}
-
-				if (!effectiveCreatorId) {
-					setError("Creator ID is required - please ensure you are logged in");
-					setLoading(false);
-					return;
-				}
-			}
-
-			setLoading(true);
-
-			try {
-				console.log(
-					"Fetching status for creatorId:",
-					effectiveCreatorId,
-					"projectId:",
-					projectId
-				);
-
-				const statusResult = await deliveryApi.getDeliveryStatus(
-					effectiveCreatorId,
-					projectId
-				);
-				console.log("Status API result:", statusResult);
-
-				const fetchedAddress = await fetchShippingAddress();
-
-				if (statusResult) {
-					// Create delivery data structure based on the status from brand API
-					const processedData: DeliveryData = {
-						id: effectiveCreatorId,
-						projectId: projectId,
-						userId: effectiveCreatorId,
-						currentStatus: statusResult.status || "pending_shipment",
-						trackingNumber: statusResult.trackingNumber,
-						shippingAddress: fetchedAddress || {
-							addressLine1: "No address found",
-							city: "N/A",
-							state: "N/A",
-							zipCode: "N/A",
-							country: "N/A",
-						},
-						statusHistory: [],
-						deliveryTime: "4-7 days",
-						productName: "Product Sample",
-						productQuantity: 1,
-						productType: "Sample Product",
-					};
-
-					// Generate status history based on current status
-					const now = Date.now() / 1000;
-					const statusHistory: StatusHistoryItem[] = [];
-
-					// Always add preparation step
+				// Add shipped step if status is shipped or beyond
+				if (
+					["shipped", "delivered", "content_creation"].includes(
+						processedData.currentStatus
+					)
+				) {
 					statusHistory.push({
-						status: "preparation",
-						timestamp: { seconds: now - 86400 * 5 }, // 5 days ago
-						description: "The Brand is preparing your product package",
+						status: "shipped",
+						timestamp: { seconds: now - 86400 * 3 }, // 3 days ago
+						description: "Your product has been shipped",
 					});
 
-					// Add shipped step if status is shipped or beyond
-					if (
-						["shipped", "delivered", "content_creation"].includes(
-							processedData.currentStatus
-						)
-					) {
-						statusHistory.push({
-							status: "shipped",
-							timestamp: { seconds: now - 86400 * 3 }, // 3 days ago
-							description: "Your product has been shipped",
-						});
+					statusHistory.push({
+						status: "in_region",
+						timestamp: { seconds: now - 86400 * 2 }, // 2 days ago
+						description: "Your product has arrived in your region",
+					});
 
-						statusHistory.push({
-							status: "in_region",
-							timestamp: { seconds: now - 86400 * 2 }, // 2 days ago
-							description: "Your product has arrived in your region",
-						});
+					statusHistory.push({
+						status: "out_for_delivery",
+						timestamp: { seconds: now - 86400 }, // 1 day ago
+						description: "Your package is on a delivery vehicle",
+					});
 
-						statusHistory.push({
-							status: "out_for_delivery",
-							timestamp: { seconds: now - 86400 }, // 1 day ago
-							description: "Your package is on a delivery vehicle",
-						});
+					// Set shipped date
+					processedData.shippedDate = { seconds: now - 86400 * 3 };
 
-						// Set shipped date
-						processedData.shippedDate = { seconds: now - 86400 * 3 };
-
-						// Calculate estimated delivery
-						processedData.estimatedDeliveryDate = {
-							from: { seconds: now - 86400 },
-							to: { seconds: now + 86400 },
-						};
-					}
-
-					// Add delivered step ONLY if status is delivered or beyond
-					if (
-						["delivered", "content_creation"].includes(
-							processedData.currentStatus
-						)
-					) {
-						statusHistory.push({
-							status: "delivered",
-							timestamp: { seconds: statusResult.updatedAt || now }, // Use actual timestamp
-							description: "Package delivered and receipt confirmed",
-						});
-
-						processedData.receiptConfirmed = true;
-						processedData.actualDeliveryDate = {
-							seconds: statusResult.updatedAt || now,
-						};
-					}
-					// Add content creation step if applicable
-					if (processedData.currentStatus === "content_creation") {
-						statusHistory.push({
-							status: "content_creation",
-							timestamp: { seconds: now },
-							description: "Content creation period has begun",
-						});
-
-						processedData.contentCreationStarted = true;
-					}
-
-					processedData.statusHistory = statusHistory;
-
-					// Calculate content due date (14 days after estimated delivery)
-					if (processedData.estimatedDeliveryDate?.to) {
-						processedData.contentDueDate = {
-							seconds:
-								processedData.estimatedDeliveryDate.to.seconds +
-								14 * 24 * 60 * 60,
-						};
-					}
-
-					setDeliveryData(processedData);
-				} else {
-					setError("No delivery information found");
+					// Calculate estimated delivery
+					processedData.estimatedDeliveryDate = {
+						from: { seconds: now - 86400 },
+						to: { seconds: now + 86400 },
+					};
 				}
-			} catch (error) {
-				console.error("Error fetching delivery status:", error);
 
-				// Provide more specific error messages
-				if (error instanceof Error) {
-					if (error.message.includes("not authenticated")) {
-						setError("Please log in to view delivery information");
-					} else if (error.message.includes("404")) {
-						setError("No delivery information found for this project");
-					} else {
-						setError(`Failed to load delivery information: ${error.message}`);
-					}
-				} else {
-					setError("Failed to load delivery information");
+				// Add delivered step ONLY if status is delivered or beyond
+				if (
+					["delivered", "content_creation"].includes(
+						processedData.currentStatus
+					)
+				) {
+					statusHistory.push({
+						status: "delivered",
+						timestamp: { seconds: statusResult.updatedAt || now }, // Use actual timestamp
+						description: "Package delivered and receipt confirmed",
+					});
+
+					processedData.receiptConfirmed = true;
+					processedData.actualDeliveryDate = {
+						seconds: statusResult.updatedAt || now,
+					};
 				}
-			} finally {
-				setLoading(false);
+
+				// Add content creation step if applicable
+				if (processedData.currentStatus === "content_creation") {
+					statusHistory.push({
+						status: "content_creation",
+						timestamp: { seconds: now },
+						description: "Content creation period has begun",
+					});
+
+					processedData.contentCreationStarted = true;
+				}
+
+				processedData.statusHistory = statusHistory;
+
+				// Calculate content due date (14 days after estimated delivery)
+				if (processedData.estimatedDeliveryDate?.to) {
+					processedData.contentDueDate = {
+						seconds:
+							processedData.estimatedDeliveryDate.to.seconds +
+							14 * 24 * 60 * 60,
+					};
+				}
+
+				return processedData;
+			} else {
+				throw new Error("No delivery information found");
 			}
-		};
+		},
+		enabled: !!(effectiveCreatorId && projectId),
+		staleTime: 30000, // 30 seconds
+		gcTime: 5 * 60 * 1000, // 5 minutes
+		retry: (failureCount, error) => {
+			// Don't retry on authentication errors
+			if (
+				error instanceof Error &&
+				error.message.includes("not authenticated")
+			) {
+				return false;
+			}
+			// Retry up to 3 times for other errors
+			return failureCount < 3;
+		},
+	});
 
-		// Only fetch if we have both required IDs or if we're still waiting for auth
-		if (
-			(effectiveCreatorId && projectId) ||
-			(!propCreatorId && authCreatorId === "")
-		) {
-			fetchDeliveryStatus();
-		}
-	}, [effectiveCreatorId, projectId, authCreatorId, propCreatorId]);
+	// Convert query error to string for existing error handling
+	const error = queryError
+		? queryError instanceof Error
+			? queryError.message.includes("not authenticated")
+				? "Please log in to view delivery information"
+				: queryError.message.includes("No delivery information found")
+					? "No delivery information found for this project"
+					: `Failed to load delivery information: ${queryError.message}`
+			: "Failed to load delivery information"
+		: null;
 
-	const handleConfirmReceipt = async () => {
-		if (!effectiveCreatorId || !projectId || !deliveryData) return;
+	const confirmReceiptMutation = useMutation({
+		mutationFn: async () => {
+			if (!effectiveCreatorId || !projectId || !deliveryData) {
+				throw new Error("Missing required data");
+			}
 
-		setConfirmModalOpen(false);
-		setLoading(true);
-
-		try {
-			// First, confirm receipt in your existing system
 			const result = await deliveryApi.confirmProductReceipt(
 				effectiveCreatorId,
 				projectId
 			);
-
 			if (result.success) {
-				// Then notify the brand about the delivery confirmation
 				await deliveryApi.notifyBrandOfDelivery(effectiveCreatorId, projectId);
-
-				// Emit socket event to notify brand side (your existing code)
-				if (socketRef.current?.connected) {
-					socketRef.current.emit("delivery-status-updated", {
-						creatorId: effectiveCreatorId,
-						projectId: projectId,
-						status: "delivered",
-						trackingNumber: deliveryData.trackingNumber,
-						updatedAt: new Date().toISOString(),
-					});
-				}
-
-				// Update real-time statuses (your existing code)
-				setRealTimeStatuses((prev) => ({
-					...prev,
-					[projectId]: {
-						status: "delivered",
-						trackingNumber: deliveryData.trackingNumber,
-						updatedAt: new Date().toISOString(),
-					},
-				}));
-
-				// Update delivery data with confirmed receipt (your existing code)
-				setDeliveryData((prev) => {
-					if (!prev) return null;
-
-					return {
-						...prev,
-						receiptConfirmed: true,
-						currentStatus: "delivered",
-						actualDeliveryDate: { seconds: Date.now() / 1000 },
-						statusHistory: [
-							...(prev.statusHistory || []),
-							{
-								status: "delivered",
-								timestamp: { seconds: Date.now() / 1000 },
-								description: "Package delivered and receipt confirmed",
-							},
-						],
-					};
-				});
-
-				// Show success message
-				toast.success("Receipt confirmed and brand notified!");
 			}
-		} catch (error) {
+			return result;
+		},
+		onSuccess: () => {
+			// Invalidate and refetch delivery status
+			queryClient.invalidateQueries({
+				queryKey: ["deliveryStatus", effectiveCreatorId, projectId],
+			});
+
+			// Update real-time statuses and socket logic (keep existing)
+			if (socketRef.current?.connected) {
+				socketRef.current.emit("delivery-status-updated", {
+					creatorId: effectiveCreatorId,
+					projectId: projectId,
+					status: "delivered",
+					trackingNumber: deliveryData?.trackingNumber,
+					updatedAt: new Date().toISOString(),
+				});
+			}
+
+			setRealTimeStatuses((prev) => ({
+				...prev,
+				[projectId!]: {
+					status: "delivered",
+					trackingNumber: deliveryData?.trackingNumber,
+					updatedAt: new Date().toISOString(),
+				},
+			}));
+
+			toast.success("Receipt confirmed and brand notified!");
+		},
+		onError: (error) => {
 			console.error("Error confirming receipt:", error);
-			setError("Failed to confirm receipt");
 			toast.error("Failed to confirm receipt. Please try again.");
-		} finally {
-			setLoading(false);
-		}
-	};
+		},
+	});
 
-	const handleBeginContentCreation = async () => {
-		if (!effectiveCreatorId || !projectId || !deliveryData) return;
-
-		setLoading(true);
-
-		try {
-			const result = await deliveryApi.beginContentCreation(
+	const beginContentCreationMutation = useMutation({
+		mutationFn: async () => {
+			if (!effectiveCreatorId || !projectId) {
+				throw new Error("Missing required data");
+			}
+			return await deliveryApi.beginContentCreation(
 				effectiveCreatorId,
 				projectId
 			);
-			if (result.success) {
-				// Update real-time status immediately
-				setRealTimeStatuses((prev) => ({
-					...prev,
-					[projectId]: {
-						status: "content_creation",
-						trackingNumber: deliveryData.trackingNumber,
-						updatedAt: new Date().toISOString(),
-					},
-				}));
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({
+				queryKey: ["deliveryStatus", effectiveCreatorId, projectId],
+			});
 
-				// Update delivery data with content creation started
-				setDeliveryData((prev) => {
-					if (!prev) return null;
-
-					return {
-						...prev,
-						contentCreationStarted: true,
-						currentStatus: "content_creation",
-						statusHistory: [
-							...(prev.statusHistory || []),
-							{
-								status: "content_creation",
-								timestamp: { seconds: Date.now() / 1000 },
-								description: "Content creation period has begun",
-							},
-						],
-					};
-				});
-			}
-		} catch (error) {
+			// Update real-time status (keep existing logic)
+			setRealTimeStatuses((prev) => ({
+				...prev,
+				[projectId!]: {
+					status: "content_creation",
+					trackingNumber: deliveryData?.trackingNumber,
+					updatedAt: new Date().toISOString(),
+				},
+			}));
+		},
+		onError: (error) => {
 			console.error("Error beginning content creation:", error);
-			setError("Failed to begin content creation");
-		} finally {
-			setLoading(false);
-		}
+		},
+	});
+
+	const handleConfirmReceipt = async () => {
+		setConfirmModalOpen(false);
+		confirmReceiptMutation.mutate();
+	};
+
+	const handleBeginContentCreation = async () => {
+		beginContentCreationMutation.mutate();
 	};
 
 	const handleSendMessageToBrand = async () => {
@@ -819,23 +734,14 @@ export default function DeliveryTracking({
 		// Check if we have project data first
 		if (!projectData?.userId) {
 			alert("Project information is still loading. Please try again.");
-			console.log("Project data:", projectData); // Debug log
 			return;
 		}
 
 		// Make sure we have the brand profile data
 		if (!brandProfile) {
 			alert("Brand information is still loading. Please try again.");
-			console.log("Brand profile:", brandProfile); // Debug log
 			return;
 		}
-
-		console.log("Sending message with:", {
-			currentUserId: currentUser.uid,
-			brandId: brandProfile.userId,
-			brandProfile,
-			projectData,
-		});
 
 		try {
 			const response = await fetch("/api/createConversation", {
@@ -895,7 +801,7 @@ export default function DeliveryTracking({
 					{!effectiveCreatorId && (
 						<button
 							className="mt-4 bg-blue-500 text-white px-4 py-2 rounded"
-							onClick={() => window.location.reload()}
+							onClick={() => refetch()}
 						>
 							Refresh Page
 						</button>
@@ -1266,6 +1172,7 @@ export default function DeliveryTracking({
 							<button
 								className="mt-4 text-sm bg-green-700 text-white py-2 px-4 rounded-md"
 								onClick={handleBeginContentCreation}
+								disabled={beginContentCreationMutation.isPending}
 							>
 								Begin Creating Content
 							</button>
@@ -1422,6 +1329,7 @@ export default function DeliveryTracking({
 							<button
 								className="bg-orange-500 text-white py-2 px-6 rounded-md flex items-center"
 								onClick={handleConfirmReceipt}
+								disabled={confirmReceiptMutation.isPending}
 							>
 								Confirm Receipt
 								<Check size={18} className="ml-2" />

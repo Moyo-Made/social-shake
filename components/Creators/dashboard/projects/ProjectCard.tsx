@@ -1,18 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, {  useState } from "react";
 import Image from "next/image";
 import { ProjectFormData } from "@/types/contestFormData";
 import { format } from "date-fns";
 import RenderActionButtons from "./RenderActionButton";
 import { getProjectTypeIcon, getStatusInfo } from "@/types/projects";
-
-// Brand profile interface matching first component
-interface BrandProfile {
-	id?: string;
-	userId: string;
-	email?: string;
-	brandName: string;
-	logoUrl: string;
-}
+import { useQuery } from '@tanstack/react-query';
 
 interface ProjectCardProps {
 	project: ProjectFormData;
@@ -20,53 +12,33 @@ interface ProjectCardProps {
 
 export default function ProjectCard({ project }: ProjectCardProps) {
 	// Add state for brand profile
-	const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
 	const [, setBrandEmail] = useState<string>("");
 
 	// Add useEffect to fetch brand profile
-	useEffect(() => {
-		const fetchBrandProfile = async () => {
-			if (!project || !project.userId) return;
-
-			try {
-				// Skip if we already have this brand profile
-				if (brandProfile && brandProfile.userId === project.userId) {
-					return;
-				}
-
-				//  fetch from API
-				const response = await fetch(
-					`/api/admin/brand-approval?userId=${project.userId}`
-				);
-
-				if (response.ok) {
-					const data = await response.json();
-					setBrandProfile(data);
-					if (data.email) {
-						setBrandEmail(data.email);
-					}
-				} else {
-					// Handle 404 or other errors by setting a placeholder
-					setBrandProfile({
-						id: project.userId,
-						userId: project.userId,
-						email: "Unknown",
-						brandName: "Unknown Brand",
-						logoUrl: "",
-					});
-				}
-			} catch (error) {
-				console.error(
-					`Error fetching brand profile for userId ${project.userId}:`,
-					error
-				);
-			}
-		};
-
-		if (project) {
-			fetchBrandProfile();
-		}
-	});
+	const { data: brandProfile } = useQuery({
+		queryKey: ['brand-profile', project?.userId],
+		queryFn: async () => {
+		  const response = await fetch(`/api/admin/brand-approval?userId=${project.userId}`);
+		  
+		  if (!response.ok) {
+			// Return placeholder for 404 or other errors
+			return {
+			  id: project.userId,
+			  userId: project.userId,
+			  email: "Unknown",
+			  brandName: "Unknown Brand",
+			  logoUrl: "",
+			};
+		  }
+		  
+		  const data = await response.json();
+		  if (data.email) {
+			setBrandEmail(data.email);
+		  }
+		  return data;
+		},
+		enabled: !!project?.userId,
+	  });
 
 	// Function to get the appropriate date for the current status
 	const getActionDate = (project: ProjectFormData) => {
