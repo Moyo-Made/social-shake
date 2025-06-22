@@ -108,7 +108,9 @@ const defaultFormData: ProjectFormData = {
 	paymentAmount: null,
 	projectTitle: "",
 	brandEmail: "",
-	projectName: ""
+	projectName: "",
+	approvedVideos: 0,
+	totalVideos: 0
 };
 
 interface ProjectFormContextType {
