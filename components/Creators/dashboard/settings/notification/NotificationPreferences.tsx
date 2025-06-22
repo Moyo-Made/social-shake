@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { useAuth } from "@/context/AuthContext";
@@ -131,26 +131,21 @@ export default function NotificationPreferences() {
 		data: userSettings,
 		isLoading,
 		error,
-	} = useQuery({
+	} = useQuery<Record<string, boolean>, Error>({
 		queryKey: ['notificationSettings', currentUser?.uid],
 		queryFn: () => fetchNotificationSettings(currentUser!.uid),
 		enabled: !!currentUser,
 		staleTime: 5 * 60 * 1000, // 5 minutes
 		retry: 2,
-		onSuccess: (data) => {
-			// Update local state when data is fetched
-			setLocalEmailSettings(mergeSettingsWithDefaults(defaultEmailSettings, data));
-			setLocalDashboardSettings(mergeSettingsWithDefaults(defaultDashboardSettings, data));
-		},
 	});
 
 	// Mutation for saving notification settings
-	const savePreferencesMutation = useMutation({
+	const savePreferencesMutation = useMutation<void, Error, Record<string, boolean>>({
 		mutationFn: (settings: Record<string, boolean>) => 
 			saveNotificationSettings(currentUser!.uid, settings),
 		onSuccess: () => {
 			// Invalidate and refetch the notification settings
-			queryClient.invalidateQueries(['notificationSettings', currentUser?.uid]);
+			queryClient.invalidateQueries({ queryKey: ['notificationSettings', currentUser?.uid] });
 		},
 		onError: (error) => {
 			console.error("Error saving notification preferences:", error);
@@ -158,13 +153,13 @@ export default function NotificationPreferences() {
 		},
 	});
 
-	// Initialize local state when user settings are loaded
-	useState(() => {
+	// Update local state when user settings are loaded
+	useEffect(() => {
 		if (userSettings) {
 			setLocalEmailSettings(mergeSettingsWithDefaults(defaultEmailSettings, userSettings));
 			setLocalDashboardSettings(mergeSettingsWithDefaults(defaultDashboardSettings, userSettings));
 		}
-	});
+	}, [userSettings]);
 
 	const toggleEmailSetting = (id: string) => {
 		setLocalEmailSettings((prev) =>
@@ -217,7 +212,7 @@ export default function NotificationPreferences() {
 					Failed to load your notification preferences. Please try again.
 				</p>
 				<button
-					onClick={() => queryClient.invalidateQueries(['notificationSettings', currentUser?.uid])}
+					onClick={() => queryClient.invalidateQueries({ queryKey: ['notificationSettings', currentUser?.uid] })}
 					className="bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
 				>
 					Retry
@@ -305,10 +300,10 @@ export default function NotificationPreferences() {
 			<div className="mt-8 flex justify-end">
 				<button
 					onClick={savePreferences}
-					disabled={savePreferencesMutation.isLoading}
+					disabled={savePreferencesMutation.isPending}
 					className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2 px-6 rounded-lg transition-colors"
 				>
-					{savePreferencesMutation.isLoading ? "Saving..." : "Save Preferences"}
+					{savePreferencesMutation.isPending ? "Saving..." : "Save Preferences"}
 				</button>
 			</div>
 
