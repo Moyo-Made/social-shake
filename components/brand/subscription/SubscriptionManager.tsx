@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
 	Calendar,
 	AlertCircle,
@@ -27,12 +28,7 @@ interface SubscriptionManagerProps {
 const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
 	userId,
 }) => {
-	const [subscription, setSubscription] = useState<SubscriptionStatus | null>(
-		null
-	);
-	const [loading, setLoading] = useState(true);
-	const [actionLoading, setActionLoading] = useState<string | null>(null);
-	const [error, setError] = useState<string | null>(null);
+	const queryClient = useQueryClient();
 	const [success, setSuccess] = useState<string | null>(null);
 
 	const callAPI = async (action: string) => {
@@ -60,48 +56,53 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
 		}
 	};
 
-	const fetchSubscriptionStatus = async () => {
-		try {
-			setLoading(true);
-			setError(null);
-			const data = await callAPI("get_status");
-			setSubscription(data.subscription);
-		} catch (err) {
-			setError(
-				err instanceof Error ? err.message : "Failed to fetch subscription"
-			);
-		} finally {
-			setLoading(false);
-		}
-	};
+	// Query for subscription status
+	const {
+		data: subscription,
+		isLoading,
+		error,
+		refetch,
+	} = useQuery<SubscriptionStatus>({
+		queryKey: ["subscription", userId],
+		queryFn: () => callAPI("get_status").then((data) => data.subscription),
+		enabled: !!userId,
+		staleTime: 5 * 60 * 1000, // 5 minutes
+		gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+	});
 
-	const handleAction = async (action: string) => {
-		try {
-			setActionLoading(action);
-			setError(null);
-			setSuccess(null);
-
+	// Mutation for subscription actions
+	const subscriptionMutation = useMutation({
+		mutationFn: async (action: string) => {
+			const data = await callAPI(action);
+			return { action, data };
+		},
+		onSuccess: (result) => {
+			const { action, data } = result;
+			
 			if (action === "create_portal_session") {
-				const data = await callAPI(action);
 				window.open(data.portalUrl, "_blank");
 				return;
 			}
 
-			const data = await callAPI(action);
 			setSuccess(data.message);
+			
+			// Invalidate and refetch subscription data after successful action
+			queryClient.invalidateQueries({
+				queryKey: ["subscription", userId],
+			});
+			
+			// Clear success message after 5 seconds
+			setTimeout(() => setSuccess(null), 5000);
+		},
+		onError: () => {
+			// Error is handled by the mutation's error state
+		},
+	});
 
-			// Refresh subscription status after action
-			await fetchSubscriptionStatus();
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Action failed");
-		} finally {
-			setActionLoading(null);
-		}
+	const handleAction = (action: string) => {
+		setSuccess(null);
+		subscriptionMutation.mutate(action);
 	};
-
-	useEffect(() => {
-		fetchSubscriptionStatus();
-	}, [userId]);
 
 	const formatDate = (dateString: string) => {
 		return new Date(dateString).toLocaleDateString("en-US", {
@@ -127,7 +128,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
 	const isInTrial =
 		subscription?.trialEnd && new Date(subscription.trialEnd) > new Date();
 
-	if (loading) {
+	if (isLoading) {
 		return (
 			<div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
 				<div className="flex flex-col justify-center items-center ">
@@ -146,9 +147,11 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
 					<h3 className="text-lg font-semibold text-gray-900 mb-2">
 						Unable to load subscription
 					</h3>
-					<p className="text-gray-600 mb-4">{error}</p>
+					<p className="text-gray-600 mb-4">
+						{error instanceof Error ? error.message : "Failed to fetch subscription"}
+					</p>
 					<button
-						onClick={fetchSubscriptionStatus}
+						onClick={() => refetch()}
 						className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
 					>
 						Try Again
@@ -187,10 +190,14 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
 			{/* Content */}
 			<div className="p-6">
 				{/* Alerts */}
-				{error && (
+				{subscriptionMutation.error && (
 					<div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center">
 						<X className="w-5 h-5 text-red-500 mr-2" />
-						<span className="text-red-700">{error}</span>
+						<span className="text-red-700">
+							{subscriptionMutation.error instanceof Error 
+								? subscriptionMutation.error.message 
+								: "Action failed"}
+						</span>
 					</div>
 				)}
 
@@ -260,10 +267,10 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
 				<div className="flex flex-wrap gap-3">
 					<button
 						onClick={() => handleAction("create_portal_session")}
-						disabled={actionLoading === "create_portal_session"}
+						disabled={subscriptionMutation.isPending}
 						className="flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 					>
-						{actionLoading === "create_portal_session" ? (
+						{subscriptionMutation.isPending && subscriptionMutation.variables === "create_portal_session" ? (
 							<RefreshCw className="w-4 h-4 mr-2 animate-spin" />
 						) : (
 							<Settings className="w-4 h-4 mr-2" />
@@ -274,10 +281,10 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
 					{subscription?.cancelAtPeriodEnd ? (
 						<button
 							onClick={() => handleAction("reactivate")}
-							disabled={actionLoading === "reactivate"}
+							disabled={subscriptionMutation.isPending}
 							className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 						>
-							{actionLoading === "reactivate" ? (
+							{subscriptionMutation.isPending && subscriptionMutation.variables === "reactivate" ? (
 								<RefreshCw className="w-4 h-4 mr-2 animate-spin" />
 							) : (
 								<Check className="w-4 h-4 mr-2" />
@@ -287,10 +294,10 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
 					) : (
 						<button
 							onClick={() => handleAction("cancel")}
-							disabled={actionLoading === "cancel"}
+							disabled={subscriptionMutation.isPending}
 							className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 						>
-							{actionLoading === "cancel" ? (
+							{subscriptionMutation.isPending && subscriptionMutation.variables === "cancel" ? (
 								<RefreshCw className="w-4 h-4 mr-2 animate-spin" />
 							) : (
 								<X className="w-4 h-4 mr-2" />
@@ -300,12 +307,12 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
 					)}
 
 					<button
-						onClick={fetchSubscriptionStatus}
-						disabled={loading}
+						onClick={() => refetch()}
+						disabled={isLoading}
 						className="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 					>
 						<RefreshCw
-							className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`}
+							className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
 						/>
 						Refresh
 					</button>

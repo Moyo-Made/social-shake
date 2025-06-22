@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
 	Select,
 	SelectContent,
@@ -52,17 +53,171 @@ interface TabItem {
 	label: string;
 }
 
+// API functions
+const fetchBrandProfile = async (email: string): Promise<BrandProfileData> => {
+	const response = await fetch(
+		`/api/brand-profile?email=${encodeURIComponent(email)}`,
+		{
+			method: "GET",
+			headers: {
+				"Content-Type": "application/json",
+			},
+		}
+	);
+
+	if (!response.ok) {
+		const errorText = await response.text();
+		throw new Error("Failed to fetch brand profile: " + errorText);
+	}
+
+	const data = await response.json();
+
+	// Updated logic to prioritize flattened fields over the nested object
+	const socialMedia: SocialMedia = {
+		facebook: data["socialMedia.facebook"] || data.socialMedia?.facebook || "",
+		instagram: data["socialMedia.instagram"] || data.socialMedia?.instagram || "",
+		tiktok: data["socialMedia.tiktok"] || data.socialMedia?.tiktok || "",
+	};
+
+	return {
+		...data,
+		socialMedia,
+	} as BrandProfileData;
+};
+
+const updateBrandProfile = async (profileData: BrandProfileData): Promise<BrandProfileData> => {
+	const dataToSend = {
+		...profileData,
+		// Ensure socialMedia is an object, not individual dot-notation fields
+		socialMedia: {
+			facebook: profileData.socialMedia?.facebook || "",
+			instagram: profileData.socialMedia?.instagram || "",
+			tiktok: profileData.socialMedia?.tiktok || "",
+		},
+	};
+
+	const response = await fetch("/api/brand-profile", {
+		method: "PUT",
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify(dataToSend),
+	});
+
+	if (!response.ok) {
+		const errorData = await response.json();
+		throw new Error(errorData.error || "Failed to update profile");
+	}
+
+	return await response.json();
+};
+
+const uploadLogo = async (file: File, email: string): Promise<{ logoUrl: string }> => {
+	const uploadData = new FormData();
+	uploadData.append("logo", file);
+	uploadData.append("email", email);
+
+	const response = await fetch("/api/brand-profile", {
+		method: "POST",
+		body: uploadData,
+	});
+
+	if (!response.ok) {
+		const errorData = await response.json();
+		throw new Error(errorData.error || "Failed to upload logo");
+	}
+
+	const data = await response.json();
+	
+	if (!data.data?.logoUrl) {
+		throw new Error("Logo URL not found in response");
+	}
+
+	return { logoUrl: data.data.logoUrl };
+};
+
 const AccountSettings: React.FC = () => {
 	const { currentUser } = useAuth();
+	const queryClient = useQueryClient();
 	const [activeTab, setActiveTab] = useState<string>("account");
-	const [isLoading, setIsLoading] = useState<boolean>(true);
-	const [error, setError] = useState<string | null>(null);
-	const [successMessage, setSuccessMessage] = useState<string | null>(null);
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	const [profileData, setProfileData] = useState<BrandProfileData | null>(null);
 	const [formData, setFormData] = useState<BrandProfileData | null>(null);
 	const [imagePreview, setImagePreview] = useState<string | null>(null);
-	const [isSaving, setIsSaving] = useState(false);
+	const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+	// Query for fetching brand profile
+	const {
+		data: profileData,
+		isLoading,
+		error: queryError,
+		isError
+	} = useQuery({
+		queryKey: ["brandProfile", currentUser?.email],
+		queryFn: () => {
+			if (!currentUser?.email) {
+				throw new Error("User email is undefined");
+			}
+			return fetchBrandProfile(currentUser.email);
+		},
+		enabled: !!currentUser?.email,
+		staleTime: 5 * 60 * 1000, // 5 minutes
+		gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+	});
+
+	// Mutation for updating brand profile
+	const updateProfileMutation = useMutation({
+		mutationFn: updateBrandProfile,
+		onSuccess: (data) => {
+			// Update the cache with new data
+			queryClient.setQueryData(["brandProfile", currentUser?.email], data);
+			setSuccessMessage("Profile updated successfully");
+			
+			// Clear success message after 3 seconds
+			setTimeout(() => {
+				setSuccessMessage(null);
+			}, 3000);
+		},
+		onError: (error: Error) => {
+			console.error("Update profile error:", error);
+		},
+	});
+
+	// Mutation for uploading logo
+	const uploadLogoMutation = useMutation({
+		mutationFn: ({ file, email }: { file: File; email: string }) => 
+			uploadLogo(file, email),
+		onSuccess: (data) => {
+			// Update form data with new logo URL
+			setFormData((prevFormData) => ({
+				...prevFormData!,
+				logoUrl: data.logoUrl,
+			}));
+
+			// Clean up the preview
+			if (imagePreview) {
+				URL.revokeObjectURL(imagePreview);
+				setImagePreview(null);
+			}
+
+			setSuccessMessage("Logo uploaded successfully");
+
+			// Invalidate and refetch the profile data to get the latest logoUrl
+			queryClient.invalidateQueries({ queryKey: ["brandProfile", currentUser?.email] });
+			
+			setTimeout(() => {
+				setSuccessMessage(null);
+			}, 3000);
+		},
+		onError: (error: Error) => {
+			console.error("Upload logo error:", error);
+		},
+	});
+
+	// Initialize form data when profile data is loaded
+	useEffect(() => {
+		if (profileData && !formData) {
+			setFormData(profileData);
+		}
+	}, [profileData, formData]);
 
 	// Define available tabs
 	const tabs: TabItem[] = [
@@ -73,61 +228,6 @@ const AccountSettings: React.FC = () => {
 		{ id: "notifications", label: "Notifications & Alerts" },
 		{ id: "security", label: "Security & Privacy" },
 	];
-
-	useEffect(() => {
-		const fetchBrandProfile = async (): Promise<void> => {
-			if (!currentUser?.email) {
-				console.warn("No user email found");
-				setIsLoading(false);
-				return;
-			}
-
-			try {
-				console.log("Fetching brand profile for email:", currentUser.email);
-
-				const response = await fetch(
-					`/api/brand-profile?email=${encodeURIComponent(currentUser.email)}`,
-					{
-						method: "GET",
-						headers: {
-							"Content-Type": "application/json",
-						},
-					}
-				);
-
-				if (!response.ok) {
-					const errorText = await response.text();
-					throw new Error("Failed to fetch brand profile: " + errorText);
-				}
-
-				const data = await response.json();
-
-				// Updated logic to prioritize flattened fields over the nested object
-				const socialMedia: SocialMedia = {
-					facebook:
-						data["socialMedia.facebook"] || data.socialMedia?.facebook || "",
-					instagram:
-						data["socialMedia.instagram"] || data.socialMedia?.instagram || "",
-					tiktok: data["socialMedia.tiktok"] || data.socialMedia?.tiktok || "",
-				};
-
-				const profileData = {
-					...data,
-					socialMedia,
-				} as BrandProfileData;
-
-				setProfileData(profileData);
-				setFormData(profileData);
-			} catch (err) {
-				console.error("Detailed error fetching brand profile:", err);
-				setError(err instanceof Error ? err.message : "Failed to load profile");
-			} finally {
-				setIsLoading(false);
-			}
-		};
-
-		fetchBrandProfile();
-	}, [currentUser]);
 
 	const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const { name, value } = e.target;
@@ -159,114 +259,24 @@ const AccountSettings: React.FC = () => {
 	const handleSaveChanges = async () => {
 		if (!formData || !currentUser?.email) return;
 
-		setError(null);
-		setSuccessMessage(null);
-
-		// Make sure socialMedia is properly structured as an object
-		const dataToSend = {
+		const dataToSave = {
 			...formData,
 			email: currentUser.email,
-			// Ensure socialMedia is an object, not individual dot-notation fields
-			socialMedia: {
-				facebook: formData.socialMedia?.facebook || "",
-				instagram: formData.socialMedia?.instagram || "",
-				tiktok: formData.socialMedia?.tiktok || "",
-			},
 		};
 
-		try {
-			setIsSaving(true);
-			const response = await fetch("/api/brand-profile", {
-				method: "PUT",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(dataToSend),
-			});
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || "Failed to update profile");
-			}
-
-			setSuccessMessage("Profile updated successfully");
-			// Update the profile data with the new form data
-			setProfileData({ ...formData });
-
-			// Clear success message after 3 seconds
-			setTimeout(() => {
-				setSuccessMessage(null);
-			}, 3000);
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to update profile");
-		} finally {
-			setIsSaving(false);
-		}
+		updateProfileMutation.mutate(dataToSave);
 	};
 
 	const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-		if (!e.target.files || !e.target.files[0]) return;
+		if (!e.target.files || !e.target.files[0] || !currentUser?.email) return;
 
-		setError(null);
 		const file = e.target.files[0];
 
 		// Create a preview URL
 		const previewUrl = URL.createObjectURL(file);
 		setImagePreview(previewUrl);
 
-		// Show loading state
-		setIsLoading(true);
-
-		const uploadData = new FormData();
-		uploadData.append("logo", file);
-
-		// Add email which is required by the API
-		if (!currentUser?.email) {
-			setError("User email is required for uploading a logo");
-			setIsLoading(false);
-			return;
-		}
-
-		uploadData.append("email", currentUser.email);
-
-		try {
-			const response = await fetch("/api/brand-profile", {
-				method: "POST",
-				body: uploadData,
-			});
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || "Failed to upload logo");
-			}
-
-			const data = await response.json();
-
-			// Update form data with new logo URL
-			if (data.data && data.data.logoUrl) {
-				setFormData((prevFormData) => ({
-					...prevFormData!,
-					logoUrl: data.data.logoUrl,
-				}));
-				setSuccessMessage("Logo uploaded successfully");
-
-				// Clear the preview now that we have the actual URL
-				if (imagePreview) {
-					URL.revokeObjectURL(imagePreview);
-					setImagePreview(null);
-				}
-			} else {
-				throw new Error("Logo URL not found in response");
-			}
-		} catch (error) {
-			setError(
-				error instanceof Error
-					? error.message
-					: "Failed to upload logo. Please try again."
-			);
-		} finally {
-			setIsLoading(false);
-		}
+		uploadLogoMutation.mutate({ file, email: currentUser.email });
 	};
 
 	// Clean up object URLs when component unmounts
@@ -278,6 +288,7 @@ const AccountSettings: React.FC = () => {
 		};
 	}, [imagePreview]);
 
+	// Handle loading state
 	if (isLoading) {
 		return (
 			<div className="flex flex-col justify-center items-center h-screen">
@@ -286,6 +297,11 @@ const AccountSettings: React.FC = () => {
 			</div>
 		);
 	}
+
+	// Handle error state
+	const error = isError ? (queryError as Error)?.message : 
+		updateProfileMutation.error?.message || 
+		uploadLogoMutation.error?.message;
 
 	return (
 		<div className="flex flex-col md:flex-row w-full">
@@ -351,13 +367,15 @@ const AccountSettings: React.FC = () => {
 										htmlFor="logo-upload"
 										className="bg-black hover:bg-gray-800 text-white px-4 py-2 rounded-md inline-flex items-center cursor-pointer"
 									>
-										Upload Logo <span className="ml-2">↑</span>
+										{uploadLogoMutation.isPending ? "Uploading..." : "Upload Logo"} 
+										<span className="ml-2">↑</span>
 										<input
 											id="logo-upload"
 											type="file"
 											className="hidden"
 											accept="image/png,image/jpeg"
 											onChange={handleLogoUpload}
+											disabled={uploadLogoMutation.isPending}
 										/>
 									</label>
 									<p className="text-gray-500 text-sm mt-2">
@@ -536,9 +554,9 @@ const AccountSettings: React.FC = () => {
 							<Button
 								onClick={handleSaveChanges}
 								className="bg-[#FD5C02] hover:bg-orange-600 text-white px-6"
-								disabled={isSaving}
+								disabled={updateProfileMutation.isPending}
 							>
-								{isSaving ? "Saving..." : "Save Changes"}
+								{updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
 							</Button>
 						</div>
 					</div>

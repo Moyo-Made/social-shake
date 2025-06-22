@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
@@ -19,6 +20,7 @@ import { useAuth } from "@/context/AuthContext";
 import io, { Socket } from "socket.io-client";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/config/firebase";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 // Define types for our data
 interface ApprovedCreator {
@@ -129,220 +131,374 @@ interface ApprovedCreatorsProps {
 	projectId: string;
 }
 
-const ApprovedCreators: React.FC<ApprovedCreatorsProps> = ({ projectId }) => {
-	const [creators, setCreators] = useState<ApprovedCreator[]>([]);
-	const [loading, setLoading] = useState<boolean>(true);
-	const [updateLoading, setUpdateLoading] = useState<Record<string, boolean>>(
-		{}
-	);
-	const [trackingNumbers, setTrackingNumbers] = useState<
-		Record<string, string>
-	>({});
-	const router = useRouter();
-	const { currentUser } = useAuth();
-	const socketRef = useRef<Socket | null>(null);
+// API functions for TanStack Query
+const getAuthToken = async () => {
+	const auth = getAuth();
+	const currentUser = auth.currentUser;
+	if (!currentUser) throw new Error("User not authenticated");
+	return await currentUser.getIdToken();
+};
 
-	// Generic function to handle creator status (automatically tries POST then PUT)
-	const updateCreatorStatus = async (
-		creatorId: string,
-		status: string,
-		trackingNumber: string | null = null
-	) => {
-		const auth = getAuth();
-		const currentUser = auth.currentUser;
+const fetchApprovedCreators = async (
+	projectId: string
+): Promise<ApprovedCreator[]> => {
+	if (!projectId) throw new Error("Project ID is required");
 
-		if (!currentUser) {
-			throw new Error("User not authenticated");
+	const token = await getAuthToken();
+	const response = await fetch(
+		`/api/project-applications?projectId=${projectId}`,
+		{
+			headers: {
+				Authorization: `Bearer ${token}`,
+				"Content-Type": "application/json",
+			},
 		}
+	);
 
-		const token = await currentUser.getIdToken();
-		const updateData = {
-			creatorId,
-			projectId,
-			status,
-			trackingNumber,
+	if (!response.ok) {
+		const errorData = await response.json().catch(() => ({}));
+		throw new Error(
+			errorData.error || `Failed to fetch applications: ${response.statusText}`
+		);
+	}
+
+	const applications = await response.json();
+	const approvedApplications = applications.filter(
+		(app: any) => app.status === "approved"
+	);
+	const userIds = [
+		...new Set(approvedApplications.map((app: any) => app.userId)),
+	];
+	const creatorDataMap = new Map();
+
+	// Fetch all creator data in parallel
+	await Promise.all(
+		userIds.map(async (userId) => {
+			try {
+				const creatorRes = await fetch(
+					`/api/admin/creator-approval?userId=${userId}`,
+					{
+						headers: {
+							Authorization: `Bearer ${token}`,
+							"Content-Type": "application/json",
+						},
+					}
+				);
+
+				if (creatorRes.ok) {
+					const response = await creatorRes.json();
+					if (response.creators && response.creators.length > 0) {
+						creatorDataMap.set(userId, response.creators[0]);
+					}
+				}
+			} catch (err) {
+				console.error(
+					`Error fetching creator data for user ID ${userId}:`,
+					err
+				);
+			}
+		})
+	);
+
+	// Fetch saved status data for each creator
+	const statusDataMap = new Map();
+	await Promise.all(
+		userIds.map(async (userId) => {
+			try {
+				const statusRes = await fetch(
+					`/api/creator-status?creatorId=${userId}&projectId=${projectId}`,
+					{
+						headers: {
+							Authorization: `Bearer ${token}`,
+							"Content-Type": "application/json",
+						},
+					}
+				);
+
+				if (statusRes.ok) {
+					const statusData = await statusRes.json();
+					statusDataMap.set(userId, statusData);
+				}
+			} catch (err) {
+				console.error(`Error fetching status for user ID ${userId}:`, err);
+			}
+		})
+	);
+
+	// Transform approved applications with detailed creator data
+	return approvedApplications.map((app: any) => {
+		const creatorData = creatorDataMap.get(app.userId);
+		const statusData = statusDataMap.get(app.userId);
+
+		return {
+			id: app.userId,
+			applicationId: app.id,
+			creatorId: app.userId,
+			projectId: app.projectId,
+			currentStatus: statusData?.data?.status || "pending_shipment",
+			trackingNumber: statusData?.data?.trackingNumber || undefined,
+			createdAt: app.createdAt,
+			updatedAt: statusData?.data?.updatedAt || app.updatedAt,
+			creator: creatorData || {},
 		};
+	});
+};
 
-		// Try PUT first (update existing)
-		let response = await fetch("/api/creator-status", {
-			method: "PUT",
+const updateCreatorStatus = async ({
+	creatorId,
+	projectId,
+	status,
+	trackingNumber,
+}: {
+	creatorId: string;
+	projectId: string;
+	status: string;
+	trackingNumber?: string | null;
+}) => {
+	const token = await getAuthToken();
+	const updateData = { creatorId, projectId, status, trackingNumber };
+
+	// Try PUT first (update existing)
+	let response = await fetch("/api/creator-status", {
+		method: "PUT",
+		headers: {
+			Authorization: `Bearer ${token}`,
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify(updateData),
+	});
+
+	// If PUT fails with 404, try POST (create new)
+	if (!response.ok && response.status === 404) {
+		response = await fetch("/api/creator-status", {
+			method: "POST",
 			headers: {
 				Authorization: `Bearer ${token}`,
 				"Content-Type": "application/json",
 			},
 			body: JSON.stringify(updateData),
 		});
+	}
 
-		// If PUT fails with 404 (not found), try POST (create new)
-		if (!response.ok && response.status === 404) {
-			console.log("Status not found, creating new status...");
-			response = await fetch("/api/creator-status", {
-				method: "POST",
-				headers: {
-					Authorization: `Bearer ${token}`,
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(updateData),
-			});
-		}
+	if (!response.ok) {
+		const errorData = await response.json().catch(() => ({}));
+		throw new Error(
+			errorData.error || `Failed to update status: ${response.statusText}`
+		);
+	}
 
-		if (!response.ok) {
-			const errorData = await response.json().catch(() => ({}));
-			throw new Error(
-				errorData.error || `Failed to update status: ${response.statusText}`
-			);
-		}
+	return await response.json();
+};
 
-		return await response.json();
-	};
+const sendNotification = async ({
+	creatorId,
+	projectId,
+	status,
+	trackingNumber,
+	message,
+}: {
+	creatorId: string;
+	projectId: string;
+	status: string;
+	trackingNumber?: string;
+	message: string;
+}) => {
+	const token = await getAuthToken();
+	const response = await fetch("/api/notify-creator", {
+		method: "POST",
+		headers: {
+			Authorization: `Bearer ${token}`,
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({
+			creatorId,
+			projectId,
+			status,
+			trackingNumber,
+			message,
+		}),
+	});
 
-	// Function to fetch approved creators from applications endpoint
-	const fetchApprovedCreators = async () => {
-		if (!projectId) return toast.error("Project ID is required");
+	if (!response.ok) {
+		throw new Error("Failed to send notification");
+	}
 
-		try {
-			setLoading(true);
+	return await response.json();
+};
 
-			// Get the current user's authentication token
-			const auth = getAuth();
-			const currentUser = auth.currentUser;
+const createConversation = async ({
+	currentUserId,
+	creatorId,
+	userData,
+	creatorData,
+}: {
+	currentUserId: string;
+	creatorId: string;
+	userData: any;
+	creatorData: any;
+}) => {
+	const response = await fetch("/api/createConversation", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({
+			currentUserId,
+			creatorId,
+			userData,
+			creatorData,
+		}),
+	});
 
-			if (!currentUser) {
-				throw new Error("User not authenticated");
-			}
+	const data = await response.json();
 
-			const token = await currentUser.getIdToken();
-			const response = await fetch(
-				`/api/project-applications?projectId=${projectId}`,
-				{
-					headers: {
-						Authorization: `Bearer ${token}`,
-						"Content-Type": "application/json",
-					},
+	if (!response.ok) {
+		throw new Error(data.error || "Failed to handle conversation");
+	}
+
+	return data;
+};
+
+const ApprovedCreators: React.FC<ApprovedCreatorsProps> = ({ projectId }) => {
+	const [trackingNumbers, setTrackingNumbers] = useState<
+		Record<string, string>
+	>({});
+	const router = useRouter();
+	const { currentUser } = useAuth();
+	const socketRef = useRef<Socket | null>(null);
+	const queryClient = useQueryClient();
+
+	// Query for approved creators
+	const {
+		data: creators = [],
+		isLoading,
+		error,
+	} = useQuery({
+		queryKey: ["approvedCreators", projectId],
+		queryFn: () => fetchApprovedCreators(projectId),
+		enabled: !!projectId,
+		staleTime: 5 * 60 * 1000, // 5 minutes
+		gcTime: 10 * 60 * 1000, // 10 minutes
+	});
+
+	// Mutation for updating creator status
+	const statusMutation = useMutation({
+		mutationFn: updateCreatorStatus,
+		onSuccess: (data, variables) => {
+			queryClient.setQueryData(
+				["approvedCreators", projectId],
+				(oldData: ApprovedCreator[] | undefined) => {
+					if (!oldData) return oldData;
+					return oldData.map((creator) =>
+						creator.id === variables.creatorId
+							? {
+									...creator,
+									currentStatus: variables.status,
+									trackingNumber:
+										variables.trackingNumber || creator.trackingNumber,
+									updatedAt: new Date().toISOString(),
+								}
+							: creator
+					);
 				}
 			);
-
-			if (!response.ok) {
-				const errorData = await response.json().catch(() => ({}));
-				throw new Error(
-					errorData.error ||
-						`Failed to fetch applications: ${response.statusText}`
-				);
-			}
-
-			const applications = await response.json();
-
-			// Filter only approved applications
-			const approvedApplications = applications.filter(
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				(app: any) => app.status === "approved"
+			toast.success(
+				`Delivery status updated to ${getDisplayStatus(variables.status)}`
 			);
-
-			// Get unique user IDs from approved applications
-			const userIds = [
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				...new Set(approvedApplications.map((app: any) => app.userId)),
-			];
-			const creatorDataMap = new Map();
-
-			// Fetch all creator data in parallel
-			await Promise.all(
-				userIds.map(async (userId) => {
-					try {
-						const creatorRes = await fetch(
-							`/api/admin/creator-approval?userId=${userId}`,
-							{
-								headers: {
-									Authorization: `Bearer ${token}`,
-									"Content-Type": "application/json",
-								},
-							}
-						);
-
-						if (creatorRes.ok) {
-							const response = await creatorRes.json();
-
-							// Store the first creator from the response
-							if (response.creators && response.creators.length > 0) {
-								creatorDataMap.set(userId, response.creators[0]);
-							}
-						}
-					} catch (err) {
-						console.log("Error details:", err);
-						console.error(
-							`Error fetching creator data for user ID ${userId}:`,
-							err
-						);
-					}
-				})
-			);
-
-			// Fetch saved status data for each creator using consistent userId
-			const statusDataMap = new Map();
-			await Promise.all(
-				userIds.map(async (userId) => {
-					try {
-						const statusRes = await fetch(
-							`/api/creator-status?creatorId=${userId}&projectId=${projectId}`,
-							{
-								headers: {
-									Authorization: `Bearer ${token}`,
-									"Content-Type": "application/json",
-								},
-							}
-						);
-
-						if (statusRes.ok) {
-							const statusData = await statusRes.json();
-							statusDataMap.set(userId, statusData);
-						}
-					} catch (err) {
-						console.error(`Error fetching status for user ID ${userId}:`, err);
-					}
-				})
-			);
-
-			// Transform approved applications with detailed creator data
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const approvedCreators = approvedApplications.map((app: any) => {
-				const creatorData = creatorDataMap.get(app.userId);
-				const statusData = statusDataMap.get(app.userId);
-
-				return {
-					id: app.userId, // ✅ Use app.userId consistently
-					applicationId: app.id,
-					creatorId: app.userId, // ✅ Use app.userId consistently
-					projectId: app.projectId,
-					currentStatus: statusData?.data?.status || "pending_shipment",
-					trackingNumber: statusData?.data?.trackingNumber || undefined,
-					createdAt: app.createdAt,
-					updatedAt: statusData?.data?.updatedAt || app.updatedAt,
-					creator: creatorData || {},
-				};
+		},
+		onError: (error) => {
+			toast.error("Failed to update delivery status", {
+				description: error instanceof Error ? error.message : "Unknown error",
 			});
+		},
+	});
 
-			setCreators(approvedCreators);
+	// Mutation for saving tracking numbers
+	const trackingMutation = useMutation({
+		mutationFn: ({
+			creatorId,
+			trackingNumber,
+		}: {
+			creatorId: string;
+			trackingNumber: string;
+		}) =>
+			updateCreatorStatus({
+				creatorId,
+				projectId,
+				status: "shipped",
+				trackingNumber,
+			}),
+		onSuccess: (data, variables) => {
+			queryClient.setQueryData(
+				["approvedCreators", projectId],
+				(oldData: ApprovedCreator[] | undefined) => {
+					if (!oldData) return oldData;
+					return oldData.map((creator) =>
+						creator.id === variables.creatorId
+							? {
+									...creator,
+									trackingNumber: variables.trackingNumber,
+									updatedAt: new Date().toISOString(),
+								}
+							: creator
+					);
+				}
+			);
+			toast.success("Tracking number saved successfully");
+		},
+		onError: (error) => {
+			toast.error("Failed to save tracking number", {
+				description: error instanceof Error ? error.message : "Unknown error",
+			});
+		},
+	});
 
+	// Mutation for sending notifications
+	const notificationMutation = useMutation({
+		mutationFn: sendNotification,
+		onSuccess: (data, variables) => {
+			const creator = creators.find((c) => c.id === variables.creatorId);
+			if (creator) {
+				toast.success("Notification Sent", {
+					description: `${creator.creator?.firstName} ${creator.creator?.lastName} has been notified`,
+				});
+			}
+		},
+		onError: (error) => {
+			toast.error("Failed to notify creator", {
+				description: error instanceof Error ? error.message : "Unknown error",
+			});
+		},
+	});
+
+	// Mutation for creating conversations
+	const conversationMutation = useMutation({
+		mutationFn: createConversation,
+		onSuccess: (data) => {
+			router.push(
+				`/brand/dashboard/messages?conversation=${data.conversationId}`
+			);
+		},
+		onError: (error) => {
+			console.error("Error handling conversation:", error);
+			alert("Failed to open conversation. Please try again.");
+		},
+	});
+
+	// Initialize tracking numbers when creators data changes
+	useEffect(() => {
+		if (creators.length > 0) {
 			const initialTrackingNumbers: Record<string, string> = {};
-			approvedCreators.forEach(
-				(creator: { trackingNumber: string; id: string | number }) => {
-					if (creator.trackingNumber) {
-						initialTrackingNumbers[creator.id] = creator.trackingNumber;
-					}
+			creators.forEach((creator) => {
+				if (creator.trackingNumber) {
+					initialTrackingNumbers[creator.id] = creator.trackingNumber;
 				}
-			);
-			setTrackingNumbers(initialTrackingNumbers);
-		} catch (err) {
-			console.error("Error fetching approved creators:", err);
-			toast.error("Failed to load approved creators", {
-				description: err instanceof Error ? err.message : "Unknown error",
 			});
-		} finally {
-			setLoading(false);
+			setTrackingNumbers(initialTrackingNumbers);
 		}
-	};
+	}, [creators]);
 
-	// Add this useEffect after your existing fetchApprovedCreators useEffect
+	// Socket connection for real-time updates
 	useEffect(() => {
 		if (!currentUser?.uid) return;
 
@@ -358,19 +514,22 @@ const ApprovedCreators: React.FC<ApprovedCreatorsProps> = ({ projectId }) => {
 			socket.emit("subscribe-user", currentUser.uid);
 		});
 
-		// Add this listener for delivery status updates
 		socket.on("delivery-status-updated", (data) => {
 			if (data.projectId === projectId) {
-				setCreators((prevCreators) =>
-					prevCreators.map((c) =>
-						c.id === data.creatorId
-							? {
-									...c,
-									currentStatus: data.status,
-									updatedAt: data.updatedAt,
-								}
-							: c
-					)
+				queryClient.setQueryData(
+					["approvedCreators", projectId],
+					(oldData: ApprovedCreator[] | undefined) => {
+						if (!oldData) return oldData;
+						return oldData.map((creator) =>
+							creator.id === data.creatorId
+								? {
+										...creator,
+										currentStatus: data.status,
+										updatedAt: data.updatedAt,
+									}
+								: creator
+						);
+					}
 				);
 			}
 		});
@@ -381,7 +540,25 @@ const ApprovedCreators: React.FC<ApprovedCreatorsProps> = ({ projectId }) => {
 			}
 			socketRef.current = null;
 		};
-	}, [currentUser?.uid, projectId]);
+	}, [currentUser?.uid, projectId, queryClient]);
+
+	// Firestore listener
+	useEffect(() => {
+		const unsubscribe = onSnapshot(
+			doc(db, "projectCreatorStatus", projectId),
+			(doc) => {
+				const data = doc.data();
+				if (data?.status === "delivered") {
+					// Invalidate and refetch the query
+					queryClient.invalidateQueries({
+						queryKey: ["approvedCreators", projectId],
+					});
+				}
+			}
+		);
+
+		return () => unsubscribe();
+	}, [projectId, queryClient]);
 
 	const handleSendMessage = async (creator: Creator) => {
 		if (!currentUser) {
@@ -389,49 +566,21 @@ const ApprovedCreators: React.FC<ApprovedCreatorsProps> = ({ projectId }) => {
 			return;
 		}
 
-		try {
-			console.log("Starting conversation with creator:", creator.id);
-
-			const response = await fetch("/api/createConversation", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					currentUserId: currentUser.uid,
-					creatorId: creator.id,
-					userData: {
-						name: currentUser.displayName || "User",
-						avatar: currentUser.photoURL || "/icons/default-avatar.svg",
-						username: currentUser.email?.split("@")[0] || "",
-					},
-					creatorData: {
-						name:
-							`${creator.firstName} ${creator.lastName}`.trim() ||
-							creator.username,
-						avatar: creator.logoUrl || "/icons/default-avatar.svg",
-						username: creator.username,
-					},
-				}),
-			});
-
-			const data = await response.json();
-
-			if (!response.ok) {
-				throw new Error(data.error || "Failed to handle conversation");
-			}
-
-			// The endpoint returns conversationId for both new and existing conversations
-			console.log(
-				`Conversation ${response.status === 201 ? "created" : "found"}`
-			);
-			router.push(
-				`/brand/dashboard/messages?conversation=${data.conversationId}`
-			);
-		} catch (error) {
-			console.error("Error handling conversation:", error);
-			alert("Failed to open conversation. Please try again.");
-		}
+		conversationMutation.mutate({
+			currentUserId: currentUser.uid,
+			creatorId: creator.id,
+			userData: {
+				name: currentUser.displayName || "User",
+				avatar: currentUser.photoURL || "/icons/default-avatar.svg",
+				username: currentUser.email?.split("@")[0] || "",
+			},
+			creatorData: {
+				name:
+					`${creator.firstName} ${creator.lastName}`.trim() || creator.username,
+				avatar: creator.logoUrl || "/icons/default-avatar.svg",
+				username: creator.username,
+			},
+		});
 	};
 
 	const handleStatusChange = async (
@@ -439,54 +588,24 @@ const ApprovedCreators: React.FC<ApprovedCreatorsProps> = ({ projectId }) => {
 		newDisplayStatus: string
 	) => {
 		const newApiStatus = getApiStatus(newDisplayStatus);
-		setUpdateLoading((prev) => ({ ...prev, [creatorId]: true }));
+		statusMutation.mutate({
+			creatorId,
+			projectId,
+			status: newApiStatus,
+			trackingNumber:
+				newApiStatus === "shipped" ? trackingNumbers[creatorId] : null,
+		});
 
-		try {
-			// Use the generic update function that handles POST/PUT automatically
-			await updateCreatorStatus(
-				creatorId,
-				newApiStatus,
-				newApiStatus === "shipped" ? trackingNumbers[creatorId] : null
-			);
-
-			// If status is being changed away from "shipped", clear tracking number
-			if (newApiStatus !== "shipped") {
-				setTrackingNumbers((prev) => {
-					const updated = { ...prev };
-					delete updated[creatorId];
-					return updated;
-				});
-			}
-
-			// Update local state after successful API call
-			setCreators((prevCreators) =>
-				prevCreators.map((c) =>
-					c.id === creatorId
-						? {
-								...c,
-								currentStatus: newApiStatus,
-								trackingNumber:
-									newApiStatus === "shipped"
-										? trackingNumbers[creatorId]
-										: undefined,
-								updatedAt: new Date().toISOString(),
-							}
-						: c
-				)
-			);
-
-			toast.success(`Delivery status updated to ${newDisplayStatus}`);
-		} catch (error) {
-			console.error("Error updating status:", error);
-			toast.error("Failed to update delivery status", {
-				description: error instanceof Error ? error.message : "Unknown error",
+		// Clear tracking number if status is changed away from "shipped"
+		if (newApiStatus !== "shipped") {
+			setTrackingNumbers((prev) => {
+				const updated = { ...prev };
+				delete updated[creatorId];
+				return updated;
 			});
-		} finally {
-			setUpdateLoading((prev) => ({ ...prev, [creatorId]: false }));
 		}
 	};
 
-	// Add this new function to handle saving tracking numbers:
 	const saveTrackingNumber = async (creatorId: string) => {
 		const trackingNumber = trackingNumbers[creatorId]?.trim();
 
@@ -495,44 +614,13 @@ const ApprovedCreators: React.FC<ApprovedCreatorsProps> = ({ projectId }) => {
 			return;
 		}
 
-		setUpdateLoading((prev) => ({ ...prev, [`tracking-${creatorId}`]: true }));
-
-		try {
-			// Use the generic update function that handles POST/PUT automatically
-			await updateCreatorStatus(creatorId, "shipped", trackingNumber);
-
-			// Update local state after successful API call
-			setCreators((prevCreators) =>
-				prevCreators.map((c) =>
-					c.id === creatorId
-						? {
-								...c,
-								trackingNumber: trackingNumber,
-								updatedAt: new Date().toISOString(),
-							}
-						: c
-				)
-			);
-
-			toast.success("Tracking number saved successfully");
-		} catch (error) {
-			console.error("Error saving tracking number:", error);
-			toast.error("Failed to save tracking number", {
-				description: error instanceof Error ? error.message : "Unknown error",
-			});
-		} finally {
-			setUpdateLoading((prev) => ({
-				...prev,
-				[`tracking-${creatorId}`]: false,
-			}));
-		}
+		trackingMutation.mutate({ creatorId, trackingNumber });
 	};
 
 	const handleTrackingNumberChange = (
 		creatorId: string,
 		trackingNumber: string
 	) => {
-		// Only update local state - no API call
 		setTrackingNumbers((prev) => ({
 			...prev,
 			[creatorId]: trackingNumber,
@@ -540,62 +628,31 @@ const ApprovedCreators: React.FC<ApprovedCreatorsProps> = ({ projectId }) => {
 	};
 
 	const notifyCreator = async (creatorId: string) => {
-		try {
-			const auth = getAuth();
-			const currentUser = auth.currentUser;
+		const creator = creators.find((c) => c.id === creatorId);
+		if (!creator) {
+			toast.error("Creator not found");
+			return;
+		}
 
-			if (!currentUser) {
-				toast.error("User not authenticated");
-				return;
-			}
+		// Send notification via API
+		notificationMutation.mutate({
+			creatorId,
+			projectId,
+			status: creator.currentStatus,
+			trackingNumber: creator.trackingNumber,
+			message: `Your delivery status has been updated to ${getDisplayStatus(creator.currentStatus)}`,
+		});
 
-			const creator = creators.find((c) => c.id === creatorId);
-			if (!creator) {
-				throw new Error("Creator not found");
-			}
-
-			const token = await currentUser.getIdToken();
-
-			// Call your notification API endpoint
-			const response = await fetch("/api/notify-creator", {
-				method: "POST",
-				headers: {
-					Authorization: `Bearer ${token}`,
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					creatorId: creatorId,
-					projectId: projectId,
-					status: creator.currentStatus,
-					trackingNumber: creator.trackingNumber,
-					message: `Your delivery status has been updated to ${getDisplayStatus(creator.currentStatus)}`,
-				}),
-			});
-
-			if (!response.ok) {
-				throw new Error("Failed to send notification");
-			}
-
-			// Emit socket event for real-time notification
-			if (socketRef.current?.connected) {
-				socketRef.current.emit("send-delivery-notification", {
-					creatorId: creatorId,
-					projectId: projectId,
-					status: creator.currentStatus,
-					trackingNumber: creator.trackingNumber,
-					message: `Your delivery status has been updated to ${getDisplayStatus(creator.currentStatus)}`,
-					timestamp: new Date().toISOString(),
-					brandName: currentUser.displayName || "Brand", // Add brand info
-				});
-			}
-
-			toast.success("Notification Sent", {
-				description: `${creator.creator?.firstName} ${creator.creator?.lastName} has been notified`,
-			});
-		} catch (error) {
-			console.error("Error notifying creator:", error);
-			toast.error("Failed to notify creator", {
-				description: error instanceof Error ? error.message : "Unknown error",
+		// Send real-time notification via socket
+		if (socketRef.current?.connected && currentUser) {
+			socketRef.current.emit("send-delivery-notification", {
+				creatorId,
+				projectId,
+				status: creator.currentStatus,
+				trackingNumber: creator.trackingNumber,
+				message: `Your delivery status has been updated to ${getDisplayStatus(creator.currentStatus)}`,
+				timestamp: new Date().toISOString(),
+				brandName: currentUser.displayName || "Brand",
 			});
 		}
 	};
@@ -654,31 +711,22 @@ const ApprovedCreators: React.FC<ApprovedCreatorsProps> = ({ projectId }) => {
 		}
 	};
 
-	// Initialize data on component mount
-	useEffect(() => {
-		fetchApprovedCreators();
-	}, [projectId]);
-
-	useEffect(() => {
-		const unsubscribe = onSnapshot(
-			doc(db, "projectCreatorStatus", projectId),
-			(doc) => {
-				const data = doc.data();
-				// Update UI based on project status changes
-				if (data?.status === "delivered") {
-					// Handle status update
-				}
-			}
-		);
-
-		return () => unsubscribe();
-	}, [projectId]);
-
-	if (loading) {
+	if (isLoading) {
 		return (
 			<div className="flex flex-col items-center justify-center h-64">
-				<Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
-				<p className="mt-4 text-gray-600">Loading approved creators...</p>
+				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+				<p className="text-gray-600">Loading delivery information...</p>
+			</div>
+		);
+	}
+
+	if (error) {
+		return (
+			<div className="text-center py-12 bg-red-50 rounded-lg">
+				<p className="text-red-500">
+					Error loading approved creators:{" "}
+					{error instanceof Error ? error.message : "Unknown error"}
+				</p>
 			</div>
 		);
 	}
@@ -724,9 +772,14 @@ const ApprovedCreators: React.FC<ApprovedCreatorsProps> = ({ projectId }) => {
 										onClick={() =>
 											creator?.creator && handleSendMessage(creator.creator)
 										}
-										className="inline-flex items-center mt-2 px-3 py-1 bg-black text-white text-xs rounded-full hover:bg-gray-800 transition-colors"
+										disabled={conversationMutation.isPending}
+										className="inline-flex items-center mt-2 px-3 py-1 bg-black text-white text-xs rounded-full hover:bg-gray-800 transition-colors disabled:opacity-50"
 									>
-										<span className="mr-1">Message Creator</span>
+										<span className="mr-1">
+											{conversationMutation.isPending
+												? "Loading..."
+												: "Message Creator"}
+										</span>
 										<Image
 											src="/icons/messageIcon.svg"
 											alt="Message Icon"
@@ -756,7 +809,7 @@ const ApprovedCreators: React.FC<ApprovedCreatorsProps> = ({ projectId }) => {
 										handleStatusChange(creator.id, value)
 									}
 									disabled={
-										updateLoading[creator.id] ||
+										statusMutation.isPending ||
 										creator.currentStatus === "delivered"
 									}
 								>
@@ -802,12 +855,12 @@ const ApprovedCreators: React.FC<ApprovedCreatorsProps> = ({ projectId }) => {
 										<Button
 											onClick={() => saveTrackingNumber(creator.id)}
 											disabled={
-												updateLoading[`tracking-${creator.id}`] ||
+												trackingMutation.isPending ||
 												!trackingNumbers[creator.id]?.trim()
 											}
 											className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md disabled:bg-gray-300 disabled:cursor-not-allowed"
 										>
-											{updateLoading[`tracking-${creator.id}`] ? (
+											{trackingMutation.isPending ? (
 												<Loader2 className="w-4 h-4 animate-spin" />
 											) : (
 												"Save"
@@ -831,11 +884,15 @@ const ApprovedCreators: React.FC<ApprovedCreatorsProps> = ({ projectId }) => {
 							className="w-full bg-orange-500 hover:bg-orange-600 text-white disabled:bg-gray-300"
 							onClick={() => notifyCreator(creator.id)}
 							disabled={
-								updateLoading[creator.id] ||
+								notificationMutation.isPending ||
 								creator.currentStatus === "delivered"
 							}
 						>
-							<span>Notify Creator</span>
+							<span>
+								{notificationMutation.isPending
+									? "Sending..."
+									: "Notify Creator"}
+							</span>
 							<Mail className="ml-2 h-4 w-4" />
 						</Button>
 					</CardFooter>

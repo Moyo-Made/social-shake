@@ -21,9 +21,9 @@ export default function SecurityPrivacySettings({
 	const [currentPassword, setCurrentPassword] = useState("");
 	const [newPassword, setNewPassword] = useState("");
 	const [confirmPassword, setConfirmPassword] = useState("");
-	const [twoFactorMethod, setTwoFactorMethod] = useState("email");
+	// const [twoFactorMethod, setTwoFactorMethod] = useState("email");
 	const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
-	const [isSubmitting, setIsSubmitting] = useState(false);
+	// const [isSubmitting, setIsSubmitting] = useState(false);
 	const [passwordErrors, setPasswordErrors] = useState({
 		current: "",
 		new: "",
@@ -120,42 +120,42 @@ export default function SecurityPrivacySettings({
 	};
 
 	// Handle 2FA setting change
-	const handleTwoFactorUpdate = async () => {
-		setIsSubmitting(true);
+	// const handleTwoFactorUpdate = async () => {
+	// 	setIsSubmitting(true);
 
-		try {
-			const response = await fetch("/api/user/two-factor", {
-				method: "PUT",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					email: userEmail,
-					twoFactorMethod: twoFactorMethod === "none" ? null : twoFactorMethod,
-				}),
-			});
+	// 	try {
+	// 		const response = await fetch("/api/user/two-factor", {
+	// 			method: "PUT",
+	// 			headers: {
+	// 				"Content-Type": "application/json",
+	// 			},
+	// 			body: JSON.stringify({
+	// 				email: userEmail,
+	// 				twoFactorMethod: twoFactorMethod === "none" ? null : twoFactorMethod,
+	// 			}),
+	// 		});
 
-			const data = await response.json();
+	// 		const data = await response.json();
 
-			if (!response.ok) {
-				throw new Error(data.error || "Failed to update two-factor settings");
-			}
+	// 		if (!response.ok) {
+	// 			throw new Error(data.error || "Failed to update two-factor settings");
+	// 		}
 
-			toast(
-				twoFactorMethod === "none"
-					? "Two-factor authentication has been disabled."
-					: `Two-factor authentication method set to ${twoFactorMethod}.`
-			);
-		} catch (error) {
-			toast(
-				error instanceof Error
-					? error.message
-					: "Failed to update two-factor settings"
-			);
-		} finally {
-			setIsSubmitting(false);
-		}
-	};
+	// 		toast(
+	// 			twoFactorMethod === "none"
+	// 				? "Two-factor authentication has been disabled."
+	// 				: `Two-factor authentication method set to ${twoFactorMethod}.`
+	// 		);
+	// 	} catch (error) {
+	// 		toast(
+	// 			error instanceof Error
+	// 				? error.message
+	// 				: "Failed to update two-factor settings"
+	// 		);
+	// 	} finally {
+	// 		setIsSubmitting(false);
+	// 	}
+	// };
 
 	// Load user's current 2FA setting
 	useEffect(() => {
@@ -167,9 +167,9 @@ export default function SecurityPrivacySettings({
 				const data = await response.json();
 
 				if (response.ok && data.twoFactorMethod) {
-					setTwoFactorMethod(data.twoFactorMethod);
+					// setTwoFactorMethod(data.twoFactorMethod);
 				} else {
-					setTwoFactorMethod("none");
+					// setTwoFactorMethod("none");
 				}
 			} catch (error) {
 				console.error("Failed to fetch user settings:", error);
@@ -263,7 +263,7 @@ export default function SecurityPrivacySettings({
 			</div>
 
 			{/* Two-Factor Authentication Section */}
-			<div className="space-y-4">
+			{/* <div className="space-y-4">
 				<div>
 					<h2 className="text-lg font-semibold">Two-Factor Authentication (2FA)</h2>
 					<p className="text-gray-500">
@@ -271,9 +271,9 @@ export default function SecurityPrivacySettings({
 					</p>
 				</div>
 
-				<div className="space-y-2">
+				<div className="space-y-2"> */}
 					{/* No 2FA */}
-					<div
+					{/* <div
 						className="flex items-center space-x-2"
 						onClick={() => setTwoFactorMethod("none")}
 					>
@@ -308,10 +308,10 @@ export default function SecurityPrivacySettings({
 								only.
 							</p>
 						</div>
-					</div>
+					</div> */}
 
 					{/* Email Authentication */}
-					<div
+					{/* <div
 						className="flex items-center space-x-2"
 						onClick={() => setTwoFactorMethod("email")}
 					>
@@ -345,10 +345,10 @@ export default function SecurityPrivacySettings({
 								Receive a verification code via Email when logging in.
 							</p>
 						</div>
-					</div>
+					</div> */}
 
 					{/* Authenticator App */}
-					<div
+					{/* <div
 						className="flex items-center space-x-2"
 						onClick={() => setTwoFactorMethod("app")}
 					>
@@ -382,17 +382,17 @@ export default function SecurityPrivacySettings({
 								Use an authenticator app like Google Authenticator or Authy
 							</p>
 						</div>
-					</div>
-				</div>
+					</div> */}
+				{/* </div> */}
 
-				<Button
+				{/* <Button
 					onClick={handleTwoFactorUpdate}
 					className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md transition"
 					disabled={isSubmitting}
 				>
 					{isSubmitting ? "Saving..." : "Save Changes"}
-				</Button>
-			</div>
+				</Button> */}
+			{/* </div> */}
 		</div>
 	);
 }

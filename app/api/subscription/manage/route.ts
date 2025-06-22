@@ -9,6 +9,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
 
 // Types
 interface SubscriptionData {
+	amount: number;
 	id: string;
 	userId: string;
 	stripeSubscriptionId: string;
@@ -201,7 +202,10 @@ async function getSubscriptionStatus(subscriptionData: SubscriptionData) {
 	try {
 		// Get latest subscription data from Stripe
 		const subscriptionResponse = await stripe.subscriptions.retrieve(
-			subscriptionData.stripeSubscriptionId
+			subscriptionData.stripeSubscriptionId,
+			{
+				expand: ['items.data.price'] // Ensure price data is expanded
+			}
 		) as unknown as StripeSubscriptionWithPeriods;
 
 		console.log("Stripe subscription raw data:", {
@@ -211,7 +215,16 @@ async function getSubscriptionStatus(subscriptionData: SubscriptionData) {
 			current_period_end: subscriptionResponse.current_period_end,
 			trial_start: subscriptionResponse.trial_start,
 			trial_end: subscriptionResponse.trial_end,
-			cancel_at_period_end: subscriptionResponse.cancel_at_period_end
+			cancel_at_period_end: subscriptionResponse.cancel_at_period_end,
+			// Add detailed items debugging
+			items_count: subscriptionResponse.items?.data?.length || 0,
+			items_data: subscriptionResponse.items?.data?.map(item => ({
+				id: item.id,
+				price_id: item.price?.id,
+				unit_amount: item.price?.unit_amount,
+				currency: item.price?.currency,
+				recurring: item.price?.recurring
+			}))
 		});
 
 		const currentPeriodStartISO = timestampToISO(subscriptionResponse.current_period_start);
@@ -255,6 +268,43 @@ async function getSubscriptionStatus(subscriptionData: SubscriptionData) {
 			console.warn("Using 30-day fallback for period end");
 		}
 
+		// Better amount calculation with detailed logging
+		let subscriptionAmount = 0;
+		let amountSource = "";
+		
+		if (subscriptionResponse.items?.data?.length > 0) {
+			const firstItem = subscriptionResponse.items.data[0];
+			console.log("First subscription item:", {
+				id: firstItem.id,
+				price: firstItem.price,
+				unit_amount: firstItem.price?.unit_amount
+			});
+			
+			if (firstItem.price?.unit_amount && firstItem.price.unit_amount > 0) {
+				subscriptionAmount = firstItem.price.unit_amount / 100;
+				amountSource = "stripe";
+				console.log(`Found subscription amount from Stripe: ${subscriptionAmount}`);
+			} else {
+				console.warn("No unit_amount found in first item price or unit_amount is 0");
+			}
+		} else {
+			console.warn("No subscription items found");
+		}
+
+		// Fallback to database stored amount if Stripe doesn't have it
+		if (subscriptionAmount === 0 && subscriptionData.amount && subscriptionData.amount > 0) {
+			subscriptionAmount = subscriptionData.amount;
+			amountSource = "database";
+			console.log(`Using stored amount from database: ${subscriptionAmount}`);
+		}
+
+		// Last resort fallback (but log it as an error)
+		if (subscriptionAmount === 0) {
+			subscriptionAmount = 99; // Your current fallback
+			amountSource = "hardcoded";
+			console.error("No subscription amount found from Stripe or database, using fallback of 99");
+		}
+
 		const subscriptionStatus: SubscriptionStatus = {
 			id: subscriptionResponse.id,
 			status: subscriptionResponse.status,
@@ -263,13 +313,21 @@ async function getSubscriptionStatus(subscriptionData: SubscriptionData) {
 			cancelAtPeriodEnd: subscriptionResponse.cancel_at_period_end || false,
 			trialStart: trialStartISO,
 			trialEnd: trialEndISO,
-			amount: subscriptionResponse.items.data[0]?.price?.unit_amount ? 
-				subscriptionResponse.items.data[0].price.unit_amount / 100 : 99,
+			amount: subscriptionAmount,
 		};
 
 		return NextResponse.json({
 			success: true,
 			subscription: subscriptionStatus,
+			// Add debug info to help troubleshoot
+			debug: {
+				stripeItemsCount: subscriptionResponse.items?.data?.length || 0,
+				foundAmountInStripe: subscriptionResponse.items?.data?.[0]?.price?.unit_amount ? true : false,
+				amountSource: amountSource,
+				stripeUnitAmount: subscriptionResponse.items?.data?.[0]?.price?.unit_amount,
+				databaseAmount: subscriptionData.amount,
+				finalAmount: subscriptionAmount
+			}
 		});
 
 	} catch (error) {

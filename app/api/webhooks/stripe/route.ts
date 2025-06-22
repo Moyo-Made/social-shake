@@ -229,6 +229,16 @@ async function handleSubscriptionCreated(event: Stripe.Event) {
 	}
 
 	try {
+		// Get subscription amount from Stripe
+		let subscriptionAmount = 0;
+		let planName = '';
+		
+		if (subscription.items.data.length > 0) {
+			const subscriptionItem = subscription.items.data[0];
+			subscriptionAmount = subscriptionItem.price.unit_amount || 0;
+			planName = subscriptionItem.price.nickname || subscriptionItem.price.id;
+		}
+
 		// Update subscription record in database
 		const subscriptionQuery = await adminDb
 			.collection("subscriptions")
@@ -246,6 +256,14 @@ async function handleSubscriptionCreated(event: Stripe.Event) {
 		await subscriptionDoc.ref.update({
 			stripeSubscriptionId: subscription.id,
 			status: subscription.status, // "trialing" during free trial
+			// NEW: Store subscription amount and plan info
+			subscriptionAmount: subscriptionAmount / 100, // Convert from cents to dollars
+			subscriptionAmountCents: subscriptionAmount, // Keep cents version too
+			planName: planName,
+			currency: subscription.items.data[0]?.price.currency || 'usd',
+			interval: subscription.items.data[0]?.price.recurring?.interval || 'month',
+			intervalCount: subscription.items.data[0]?.price.recurring?.interval_count || 1,
+			// END NEW
 			trialStart: subscription.trial_start
 				? new Date(subscription.trial_start * 1000).toISOString()
 				: null,
@@ -261,7 +279,7 @@ async function handleSubscriptionCreated(event: Stripe.Event) {
 			updatedAt: new Date().toISOString(),
 		});
 
-		// Update user record
+		// Update user record (also store amount here for easy access)
 		await adminDb
 			.collection("users")
 			.doc(userId)
@@ -269,23 +287,29 @@ async function handleSubscriptionCreated(event: Stripe.Event) {
 				subscriptionStatus: subscription.status,
 				stripeSubscriptionId: subscription.id,
 				subscriptionTrial: subscription.status === "trialing",
+				// NEW: Store subscription amount in user record too
+				subscriptionAmount: subscriptionAmount / 100,
+				subscriptionPlan: planName,
+				// END NEW
 				trialEndDate: subscription.trial_end
 					? new Date(subscription.trial_end * 1000).toISOString()
 					: null,
 				updatedAt: new Date().toISOString(),
 			});
 
-		// Send welcome notification
+		// Send welcome notification (updated to include amount)
 		await sendNotification(userId, {
 			type: "subscription_trial_started",
 			message:
-				"Welcome to Social Shake Pro! Your 7-day free trial has started. You'll be charged $99 on " +
+				"Welcome to Social Shake Pro! Your 7-day free trial has started. You'll be charged $" +
+				(subscriptionAmount / 100).toFixed(2) +
+				" on " +
 				(subscription.trial_end
 					? new Date(subscription.trial_end * 1000).toLocaleDateString()
 					: "trial end"),
 		});
 
-		console.log(`Subscription created for user ${userId}: ${subscription.id}`);
+		console.log(`Subscription created for user ${userId}: ${subscription.id} - Amount: $${subscriptionAmount / 100}`);
 	} catch (error) {
 		console.error("Error handling subscription created:", error);
 		throw error;
@@ -340,10 +364,23 @@ async function handleSubscriptionPaymentSucceeded(event: Stripe.Event) {
 
 		if (!subscriptionQuery.empty) {
 			const subscriptionDoc = subscriptionQuery.docs[0];
+			const subscriptionData = subscriptionDoc.data();
+			
+			// Verify the payment amount matches expected subscription amount
+			const expectedAmount = subscriptionData.subscriptionAmountCents || 0;
+			const actualAmount = invoice.amount_paid;
+			
+			if (expectedAmount !== actualAmount) {
+				console.warn(`Amount mismatch for subscription ${subscription.id}. Expected: ${expectedAmount}, Actual: ${actualAmount}`);
+			}
+			
 			await subscriptionDoc.ref.update({
 				status: subscription.status, // Should be "active" now
 				lastPaymentDate: new Date().toISOString(),
 				lastPaymentAmount: invoice.amount_paid / 100,
+				// NEW: Track if this payment amount matches subscription amount
+				lastPaymentAmountMatches: expectedAmount === actualAmount,
+				// END NEW
 				nextPaymentDate: new Date(
 					subscription.current_period_end * 1000
 				).toISOString(),

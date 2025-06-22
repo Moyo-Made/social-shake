@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
 	Download,
 	Grid3X3,
@@ -86,19 +87,145 @@ interface DeliveredOrdersLibraryProps {
 	className?: string;
 }
 
+// Query keys
+const QUERY_KEYS = {
+	deliveredOrders: (userId: string) => ["delivered-orders", userId],
+} as const;
+
+// API functions
+const fetchDeliveredOrders = async (
+	userId: string
+): Promise<{ orders: DeliveredOrder[] }> => {
+	const response = await fetch(`/api/orders/delivered?userId=${userId}`);
+
+	if (!response.ok) {
+		throw new Error("Failed to fetch delivered orders");
+	}
+
+	return response.json();
+};
+
+const approveVideo = async ({
+	paymentId,
+	deliverableId,
+	approveAll = false,
+}: {
+	paymentId: string;
+	deliverableId?: string;
+	approveAll?: boolean;
+}) => {
+	const response = await fetch("/api/payments/approve-video", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			paymentId,
+			action: "approve",
+			approveAll,
+			deliverableId: approveAll ? null : deliverableId,
+		}),
+	});
+
+	if (!response.ok) {
+		const errorData = await response.json();
+		throw new Error(errorData.error || "Failed to approve video");
+	}
+
+	return response.json();
+};
+
+const requestRevision = async ({
+	paymentId,
+	deliverableId,
+	revisionNotes,
+}: {
+	paymentId: string;
+	deliverableId: string;
+	revisionNotes: string;
+}) => {
+	const response = await fetch("/api/payments/request-review", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			paymentId,
+			action: "request_review",
+			deliverableId,
+			reason: "Revision requested by brand",
+			revisionNotes,
+			keepInCollection: true,
+		}),
+	});
+
+	if (!response.ok) {
+		const errorData = await response.json();
+		throw new Error(errorData.error || "Failed to request revision");
+	}
+
+	return response.json();
+};
+
 const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 	className = "",
 }) => {
 	const { currentUser } = useAuth();
+	const queryClient = useQueryClient();
 
-	const [deliveredOrders, setDeliveredOrders] = useState<DeliveredOrder[]>([]);
+	// Query for delivered orders
+	const {
+		data: deliveredOrdersData,
+		isLoading: loading,
+		error,
+		refetch,
+	} = useQuery({
+		queryKey: QUERY_KEYS.deliveredOrders(currentUser?.uid || ""),
+		queryFn: () => fetchDeliveredOrders(currentUser!.uid),
+		enabled: !!currentUser?.uid,
+		staleTime: 30000, // 30 seconds
+		refetchOnWindowFocus: true,
+	});
+
+	const deliveredOrders = deliveredOrdersData?.orders || [];
+
+	// Mutations
+	const approveVideoMutation = useMutation({
+		mutationFn: approveVideo,
+		onSuccess: () => {
+			// Invalidate and refetch delivered orders
+			queryClient.invalidateQueries({
+				queryKey: QUERY_KEYS.deliveredOrders(currentUser!.uid),
+			});
+		},
+		onError: (error: Error) => {
+			console.error("Approval error:", error);
+			toast.error(error.message || "Failed to approve video");
+		},
+	});
+
+	const requestRevisionMutation = useMutation({
+		mutationFn: requestRevision,
+		onSuccess: () => {
+			// Invalidate and refetch delivered orders
+			queryClient.invalidateQueries({
+				queryKey: QUERY_KEYS.deliveredOrders(currentUser!.uid),
+			});
+			// Close modal and reset state
+			setIsRevisionModalOpen(false);
+			setSelectedRevisionDeliverable(null);
+			toast.success(
+				"Revision requested! The video will remain here until a new version is submitted."
+			);
+		},
+		onError: (error: Error) => {
+			console.error("Revision request error:", error);
+			toast.error(`Failed to request revision: ${error.message}`);
+		},
+	});
+
+	// Local state
 	const [selectedOrder, setSelectedOrder] = useState<DeliveredOrder | null>(
 		null
 	);
 	const [selectedDeliverable, setSelectedDeliverable] =
 		useState<Deliverable | null>(null);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
 	const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 	const [searchQuery, setSearchQuery] = useState("");
 	const [sortBy, setSortBy] = useState<string>("newest");
@@ -115,7 +242,6 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 			deliverable: Deliverable;
 			order: DeliveredOrder;
 		} | null>(null);
-	const [isSubmittingRevision, setIsSubmittingRevision] = useState(false);
 
 	// Add this function to toggle package expansion
 	const togglePackageExpansion = (orderId: string) => {
@@ -147,84 +273,14 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 		}
 
 		try {
-			const paymentId = order.payment_id;
-
-			const response = await fetch("/api/payments/approve-video", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					paymentId: paymentId,
-					action: "approve",
-					approveAll: true, // NEW: Approve all flag
-					deliverableId: null, // Not needed when approving all
-				}),
+			await approveVideoMutation.mutateAsync({
+				paymentId: order.payment_id,
+				approveAll: true,
 			});
 
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || "Failed to approve all videos");
-			}
-
-			// NEW: Refetch the delivered orders to get updated approval status from server
-			await refetchDeliveredOrders();
-
 			toast.success(`All ${pendingDeliverables.length} videos approved!`);
-		} catch (error) {
-			console.error("Approval error:", error);
-			toast.error("Failed to approve all videos");
-		}
-	};
-
-	// Fetch delivered orders
-	useEffect(() => {
-		const fetchDeliveredOrders = async () => {
-			if (!currentUser) {
-				setLoading(false);
-				return;
-			}
-
-			try {
-				setLoading(true);
-				setError(null);
-
-				const response = await fetch(
-					`/api/orders/delivered?userId=${currentUser.uid}`
-				);
-
-				if (!response.ok) {
-					throw new Error("Failed to fetch delivered orders");
-				}
-
-				const data = await response.json();
-				setDeliveredOrders(data.orders || []);
-			} catch (err) {
-				console.error("Error fetching delivered orders:", err);
-				setError("Failed to load delivered orders");
-			} finally {
-				setLoading(false);
-			}
-		};
-
-		fetchDeliveredOrders();
-	}, [currentUser]);
-
-	const refetchDeliveredOrders = async () => {
-		if (!currentUser) return;
-
-		try {
-			const response = await fetch(
-				`/api/orders/delivered?userId=${currentUser.uid}`
-			);
-
-			if (!response.ok) {
-				throw new Error("Failed to fetch delivered orders");
-			}
-
-			const data = await response.json();
-			setDeliveredOrders(data.orders || []);
-		} catch (err) {
-			console.error("Error refetching delivered orders:", err);
-			// Don't show error toast here as it might be annoying during normal operation
+		} catch {
+			// Error handling is done in the mutation's onError
 		}
 	};
 
@@ -330,36 +386,17 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 				return;
 			}
 
-			const paymentResponse = await fetch("/api/payments/approve-video", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					paymentId: paymentId,
-					action: "approve",
-					deliverableId: deliverable.firestore_id, // NEW: Pass specific deliverable ID
-					approveAll: false, // NEW: Single approval flag
-				}),
+			await approveVideoMutation.mutateAsync({
+				paymentId,
+				deliverableId: deliverable.firestore_id,
+				approveAll: false,
 			});
-
-			if (!paymentResponse.ok) {
-				const errorData = await paymentResponse.json();
-				throw new Error(errorData.error || "Failed to process payment");
-			}
-
-			const paymentResult = await paymentResponse.json();
-			console.log("Payment processed:", paymentResult);
-
-			// NEW: Refetch the delivered orders to get updated approval status from server
-			await refetchDeliveredOrders();
 
 			toast.success(
 				`Video approved! $${order.total_price} transferred to ${order.creator?.name}`
 			);
-		} catch (error) {
-			console.error("Approval error:", error);
-			toast.error(
-				error instanceof Error ? error.message : "Failed to approve video"
-			);
+		} catch {
+			// Error handling is done in the mutation's onError
 		}
 	};
 
@@ -384,7 +421,6 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 		if (!selectedRevisionDeliverable) return;
 
 		const { deliverable, order } = selectedRevisionDeliverable;
-		setIsSubmittingRevision(true);
 
 		try {
 			const paymentId = order.payment_id;
@@ -402,55 +438,19 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 				return;
 			}
 
-			const requestPayload = {
-				paymentId: paymentId,
-				action: "request_review",
-				deliverableId: deliverableId,
-				reason: "Revision requested by brand",
-				revisionNotes: revisionNotes,
-				keepInCollection: true, // NEW: Flag to keep in collection
-			};
-
-			const response = await fetch("/api/payments/request-review", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(requestPayload),
+			await requestRevisionMutation.mutateAsync({
+				paymentId,
+				deliverableId: String(deliverableId),
+				revisionNotes,
 			});
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				console.error("Error response:", errorData);
-				throw new Error(errorData.error || "Failed to request revision");
-			}
-
-			const result = await response.json();
-			console.log("Revision request result:", result);
-
-			// Refetch to get updated status
-			await refetchDeliveredOrders();
-
-			// Close modal and reset state
-			setIsRevisionModalOpen(false);
-			setSelectedRevisionDeliverable(null);
-
-			toast.success(
-				"Revision requested! The video will remain here until a new version is submitted."
-			);
-		} catch (error) {
-			console.error("Revision request error:", error);
-			if (error instanceof Error) {
-				toast.error(`Failed to request revision: ${error.message}`);
-			} else {
-				toast.error("Failed to request revision");
-			}
-		} finally {
-			setIsSubmittingRevision(false);
+		} catch {
+			// Error handling is done in the mutation's onError
 		}
 	};
 
 	// Handle modal close
 	const handleRevisionModalClose = () => {
-		if (!isSubmittingRevision) {
+		if (!requestRevisionMutation.isPending) {
 			setIsRevisionModalOpen(false);
 			setSelectedRevisionDeliverable(null);
 		}
@@ -597,10 +597,12 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 					<p className="text-lg font-semibold">
 						Error Loading Delivered Orders
 					</p>
-					<p className="text-sm mt-1">{error}</p>
+					<p className="text-sm mt-1">
+						{error instanceof Error ? error.message : "Unknown error"}
+					</p>
 				</div>
 				<Button
-					onClick={() => window.location.reload()}
+					onClick={() => refetch()}
 					className="bg-orange-500 hover:bg-orange-600 text-white"
 				>
 					Try Again
@@ -995,7 +997,8 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 																					</span>
 																				</div>
 																				<p className="text-xs text-green-600 mt-1">
-																					Full amount will be sent to the creator
+																					Full amount will be sent to the
+																					creator
 																				</p>
 																			</div>
 																		)}
@@ -1400,7 +1403,6 @@ const DeliveredOrdersLibrary: React.FC<DeliveredOrdersLibraryProps> = ({
 					onSubmit={handleRevisionSubmit}
 					deliverable={selectedRevisionDeliverable.deliverable}
 					order={selectedRevisionDeliverable.order}
-					isSubmitting={isSubmittingRevision}
 				/>
 			)}
 		</div>

@@ -9,12 +9,13 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import TransactionModal from "./TransactionModal";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { useQuery } from "@tanstack/react-query";
 
 // Define Transaction type
 type TransactionStatus = "Processed" | "Pending" | "Refunded";
@@ -39,6 +40,24 @@ interface TotalTransactions {
 	pendingPayments: string;
 	totalProcessed: string;
 	dataSource?: string; // Added to track if data comes from Stripe or Firestore
+}
+
+interface TransactionsResponse {
+	transactions: Transaction[];
+	totals: TotalTransactions;
+	pagination: {
+		hasMore: boolean;
+		cursor: string | null;
+		totalCount: number;
+	};
+}
+
+// Interface for pagination state
+interface PaginationState {
+	currentPage: number;
+	hasMore: boolean;
+	cursor: string | null;
+	totalCount: number;
 }
 
 // Helper function to get type badge styling
@@ -96,13 +115,49 @@ const getStatusIcon = (status: TransactionStatus): React.ReactNode => {
 	}
 };
 
-// Interface for pagination state
-interface PaginationState {
-	currentPage: number;
-	hasMore: boolean;
-	cursor: string | null;
-	totalCount: number;
-}
+// Fetch function for TanStack Query
+const fetchTransactions = async (
+	userId: string,
+	cursor: string | null = null,
+	pageSize: number = 10
+): Promise<TransactionsResponse> => {
+	let url = `/api/transactions?userId=${userId}&pageSize=${pageSize}`;
+	
+	if (cursor) {
+		url += `&cursor=${encodeURIComponent(cursor)}`;
+	}
+
+	console.log('Fetching URL:', url); // Debug log
+
+	const response = await fetch(url, {
+		method: "GET",
+		headers: {
+			"Content-Type": "application/json",
+		},
+	});
+
+	if (!response.ok) {
+		const errorData = await response.json();
+		throw new Error(errorData.error || "Failed to fetch transactions");
+	}
+
+	const data = await response.json();
+	console.log('API Response:', data); // Debug log
+
+	return {
+		transactions: data.transactions || [],
+		totals: data.totals || {
+			totalSpend: "0",
+			pendingPayments: "0",
+			totalProcessed: "0",
+		},
+		pagination: {
+			hasMore: data.pagination?.hasMore || false,
+			cursor: data.pagination?.cursor || null,
+			totalCount: data.pagination?.totalCount || 0,
+		}
+	};
+};
 
 const Transactions: React.FC = () => {
 	const [modalOpen, setModalOpen] = useState<boolean>(false);
@@ -112,21 +167,7 @@ const Transactions: React.FC = () => {
 	const [typeFilter, setTypeFilter] = useState<string>("");
 	const [statusFilter, setStatusFilter] = useState<string>("");
 
-	// Add loading and error states
-	const [loading, setLoading] = useState<boolean>(true);
-	const [error, setError] = useState<string | null>(null);
-
-	// State to hold the real data
-	const [transactions, setTransactions] = useState<Transaction[]>([]);
-	const [totalTransactions, setTotalTransactions] = useState<TotalTransactions>(
-		{
-			totalSpend: "0",
-			pendingPayments: "0",
-			totalProcessed: "0",
-		}
-	);
-	
-	// Updated pagination state
+	// Pagination state
 	const [pagination, setPagination] = useState<PaginationState>({
 		currentPage: 1,
 		hasMore: false,
@@ -140,83 +181,56 @@ const Transactions: React.FC = () => {
 	const [pageSize] = useState<number>(10); // Fixed at 10 items per page
 	const { currentUser } = useAuth();
 
+	// TanStack Query for fetching transactions
+	const {
+		data: transactionsData,
+		isLoading,
+		isError,
+		error,
+		refetch,
+		isFetching
+	} = useQuery({
+		queryKey: ['transactions', currentUser?.uid, pagination.cursor, pageSize],
+		queryFn: () => fetchTransactions(currentUser!.uid, pagination.cursor, pageSize),
+		enabled: !!currentUser, // Only run query if user is authenticated
+		staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+		gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+		retry: 3,
+		retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+	});
+
+	// Extract data from query result
+	const transactions = transactionsData?.transactions || [];
+	const totalTransactions = transactionsData?.totals || {
+		totalSpend: "0",
+		pendingPayments: "0",
+		totalProcessed: "0",
+	};
+
+	// Update pagination state when data changes
+	React.useEffect(() => {
+		if (transactionsData?.pagination) {
+			setPagination(prev => ({
+				...prev,
+				hasMore: transactionsData.pagination.hasMore,
+				totalCount: transactionsData.pagination.totalCount,
+			}));
+		}
+	}, [transactionsData]);
+
 	// Whether the user has any transactions
 	const hasTransactions = transactions.length > 0;
 
-	const fetchTransactions = async (
-		cursor: string | null = null,
-		pageNumber: number = 1
-	) => {
-		// Don't try to fetch if there's no user
-		if (!currentUser) {
-			setLoading(false);
-			return;
-		}
-
-		try {
-			setLoading(true);
-			setError(null);
-
-			// Build the URL with proper parameters that match your API
-			let url = `/api/transactions?userId=${currentUser.uid}&pageSize=${pageSize}`;
-			
-			// Add cursor if provided
-			if (cursor) {
-				url += `&cursor=${encodeURIComponent(cursor)}`;
-			}
-
-			console.log('Fetching URL:', url); // Debug log
-
-			const response = await fetch(url, {
-				method: "GET",
-				headers: {
-					"Content-Type": "application/json",
-				},
-			});
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || "Failed to fetch transactions");
-			}
-
-			const data = await response.json();
-			console.log('API Response:', data); // Debug log
-
-			// Update state with the fetched data
-			setTransactions(data.transactions || []);
-			setTotalTransactions(
-				data.totals || {
-					totalSpend: "0",
-					pendingPayments: "0",
-					totalProcessed: "0",
-				}
-			);
-
-			// Update pagination state properly
-			setPagination({
-				currentPage: pageNumber,
-				hasMore: data.pagination?.hasMore || false,
-				cursor: data.pagination?.cursor || null,
-				totalCount: data.pagination?.totalCount || 0,
-			});
-
-			setLoading(false);
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		} catch (error: any) {
-			console.error("Error fetching transactions:", error);
-			setError(
-				error.message || "An error occurred while fetching transactions"
-			);
-			setLoading(false);
-		}
-	};
-
 	// Updated next page function
 	const goToNextPage = () => {
-		if (pagination.hasMore && pagination.cursor) {
+		if (transactionsData?.pagination.hasMore && transactionsData?.pagination.cursor) {
 			// Add current cursor to history before moving forward
-			setCursorHistory(prev => [...prev, pagination.cursor]);
-			fetchTransactions(pagination.cursor, pagination.currentPage + 1);
+			setCursorHistory(prev => [...prev, transactionsData.pagination.cursor]);
+			setPagination(prev => ({
+				...prev,
+				currentPage: prev.currentPage + 1,
+				cursor: transactionsData.pagination.cursor,
+			}));
 		}
 	};
 
@@ -229,14 +243,17 @@ const Transactions: React.FC = () => {
 			const previousCursor = newHistory[newHistory.length - 1];
 			
 			setCursorHistory(newHistory);
-			fetchTransactions(previousCursor, pagination.currentPage - 1);
+			setPagination(prev => ({
+				...prev,
+				currentPage: prev.currentPage - 1,
+				cursor: previousCursor,
+			}));
 		}
 	};
 
-	// Reset pagination when component mounts or user changes
-	useEffect(() => {
+	// Reset pagination when user changes
+	React.useEffect(() => {
 		if (currentUser) {
-			// Reset pagination state
 			setPagination({
 				currentPage: 1,
 				hasMore: false,
@@ -244,7 +261,6 @@ const Transactions: React.FC = () => {
 				totalCount: 0,
 			});
 			setCursorHistory([null]);
-			fetchTransactions(null, 1);
 		}
 	}, [currentUser]);
 
@@ -292,7 +308,7 @@ const Transactions: React.FC = () => {
 	}, [searchTerm, typeFilter, statusFilter, hasTransactions, transactions]);
 
 	// Render loading state
-	if (loading) {
+	if (isLoading) {
 		return (
 			<div className="w-full flex flex-col items-center justify-center py-12 h-screen">
 				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
@@ -302,7 +318,7 @@ const Transactions: React.FC = () => {
 	}
 
 	// Render error state
-	if (error) {
+	if (isError) {
 		return (
 			<div className="w-full flex flex-col items-center justify-center py-12">
 				<div
@@ -310,7 +326,9 @@ const Transactions: React.FC = () => {
 					role="alert"
 				>
 					<strong className="font-bold">Error: </strong>
-					<span className="block sm:inline">{error}</span>
+					<span className="block sm:inline">
+						{error instanceof Error ? error.message : 'An error occurred while fetching transactions'}
+					</span>
 				</div>
 				<Button
 					className="mt-4 bg-orange-500 hover:bg-orange-600 text-white"
@@ -323,7 +341,7 @@ const Transactions: React.FC = () => {
 							totalCount: 0,
 						});
 						setCursorHistory([null]);
-						fetchTransactions(null, 1);
+						refetch();
 					}}
 				>
 					Try Again
@@ -341,7 +359,9 @@ const Transactions: React.FC = () => {
 					<h2 className="text-2xl text-[#101828] font-semibold">
 						${hasTransactions ? totalTransactions.totalSpend : "0"}
 					</h2>
-					
+					{isFetching && (
+						<div className="w-4 h-4 animate-spin rounded-full border-t-2 border-b-2 border-orange-500 mt-2"></div>
+					)}
 				</Card>
 
 				<Card className="py-4 px-5 flex flex-col items-center justify-center border border-[#6670854D] shadow-none">
@@ -349,6 +369,9 @@ const Transactions: React.FC = () => {
 					<h2 className="text-2xl text-[#101828] font-semibold">
 						${hasTransactions ? totalTransactions.pendingPayments : "0"}
 					</h2>
+					{isFetching && (
+						<div className="w-4 h-4 animate-spin rounded-full border-t-2 border-b-2 border-orange-500 mt-2"></div>
+					)}
 				</Card>
 
 				<Card className="py-4 px-5 flex flex-col items-center justify-center border border-[#6670854D] shadow-none">
@@ -356,6 +379,9 @@ const Transactions: React.FC = () => {
 					<h2 className="text-2xl text-[#101828] font-semibold">
 						${hasTransactions ? totalTransactions.totalProcessed : "0"}
 					</h2>
+					{isFetching && (
+						<div className="w-4 h-4 animate-spin rounded-full border-t-2 border-b-2 border-orange-500 mt-2"></div>
+					)}
 				</Card>
 			</div>
 			<div className="mx-10">
@@ -465,39 +491,48 @@ const Transactions: React.FC = () => {
 						</div>
 					) : filteredTransactions.length > 0 ? (
 						// We have transactions that match the filters
-						filteredTransactions.map((item, index) => (
-							<div
-								key={`${item.id}-${index}`} // Better key for React
-								className="grid grid-cols-7 p-3 items-center border-t border-gray-200 text-sm text-[#101828] hover:bg-gray-50"
-							>
-								<div className="col-span-1 pl-4">{item.transactionDate}</div>
-								<div className="col-span-2 pr-4">{item.description} </div>
-								<div className="col-span-1">${item.amount}</div>
-								<div className="col-span-1">
-									<span
-										className={`px-4 py-1 rounded-full text-sm ${getTypeBadgeStyle(item.type)}`}
-									>
-										{item.type === "Contest" ? "Contests" : item.type}
-									</span>
+						<>
+							{filteredTransactions.map((item, index) => (
+								<div
+									key={`${item.id}-${index}`} // Better key for React
+									className="grid grid-cols-7 p-3 items-center border-t border-gray-200 text-sm text-[#101828] hover:bg-gray-50"
+								>
+									<div className="col-span-1 pl-4">{item.transactionDate}</div>
+									<div className="col-span-2 pr-4">{item.description} </div>
+									<div className="col-span-1">${item.amount}</div>
+									<div className="col-span-1">
+										<span
+											className={`px-4 py-1 rounded-full text-sm ${getTypeBadgeStyle(item.type)}`}
+										>
+											{item.type === "Contest" ? "Contests" : item.type}
+										</span>
+									</div>
+									<div className="col-span-1">
+										<span
+											className={`w-fit px-2 py-1 rounded-full text-xs ${getStatusBadgeStyle(item.status)}`}
+										>
+											{getStatusIcon(item.status)}
+											{item.status}
+										</span>
+									</div>
+									<div className="col-span-1">
+										<button
+											className="text-orange-500 hover:underline"
+											onClick={() => handleViewTransaction(item)}
+										>
+											{item.actions}
+										</button>
+									</div>
 								</div>
-								<div className="col-span-1">
-									<span
-										className={`w-fit px-2 py-1 rounded-full text-xs ${getStatusBadgeStyle(item.status)}`}
-									>
-										{getStatusIcon(item.status)}
-										{item.status}
-									</span>
+							))}
+							{/* Loading indicator for pagination */}
+							{isFetching && (
+								<div className="flex justify-center items-center py-4 border-t border-gray-200">
+									<div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-orange-500"></div>
+									<span className="ml-2 text-gray-600">Loading...</span>
 								</div>
-								<div className="col-span-1">
-									<button
-										className="text-orange-500 hover:underline"
-										onClick={() => handleViewTransaction(item)}
-									>
-										{item.actions}
-									</button>
-								</div>
-							</div>
-						))
+							)}
+						</>
 					) : (
 						// We have transactions but none match the current filters
 						<div className="flex flex-col justify-center items-center py-10">
@@ -531,14 +566,14 @@ const Transactions: React.FC = () => {
 					<div className="flex gap-2">
 						<Button
 							onClick={goToPreviousPage}
-							disabled={pagination.currentPage <= 1}
+							disabled={pagination.currentPage <= 1 || isFetching}
 							className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
 						>
 							Previous
 						</Button>
 						<Button
 							onClick={goToNextPage}
-							disabled={!pagination.hasMore}
+							disabled={!transactionsData?.pagination.hasMore || isFetching}
 							className="bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50"
 						>
 							Next

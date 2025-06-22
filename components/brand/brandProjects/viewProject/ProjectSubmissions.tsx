@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+import React, { useEffect } from "react";
 import { getAuth } from "firebase/auth";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +25,7 @@ import VerifyTikTokLinkModal from "./VerifyTikTokLinkModal";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
 import { useProjectForm } from "../ProjectFormContext";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface ProjectSubmissionsProps {
 	projectFormData: ProjectFormData;
@@ -30,231 +33,281 @@ interface ProjectSubmissionsProps {
 	projectId: string;
 }
 
+// API functions
+const fetchSubmissions = async (projectId: string): Promise<CreatorSubmission[]> => {
+	const response = await fetch(`/api/project-submissions?projectId=${projectId}`);
+	
+	if (!response.ok) {
+		throw new Error(`Error fetching submissions: ${response.statusText}`);
+	}
+
+	const data = await response.json();
+	
+	if (!data.success || !data.submissions) {
+		throw new Error(data.error || "Failed to fetch submissions");
+	}
+
+	// Get unique user IDs for creator data fetching
+	const userIds = [...new Set(data.submissions.map((sub: any) => sub.userId))];
+	const creatorDataMap = new Map();
+
+	// Fetch creator data in parallel
+	await Promise.all(
+		userIds.map(async (userId) => {
+			try {
+				const creatorRes = await fetch(`/api/admin/creator-approval?userId=${userId}`);
+				if (creatorRes.ok) {
+					const response = await creatorRes.json();
+					if (response.creators && response.creators.length > 0) {
+						creatorDataMap.set(userId, response.creators[0]);
+					}
+				}
+			} catch (err) {
+				console.error(`Error fetching creator data for user ID ${userId}:`, err);
+			}
+		})
+	);
+
+	// Transform submissions with creator data
+	return data.submissions.map((submission: any, index: number) => {
+		const creatorData = creatorDataMap.get(submission.userId);
+		
+		return {
+			id: submission.id,
+			userId: submission.userId,
+			projectId: submission.projectId,
+			creatorName: creatorData?.username || submission.creatorName || "Creator",
+			creatorIcon: creatorData?.logoUrl || submission.creatorIcon || "/placeholder-profile.jpg",
+			videoUrl: submission.videoUrl || "/placeholder-video.jpg",
+			videoNumber: submission.videoNumber || `#${index + 1}`,
+			revisionNumber: submission.revisionNumber ? `#${submission.revisionNumber}` : "",
+			status: submission.status || "new",
+			createdAt: new Date(submission.createdAt).toLocaleDateString(),
+			sparkCode: submission.sparkCode || "",
+			tiktokLink: submission.tiktokLink || "",
+			affiliate: submission.affiliateLink || "",
+			creator: creatorData || null,
+		};
+	});
+};
+
+const updateSubmissionStatus = async ({
+	submissionId,
+	status,
+	additionalData = {}
+}: {
+	submissionId: string;
+	status: string;
+	additionalData?: Record<string, unknown>;
+}) => {
+	const auth = getAuth();
+	const currentUser = auth.currentUser;
+
+	if (!currentUser) {
+		throw new Error("You must be logged in to update submissions");
+	}
+
+	const token = await currentUser.getIdToken();
+
+	const response = await fetch("/api/project-submissions/update-status", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			Authorization: `Bearer ${token}`,
+		},
+		body: JSON.stringify({
+			submissionId,
+			status,
+			...additionalData,
+		}),
+	});
+
+	if (!response.ok) {
+		throw new Error(`Failed to update status: ${response.statusText}`);
+	}
+
+	const data = await response.json();
+	
+	if (!data.success) {
+		throw new Error(data.error || "Failed to update status");
+	}
+
+	return data;
+};
+
+const fetchSparkCode = async (submissionId: string) => {
+	const response = await fetch("/api/project-submissions/get-spark-code", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({ submissionId }),
+	});
+
+	if (!response.ok) {
+		throw new Error("Failed to fetch spark code");
+	}
+
+	const data = await response.json();
+	
+	if (!data.success || !data.data.sparkCode) {
+		throw new Error("No spark code found");
+	}
+
+	return data.data.sparkCode;
+};
+
+const fetchTikTokLink = async (submissionId: string) => {
+	const response = await fetch("/api/project-submissions/get-tiktok-link", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({ submissionId }),
+	});
+
+	if (!response.ok) {
+		throw new Error("Failed to fetch TikTok link");
+	}
+
+	const data = await response.json();
+	
+	if (!data.success || !data.data.tiktokLink) {
+		throw new Error("No TikTok link found");
+	}
+
+	return data.data.tiktokLink;
+};
+
 export default function ProjectSubmissions({
 	projectFormData,
-	userId,
 	projectId,
 }: ProjectSubmissionsProps) {
+	const queryClient = useQueryClient();
 	const projectType = projectFormData?.projectDetails?.projectType;
 
-	const [activeView, setActiveView] = useState<"project" | "creator">(
-		"project"
-	);
+	const [activeView, setActiveView] = useState<"project" | "creator">("project");
 	const [openReviewDialog, setOpenReviewDialog] = useState(false);
 	const [openApproveDialog, setOpenApproveDialog] = useState(false);
 	const [openVerifySparkDialog, setOpenVerifySparkDialog] = useState(false);
-	const [openVerifyTiktokLinkDialog, setOpenVerifyTiktokLinkDialog] =
-		useState(false);
-	const [currentSubmission, setCurrentSubmission] =
-		useState<CreatorSubmission | null>(null);
+	const [openVerifyTiktokLinkDialog, setOpenVerifyTiktokLinkDialog] = useState(false);
+	const [currentSubmission, setCurrentSubmission] = useState<CreatorSubmission | null>(null);
 	const [revisionUsed, setRevisionUsed] = useState<number>(1);
-	const [submissionsList, setSubmissionsList] = useState<CreatorSubmission[]>(
-		[]
-	);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-	const [expandedCreators, setExpandedCreators] = useState<
-		Record<string, boolean>
-	>({});
+	const [expandedCreators, setExpandedCreators] = useState<Record<string, boolean>>({});
 	const [statusFilter, setStatusFilter] = useState<string>("all");
 	const [sortBy, setSortBy] = useState<string>("newest");
 
 	const { triggerPaymentIntent } = useProjectForm();
 
-	// Fetch submissions data
-	useEffect(() => {
-		const fetchSubmissions = async () => {
-			try {
-				setLoading(true);
+	// Query for submissions
+	const {
+		data: submissionsList = [],
+		isLoading: loading,
+		error,
+		refetch
+	} = useQuery({
+		queryKey: ['project-submissions', projectId],
+		queryFn: () => fetchSubmissions(projectId),
+		staleTime: 30000, // 30 seconds
+		refetchOnWindowFocus: false,
+	});
 
-				const response = await fetch(
-					`/api/project-submissions?projectId=${projectId}`
+	// Mutation for updating submission status
+	const updateStatusMutation = useMutation({
+		mutationFn: updateSubmissionStatus,
+		onSuccess: (data, variables) => {
+			// Update the cache optimistically
+			queryClient.setQueryData(['project-submissions', projectId], (old: CreatorSubmission[] = []) => {
+				return old.map(sub => 
+					sub.id === variables.submissionId 
+						? { ...sub, status: variables.status as CreatorSubmission["status"], ...variables.additionalData }
+						: sub
 				);
-
-				if (!response.ok) {
-					throw new Error(`Error fetching submissions: ${response.statusText}`);
-				}
-
-				const data = await response.json();
-
-				if (data.success && data.submissions) {
-					// First set basic submissions data
-					const basicSubmissions = data.submissions;
-
-					// Fetch all creator data in parallel
-					const userIds = [
-						...new Set(
-							basicSubmissions.map((sub: CreatorSubmission) => sub.userId)
-						),
-					];
-					const creatorDataMap = new Map();
-
-					await Promise.all(
-						userIds.map(async (userId) => {
-							try {
-								const creatorRes = await fetch(
-									`/api/admin/creator-approval?userId=${userId}`
-								);
-
-								if (creatorRes.ok) {
-									const response = await creatorRes.json();
-
-									// Store the first creator from the response
-									if (response.creators && response.creators.length > 0) {
-										creatorDataMap.set(userId, response.creators[0]);
-									}
-								}
-							} catch (err) {
-								console.error(
-									`Error fetching creator data for user ID ${userId}:`,
-									err
-								);
-							}
-						})
-					);
-
-					// Transform the API response to match our Submission interface with creator data
-					const transformedSubmissions = basicSubmissions.map(
-						// eslint-disable-next-line @typescript-eslint/no-explicit-any
-						(submission: any, index: number) => {
-							const creatorData = creatorDataMap.get(submission.userId);
-
-							return {
-								id: submission.id,
-								userId: submission.userId,
-								projectId: submission.projectId,
-								creatorName:
-									creatorData?.username || submission.creatorName || "Creator",
-								creatorIcon:
-									creatorData?.logoUrl ||
-									submission.creatorIcon ||
-									"/placeholder-profile.jpg",
-								videoUrl: submission.videoUrl || "/placeholder-video.jpg",
-								videoNumber: submission.videoNumber || `#${index + 1}`,
-								revisionNumber: submission.revisionNumber
-									? `#${submission.revisionNumber}`
-									: "",
-								status: submission.status || "new",
-								createdAt: new Date(submission.createdAt).toLocaleDateString(),
-								sparkCode: submission.sparkCode || "",
-								tiktokLink: submission.tiktokLink || "",
-								affiliate: submission.affiliateLink || "",
-								creator: creatorData || null,
-							};
-						}
-					);
-
-					setSubmissionsList(transformedSubmissions);
-
-					// Initialize expanded state for creators
-					const creatorExpandState: Record<string, boolean> = {};
-					transformedSubmissions.forEach((submission: CreatorSubmission) => {
-						if (
-							submission.creatorName &&
-							!creatorExpandState[submission.creatorName]
-						) {
-							creatorExpandState[submission.creatorName] = true; // Default to expanded
-						}
-					});
-					setExpandedCreators(creatorExpandState);
-				} else {
-					throw new Error(data.error || "Failed to fetch submissions");
-				}
-			} catch (err) {
-				console.error("Error fetching submissions:", err);
-				setError(
-					err instanceof Error ? err.message : "An unknown error occurred"
-				);
-				if (toast) {
-					toast.error("Failed to fetch submissions");
-				}
-			} finally {
-				setLoading(false);
-			}
-		};
-
-		fetchSubmissions();
-	}, [userId, projectId]);
-
-	// Function to update submission status
-	const updateSubmissionStatus = async (
-		submissionId: string,
-		newStatus: string,
-		additionalData: Record<string, unknown> = {}
-	) => {
-		try {
-			// Get current user token from Firebase Auth
-			const auth = getAuth();
-			const currentUser = auth.currentUser;
-
-			if (!currentUser) {
-				toast.error("You must be logged in to update submissions");
-				return false;
-			}
-
-			// Get the authentication token
-			const token = await currentUser.getIdToken();
-
-			// Ensure statuses match between frontend and backend
-			const apiStatus = newStatus;
-			// Both backend and frontend use the same status values now
-
-			const response = await fetch("/api/project-submissions/update-status", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${token}`, // Add the auth token
-				},
-				body: JSON.stringify({
-					submissionId,
-					status: apiStatus,
-					...additionalData,
-				}),
 			});
-
-			if (!response.ok) {
-				// Log more detailed error info
-				const errorData = await response.json();
-				console.error("API Response Error:", {
-					status: response.status,
-					statusText: response.statusText,
-					data: errorData,
-				});
-				throw new Error(`Failed to update status: ${response.statusText}`);
-			}
-
-			const data = await response.json();
-
-			if (data.success) {
-				// Update local state with new status
-				setSubmissionsList((prevList) =>
-					prevList.map((sub) =>
-						sub.id === submissionId
-							? {
-									...sub,
-									status: newStatus as CreatorSubmission["status"],
-									...additionalData,
-								}
-							: sub
-					)
-				);
-
-				toast.success(`Status updated to ${newStatus}`);
-				return true;
-			} else {
-				throw new Error(data.error || "Failed to update status");
-			}
-		} catch (err) {
-			console.error("Error updating submission status:", err);
+			toast.success(`Status updated to ${variables.status}`);
+		},
+		onError: (error) => {
+			console.error("Error updating submission status:", error);
 			toast.error("Failed to update submission status");
-			return false;
 		}
-	};
+	});
+
+	// Mutation for requesting spark code
+	const requestSparkCodeMutation = useMutation({
+		mutationFn: async (submissionId: string) => {
+			// First update status to spark_requested
+			await updateSubmissionStatus({ submissionId, status: "spark_requested" });
+			
+			try {
+				// Try to fetch the spark code
+				const sparkCode = await fetchSparkCode(submissionId);
+				// If successful, update status to spark_received
+				await updateSubmissionStatus({ 
+					submissionId, 
+					status: "spark_received", 
+					additionalData: { sparkCode } 
+				});
+				return { sparkCode };
+			} catch (error) {
+				// If no spark code found, leave status as spark_requested
+				throw error;
+			}
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['project-submissions', projectId] });
+		},
+		onError: (error) => {
+			console.error("Error requesting spark code:", error);
+			// Don't show error toast as the status is still updated to requested
+		}
+	});
+
+	// Mutation for requesting TikTok link
+	const requestTikTokLinkMutation = useMutation({
+		mutationFn: async (submissionId: string) => {
+			// First update status to tiktokLink_requested
+			await updateSubmissionStatus({ submissionId, status: "tiktokLink_requested" });
+			
+			try {
+				// Try to fetch the TikTok link
+				const tiktokLink = await fetchTikTokLink(submissionId);
+				// If successful, update status to tiktokLink_received
+				await updateSubmissionStatus({ 
+					submissionId, 
+					status: "tiktokLink_received", 
+					additionalData: { tiktokLink } 
+				});
+				return { tiktokLink };
+			} catch (error) {
+				// If no TikTok link found, leave status as tiktokLink_requested
+				throw error;
+			}
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['project-submissions', projectId] });
+		},
+		onError: (error) => {
+			console.error("Error requesting TikTok link:", error);
+			// Don't show error toast as the status is still updated to requested
+		}
+	});
+
+	// Initialize expanded creators when data loads
+useEffect(() => {
+		if (submissionsList.length > 0) {
+			const creatorExpandState: Record<string, boolean> = {};
+			submissionsList.forEach((submission: CreatorSubmission) => {
+				if (submission.creatorName && !creatorExpandState[submission.creatorName]) {
+					creatorExpandState[submission.creatorName] = true;
+				}
+			});
+			setExpandedCreators(creatorExpandState);
+		}
+	}, [submissionsList]);
 
 	const handleReview = (submission: CreatorSubmission) => {
 		setCurrentSubmission(submission);
 		setOpenReviewDialog(true);
-		// Determine revision number based on submission data
 		setRevisionUsed(
 			parseInt(String(submission.revisionNumber)?.replace("#", "") || "1")
 		);
@@ -265,82 +318,54 @@ export default function ProjectSubmissions({
 		setOpenApproveDialog(true);
 	};
 
-	// Helper function to get the payment amount for a creator
 	const getCreatorPaymentAmount = (submission: CreatorSubmission) => {
-		if (
-			projectFormData.creatorPricing.selectionMethod ===
-			"Invite Specific Creators"
-		) {
-			// Access creator payment data using creatorId as key
-			const creatorPaymentData =
-				projectFormData.creatorPricing.creatorPayments?.[submission.userId];
+		if (projectFormData.creatorPricing.selectionMethod === "Invite Specific Creators") {
+			const creatorPaymentData = projectFormData.creatorPricing.creatorPayments?.[submission.userId];
 
 			if (!creatorPaymentData) {
 				return 0;
 			}
 
-			// For bulk pricing, return price per video instead of total amount
 			if (creatorPaymentData.pricingTier === "bulk rate") {
 				return creatorPaymentData.pricePerVideo || 0;
 			}
 
-			// For other pricing tiers, calculate price per video from total amount
-			const videosPerCreator =
-				projectFormData.creatorPricing.videosPerCreator || 1;
-			const pricePerVideo =
-				(creatorPaymentData.totalAmount || 0) / videosPerCreator;
-			return Math.round(pricePerVideo * 100) / 100; // Round to 2 decimal places
+			const videosPerCreator = projectFormData.creatorPricing.videosPerCreator || 1;
+			const pricePerVideo = (creatorPaymentData.totalAmount || 0) / videosPerCreator;
+			return Math.round(pricePerVideo * 100) / 100;
 		} else {
-			// For non-specific creator selection, return budget per video
 			return projectFormData.creatorPricing.budgetPerVideo || 0;
 		}
 	};
 
-	// Replace the handleApprove function in your ProjectSubmissions component with this:
-
 	const handleApprove = async () => {
 		if (currentSubmission) {
-			// Calculate the payment per video instead of total amount
 			let creatorPaymentPerVideo = 0;
 
-			if (
-				projectFormData.creatorPricing.selectionMethod ===
-				"Invite Specific Creators"
-			) {
-				// Get the creator's payment data using their ID as the key
-				const creatorPaymentData =
-					projectFormData.creatorPricing.creatorPayments?.[
-						currentSubmission.userId
-					];
+			if (projectFormData.creatorPricing.selectionMethod === "Invite Specific Creators") {
+				const creatorPaymentData = projectFormData.creatorPricing.creatorPayments?.[currentSubmission.userId];
 
 				if (creatorPaymentData) {
 					if (creatorPaymentData.pricingTier === "bulk rate") {
 						creatorPaymentPerVideo = creatorPaymentData.pricePerVideo || 0;
 					} else {
-						// Calculate per video from total amount
-						const videosPerCreator =
-							projectFormData.creatorPricing.videosPerCreator || 1;
-						creatorPaymentPerVideo =
-							(creatorPaymentData.totalAmount || 0) / videosPerCreator;
+						const videosPerCreator = projectFormData.creatorPricing.videosPerCreator || 1;
+						creatorPaymentPerVideo = (creatorPaymentData.totalAmount || 0) / videosPerCreator;
 					}
 				}
 			} else {
-				creatorPaymentPerVideo =
-					projectFormData.creatorPricing.budgetPerVideo || 0;
+				creatorPaymentPerVideo = projectFormData.creatorPricing.budgetPerVideo || 0;
 			}
 
 			try {
-				// Pass the per-video payment amount to the payment intent
 				await triggerPaymentIntent(creatorPaymentPerVideo, {
 					...currentSubmission,
 					type: "submission_approval",
 					submissionId: currentSubmission.id,
-					// Add the project form data and submission data
 					projectFormData: projectFormData,
 					submissionData: currentSubmission,
 				});
 
-				// Close dialog and show loading state
 				setOpenApproveDialog(false);
 				toast("Processing payment...");
 			} catch (error) {
@@ -350,96 +375,12 @@ export default function ProjectSubmissions({
 		}
 	};
 
-	const handleRequestSparkCode = async (submission: CreatorSubmission) => {
-		// First update the status to spark_requested and don't change it automatically
-		const success = await updateSubmissionStatus(
-			submission.id,
-			"spark_requested"
-		);
-
-		if (success) {
-			try {
-				// When fetching the spark code, don't automatically update the status
-				const response = await fetch(
-					"/api/project-submissions/get-spark-code",
-					{
-						method: "POST",
-						headers: {
-							"Content-Type": "application/json",
-						},
-						body: JSON.stringify({
-							submissionId: submission.id,
-						}),
-					}
-				);
-
-				if (!response.ok) {
-					const errorData = await response.json();
-					console.error("Failed to fetch spark code:", errorData);
-					// Don't change the status here, leave it as spark_requested
-					return;
-				}
-
-				const data = await response.json();
-
-				if (data.success && data.data.sparkCode) {
-					// Only if we successfully got a spark code, update the status
-					await updateSubmissionStatus(submission.id, "spark_received", {
-						sparkCode: data.data.sparkCode,
-					});
-				}
-				// If no spark code was found, the status remains as spark_requested
-			} catch (error) {
-				console.error("Error fetching spark code:", error);
-				// Don't change the status on error
-			}
-		}
+	const handleRequestSparkCode = (submission: CreatorSubmission) => {
+		requestSparkCodeMutation.mutate(submission.id);
 	};
 
-	const handleRequestTiktokLink = async (submission: CreatorSubmission) => {
-		// First update the status to tiktokLink_requested and don't change it automatically
-		const success = await updateSubmissionStatus(
-			submission.id,
-			"tiktokLink_requested"
-		);
-
-		if (success) {
-			try {
-				// When fetching the tiktok link, don't automatically update the status
-				const response = await fetch(
-					"/api/project-submissions/get-tiktok-link",
-					{
-						method: "POST",
-						headers: {
-							"Content-Type": "application/json",
-						},
-						body: JSON.stringify({
-							submissionId: submission.id,
-						}),
-					}
-				);
-
-				if (!response.ok) {
-					const errorData = await response.json();
-					console.error("Failed to fetch tiktok link:", errorData);
-					// Don't change the status here, leave it as tiktokLink_requested
-					return;
-				}
-
-				const data = await response.json();
-
-				if (data.success && data.data.tiktokLink) {
-					// Only if we successfully got a tiktok code, update the status
-					await updateSubmissionStatus(submission.id, "tiktokLink_received", {
-						tiktokLink: data.data.tiktokLink,
-					});
-				}
-				// If no tiktok link was found, the status remains as tiktkLink_requested
-			} catch (error) {
-				console.error("Error fetching tiktok link:", error);
-				// Don't change the status on error
-			}
-		}
+	const handleRequestTiktokLink = (submission: CreatorSubmission) => {
+		requestTikTokLinkMutation.mutate(submission.id);
 	};
 
 	const handleVerifySparkCode = (submission: CreatorSubmission) => {
@@ -454,27 +395,21 @@ export default function ProjectSubmissions({
 
 	const confirmSparkCodeVerification = async () => {
 		if (currentSubmission) {
-			const success = await updateSubmissionStatus(
-				currentSubmission.id,
-				"spark_verified"
-			);
-
-			if (success) {
-				setOpenVerifySparkDialog(false);
-			}
+			updateStatusMutation.mutate({
+				submissionId: currentSubmission.id,
+				status: "spark_verified"
+			});
+			setOpenVerifySparkDialog(false);
 		}
 	};
 
 	const confirmTiktokLinkVerification = async () => {
 		if (currentSubmission) {
-			const success = await updateSubmissionStatus(
-				currentSubmission.id,
-				"tiktokLink_verified" // Changed to tiktokLink_verified
-			);
-
-			if (success) {
-				setOpenVerifyTiktokLinkDialog(false);
-			}
+			updateStatusMutation.mutate({
+				submissionId: currentSubmission.id,
+				status: "tiktokLink_verified"
+			});
+			setOpenVerifyTiktokLinkDialog(false);
 		}
 	};
 
@@ -483,17 +418,11 @@ export default function ProjectSubmissions({
 		setIsModalOpen: React.Dispatch<React.SetStateAction<boolean>>
 	) => {
 		setIsModalOpen(false);
-
-		// Set status to spark_requested
-		const success = await updateSubmissionStatus(
-			submission.id,
-			"spark_requested"
-		);
-
-		// Don't do anything else automatically - leave it in the requested state
-		if (success) {
-			toast.success("New spark code requested successfully");
-		}
+		updateStatusMutation.mutate({
+			submissionId: submission.id,
+			status: "spark_requested"
+		});
+		toast.success("New spark code requested successfully");
 	};
 
 	const handleRequestNewLink = async (
@@ -501,17 +430,11 @@ export default function ProjectSubmissions({
 		setIsModalOpen: React.Dispatch<React.SetStateAction<boolean>>
 	) => {
 		setIsModalOpen(false);
-
-		// Set status to tiktokLink_requested
-		const success = await updateSubmissionStatus(
-			submission.id,
-			"tiktokLink_requested"
-		);
-
-		// Don't do anything else automatically - leave it in the requested state
-		if (success) {
-			toast.success("New tiktok link requested successfully");
-		}
+		updateStatusMutation.mutate({
+			submissionId: submission.id,
+			status: "tiktokLink_requested"
+		});
+		toast.success("New TikTok link requested successfully");
 	};
 
 	const handleSubmit = async (
@@ -521,23 +444,16 @@ export default function ProjectSubmissions({
 		videoTimestamps?: { time: number; note: string }[]
 	) => {
 		if (currentSubmission) {
-			if (approved) {
-				await updateSubmissionStatus(currentSubmission.id, "approved", {
+			const status = approved ? "approved" : "revision_requested";
+			updateStatusMutation.mutate({
+				submissionId: currentSubmission.id,
+				status,
+				additionalData: {
 					feedback,
 					issues,
 					videoTimestamps,
-				});
-			} else {
-				await updateSubmissionStatus(
-					currentSubmission.id,
-					"revision_requested",
-					{
-						feedback,
-						issues,
-						videoTimestamps, // Include timestamps in the update
-					}
-				);
-			}
+				}
+			});
 		}
 		setOpenReviewDialog(false);
 	};
@@ -565,13 +481,9 @@ export default function ProjectSubmissions({
 	const sortedSubmissions = [...filteredSubmissions].sort((a, b) => {
 		switch (sortBy) {
 			case "newest":
-				return (
-					new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-				);
+				return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
 			case "oldest":
-				return (
-					new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-				);
+				return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
 			case "creator":
 				return a.createdAt.localeCompare(b.createdAt);
 			default:
@@ -593,9 +505,8 @@ export default function ProjectSubmissions({
 
 	// Calculate progress metrics
 	const totalVideosRequested = projectFormData?.creatorPricing?.videosPerCreator
-		? projectFormData.creatorPricing.videosPerCreator *
-			(projectFormData.creatorPricing.creatorCount || 1)
-		: submissionsList.length; // fallback to actual submissions if data not available
+		? projectFormData.creatorPricing.videosPerCreator * (projectFormData.creatorPricing.creatorCount || 1)
+		: submissionsList.length;
 
 	const completedVideos = submissionsList.filter(
 		(sub) =>
@@ -611,13 +522,14 @@ export default function ProjectSubmissions({
 			sub.status === "payment_confirmed"
 	).length;
 
-	const completionPercentage =
-		totalVideosRequested > 0
-			? (completedVideos / totalVideosRequested) * 100
-			: 0;
+	const completionPercentage = totalVideosRequested > 0 ? (completedVideos / totalVideosRequested) * 100 : 0;
 
 	// Render buttons based on submission status
 	const renderSubmissionButtons = (submission: CreatorSubmission) => {
+		const isUpdating = updateStatusMutation.isPending && currentSubmission?.id === submission.id;
+		const isRequestingSparkCode = requestSparkCodeMutation.isPending && requestSparkCodeMutation.variables === submission.id;
+		const isRequestingTikTokLink = requestTikTokLinkMutation.isPending && requestTikTokLinkMutation.variables === submission.id;
+
 		switch (submission.status) {
 			case "submitted":
 			case "new":
@@ -628,6 +540,7 @@ export default function ProjectSubmissions({
 							variant="secondary"
 							className="flex-1 mr-2 bg-[#FD5C02] text-white"
 							onClick={() => handleReview(submission)}
+							disabled={isUpdating}
 						>
 							Review
 						</Button>
@@ -635,28 +548,28 @@ export default function ProjectSubmissions({
 							variant="default"
 							className="flex-1 bg-[#067647] hover:bg-green-700 text-white"
 							onClick={() => handleApproveClick(submission)}
+							disabled={isUpdating}
 						>
 							Approve (${getCreatorPaymentAmount(submission)})
 							<Check className="h-5 w-5 ml-1" />
 						</Button>
 					</>
 				);
+
 			case "revision_requested":
 				return (
 					<Button
 						variant="secondary"
 						className="flex-grow bg-[#FD5C02] text-white flex items-center justify-center"
 						onClick={() => handleReview(submission)}
+						disabled={isUpdating}
 					>
 						Review
 					</Button>
 				);
+
 			case "approved":
-				// For UGC, show download directly after approval
-				if (
-					projectType === "UGC Content Only" ||
-					projectType === "TikTok Shop"
-				) {
+				if (projectType === "UGC Content Only" || projectType === "TikTok Shop") {
 					return (
 						<Button
 							variant="secondary"
@@ -667,28 +580,26 @@ export default function ProjectSubmissions({
 							<Download className="h-4 w-4 ml-2" />
 						</Button>
 					);
-				}
-				// For Spark Ads, start with request spark code
-				else if (projectType === "Spark Ads") {
+				} else if (projectType === "Spark Ads") {
 					return (
 						<Button
 							variant="secondary"
 							className="flex-grow bg-[#FD5C02] text-white flex items-center justify-center"
 							onClick={() => handleRequestSparkCode(submission)}
+							disabled={isRequestingSparkCode}
 						>
-							Request Spark Code
+							{isRequestingSparkCode ? "Requesting..." : "Request Spark Code"}
 						</Button>
 					);
-				}
-				// For TikTok, start with request TikTok link
-				else if (projectType === "Creator-Posted UGC") {
+				} else if (projectType === "Creator-Posted UGC") {
 					return (
 						<Button
 							variant="secondary"
 							className="flex-grow bg-[#FD5C02] text-white flex items-center justify-center"
 							onClick={() => handleRequestTiktokLink(submission)}
+							disabled={isRequestingTikTokLink}
 						>
-							Request TikTok Link
+							{isRequestingTikTokLink ? "Requesting..." : "Request TikTok Link"}
 						</Button>
 					);
 				}
@@ -752,6 +663,7 @@ export default function ProjectSubmissions({
 						</Button>
 					</div>
 				);
+
 			case "awaiting_payment":
 				return (
 					<div className="flex flex-col w-full gap-2">
@@ -772,6 +684,7 @@ export default function ProjectSubmissions({
 						</Button>
 					</div>
 				);
+
 			case "payment_confirmed":
 				return (
 					<Button
@@ -783,6 +696,7 @@ export default function ProjectSubmissions({
 						<Download className="h-4 w-4 ml-2" />
 					</Button>
 				);
+
 			default:
 				return (
 					<Button
@@ -813,7 +727,13 @@ export default function ProjectSubmissions({
 			<div className="container mx-auto p-6">
 				<div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
 					<strong className="font-bold">Error: </strong>
-					<span className="block sm:inline">{error}</span>
+					<span className="block sm:inline">{error.message}</span>
+					<Button 
+						onClick={() => refetch()} 
+						className="mt-2 bg-red-600 hover:bg-red-700 text-white"
+					>
+						Retry
+					</Button>
 				</div>
 			</div>
 		);
@@ -828,6 +748,9 @@ export default function ProjectSubmissions({
 					<p className="text-gray-500 mb-4">
 						There are no submissions for this project currently.
 					</p>
+					<Button onClick={() => refetch()} className="bg-orange-500 hover:bg-orange-600 text-white">
+						Refresh
+					</Button>
 				</div>
 			</div>
 		);

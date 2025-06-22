@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Heart, Send, ArrowLeft, Video, X } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import {
 	Card,
 	CardContent,
@@ -121,21 +122,196 @@ export interface Creators {
 
 const defaultProfileImg = "";
 
+// Query keys
+const QUERY_KEYS = {
+	creators: ["creators", "approved"] as const,
+	savedCreators: ["savedCreators"] as const,
+};
+
+// API functions
+const fetchCreators = async (): Promise<Creators[]> => {
+	const url = `/api/admin/creator-approval?status=approved`;
+	const response = await fetch(url);
+
+	if (!response.ok) {
+		throw new Error(`Error: ${response.status}`);
+	}
+
+	const data = await response.json();
+
+	// Map the API response data to our Creator interface
+	const mappedCreators = data.creators.map(
+		(creator: {
+			userId: string;
+			firstName?: string;
+			lastName?: string;
+			username?: string;
+			bio?: string;
+			totalGMV?: number;
+			avgGMVPerVideo?: number;
+
+			pricing: {
+				oneVideo?: number;
+				threeVideos?: number;
+				fiveVideos?: number;
+				bulkVideos?: number;
+				bulkVideosNote?: string;
+				aiActorPricing?: number;
+			};
+			logoUrl?: string;
+			contentTypes?: string[];
+			country?: string;
+			socialMedia?: {
+				tiktok?: string;
+			};
+			status?: string;
+			dateOfBirth?: string;
+			gender?: string;
+			ethnicity?: string;
+			contentLinks?: string[];
+			verificationVideoUrl?: string;
+			verifiableIDUrl?: string;
+			creatorProfileData?: {
+				tiktokAvatarUrl?: string;
+				tiktokDisplayName?: string;
+			};
+			abnNumber?: string;
+			aboutMeVideoUrl?: string;
+			portfolioVideoUrls?: string[];
+		}) => ({
+			id: creator.userId,
+			name: `${creator.firstName || ""} ${creator.lastName || ""}`.trim(),
+			username: creator.username || "",
+			bio: creator.bio || "",
+			totalGMV: creator.totalGMV || 0,
+			avgGMVPerVideo: creator.avgGMVPerVideo || 0,
+			avgImpressions: "0",
+			pricing: {
+				oneVideo: creator.pricing?.oneVideo || 0,
+				threeVideos: creator.pricing?.threeVideos || 0,
+				fiveVideos: creator.pricing?.fiveVideos || 0,
+				bulkVideos: creator.pricing?.bulkVideos || 0,
+				bulkVideosNote: creator.pricing?.bulkVideosNote || "",
+				aiActorPricing: creator.pricing?.aiActorPricing || 0,
+			},
+			profilePictureUrl: creator.logoUrl || defaultProfileImg,
+			creatorProfileData: {
+				tiktokAvatarUrl: creator.creatorProfileData?.tiktokAvatarUrl || "",
+				tiktokDisplayName: creator.creatorProfileData?.tiktokDisplayName || "",
+			},
+			contentTypes: creator.contentTypes || [],
+			country: creator.country || "",
+			socialMedia: creator.socialMedia || {
+				instagram: "",
+				twitter: "",
+				facebook: "",
+				youtube: "",
+			},
+			tiktokUrl: creator.socialMedia?.tiktok || "",
+			status: creator.status || "pending",
+			dateOfBirth: creator.dateOfBirth || "",
+			gender: creator.gender || "",
+			ethnicity: creator.ethnicity || "",
+			contentLinks: creator.contentLinks || [],
+			verificationVideoUrl: creator.verificationVideoUrl || "",
+			verifiableIDUrl: creator.verifiableIDUrl || "",
+			abnNumber: creator.abnNumber,
+			aboutMeVideoUrl: creator.aboutMeVideoUrl,
+			portfolioVideoUrls: creator.portfolioVideoUrls || [],
+		})
+	);
+
+	return mappedCreators;
+};
+
+const createConversation = async ({
+	currentUserId,
+	creatorId,
+	userData,
+	creatorData,
+}: {
+	currentUserId: string;
+	creatorId: string;
+	userData: {
+		name: string;
+		avatar: string;
+		username: string;
+	};
+	creatorData: {
+		name: string;
+		avatar: string;
+		username: string;
+	};
+}) => {
+	const response = await fetch("/api/createConversation", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({
+			currentUserId,
+			creatorId,
+			userData,
+			creatorData,
+		}),
+	});
+
+	const data = await response.json();
+
+	if (!response.ok) {
+		throw new Error(data.error || "Failed to create conversation");
+	}
+
+	return data;
+};
+
+// Custom hooks for localStorage operations
+const useSavedCreators = () => {
+	const [isClient, setIsClient] = useState(false);
+
+	useEffect(() => {
+		setIsClient(true);
+	}, []);
+
+	const getSavedCreators = (): Creators[] => {
+		if (!isClient) return [];
+		const savedCreatorsData = localStorage.getItem("savedCreators");
+		if (savedCreatorsData) {
+			try {
+				return JSON.parse(savedCreatorsData);
+			} catch (e) {
+				console.error("Error parsing saved creators:", e);
+				localStorage.removeItem("savedCreators");
+				return [];
+			}
+		}
+		return [];
+	};
+
+	const setSavedCreators = (creators: Creators[]) => {
+		if (!isClient) return;
+		localStorage.setItem("savedCreators", JSON.stringify(creators));
+	};
+
+	return {
+		getSavedCreators,
+		setSavedCreators,
+		isClient,
+	};
+};
+
 const CreatorMarketplace = () => {
 	const router = useRouter();
 	const pathname = usePathname();
 	const { currentUser } = useAuth();
+	const { getSavedCreators, setSavedCreators, isClient } = useSavedCreators();
 
 	const isSavedCreatorsPage = pathname === "/brand/dashboard/creators/saved";
 
 	const [selectedCreator, setSelectedCreator] = useState<Creators | null>(null);
 	const [showAlert, setShowAlert] = useState<boolean>(false);
-	const [savedCreators, setSavedCreators] = useState<Creators[]>([]);
+	const [savedCreators, setSavedCreatorsState] = useState<Creators[]>([]);
 	const [alertMessage, setAlertMessage] = useState<string>("");
-	const [creators, setCreators] = useState<Creators[]>([]);
-	const [isClient, setIsClient] = useState(false);
-	const [isLoading, setIsLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
 	const [currentPlayingVideo, setCurrentPlayingVideo] = useState<string | null>(
 		null
 	);
@@ -151,8 +327,45 @@ const CreatorMarketplace = () => {
 	const [selectedNationalities, setSelectedNationalities] = useState<string[]>(
 		[]
 	);
-
 	const [searchTerm, setSearchTerm] = useState("");
+
+	// Fetch creators using React Query
+	const {
+		data: creators = [],
+		isLoading,
+		error,
+		refetch: refetchCreators,
+	} = useQuery({
+		queryKey: QUERY_KEYS.creators,
+		queryFn: fetchCreators,
+		staleTime: 5 * 60 * 1000, // 5 minutes
+		gcTime: 10 * 60 * 1000, // 10 minutes
+		retry: 3,
+		retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+	});
+
+	// Create conversation mutation
+	const createConversationMutation = useMutation({
+		mutationFn: createConversation,
+		onSuccess: (data) => {
+			// Navigate to chat page with this conversation
+			const timestamp = Date.now();
+			router.push(
+				`/brand/dashboard/messages?conversation=${data.conversationId}&refresh=${timestamp}`
+			);
+		},
+		onError: (error) => {
+			console.error("Error creating conversation:", error);
+			alert("Failed to start conversation. Please try again.");
+		},
+	});
+
+	// Initialize saved creators from localStorage
+	useEffect(() => {
+		if (isClient) {
+			setSavedCreatorsState(getSavedCreators());
+		}
+	}, [isClient]);
 
 	const handleSearchChange = (e: {
 		target: { value: React.SetStateAction<string> };
@@ -163,144 +376,6 @@ const CreatorMarketplace = () => {
 	const clearSearch = () => {
 		setSearchTerm("");
 	};
-
-	// Fetch creators from Firebase
-	useEffect(() => {
-		const fetchCreators = async () => {
-			try {
-				setIsLoading(true);
-
-				// Fetch from API endpoint instead of direct Firebase access
-				const url = `/api/admin/creator-approval?status=approved`;
-				const response = await fetch(url);
-
-				if (!response.ok) {
-					throw new Error(`Error: ${response.status}`);
-				}
-
-				const data = await response.json();
-
-				// Map the API response data to our Creator interface
-				const mappedCreators = data.creators.map(
-					(creator: {
-						userId: string;
-						firstName?: string;
-						lastName?: string;
-						username?: string;
-						bio?: string;
-						totalGMV?: number;
-						avgGMVPerVideo?: number;
-
-						pricing: {
-							oneVideo?: number;
-							threeVideos?: number;
-							fiveVideos?: number;
-							bulkVideos?: number;
-							bulkVideosNote?: string;
-							aiActorPricing?: number;
-						};
-						logoUrl?: string;
-						contentTypes?: string[];
-						country?: string;
-						socialMedia?: {
-							tiktok?: string;
-						};
-						status?: string;
-						dateOfBirth?: string;
-						gender?: string;
-						ethnicity?: string;
-						contentLinks?: string[];
-						verificationVideoUrl?: string;
-						verifiableIDUrl?: string;
-						creatorProfileData?: {
-							tiktokAvatarUrl?: string;
-							tiktokDisplayName?: string;
-						};
-						abnNumber?: string;
-						aboutMeVideoUrl?: string;
-						portfolioVideoUrls?: string[];
-					}) => ({
-						id: creator.userId,
-						name: `${creator.firstName || ""} ${creator.lastName || ""}`.trim(),
-						username: creator.username || "",
-						bio: creator.bio || "",
-						totalGMV: creator.totalGMV || 0,
-						avgGMVPerVideo: creator.avgGMVPerVideo || 0,
-						avgImpressions: "0",
-						pricing: {
-							oneVideo: creator.pricing?.oneVideo || 0,
-							threeVideos: creator.pricing?.threeVideos || 0,
-							fiveVideos: creator.pricing?.fiveVideos || 0,
-							bulkVideos: creator.pricing?.bulkVideos || 0,
-							bulkVideosNote: creator.pricing?.bulkVideosNote || "",
-							aiActorPricing: creator.pricing?.aiActorPricing || 0,
-						},
-						profilePictureUrl: creator.logoUrl || defaultProfileImg,
-						creatorProfileData: {
-							tiktokAvatarUrl:
-								creator.creatorProfileData?.tiktokAvatarUrl || "",
-							tiktokDisplayName:
-								creator.creatorProfileData?.tiktokDisplayName || "",
-						},
-						contentTypes: creator.contentTypes || [],
-						country: creator.country || "",
-						socialMedia: creator.socialMedia || {
-							instagram: "",
-							twitter: "",
-							facebook: "",
-							youtube: "",
-						},
-						tiktokUrl: creator.socialMedia?.tiktok || "",
-						status: creator.status || "pending",
-						dateOfBirth: creator.dateOfBirth || "",
-						gender: creator.gender || "",
-						ethnicity: creator.ethnicity || "",
-						contentLinks: creator.contentLinks || [],
-						verificationVideoUrl: creator.verificationVideoUrl || "",
-						verifiableIDUrl: creator.verifiableIDUrl || "",
-						abnNumber: creator.abnNumber,
-						aboutMeVideoUrl: creator.aboutMeVideoUrl,
-						portfolioVideoUrls: creator.portfolioVideoUrls || [],
-					})
-				);
-
-				// Use mappedCreators directly as the filtered and mapped data
-				setCreators(mappedCreators);
-			} catch (err) {
-				console.error("Error fetching creators:", err);
-				setError("Failed to load creators. Please try again later.");
-			} finally {
-				setIsLoading(false);
-			}
-		};
-
-		fetchCreators();
-	}, []);
-
-	// Ensure we only access localStorage after component mounts on client
-	useEffect(() => {
-		setIsClient(true);
-		// Load saved creators from localStorage (more persistent than sessionStorage)
-		const savedCreatorsData = localStorage.getItem("savedCreators");
-		if (savedCreatorsData) {
-			try {
-				setSavedCreators(JSON.parse(savedCreatorsData));
-			} catch (e) {
-				console.error("Error parsing saved creators:", e);
-				localStorage.removeItem("savedCreators");
-			}
-		}
-	}, []);
-
-	// Save to localStorage whenever savedCreators changes
-	useEffect(() => {
-		if (
-			isClient &&
-			(savedCreators.length > 0 || localStorage.getItem("savedCreators"))
-		) {
-			localStorage.setItem("savedCreators", JSON.stringify(savedCreators));
-		}
-	}, [savedCreators, isClient]);
 
 	const openVideoModal = (
 		videoUrl: string,
@@ -321,52 +396,27 @@ const CreatorMarketplace = () => {
 	const handleBackToList = (): void => {
 		setSelectedCreator(null);
 	};
+
 	const handleSendMessage = async (creator: Creators) => {
 		if (!currentUser) {
 			alert("You need to be logged in to send messages");
 			return;
 		}
-	
-		try {
-			// Show loading indicator or disable button here if needed
-	
-			const response = await fetch("/api/createConversation", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					currentUserId: currentUser.uid,
-					creatorId: creator.id,
-					userData: {
-						name: currentUser.displayName || "User",
-						avatar: currentUser.photoURL || "/icons/default-avatar.svg",
-						username: currentUser.email?.split("@")[0] || "",
-					},
-					creatorData: {
-						name: creator.name,
-						avatar: creator.profilePictureUrl,
-						username: creator.username,
-					},
-				}),
-			});
-	
-			const data = await response.json();
-	
-			if (!response.ok) {
-				throw new Error(data.error || "Failed to create conversation");
-			}
-	
-			// Navigate to chat page with this conversation
-			// Add a timestamp or random param to force a fresh load
-			const timestamp = Date.now();
-			router.push(
-				`/brand/dashboard/messages?conversation=${data.conversationId}&refresh=${timestamp}`
-			);
-		} catch (error) {
-			console.error("Error creating conversation:", error);
-			alert("Failed to start conversation. Please try again.");
-		}
+
+		createConversationMutation.mutate({
+			currentUserId: currentUser.uid,
+			creatorId: creator.id,
+			userData: {
+				name: currentUser.displayName || "User",
+				avatar: currentUser.photoURL || "/icons/default-avatar.svg",
+				username: currentUser.email?.split("@")[0] || "",
+			},
+			creatorData: {
+				name: creator.name,
+				avatar: creator.profilePictureUrl,
+				username: creator.username,
+			},
+		});
 	};
 
 	const isCreatorSaved = (creatorId: string): boolean => {
@@ -374,28 +424,24 @@ const CreatorMarketplace = () => {
 	};
 
 	const handleSaveCreator = (creator: Creators): void => {
+		let newSavedCreators;
+
 		if (!isCreatorSaved(creator.id)) {
-			const newSavedCreators = [...savedCreators, creator];
-			setSavedCreators(newSavedCreators);
-			// Immediately update localStorage to ensure consistency
-			if (isClient) {
-				localStorage.setItem("savedCreators", JSON.stringify(newSavedCreators));
-			}
+			newSavedCreators = [...savedCreators, creator];
 			setAlertMessage("Profile saved to your favorites!");
 		} else {
-			const updatedSavedCreators = savedCreators.filter(
+			newSavedCreators = savedCreators.filter(
 				(saved) => saved.id !== creator.id
 			);
-			setSavedCreators(updatedSavedCreators);
-			// Immediately update localStorage to ensure consistency
-			if (isClient) {
-				localStorage.setItem(
-					"savedCreators",
-					JSON.stringify(updatedSavedCreators)
-				);
-			}
 			setAlertMessage("Profile removed from your favorites!");
 		}
+
+		// Update both state and localStorage in one place
+		setSavedCreatorsState(newSavedCreators);
+		if (isClient) {
+			setSavedCreators(newSavedCreators); // This updates localStorage
+		}
+
 		setShowAlert(true);
 		setTimeout(() => setShowAlert(false), 3000);
 	};
@@ -500,9 +546,11 @@ const CreatorMarketplace = () => {
 			<div className="container mx-auto p-3 md:p-4">
 				<div className="bg-red-50 border border-red-200 p-4 rounded-lg text-center">
 					<h3 className="font-medium text-red-800 mb-2">Error</h3>
-					<p className="text-red-600">{error}</p>
+					<p className="text-red-600">
+						{error instanceof Error ? error.message : "Failed to load creators"}
+					</p>
 					<button
-						onClick={() => window.location.reload()}
+						onClick={() => refetchCreators()}
 						className="mt-4 px-4 py-2 bg-red-500 text-white rounded-md"
 					>
 						Try Again
@@ -583,9 +631,12 @@ const CreatorMarketplace = () => {
 							<div className="flex gap-3">
 								<Button
 									onClick={() => handleSendMessage(selectedCreator)}
+									disabled={createConversationMutation.isPending}
 									className="bg-orange-500 hover:bg-orange-600 text-white"
 								>
-									Send Message
+									{createConversationMutation.isPending
+										? "Sending..."
+										: "Send Message"}
 									<Send size={16} className="" />
 								</Button>
 								<Button

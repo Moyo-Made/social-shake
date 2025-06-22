@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, SetStateAction } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import {
 	Select,
@@ -40,6 +41,143 @@ export interface Project {
 	rawData: ProjectFormData;
 }
 
+// Fetch projects function
+const fetchProjects = async (userId: string | null): Promise<Project[]> => {
+	if (!userId) {
+		return [];
+	}
+
+	// Create a reference to the projects collection
+	const projectsRef = collection(db, "projects");
+
+	// Create a query filtered by the current user's ID
+	const projectsQuery = query(
+		projectsRef,
+		where("userId", "==", userId),
+		orderBy("createdAt", "desc")
+	);
+
+	const querySnapshot = await getDocs(projectsQuery);
+
+	// Format the data to match our component's expected structure
+	const projectsData = querySnapshot.docs.map((doc) => {
+		const data = doc.data();
+
+		// Determine status based on the status field or default to Draft
+		const rawStatus = data.status || "Accepting Pitches";
+		// Make first letter of each word uppercase for display
+		const status = rawStatus
+			.split(" ")
+			.map(
+				(word: string) =>
+					word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+			)
+			.join(" ");
+
+		// Extract description, which could be a string or array
+		const description = Array.isArray(data.projectDetails?.projectDescription)
+			? data.projectDetails.projectDescription.join(" ")
+			: data.projectDetails?.projectDescription || "";
+
+		// Get thumbnail URL from the project details or use placeholder
+		const thumbnailUrl = data.projectDetails?.projectThumbnail;
+
+		return {
+			id: doc.id,
+			status: status.charAt(0).toUpperCase() + status.slice(1), // Capitalize status
+			title: data.projectDetails?.projectName || "Untitled Project",
+			projectType: data.projectDetails?.projectType || "UGC Content Only",
+			budget: data.creatorPricing?.budgetPerVideo || 0,
+			creatorsRequired: data.creatorPricing?.creatorCount || 0,
+			creatorsApplied: data.applicantsCount || 0,
+			description: description,
+			thumbnailUrl: thumbnailUrl,
+			submissions: {
+				videos: data.submissions?.length || 0,
+				pending: data.pendingSubmissions?.length || 0,
+			},
+			submissionsList: [], // Initialize with empty array, will be populated later
+			// Store the raw data for any additional needs
+			rawData: data as ProjectFormData,
+		};
+	});
+
+	// Fetch submissions for each project
+	const projectsWithSubmissions = await Promise.all(
+		projectsData.map(async (project) => {
+			// Only fetch submissions for projects that should show them
+			if (shouldShowSubmissions(project.status)) {
+				try {
+					const response = await fetch(
+						`/api/project-submissions?projectId=${project.id}`
+					);
+
+					if (response.ok) {
+						const data = await response.json();
+
+						if (data.success && data.submissions) {
+							const basicSubmissions = data.submissions;
+
+							// Transform the API response to match our Submission interface
+							const transformedSubmissions = basicSubmissions.map(
+								// eslint-disable-next-line @typescript-eslint/no-explicit-any
+								(submission: any, index: number) => ({
+									id: submission.id,
+									userId: submission.userId,
+									projectId: submission.projectId,
+									creatorName: submission.creatorName || "Creator",
+									creatorIcon:
+										submission.creatorIcon || "/placeholder-profile.jpg",
+									videoUrl: submission.videoUrl || "/placeholder-video.jpg",
+									videoNumber: submission.videoNumber || `#${index + 1}`,
+									revisionNumber: submission.revisionNumber
+										? `#${submission.revisionNumber}`
+										: "",
+									status: submission.status || "new",
+									createdAt: new Date(
+										submission.createdAt
+									).toLocaleDateString(),
+									sparkCode: submission.sparkCode || "",
+								})
+							);
+
+							// Return project with submissions data
+							return {
+								...project,
+								submissionsList: transformedSubmissions,
+								submissions: {
+									videos: transformedSubmissions.length,
+									pending: transformedSubmissions.filter(
+										(sub: { status: string }) => sub.status === "pending"
+									).length,
+								},
+							};
+						}
+					}
+				} catch (err) {
+					console.error(
+						`Error fetching submissions for project ${project.id}:`,
+						err
+					);
+				}
+			}
+
+			// If fetch failed or wasn't attempted, return project as is
+			return project;
+		})
+	);
+
+	return projectsWithSubmissions;
+};
+
+// Helper function to determine if project should show submissions
+const shouldShowSubmissions = (status: string) => {
+	// Only show submissions for active or completed projects
+	return ["active", "invite", "ongoing project", "completed"].includes(
+		status.toLowerCase()
+	);
+};
+
 const ProjectDashboard = () => {
 	const { startNewProject } = useProjectForm();
 	const [searchTerm, setSearchTerm] = useState("");
@@ -50,18 +188,9 @@ const ProjectDashboard = () => {
 	);
 	const [viewType, setViewType] = useState("grid"); // 'grid' or 'list'
 	const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
-	const [projects, setProjects] = useState<Project[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
 	const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
 	const router = useRouter();
-
-	const handleCreateNew = () => {
-		startNewProject();
-		// Then navigate to create form
-		router.push("/brand/dashboard/projects/new");
-	};
 
 	// Set up auth state listener to get current user ID
 	useEffect(() => {
@@ -70,175 +199,28 @@ const ProjectDashboard = () => {
 				setCurrentUserId(user.uid);
 			} else {
 				setCurrentUserId(null);
-				setProjects([]);
-				setFilteredProjects([]);
-				setLoading(false);
 			}
 		});
 
 		return () => unsubscribe();
 	}, []);
 
-	// Fetch projects from Firebase when user ID changes
+	// TanStack Query for fetching projects
+	const {
+		data: projects = [],
+		isLoading,
+		error,
+		refetch,
+	} = useQuery({
+		queryKey: ["projects", currentUserId],
+		queryFn: () => fetchProjects(currentUserId),
+		enabled: !!currentUserId, // Only run query when we have a user ID
+		staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+		gcTime: 10 * 60 * 1000, // Keep data in cache for 10 minutes
+	});
+
+	// Apply filters whenever filter states or projects change
 	useEffect(() => {
-		if (!currentUserId) {
-			// If no user is logged in or ID isn't available, don't fetch
-			setProjects([]);
-			setFilteredProjects([]);
-			setLoading(false);
-			return;
-		}
-
-		const fetchProjects = async () => {
-			try {
-				setLoading(true);
-				console.log("Fetching projects for user ID:", currentUserId);
-
-				// Create a reference to the projects collection
-				const projectsRef = collection(db, "projects");
-
-				// Create a query filtered by the current user's ID
-				const projectsQuery = query(
-					projectsRef,
-					where("userId", "==", currentUserId),
-					orderBy("createdAt", "desc")
-				);
-
-				const querySnapshot = await getDocs(projectsQuery);
-				console.log(`Found ${querySnapshot.size} projects for this user`);
-
-				// Format the data to match our component's expected structure
-				const projectsData = querySnapshot.docs.map((doc) => {
-					const data = doc.data();
-
-					// Determine status based on the status field or default to Draft
-					const rawStatus = data.status || "Accepting Pitches";
-					// Make first letter of each word uppercase for display
-					const status = rawStatus
-						.split(" ")
-						.map(
-							(word: string) =>
-								word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-						)
-						.join(" ");
-
-					// Extract description, which could be a string or array
-					const description = Array.isArray(
-						data.projectDetails?.projectDescription
-					)
-						? data.projectDetails.projectDescription.join(" ")
-						: data.projectDetails?.projectDescription || "";
-
-					// Get thumbnail URL from the project details or use placeholder
-					const thumbnailUrl = data.projectDetails?.projectThumbnail;
-
-					return {
-						id: doc.id,
-						status: status.charAt(0).toUpperCase() + status.slice(1), // Capitalize status
-						title: data.projectDetails?.projectName || "Untitled Project",
-						projectType: data.projectDetails?.projectType || "UGC Content Only",
-						budget: data.creatorPricing?.budgetPerVideo || 0,
-						creatorsRequired: data.creatorPricing?.creatorCount || 0,
-						creatorsApplied: data.applicantsCount || 0,
-						description: description,
-						thumbnailUrl: thumbnailUrl,
-						submissions: {
-							videos: data.submissions?.length || 0,
-							pending: data.pendingSubmissions?.length || 0,
-						},
-						submissionsList: [], // Initialize with empty array, will be populated later
-						// Store the raw data for any additional needs
-						rawData: data as ProjectFormData,
-					};
-				});
-
-				// First set projects without submissions to show something to user quickly
-				setProjects(projectsData);
-				setFilteredProjects(projectsData);
-
-				// Then fetch submissions for each project
-				const projectsWithSubmissions = await Promise.all(
-					projectsData.map(async (project) => {
-						// Only fetch submissions for projects that should show them
-						if (shouldShowSubmissions(project.status)) {
-							try {
-								const response = await fetch(
-									`/api/project-submissions?projectId=${project.id}`
-								);
-
-								if (response.ok) {
-									const data = await response.json();
-
-									if (data.success && data.submissions) {
-										const basicSubmissions = data.submissions;
-
-										// Transform the API response to match our Submission interface
-										const transformedSubmissions = basicSubmissions.map(
-											// eslint-disable-next-line @typescript-eslint/no-explicit-any
-											(submission: any, index: number) => ({
-												id: submission.id,
-												userId: submission.userId,
-												projectId: submission.projectId,
-												creatorName: submission.creatorName || "Creator",
-												creatorIcon:
-													submission.creatorIcon || "/placeholder-profile.jpg",
-												videoUrl:
-													submission.videoUrl || "/placeholder-video.jpg",
-												videoNumber: submission.videoNumber || `#${index + 1}`,
-												revisionNumber: submission.revisionNumber
-													? `#${submission.revisionNumber}`
-													: "",
-												status: submission.status || "new",
-												createdAt: new Date(
-													submission.createdAt
-												).toLocaleDateString(),
-												sparkCode: submission.sparkCode || "",
-											})
-										);
-
-										// Return project with submissions data
-										return {
-											...project,
-											submissionsList: transformedSubmissions,
-											submissions: {
-												videos: transformedSubmissions.length,
-												pending: transformedSubmissions.filter(
-													(sub: { status: string }) => sub.status === "pending"
-												).length,
-											},
-										};
-									}
-								}
-							} catch (err) {
-								console.error(
-									`Error fetching submissions for project ${project.id}:`,
-									err
-								);
-							}
-						}
-
-						// If fetch failed or wasn't attempted, return project as is
-						return project;
-					})
-				);
-
-				// Update state with the projects that now include submissions data
-				setProjects(projectsWithSubmissions);
-				setFilteredProjects(projectsWithSubmissions);
-				setLoading(false);
-			} catch (err: unknown) {
-				console.error("Error fetching projects:", err);
-				setError(`Failed to load projects: ${(err as Error).message}`);
-				setLoading(false);
-			}
-		};
-
-		fetchProjects();
-	}, [currentUserId]);
-
-	// Apply filters whenever filter states change
-	useEffect(() => {
-		// Define applyFilters inside the effect
 		const applyFilters = () => {
 			let result = [...projects];
 
@@ -277,7 +259,19 @@ const ProjectDashboard = () => {
 		};
 
 		applyFilters();
-	}, [searchTerm, statusFilter, budgetFilter, projectTypeFilter, projects]);
+	}, [
+		searchTerm,
+		statusFilter,
+		budgetFilter,
+		projectTypeFilter,
+		projects.length,
+	]); // Changed: Use projects.length instead of projects
+
+	const handleCreateNew = () => {
+		startNewProject();
+		// Then navigate to create form
+		router.push("/brand/dashboard/projects/new");
+	};
 
 	// Handle search input change
 	const handleSearch = (e: { target: { value: SetStateAction<string> } }) => {
@@ -335,13 +329,6 @@ const ProjectDashboard = () => {
 		];
 
 		return !nonEditableStatuses.includes(status.toLowerCase());
-	};
-
-	const shouldShowSubmissions = (status: string) => {
-		// Only show submissions for active or completed projects
-		return ["active", "invite", "ongoing project", "completed"].includes(
-			status.toLowerCase()
-		);
 	};
 
 	return (
@@ -451,7 +438,7 @@ const ProjectDashboard = () => {
 			</div>
 
 			{/* Loading state */}
-			{loading && (
+			{isLoading && (
 				<div className="flex flex-col items-center justify-center text-center py-12">
 					<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
 					<p className="text-gray-500">Loading projects...</p>
@@ -461,10 +448,12 @@ const ProjectDashboard = () => {
 			{/* Error state */}
 			{error && (
 				<div className="text-center py-12">
-					<p className="text-red-500">Error loading projects: {error}</p>
+					<p className="text-red-500">
+						Error loading projects: {error.message}
+					</p>
 					<button
 						className="mt-4 bg-orange-500 text-white font-medium py-2 px-4 rounded-md"
-						onClick={() => window.location.reload()}
+						onClick={() => refetch()}
 					>
 						Retry
 					</button>
@@ -472,7 +461,7 @@ const ProjectDashboard = () => {
 			)}
 
 			{/* Empty state */}
-			{!loading && !error && filteredProjects.length === 0 && (
+			{!isLoading && !error && filteredProjects.length === 0 && (
 				<div className="text-center py-12">
 					<p className="text-gray-500">
 						{currentUserId
@@ -483,7 +472,7 @@ const ProjectDashboard = () => {
 			)}
 
 			{/* Projects display - Grid View */}
-			{!loading &&
+			{!isLoading &&
 				!error &&
 				filteredProjects.length > 0 &&
 				viewType === "grid" && (
@@ -690,7 +679,7 @@ const ProjectDashboard = () => {
 				)}
 
 			{/* Projects display - List View */}
-			{!loading &&
+			{!isLoading &&
 				!error &&
 				filteredProjects.length > 0 &&
 				viewType === "list" && (
@@ -750,206 +739,7 @@ const ProjectDashboard = () => {
 										</div>
 									</div>
 
-									<p className="ext-base text-[#667085] mb-4 line-clamp-3">
-										{project.description}
-									</p>
-
-									{/* Project Details Section - LIST VIEW - UPDATED TO 4 COLUMNS */}
-									<div className="border-t border-gray-200 pt-4 grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-										{/* Project Budget */}
-										<div className="flex items-center gap-2">
-											<Image
-												src="/icons/dollar.svg"
-												alt="Dollar icon"
-												width={25}
-												height={25}
-											/>
-											<div>
-												<p className="text-sm text-orange-500 font-medium">
-													Project Budget
-												</p>
-												<p className="text-sm font-normal">
-													${project.budget}/Creator
-												</p>
-											</div>
-										</div>
-
-										{/* Creators Required */}
-										<div>
-											<p className="text-sm text-orange-500 font-medium">
-												Creators Required
-											</p>
-											<p className="text-sm font-normal">
-												{project.creatorsRequired} Creators
-											</p>
-										</div>
-
-										{/* Show Creators Applied conditionally */}
-										{shouldShowSubmissions(project.status) && (
-											<div className="flex items-center gap-2">
-												<Image
-													src="/icons/applied.svg"
-													alt="Creator applied icon"
-													width={25}
-													height={25}
-												/>
-												<div>
-													<p className="text-sm text-orange-500 font-medium">
-														Creators Applied
-													</p>
-													<p className="text-sm font-normal">
-														{project.creatorsApplied} Applied
-													</p>
-												</div>
-											</div>
-										)}
-
-										{/* Show Submissions directly in the grid for list view */}
-										{shouldShowSubmissions(project.status) && (
-											<div className="flex items-center gap-2">
-												<Image
-													src="/icons/applied.svg"
-													alt="Submissions icon"
-													width={25}
-													height={25}
-												/>
-												<div>
-													<span className="text-sm text-orange-500 font-medium">
-														Submissions
-													</span>{" "}
-													<p className="text-sm font-normal">
-														{project.submissionsList.length}{" "}
-														{project.submissionsList.length !== 1
-															? "Videos"
-															: "Video"}{" "}
-														•{" "}
-														{
-															project.submissionsList.filter(
-																(sub) => sub.status === "pending"
-															).length
-														}{" "}
-														Pending
-													</p>
-												</div>
-											</div>
-										)}
-									</div>
-
-									{/* Action Button */}
-									{shouldShowEditButton(project.status) ? (
-										<Link
-											href={`/brand/dashboard/projects/edit/${project.id}`}
-											className="w-full flex py-2 px-4 bg-orange-500 text-white font-medium rounded-md items-center justify-center gap-2"
-										>
-											Edit Project
-											<svg
-												width="16"
-												height="16"
-												viewBox="0 0 24 24"
-												fill="none"
-												xmlns="http://www.w3.org/2000/svg"
-												className="inline ml-2"
-											>
-												<path
-													d="M5 12H19M19 12L12 5M19 12L12 19"
-													stroke="currentColor"
-													strokeWidth="2"
-													strokeLinecap="round"
-													strokeLinejoin="round"
-												/>
-											</svg>
-										</Link>
-									) : (
-										<Link
-											href={`/brand/dashboard/projects/${project.id}`}
-											className="w-full flex py-2 px-4 bg-orange-500 text-white font-medium rounded-md items-center justify-center gap-2"
-										>
-											View Project
-											<svg
-												width="16"
-												height="16"
-												viewBox="0 0 24 24"
-												fill="none"
-												xmlns="http://www.w3.org/2000/svg"
-											>
-												<path
-													d="M5 12H19M19 12L12 5M19 12L12 19"
-													stroke="currentColor"
-													strokeWidth="2"
-													strokeLinecap="round"
-													strokeLinejoin="round"
-												/>
-											</svg>
-										</Link>
-									)}
-								</div>
-							</div>
-						))}
-					</div>
-				)}
-
-			{/* Projects display - List View */}
-			{!loading &&
-				!error &&
-				filteredProjects.length > 0 &&
-				viewType === "list" && (
-					<div className="space-y-4">
-						{filteredProjects.map((project) => (
-							<div
-								key={project.id}
-								className="bg-white border border-[#D2D2D2] rounded-xl shadow-sm overflow-hidden flex flex-col md:flex-row p-3"
-							>
-								<div className="relative w-full md:w-72 h-48 md:h-auto flex-shrink-0">
-									{project.thumbnailUrl ? (
-										// eslint-disable-next-line @next/next/no-img-element
-										<img
-											src={project.thumbnailUrl}
-											alt={`${project.title} thumbnail`}
-											className="w-full h-48 object-cover"
-											onError={handleImageError}
-											loading="lazy"
-										/>
-									) : (
-										<div className="w-full h-48 bg-gray-100 flex items-center justify-center rounded-xl">
-											<p className="text-gray-400">No thumbnail available</p>
-										</div>
-									)}
-								</div>
-
-								<div className="py-3 px-6 flex-1">
-									<div className="flex flex-col md:flex-row justify-between items-start mb-3">
-										<div>
-											<h3 className="text-lg font-semibold mb-2">
-												{project.title || "Untitled Project"}
-											</h3>
-											{/* Project Type Badge */}
-											<div className="flex items-center gap-2 mb-2 bg-[#FFF4EE] rounded-full py-2 px-4 w-fit">
-												<div className="w-6 h-6 rounded-full flex items-center justify-center">
-													<Image
-														src={getProjectTypeIcon(project.projectType)}
-														alt={project.projectType}
-														width={20}
-														height={20}
-													/>
-												</div>
-												<span className="text-sm font-normal">
-													{project.projectType}
-												</span>
-											</div>
-										</div>
-
-										{/* Status Badge */}
-										<div className="flex gap-1 items-center mb-4">
-											<div className="text-[#667085] text-base">Status:</div>
-											<div
-												className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${getStatusStyle(project.status).color}`}
-											>
-												{getStatusStyle(project.status).text}
-											</div>
-										</div>
-									</div>
-
-									<p className="ext-base text-[#667085] mb-4 line-clamp-3">
+									<p className="text-base text-[#667085] mb-4 line-clamp-3">
 										{project.description}
 									</p>
 

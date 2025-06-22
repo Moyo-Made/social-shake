@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface NotificationSetting {
 	id: string;
@@ -10,94 +11,84 @@ interface NotificationSetting {
 	enabled: boolean;
 }
 
+const defaultSettings: NotificationSetting[] = [
+	{
+		id: "creator_applications",
+		title: "New creator applications",
+		description: "Receive emails when creators apply to your projects",
+		enabled: true,
+	},
+	{
+		id: "submission_approvals",
+		title: "Project Submission approval requests",
+		description: "Get notified when submissions needs your approval",
+		enabled: true,
+	},
+	{
+		id: "payment_receipts",
+		title: "Payment receipts",
+		description: "Receive email confirmations for all payments",
+		enabled: true,
+	},
+	{
+		id: "milestone_updates",
+		title: "Creator milestone updates",
+		description: "Get notified about project progress and milestones",
+		enabled: true,
+	},
+	{
+		id: "deadline_reminders",
+		title: "Contest deadline reminders",
+		description: "Receive reminders about upcoming project deadlines",
+		enabled: false,
+	},
+];
+
 export default function NotificationPreferences() {
 	const { currentUser } = useAuth();
-	const [settings, setSettings] = useState<NotificationSetting[]>([
-		{
-			id: "creator_applications",
-			title: "New creator applications",
-			description: "Receive emails when creators apply to your projects",
-			enabled: true,
-		},
-		{
-			id: "submission_approvals",
-			title: "Project Submission approval requests",
-			description: "Get notified when submissions needs your approval",
-			enabled: true,
-		},
-		{
-			id: "payment_receipts",
-			title: "Payment receipts",
-			description: "Receive email confirmations for all payments",
-			enabled: true,
-		},
-		{
-			id: "milestone_updates",
-			title: "Creator milestone updates",
-			description: "Get notified about project progress and milestones",
-			enabled: true,
-		},
-		{
-			id: "deadline_reminders",
-			title: "Contest deadline reminders",
-			description: "Receive reminders about upcoming project deadlines",
-			enabled: false,
-		},
-	]);
-	const [isSaving, setIsSaving] = useState(false);
-	const [isLoading, setIsLoading] = useState(true);
+	const queryClient = useQueryClient();
+	const [localSettings, setLocalSettings] = useState<NotificationSetting[]>(defaultSettings);
 
-	// Fetch current notification settings
-	useEffect(() => {
-		async function fetchSettings() {
-			if (!currentUser) return;
+	// Fetch notification settings
+	const {
+		data: settings,
+		isLoading,
+		error,
+	} = useQuery({
+		queryKey: ["notificationSettings", currentUser?.uid],
+		queryFn: async () => {
+			if (!currentUser) throw new Error("No user authenticated");
 
-			try {
-				const userDocRef = doc(db, "users", currentUser.uid);
-				const userDoc = await getDoc(userDocRef);
+			const userDocRef = doc(db, "users", currentUser.uid);
+			const userDoc = await getDoc(userDocRef);
 
-				if (userDoc.exists() && userDoc.data().notificationSettings) {
-					const userSettings = userDoc.data().notificationSettings;
+			if (userDoc.exists() && userDoc.data().notificationSettings) {
+				const userSettings = userDoc.data().notificationSettings;
 
-					// Update local state with user's saved preferences
-					setSettings((prev) =>
-						prev.map((setting) => ({
-							...setting,
-							enabled:
-								userSettings[setting.id] !== undefined
-									? userSettings[setting.id]
-									: setting.enabled,
-						}))
-					);
-				}
-				setIsLoading(false);
-			} catch (error) {
-				console.error("Error fetching notification settings:", error);
-				setIsLoading(false);
+				// Merge default settings with user's saved preferences
+				return defaultSettings.map((setting) => ({
+					...setting,
+					enabled:
+						userSettings[setting.id] !== undefined
+							? userSettings[setting.id]
+							: setting.enabled,
+				}));
 			}
-		}
 
-		fetchSettings();
-	}, [currentUser]);
+			return defaultSettings;
+		},
+		enabled: !!currentUser,
+	});
 
-	const toggleSetting = (id: string) => {
-		setSettings((prev) =>
-			prev.map((setting) =>
-				setting.id === id ? { ...setting, enabled: !setting.enabled } : setting
-			)
-		);
-	};
+	// Save notification settings mutation
+	const saveSettingsMutation = useMutation({
+		mutationFn: async (newSettings: NotificationSetting[]) => {
+			if (!currentUser) throw new Error("No user authenticated");
 
-	const savePreferences = async () => {
-		if (!currentUser) return;
-
-		setIsSaving(true);
-
-		try {
 			const userDocRef = doc(db, "users", currentUser.uid);
 
 			// Convert settings array to object for storage
-			const settingsObj = settings.reduce(
+			const settingsObj = newSettings.reduce(
 				(acc, setting) => {
 					acc[setting.id] = setting.enabled;
 					return acc;
@@ -110,12 +101,45 @@ export default function NotificationPreferences() {
 				updatedAt: new Date(),
 			});
 
-			setIsSaving(false);
-		} catch (error) {
+			return newSettings;
+		},
+		onSuccess: (updatedSettings) => {
+			// Update the query cache with the new settings
+			queryClient.setQueryData(
+				["notificationSettings", currentUser?.uid],
+				updatedSettings
+			);
+		},
+		onError: (error) => {
 			console.error("Error saving notification preferences:", error);
-			setIsSaving(false);
+			// Reset local state to server state on error
+			if (settings) {
+				setLocalSettings(settings);
+			}
+		},
+	});
+
+	// Initialize local state when query data loads
+	useState(() => {
+		if (settings) {
+			setLocalSettings(settings);
 		}
+	});
+
+	const toggleSetting = (id: string) => {
+		setLocalSettings((prev) =>
+			prev.map((setting) =>
+				setting.id === id ? { ...setting, enabled: !setting.enabled } : setting
+			)
+		);
 	};
+
+	const savePreferences = () => {
+		saveSettingsMutation.mutate(localSettings);
+	};
+
+	// Use settings from query or local state as fallback
+	const currentSettings = settings || localSettings;
 
 	if (isLoading) {
 		return (
@@ -126,15 +150,25 @@ export default function NotificationPreferences() {
 		);
 	}
 
+	if (error) {
+		return (
+			<div className="bg-red-50 border border-red-200 rounded-lg p-4 max-w-3xl mx-auto">
+				<p className="text-red-600">
+					Error loading notification preferences. Please try again.
+				</p>
+			</div>
+		);
+	}
+
 	return (
-		<div className="bg-white border border-[#FFD9C3] rounded-lg shadow-md p-6  max-w-3xl mx-auto">
+		<div className="bg-white border border-[#FFD9C3] rounded-lg shadow-md p-6 max-w-3xl mx-auto">
 			<h2 className="text-xl font-medium mb-1">Notifications & Alerts</h2>
 			<p className="text-gray-500 mb-2">
 				Manage your notification preferences.
 			</p>
 			<hr className="my-4" />
 			<div className="space-y-6">
-				{settings.map((setting) => (
+				{currentSettings.map((setting) => (
 					<div key={setting.id} className="flex items-center justify-between">
 						<div>
 							<h3 className="font-medium text-base">{setting.title}</h3>
@@ -162,12 +196,28 @@ export default function NotificationPreferences() {
 			<div className="mt-8 flex justify-end">
 				<button
 					onClick={savePreferences}
-					disabled={isSaving}
-					className="bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-6 rounded-lg transition-colors"
+					disabled={saveSettingsMutation.isPending}
+					className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-medium py-2 px-6 rounded-lg transition-colors"
 				>
-					{isSaving ? "Saving..." : "Save Preferences"}
+					{saveSettingsMutation.isPending ? "Saving..." : "Save Preferences"}
 				</button>
 			</div>
+
+			{saveSettingsMutation.isError && (
+				<div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+					<p className="text-red-600 text-sm">
+						Failed to save preferences. Please try again.
+					</p>
+				</div>
+			)}
+
+			{saveSettingsMutation.isSuccess && (
+				<div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+					<p className="text-green-600 text-sm">
+						Preferences saved successfully!
+					</p>
+				</div>
+			)}
 		</div>
 	);
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
@@ -11,93 +11,97 @@ import { getStatusStyle } from "@/utils/statusUtils";
 import ProjectSubmissions from "./ProjectSubmissions";
 import ProductDelivery from "./ProductDelivery";
 import Image from "next/image";
-// import ProjectAnalytics from "./ProjectAnalytics";
-// import AffiliatePayout from "./AffiliatePayout";
 import ProjectApplications from "./ProjectApplications";
 import { CreatorSubmission } from "@/types/submission";
 import { ProjectFormProvider } from "../ProjectFormContext";
 import { topLanguages } from "@/types/languages";
+import { useQuery } from "@tanstack/react-query";
 
 interface ProjectDetailPageProps {
 	projectId: string;
 }
+
+// Query functions
+const fetchProjectData = async (projectId: string): Promise<ProjectFormData> => {
+	const projectRef = doc(db, "projects", projectId.toString());
+	const projectSnap = await getDoc(projectRef);
+
+	if (projectSnap.exists()) {
+		return projectSnap.data() as ProjectFormData;
+	} else {
+		throw new Error("Project not found");
+	}
+};
+
+const fetchSubmissions = async (projectId: string): Promise<CreatorSubmission[]> => {
+	const response = await fetch(`/api/project-submissions?projectId=${projectId}`);
+
+	if (!response.ok) {
+		throw new Error(`Error fetching submissions: ${response.statusText}`);
+	}
+
+	const data = await response.json();
+
+	if (data.success && data.submissions) {
+		const basicSubmissions = data.submissions;
+
+		// Transform the API response to match our Submission interface
+		const transformedSubmissions = basicSubmissions.map(
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			(submission: any, index: number) => ({
+				id: submission.id,
+				userId: submission.userId,
+				projectId: submission.projectId,
+				creatorName: submission.creatorName || "Creator",
+				creatorIcon: submission.creatorIcon || "/placeholder-profile.jpg",
+				videoUrl: submission.videoUrl || "/placeholder-video.jpg",
+				videoNumber: submission.videoNumber || `#${index + 1}`,
+				revisionNumber: submission.revisionNumber
+					? `#${submission.revisionNumber}`
+					: "",
+				status: submission.status || "new",
+				createdAt: new Date(submission.createdAt).toLocaleDateString(),
+				sparkCode: submission.sparkCode || "",
+			})
+		);
+
+		return transformedSubmissions;
+	}
+
+	return [];
+};
+
 const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
-	const [project, setProject] = useState<ProjectFormData | null>(null);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-	const [submissionsList, setSubmissionsList] = useState<CreatorSubmission[]>(
-		[]
-	);
+	// TanStack Query for project data
+	const {
+		data: project,
+		isLoading: projectLoading,
+		error: projectError,
+	} = useQuery({
+		queryKey: ["project", projectId],
+		queryFn: () => fetchProjectData(projectId),
+		enabled: !!projectId,
+		staleTime: 5 * 60 * 1000, // 5 minutes
+		retry: 2,
+	});
 
-	useEffect(() => {
-		const fetchProjectData = async () => {
-			try {
-				setLoading(true);
-				const projectRef = doc(db, "projects", projectId.toString());
-				const projectSnap = await getDoc(projectRef);
+	// TanStack Query for submissions
+	const {
+		data: submissionsList = [],
+		isLoading: submissionsLoading,
+		error: submissionsError,
+	} = useQuery({
+		queryKey: ["submissions", projectId],
+		queryFn: () => fetchSubmissions(projectId),
+		enabled: !!projectId,
+		staleTime: 2 * 60 * 1000, // 2 minutes
+		retry: 2,
+	});
 
-				if (projectSnap.exists()) {
-					setProject(projectSnap.data() as ProjectFormData);
-				} else {
-					setError("Project not found");
-				}
-			} catch (err) {
-				console.error("Error fetching project:", err);
-				setError("Failed to load project details");
-			} finally {
-				setLoading(false);
-			}
-		};
+	const isLoading = projectLoading || submissionsLoading;
+	const error = projectError || submissionsError;
 
-		const fetchSubmissions = async () => {
-			try {
-				const response = await fetch(
-					`/api/project-submissions?projectId=${projectId}`
-				);
-
-				if (!response.ok) {
-					throw new Error(`Error fetching submissions: ${response.statusText}`);
-				}
-
-				const data = await response.json();
-
-				if (data.success && data.submissions) {
-					const basicSubmissions = data.submissions;
-
-					// Transform the API response to match our Submission interface
-					const transformedSubmissions = basicSubmissions.map(
-						// eslint-disable-next-line @typescript-eslint/no-explicit-any
-						(submission: any, index: number) => ({
-							id: submission.id,
-							userId: submission.userId,
-							projectId: submission.projectId,
-							creatorName: submission.creatorName || "Creator",
-							creatorIcon: submission.creatorIcon || "/placeholder-profile.jpg",
-							videoUrl: submission.videoUrl || "/placeholder-video.jpg",
-							videoNumber: submission.videoNumber || `#${index + 1}`,
-							revisionNumber: submission.revisionNumber
-								? `#${submission.revisionNumber}`
-								: "",
-							status: submission.status || "new",
-							createdAt: new Date(submission.createdAt).toLocaleDateString(),
-							sparkCode: submission.sparkCode || "",
-						})
-					);
-
-					setSubmissionsList(transformedSubmissions);
-				}
-			} catch (err) {
-				console.error("Error fetching submissions:", err);
-			}
-		};
-
-		if (projectId) {
-			fetchProjectData();
-			fetchSubmissions();
-		}
-	}, [projectId]);
-
-	if (loading) {
+	if (isLoading) {
 		return (
 			<div className="flex flex-col items-center justify-center h-screen">
 				<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
@@ -109,7 +113,7 @@ const ProjectDetailPage = ({ projectId }: ProjectDetailPageProps) => {
 	if (error || !project) {
 		return (
 			<div className="p-8 text-center text-red-500">
-				{error || "Project not available"}
+				{error instanceof Error ? error.message : "Project not available"}
 			</div>
 		);
 	}

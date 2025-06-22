@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +12,6 @@ import {
 import { Check, ChevronLeft, Mail, Search, X } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { useAuthApi } from "@/hooks/useAuthApi";
 import { ShippingAddress } from "@/components/Creators/dashboard/projects/available/ProjectApplyModal";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
@@ -51,7 +51,6 @@ interface Creator {
 	dateOfBirth: string;
 	verifiableIDUrl: string | null;
 	verificationVideoUrl: string | null;
-	// Extended properties for application display
 	following?: number;
 	gmv?: number;
 }
@@ -76,30 +75,222 @@ interface Application {
 	creator?: Creator;
 }
 
+// Query keys
+const queryKeys = {
+	applications: (projectId: string) => ['applications', projectId],
+	shippingAddress: (applicationId: string) => ['shippingAddress', applicationId],
+	creatorData: (userId: string) => ['creatorData', userId],
+};
+
+// API functions
+const fetchApplications = async (projectId: string): Promise<Application[]> => {
+	const response = await fetch(`/api/project-applications?projectId=${projectId}`);
+	if (!response.ok) {
+		throw new Error("Failed to fetch applications");
+	}
+	return response.json();
+};
+
+const fetchCreatorData = async (userId: string): Promise<Creator | null> => {
+	const response = await fetch(`/api/admin/creator-approval?userId=${userId}`);
+	if (!response.ok) {
+		return null;
+	}
+	const data = await response.json();
+	return data.creators && data.creators.length > 0 ? data.creators[0] : null;
+};
+
+const fetchShippingAddress = async (applicationId: string): Promise<ShippingAddress | null> => {
+	const response = await fetch(`/api/project-application-address?applicationId=${applicationId}`);
+	if (!response.ok) {
+		return null;
+	}
+	return response.json();
+};
+
+const updateApplicationStatus = async ({ applicationId, status }: { applicationId: string; status: string }) => {
+	const response = await fetch(`/api/project-applications?applicationId=${applicationId}`, {
+		method: "PUT",
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({ status }),
+	});
+
+	if (!response.ok) {
+		throw new Error(`Failed to ${status} application`);
+	}
+
+	return response.json();
+};
+
 const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 	// States
-	const [applications, setApplications] = useState<Application[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [statusFilter, setStatusFilter] = useState("");
 	const [sortOrder, setSortOrder] = useState("");
-	const [selectedApplication, setSelectedApplication] =
-		useState<Application | null>(null);
-	const [filteredApplications, setFilteredApplications] = useState<
-		Application[]
-	>([]);
+	const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
+	const [filteredApplications, setFilteredApplications] = useState<Application[]>([]);
 
 	// Modal states
 	const [showApproveModal, setShowApproveModal] = useState(false);
 	const [showRejectModal, setShowRejectModal] = useState(false);
 	const [pendingActionId, setPendingActionId] = useState<string | null>(null);
-	const [applicationAddresses, setApplicationAddresses] = useState<
-		Record<string, ShippingAddress>
-	>({});
-	const api = useAuthApi();
+
 	const { currentUser } = useAuth();
 	const router = useRouter();
+	const queryClient = useQueryClient();
+
+	// Queries
+	const {
+		data: applications = [],
+		isLoading,
+		error,
+		refetch
+	} = useQuery({
+		queryKey: queryKeys.applications(projectData?.id || ''),
+		queryFn: () => fetchApplications(projectData.id),
+		enabled: !!projectData?.id,
+		staleTime: 5 * 60 * 1000, // 5 minutes
+		gcTime: 10 * 60 * 1000, // 10 minutes
+	});
+
+	// Fetch creator data for all applications
+	const creatorQueries = useQuery({
+		queryKey: ['creatorsForApplications', projectData?.id],
+		queryFn: async () => {
+			if (!applications.length) return new Map();
+
+			const userIds = [...new Set(applications.map((app: Application) => app.userId))];
+			const creatorDataMap = new Map();
+
+			await Promise.all(
+				userIds.map(async (userId) => {
+					try {
+						const creatorData = await fetchCreatorData(userId);
+						if (creatorData) {
+							creatorDataMap.set(userId, creatorData);
+						}
+					} catch (err) {
+						console.error(`Error fetching creator data for user ID ${userId}:`, err);
+					}
+				})
+			);
+
+			return creatorDataMap;
+		},
+		enabled: applications.length > 0,
+		staleTime: 10 * 60 * 1000, // 10 minutes
+	});
+
+	// Shipping address query for selected application
+	const { data: shippingAddress } = useQuery({
+		queryKey: queryKeys.shippingAddress(selectedApplication?.id || ''),
+		queryFn: () => fetchShippingAddress(selectedApplication!.id),
+		enabled: !!(selectedApplication?.id && selectedApplication.productOwnership === "need"),
+		staleTime: 15 * 60 * 1000, // 15 minutes
+	});
+
+	// Mutations
+	const approveApplicationMutation = useMutation({
+		mutationFn: (applicationId: string) => updateApplicationStatus({ applicationId, status: 'approved' }),
+		onSuccess: (data, applicationId) => {
+			// Update the applications cache
+			queryClient.setQueryData(
+				queryKeys.applications(projectData.id),
+				(oldData: Application[] | undefined) =>
+					oldData?.map(app =>
+						app.id === applicationId ? { ...app, status: 'approved' } : app
+					) || []
+			);
+
+			// Update selected application if it's the one being modified
+			if (selectedApplication && selectedApplication.id === applicationId) {
+				setSelectedApplication(prev => prev ? { ...prev, status: 'approved' } : null);
+			}
+
+			closeModals();
+		},
+		onError: (error) => {
+			console.error("Error approving application:", error);
+		},
+	});
+
+	const rejectApplicationMutation = useMutation({
+		mutationFn: (applicationId: string) => updateApplicationStatus({ applicationId, status: 'rejected' }),
+		onSuccess: (data, applicationId) => {
+			// Update the applications cache
+			queryClient.setQueryData(
+				queryKeys.applications(projectData.id),
+				(oldData: Application[] | undefined) =>
+					oldData?.map(app =>
+						app.id === applicationId ? { ...app, status: 'rejected' } : app
+					) || []
+			);
+
+			// Update selected application if it's the one being modified
+			if (selectedApplication && selectedApplication.id === applicationId) {
+				setSelectedApplication(prev => prev ? { ...prev, status: 'rejected' } : null);
+			}
+
+			closeModals();
+		},
+		onError: (error) => {
+			console.error("Error rejecting application:", error);
+		},
+	});
+
+	// Combine applications with creator data
+	const applicationsWithCreators = React.useMemo(() => {
+		if (!applications.length || !creatorQueries.data) return [];
+
+		return applications.map((app: Application) => {
+			const creatorData = creatorQueries.data.get(app.userId);
+			if (creatorData) {
+				return { ...app, creator: creatorData };
+			}
+			// Fallback if creator data not found
+			return {
+				...app,
+				creator: {
+					id: app.userId,
+					userId: app.userId,
+					verificationId: "",
+					creator: "",
+					status: "",
+					createdAt: "",
+					logoUrl: "",
+					bio: "",
+					socialMedia: {
+						instagram: "",
+						twitter: "",
+						facebook: "",
+						youtube: "",
+						tiktok: "",
+					},
+					firstName: "",
+					lastName: "",
+					email: "Unknown",
+					username: "Unknown Creator",
+					contentTypes: [],
+					contentLinks: [],
+					country: "",
+					gender: "",
+					ethnicity: null,
+					dateOfBirth: "",
+					verifiableIDUrl: null,
+					verificationVideoUrl: null,
+					following: 0,
+					gmv: 0,
+				},
+			};
+		});
+	}, [applications, creatorQueries.data]);
+
+	// Update filtered applications when data changes
+	useEffect(() => {
+		setFilteredApplications(applicationsWithCreators);
+	}, [applicationsWithCreators]);
 
 	const handleSendMessage = async (creator: Creator) => {
 		if (!currentUser) {
@@ -111,9 +302,7 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 			console.log("Starting conversation with creator:", creator.id);
 			console.log("Current user ID:", currentUser.uid);
 
-			// Debug: Check if we have the creator profile with verification ID
-			const effectiveUserId = currentUser.uid; // Use the auth user ID directly
-
+			const effectiveUserId = currentUser.uid;
 			console.log("Using effective user ID:", effectiveUserId);
 
 			const response = await fetch("/api/createConversation", {
@@ -122,13 +311,12 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
-					currentUserId: effectiveUserId, // Use the consistent ID
+					currentUserId: effectiveUserId,
 					creatorId: creator.userId || creator.id,
 					userData: {
 						name: currentUser.displayName || "User",
 						avatar: currentUser.photoURL || "/icons/default-avatar.svg",
 						username: currentUser.email?.split("@")[0] || "",
-						// Add the auth user ID for reference
 						authUserId: currentUser.uid,
 					},
 					creatorData: {
@@ -148,7 +336,6 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 				throw new Error(data.error || "Failed to handle conversation");
 			}
 
-			// Log success details
 			console.log(
 				`Conversation ${response.status === 201 ? "created" : "found"}`,
 				"ID:",
@@ -185,14 +372,16 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 							variant="outline"
 							onClick={closeModals}
 							className="bg-white"
+							disabled={approveApplicationMutation.isPending}
 						>
 							Cancel
 						</Button>
 						<Button
 							onClick={handleApproveApplication}
 							className="bg-orange-500 hover:bg-orange-600 text-white"
+							disabled={approveApplicationMutation.isPending}
 						>
-							Approve <Check className="ml-px h-4 w-4" />
+							{approveApplicationMutation.isPending ? "Approving..." : "Approve"} <Check className="ml-px h-4 w-4" />
 						</Button>
 					</div>
 				</div>
@@ -218,164 +407,22 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 							variant="outline"
 							onClick={closeModals}
 							className="bg-white"
+							disabled={rejectApplicationMutation.isPending}
 						>
 							Cancel
 						</Button>
 						<Button
 							onClick={handleRejectApplication}
 							className="bg-red-500 hover:bg-red-600 text-white"
+							disabled={rejectApplicationMutation.isPending}
 						>
-							Reject <X className="ml-px h-4 w-4" />
+							{rejectApplicationMutation.isPending ? "Rejecting..." : "Reject"} <X className="ml-px h-4 w-4" />
 						</Button>
 					</div>
 				</div>
 			</div>
 		);
 	};
-
-	const fetchApplicationAddress = async (applicationId: string) => {
-		try {
-			const { data, error } = await api.get(
-				`/api/project-application-address?applicationId=${applicationId}`
-			);
-
-			if (error) {
-				console.error(
-					`Failed to load shipping address for application ${applicationId}:`,
-					error
-				);
-				return null;
-			}
-
-			if (data) {
-				// Store the address in our applicationAddresses state
-				setApplicationAddresses((prev) => ({
-					...prev,
-					[applicationId]: data as ShippingAddress,
-				}));
-
-				return data;
-			}
-
-			return null;
-		} catch (err) {
-			console.error(
-				`Error fetching address for application ${applicationId}:`,
-				err
-			);
-			return null;
-		}
-	};
-
-	// Fetch applications data
-	useEffect(() => {
-		const fetchData = async () => {
-			if (!projectData?.id) return;
-
-			try {
-				setLoading(true);
-
-				const response = await fetch(
-					`/api/project-applications?projectId=${projectData.id}`
-				);
-
-				if (!response.ok) {
-					throw new Error("Failed to fetch applications");
-				}
-
-				const data = await response.json();
-
-				// First, set the applications without creator data
-				setApplications(data);
-
-				// Fetch all user data in parallel
-				const userIds = [
-					...new Set(data.map((app: Application) => app.userId)),
-				];
-				const creatorDataMap = new Map();
-
-				await Promise.all(
-					userIds.map(async (userId) => {
-						try {
-							const creatorRes = await fetch(
-								`/api/admin/creator-approval?userId=${userId}`
-							);
-
-							if (creatorRes.ok) {
-								const response = await creatorRes.json();
-
-								// Store the first creator from the response (assuming it's the one we want)
-								if (response.creators && response.creators.length > 0) {
-									creatorDataMap.set(userId, response.creators[0]);
-								}
-							}
-						} catch (err) {
-							console.log("Error details:", err);
-							console.error(
-								`Error fetching creator data for user ID ${userId}:`,
-								err
-							);
-						}
-					})
-				);
-
-				// Update applications with creator data
-				const updatedApplications = data.map((app: Application) => {
-					const creatorData = creatorDataMap.get(app.userId);
-					if (creatorData) {
-						return { ...app, creator: creatorData };
-					}
-					// Fallback if creator data not found
-					return {
-						...app,
-						creator: {
-							id: app.userId,
-							userId: app.userId,
-							verificationId: "",
-							creator: "",
-							status: "",
-							createdAt: "",
-							logoUrl: "",
-							bio: "",
-							socialMedia: {
-								instagram: "",
-								twitter: "",
-								facebook: "",
-								youtube: "",
-								tiktok: "",
-							},
-							firstName: "",
-							lastName: "",
-							email: "Unknown",
-							username: "Unknown Creator",
-							contentTypes: [],
-							contentLinks: [],
-							country: "",
-							gender: "",
-							ethnicity: null,
-							dateOfBirth: "",
-							verifiableIDUrl: null,
-							verificationVideoUrl: null,
-							following: 0,
-							gmv: 0,
-						},
-					};
-				});
-
-				setApplications(updatedApplications);
-				setFilteredApplications(updatedApplications);
-				setLoading(false);
-			} catch (err) {
-				setError(
-					err instanceof Error ? err.message : "An unknown error occurred"
-				);
-				console.error("Error fetching applications:", err);
-				setLoading(false);
-			}
-		};
-
-		fetchData();
-	}, [projectData?.id]);
 
 	// Handle search input
 	const handleSearch = (e: { target: { value: string } }) => {
@@ -397,7 +444,6 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 
 		if (value === "date-asc" || value === "date-desc") {
 			sorted.sort((a, b) => {
-				// Simplified date conversion
 				const dateA = new Date(a.createdAt as string);
 				const dateB = new Date(b.createdAt as string);
 
@@ -420,7 +466,7 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 
 	// Filter applications based on search query and status
 	const filterApplications = (query: string, status: string) => {
-		let filtered = [...applications];
+		let filtered = [...applicationsWithCreators];
 
 		if (query) {
 			filtered = filtered.filter(
@@ -478,18 +524,10 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 	};
 
 	// View application details
-	const handleViewApplication = async (id: string) => {
-		const application = applications.find((app) => app.id === id);
+	const handleViewApplication = (id: string) => {
+		const application = applicationsWithCreators.find((app) => app.id === id);
 		if (application) {
 			setSelectedApplication(application);
-
-			// Only fetch address if the user needs the product
-			if (
-				application.productOwnership === "need" &&
-				!applicationAddresses[id]
-			) {
-				await fetchApplicationAddress(id);
-			}
 		}
 	};
 
@@ -517,107 +555,17 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 		setPendingActionId(null);
 	};
 
-	useEffect(() => {}, [pendingActionId]);
-
 	// Handle approving an application
-	const handleApproveApplication = async () => {
+	const handleApproveApplication = () => {
 		if (pendingActionId) {
-			try {
-				const response = await fetch(
-					`/api/project-applications?applicationId=${pendingActionId}`,
-					{
-						method: "PUT",
-						headers: {
-							"Content-Type": "application/json",
-						},
-						body: JSON.stringify({ status: "approved" }),
-					}
-				);
-
-				if (!response.ok) {
-					throw new Error("Failed to approve application");
-				}
-
-				// Add this line to log the response:
-				const responseData = await response.json();
-				console.log("Approval response:", responseData);
-
-				// Update local state
-				const updatedApplications = applications.map((app) =>
-					app.id === pendingActionId ? { ...app, status: "approved" } : app
-				);
-				setApplications(updatedApplications);
-
-				// Update filtered applications
-				const updatedFiltered = filteredApplications.map((app) =>
-					app.id === pendingActionId ? { ...app, status: "approved" } : app
-				);
-				setFilteredApplications(updatedFiltered);
-
-				// Update selected application if it's the one being modified
-				if (selectedApplication && selectedApplication.id === pendingActionId) {
-					setSelectedApplication({
-						...selectedApplication,
-						status: "approved",
-					});
-				}
-
-				closeModals();
-			} catch (error) {
-				console.error("Error approving application:", error);
-				// Optionally show an error message to the user
-			}
+			approveApplicationMutation.mutate(pendingActionId);
 		}
 	};
 
 	// Handle rejecting an application
-	const handleRejectApplication = async () => {
+	const handleRejectApplication = () => {
 		if (pendingActionId) {
-			try {
-				const response = await fetch(
-					`/api/project-applications?applicationId=${pendingActionId}`,
-					{
-						method: "PUT",
-						headers: {
-							"Content-Type": "application/json",
-						},
-						body: JSON.stringify({ status: "rejected" }),
-					}
-				);
-
-				if (!response.ok) {
-					throw new Error("Failed to reject application");
-				}
-
-				// Add this line to log the response:
-				const responseData = await response.json();
-				console.log("Approval response:", responseData);
-
-				// Update local state
-				const updatedApplications = applications.map((app) =>
-					app.id === pendingActionId ? { ...app, status: "rejected" } : app
-				);
-				setApplications(updatedApplications);
-
-				// Update filtered applications
-				const updatedFiltered = filteredApplications.map((app) =>
-					app.id === pendingActionId ? { ...app, status: "rejected" } : app
-				);
-				setFilteredApplications(updatedFiltered);
-
-				// Update selected application if it's the one being modified
-				if (selectedApplication && selectedApplication.id === pendingActionId) {
-					setSelectedApplication({
-						...selectedApplication,
-						status: "rejected",
-					});
-				}
-
-				closeModals();
-			} catch (error) {
-				console.error("Error rejecting application:", error);
-				// Optionally show an error message to the user
-			}
+			rejectApplicationMutation.mutate(pendingActionId);
 		}
 	};
 
@@ -628,7 +576,6 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 
 		const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
 
-		// Format as "Month Day, Year"
 		return new Intl.DateTimeFormat("en-US", {
 			month: "long",
 			day: "numeric",
@@ -637,11 +584,12 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 	};
 
 	// Loading state
-	if (loading) {
+	if (isLoading || creatorQueries.isLoading) {
 		return (
-			<div className="w-full -mt-3 mx-auto bg-white p-8 rounded-lg border border-gray-200 text-center">
-				<p>Loading applications...</p>
-			</div>
+			<div className="flex flex-col items-center justify-center mt-10">
+			<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+			<div className="text-center">Loading applications...</div>
+		</div>
 		);
 	}
 
@@ -649,8 +597,8 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 	if (error) {
 		return (
 			<div className="w-full -mt-3 mx-auto bg-white p-8 rounded-lg border border-gray-200 text-center">
-				<p className="text-red-500">Error: {error}</p>
-				<Button onClick={() => window.location.reload()} className="mt-4">
+				<p className="text-red-500">Error: {error.message}</p>
+				<Button onClick={() => refetch()} className="mt-4">
 					Try Again
 				</Button>
 			</div>
@@ -693,7 +641,6 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 
 		return (
 			<>
-				{/* Include modals at the top level so they're always rendered */}
 				<ApproveModal />
 				<RejectModal />
 
@@ -758,54 +705,34 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 							{selectedApplication.productOwnership === "need" && (
 								<div className="flex flex-col space-y-1">
 									<p className="text-sm text-[#667085]">Shipping Address</p>
-									{!applicationAddresses[selectedApplication.id] ? (
+									{!shippingAddress ? (
 										<div>
 											<p className="font-normal text-[#101828]">
 												Loading shipping address...
 											</p>
-											<button
-												onClick={() =>
-													fetchApplicationAddress(selectedApplication.id)
-												}
-												className="text-sm text-orange-500 hover:underline mt-2"
-											>
-												Retry loading address
-											</button>
 										</div>
 									) : (
 										<>
 											<p className="font-normal text-[#101828]">
-												{applicationAddresses[selectedApplication.id]?.name}
+												{shippingAddress?.name}
 											</p>
 											<p className="font-normal text-[#101828]">
-												{
-													applicationAddresses[selectedApplication.id]
-														?.addressLine1
-												}
+												{shippingAddress?.addressLine1}
 											</p>
-											{applicationAddresses[selectedApplication.id]
-												?.addressLine2 && (
+											{shippingAddress?.addressLine2 && (
 												<p className="font-normal text-[#101828]">
-													{
-														applicationAddresses[selectedApplication.id]
-															?.addressLine2
-													}
+													{shippingAddress?.addressLine2}
 												</p>
 											)}
 											<p className="font-normal text-[#101828]">
-												{applicationAddresses[selectedApplication.id]?.city},{" "}
-												{applicationAddresses[selectedApplication.id]?.state}{" "}
-												{applicationAddresses[selectedApplication.id]?.zipCode}
+												{shippingAddress?.city}, {shippingAddress?.state}{" "}
+												{shippingAddress?.zipCode}
 											</p>
 											<p className="font-normal text-[#101828]">
-												{applicationAddresses[selectedApplication.id]?.country}
+												{shippingAddress?.country}
 											</p>
 											<p className="font-normal text-[#101828]">
-												Phone:{" "}
-												{
-													applicationAddresses[selectedApplication.id]
-														?.phoneNumber
-												}
+												Phone: {shippingAddress?.phoneNumber}
 											</p>
 										</>
 									)}
@@ -823,22 +750,6 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 									{formatDate(selectedApplication.createdAt)}
 								</p>
 							</div>
-
-							{/* <div>
-								<p className="text-sm text-[#667085]">
-									Creator TikTok Following
-								</p>
-								<p className="font-medium text-[#101828] text-sm">
-									{creator.following?.toLocaleString() || "Unknown"}
-								</p>
-							</div> */}
-
-							{/* <div>
-								<p className="text-sm text-[#667085]">Total GMV</p>
-								<p className="font-medium text-[#101828] text-sm">
-									${creator.gmv?.toLocaleString() || "0"}
-								</p>
-							</div> */}
 
 							<div>
 								<p className="text-sm text-[#667085]">Status</p>
@@ -871,16 +782,18 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 									<Button
 										onClick={() => openApproveModal(selectedApplication.id)}
 										className="w-full bg-black hover:bg-gray-800 text-white"
+										disabled={approveApplicationMutation.isPending}
 									>
 										<Check className="mr-2 h-4 w-4" />
-										Approve Application
+										{approveApplicationMutation.isPending ? "Approving..." : "Approve Application"}
 									</Button>
 									<Button
 										onClick={() => openRejectModal(selectedApplication.id)}
 										className="w-full bg-white hover:bg-gray-50 text-red-500 border border-red-200"
+										disabled={rejectApplicationMutation.isPending}
 									>
 										<X className="mr-2 h-4 w-4" />
-										Reject Application
+										{rejectApplicationMutation.isPending ? "Rejecting..." : "Reject Application"}
 									</Button>
 								</>
 							)}
@@ -892,7 +805,7 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 	}
 
 	// If no applications are found
-	if (applications.length === 0) {
+	if (applicationsWithCreators.length === 0) {
 		return (
 			<div className="w-full -mt-3 mx-auto bg-white p-8 rounded-lg border border-gray-200 text-center">
 				<div className="max-w-md mx-auto">
@@ -914,7 +827,6 @@ const ProjectApplications: React.FC<ApplicationsProps> = ({ projectData }) => {
 	// Main applications list view
 	return (
 		<>
-			{/* Render modals at the top level so they're always present */}
 			<ApproveModal />
 			<RejectModal />
 

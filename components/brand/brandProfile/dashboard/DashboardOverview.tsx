@@ -1,7 +1,8 @@
-/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import EmptyContest from "./EmptyContest";
 import { Button } from "@/components/ui/button";
 import { useSocket } from "@/context/SocketContext";
@@ -73,6 +74,256 @@ interface SubscriptionStatus {
 	amount: number;
 }
 
+interface UserData {
+	summary: {
+		activeProjects: number;
+		activeContests: number;
+	};
+	totalSpend: number;
+	projects: Array<{
+		timestamp: string | number | Date;
+		createdAt: string | Date;
+		projectId: string;
+		status: string;
+		projectDetails?: {
+			projectName: string;
+		};
+		projectType?: {
+			type: string;
+		};
+		creatorPricing?: {
+			budgetPerVideo: number;
+		};
+	}>;
+	contests: Array<ContestFormData>;
+}
+
+interface CreatorMessage {
+	id: string;
+	sender: string;
+	content: string;
+	timestamp: string | Date;
+	senderInfo?: {
+		name: string;
+		avatar: string;
+		username?: string;
+		bio?: string;
+	};
+	conversationId: string;
+	isRead?: boolean;
+}
+
+// API functions
+const fetchUserData = async (userId: string): Promise<UserData> => {
+	const response = await fetch(`/api/user-stats?userId=${userId}`);
+	const data = await response.json();
+
+	if (!data.success) {
+		throw new Error(data.error || "Failed to fetch user data");
+	}
+
+	return data.data;
+};
+
+const fetchCreatorMessages = async (
+	userId: string
+): Promise<CreatorMessage[]> => {
+	const response = await fetch(
+		`/api/creator-messages?userId=${userId}&limit=4`
+	);
+
+	if (!response.ok) {
+		throw new Error("Failed to fetch creator messages");
+	}
+
+	const data = await response.json();
+	return data.messages || [];
+};
+
+const fetchSubscriptionStatus = async (
+	userId: string
+): Promise<SubscriptionStatus | null> => {
+	const response = await fetch("/api/subscription/manage", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({
+			action: "get_status",
+			userId,
+		}),
+	});
+
+	const data = await response.json();
+	if (!response.ok) {
+		throw new Error("Failed to fetch subscription status");
+	}
+
+	return data.subscription;
+};
+
+const fetchLatestContest = async (
+	userId: string
+): Promise<ContestFormData | null> => {
+	const response = await fetch(
+		`/api/contests?creatorId=${userId}&orderBy=createdAt&orderDirection=desc&limit=1`
+	);
+
+	if (!response.ok) {
+		throw new Error(`Failed to fetch latest contest: ${response.status}`);
+	}
+
+	const result = await response.json();
+
+	if (result.success && result.data && result.data.length > 0) {
+		return result.data[0];
+	}
+
+	return null;
+};
+
+const fetchLeaderboardData = async (
+	contestId: string
+): Promise<ContestParticipant[]> => {
+	if (!contestId) return [];
+
+	// Fetch applications for the contest
+	const response = await fetch(
+		`/api/contest-applications?contestId=${contestId}`
+	);
+
+	if (!response.ok) {
+		throw new Error("Failed to fetch applications");
+	}
+
+	const data = await response.json();
+
+	// Filter only approved applications
+	const approvedApplications = data.filter(
+		(app: { status: string }) => app.status.toLowerCase() === "approved"
+	);
+
+	if (approvedApplications.length === 0) {
+		return [];
+	}
+
+	// Fetch creator data for each approved application
+	const creatorDataArray = await Promise.all(
+		approvedApplications.map(
+			async (app: { postUrl: string; userId: string }) => {
+				try {
+					const creatorRes = await fetch(
+						`/api/admin/creator-approval?userId=${app.userId}`
+					);
+
+					if (creatorRes.ok) {
+						const response = await creatorRes.json();
+
+						if (response.creators && response.creators.length > 0) {
+							const creator = response.creators[0];
+
+							// Combine application data with creator data
+							return {
+								...app,
+								metrics: {
+									views:
+										creator.tiktokMetrics?.views ||
+										creator.creatorProfileData?.tiktokMetrics?.views ||
+										creator.tiktokData?.tiktokAverageViews ||
+										0,
+									likes:
+										creator.tiktokMetrics?.likes ||
+										creator.creatorProfileData?.tiktokMetrics?.likes ||
+										0,
+									comments:
+										creator.tiktokMetrics?.comments ||
+										creator.creatorProfileData?.tiktokMetrics?.comments ||
+										0,
+									followers:
+										creator.tiktokMetrics?.followers?.count ||
+										creator.creatorProfileData?.tiktokMetrics?.followers
+											?.count ||
+										creator.tiktokData?.tiktokFollowers ||
+										0,
+								},
+								position: 0, // Will be calculated later
+								profileImage:
+									creator.creatorProfileData?.tiktokAvatarUrl ||
+									creator.logoUrl ||
+									"/icons/colina.svg",
+								username:
+									creator.creatorProfileData?.tiktokUsername ||
+									creator.username ||
+									"Unknown",
+								fullName:
+									`${creator.firstName || ""} ${creator.lastName || ""}`.trim() ||
+									creator.creatorProfileData?.tiktokDisplayName ||
+									"Unknown Creator",
+							};
+						}
+					}
+					return null;
+				} catch (err) {
+					console.error(
+						`Error fetching creator data for user ID ${app.userId}:`,
+						err
+					);
+					return null;
+				}
+			}
+		)
+	);
+
+	// Filter out null values and sort by views
+	const validCreators = creatorDataArray
+		.filter((creator) => creator !== null)
+		.sort((a, b) => (b.metrics?.views || 0) - (a.metrics?.views || 0));
+
+	// Assign positions based on sorting
+	const creatorsWithPositions = validCreators.map((creator, index) => ({
+		...creator,
+		position: index + 1,
+	}));
+
+	return creatorsWithPositions;
+};
+
+const fetchCreatorDetails = async (creatorId: string): Promise<any> => {
+	const response = await fetch(`/api/admin/creator-approval?status=approved`);
+	if (!response.ok) throw new Error("Failed to fetch creator details");
+
+	const data = await response.json();
+	return data.creators.find((c: any) => c.userId === creatorId);
+};
+
+const sendMessage = async ({
+	conversationId,
+	userId,
+	content,
+}: {
+	conversationId: string;
+	userId: string;
+	content: string;
+}) => {
+	const response = await fetch("/api/messages", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({
+			conversationId,
+			sender: userId,
+			content,
+		}),
+	});
+
+	if (!response.ok) {
+		throw new Error("Failed to send message");
+	}
+
+	return response.json();
+};
+
 const LoadingState = () => (
 	<div className="flex flex-col justify-center items-center h-screen">
 		<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
@@ -83,79 +334,96 @@ const LoadingState = () => (
 const UserDashboard = dynamic(
 	() =>
 		Promise.resolve(({ userId }: UserDashboardProps) => {
-			const [loading, setLoading] = useState(true);
-			interface UserData {
-				summary: {
-					activeProjects: number;
-					activeContests: number;
-				};
-				totalSpend: number;
-				projects: Array<{
-					timestamp: string | number | Date;
-					createdAt: string | Date;
-					projectId: string;
-					status: string;
-					projectDetails?: {
-						projectName: string;
-					};
-					projectType?: {
-						type: string;
-					};
-					creatorPricing?: {
-						budgetPerVideo: number;
-					};
-				}>;
-				contests: Array<ContestFormData>;
-			}
-
-			interface CreatorMessage {
-				id: string;
-				sender: string;
-				content: string;
-				timestamp: string | Date;
-				senderInfo?: {
-					name: string;
-					avatar: string;
-					username?: string;
-					bio?: string;
-				};
-				conversationId: string;
-				isRead?: boolean;
-			}
-
-			const [creatorMessages, setCreatorMessages] = useState<CreatorMessage[]>(
-				[]
-			);
-			const [loadingMessages, setLoadingMessages] = useState(true);
+			const queryClient = useQueryClient();
 			const [replyText, setReplyText] = useState("");
 			const [activeReply, setActiveReply] = useState<string | null>(null);
-			const { sendMessage: socketSendMessage, socket } = useSocket();
-			const [userData, setUserData] = useState<UserData | null>(null);
 			const [selectedCreator, setSelectedCreator] = useState<Creators | null>(
 				null
 			);
-			const [subscriptionData, setSubscriptionData] =
-				useState<SubscriptionStatus | null>(null);
+			const { sendMessage: socketSendMessage, socket } = useSocket();
 
-			// Add state for latest contest and leaderboard data
-			const [latestContest, setLatestContest] =
-				useState<ContestFormData | null>(null);
+			// TanStack Query hooks
+			const {
+				data: userData,
+				isLoading: userDataLoading,
+				error: userDataError,
+			} = useQuery({
+				queryKey: ["userData", userId],
+				queryFn: () => fetchUserData(userId),
+				enabled: !!userId,
+			});
 
-			const [leaderboardData, setLeaderboardData] = useState<
-				ContestParticipant[]
-			>([]);
-			const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
+			const {
+				data: creatorMessages = [],
+				isLoading: messagesLoading,
+				refetch: refetchMessages,
+			} = useQuery({
+				queryKey: ["creatorMessages", userId],
+				queryFn: () => fetchCreatorMessages(userId),
+				enabled: !!userId,
+				refetchInterval: 30000, // Refetch every 30 seconds
+			});
 
-			const activeProjects =
-				userData &&
-				userData.projects.filter(
-					(project) =>
-						project.status === "active" ||
-						project.status === "accepting pitches" ||
-						project.status === "invite"
-				).length > 0;
+			const { data: subscriptionData } = useQuery({
+				queryKey: ["subscriptionStatus", userId],
+				queryFn: () => fetchSubscriptionStatus(userId),
+				enabled: !!userId,
+			});
 
-			// function to calculate time ago
+			const { data: latestContest } = useQuery({
+				queryKey: ["latestContest", userId],
+				queryFn: () => fetchLatestContest(userId),
+				enabled: !!userId && !!userData?.contests?.length,
+			});
+
+			const { data: leaderboardData = [], isLoading: loadingLeaderboard } =
+				useQuery({
+					queryKey: ["leaderboard", latestContest?.contestId],
+					queryFn: () => fetchLeaderboardData(latestContest!.contestId),
+					enabled: !!latestContest?.contestId,
+				});
+
+			// Mutations
+			const sendMessageMutation = useMutation({
+				mutationFn: sendMessage,
+				onSuccess: () => {
+					// Refetch messages after sending
+					queryClient.invalidateQueries({
+						queryKey: ["creatorMessages", userId],
+					});
+					setReplyText("");
+					setActiveReply(null);
+				},
+				onError: (error) => {
+					console.error("Error sending reply:", error);
+				},
+			});
+
+			// Socket effects
+			useEffect(() => {
+				if (socket) {
+					const handleNewMessage = (message: CreatorMessage) => {
+						// Only refetch if the message is from someone else (a creator)
+						if (message.sender !== userId) {
+							refetchMessages();
+						}
+					};
+
+					const handleUnreadCountsUpdate = () => {
+						refetchMessages();
+					};
+
+					socket.on("new-message", handleNewMessage);
+					socket.on("unread-counts-update", handleUnreadCountsUpdate);
+
+					return () => {
+						socket.off("new-message", handleNewMessage);
+						socket.off("unread-counts-update", handleUnreadCountsUpdate);
+					};
+				}
+			}, [userId, socket, refetchMessages]);
+
+			// Helper functions
 			const timeAgo = (timestamp: string | number | Date) => {
 				if (!timestamp) return "just now";
 
@@ -174,7 +442,6 @@ const UserDashboard = dynamic(
 				return `${diffDays} ${diffDays === 1 ? "day" : "days"} ago`;
 			};
 
-			// Helper function to calculate days remaining in trial
 			const getTrialDaysRemaining = () => {
 				if (!subscriptionData?.trialEnd) return 0;
 
@@ -186,329 +453,20 @@ const UserDashboard = dynamic(
 				return Math.max(0, diffDays);
 			};
 
-			// Check if user is in trial period
 			const isInTrial =
 				subscriptionData?.trialEnd &&
 				new Date(subscriptionData.trialEnd) > new Date();
 			const trialDaysLeft = getTrialDaysRemaining();
 
-			const fetchSubscriptionStatus = async () => {
-				try {
-					const response = await fetch("/api/subscription/manage", {
-						method: "POST",
-						headers: {
-							"Content-Type": "application/json",
-						},
-						body: JSON.stringify({
-							action: "get_status",
-							userId,
-						}),
-					});
+			const activeProjects =
+				userData &&
+				userData.projects.filter(
+					(project) =>
+						project.status === "active" ||
+						project.status === "accepting pitches" ||
+						project.status === "invite"
+				).length > 0;
 
-					const data = await response.json();
-					if (response.ok) {
-						setSubscriptionData(data.subscription);
-					}
-				} catch (error) {
-					console.error("Failed to fetch subscription status:", error);
-				}
-			};
-
-			const fetchCreatorMessages = async () => {
-				if (!userId) return;
-
-				try {
-					setLoadingMessages(true);
-					// Fetch creator messages from the new specialized endpoint
-					const response = await fetch(
-						`/api/creator-messages?userId=${userId}&limit=4`
-					);
-
-					if (!response.ok) {
-						throw new Error("Failed to fetch creator messages");
-					}
-
-					const data = await response.json();
-					if (data.messages) {
-						// The new endpoint already returns messages in the desired format
-						setCreatorMessages(data.messages);
-					}
-				} catch (error) {
-					console.error("Error fetching creator messages:", error);
-				} finally {
-					setLoadingMessages(false);
-				}
-			};
-
-			//  function to handle reply
-			// eslint-disable-next-line @typescript-eslint/no-unused-vars
-			const handleSendReply = async (conversationId: string, id: string) => {
-				if (!replyText.trim() || !conversationId || !userId) return;
-
-				try {
-					// Use socket to send message
-					if (socketSendMessage) {
-						socketSendMessage(conversationId, replyText);
-					} else {
-						// Fallback to API if socket not available
-						await fetch("/api/messages", {
-							method: "POST",
-							headers: {
-								"Content-Type": "application/json",
-							},
-							body: JSON.stringify({
-								conversationId,
-								sender: userId,
-								content: replyText,
-							}),
-						});
-					}
-
-					// Clear reply text and close reply input
-					setReplyText("");
-					setActiveReply(null);
-
-					// Remove the specific message from creatorMessages
-					setCreatorMessages((prevMessages) =>
-						prevMessages.filter(
-							(message) => message.conversationId !== conversationId
-						)
-					);
-				} catch (error) {
-					console.error("Error sending reply:", error);
-				}
-			};
-
-			// Function to fetch contest leaderboard data
-			const fetchLeaderboardData = async (contestId: string) => {
-				if (!contestId) return;
-
-				try {
-					setLoadingLeaderboard(true);
-
-					// Fetch applications for the contest
-					const response = await fetch(
-						`/api/contest-applications?contestId=${contestId}`
-					);
-
-					if (!response.ok) {
-						throw new Error("Failed to fetch applications");
-					}
-
-					const data = await response.json();
-
-					// Filter only approved applications
-					const approvedApplications = data.filter(
-						(app: { status: string }) => app.status.toLowerCase() === "approved"
-					);
-
-					// If there are no approved applications, set empty array and stop loading
-					if (approvedApplications.length === 0) {
-						setLeaderboardData([]);
-						setLoadingLeaderboard(false);
-						return;
-					}
-
-					// Fetch creator data for each approved application
-					const creatorDataArray = await Promise.all(
-						approvedApplications.map(
-							async (app: { postUrl: string; userId: string }) => {
-								try {
-									const creatorRes = await fetch(
-										`/api/admin/creator-approval?userId=${app.userId}`
-									);
-
-									if (creatorRes.ok) {
-										const response = await creatorRes.json();
-
-										if (response.creators && response.creators.length > 0) {
-											const creator = response.creators[0];
-
-											// Combine application data with creator data
-											return {
-												...app,
-												metrics: {
-													// Get metrics from TikTok data
-													views:
-														creator.tiktokMetrics?.views ||
-														creator.creatorProfileData?.tiktokMetrics?.views ||
-														creator.tiktokData?.tiktokAverageViews ||
-														0,
-													likes:
-														creator.tiktokMetrics?.likes ||
-														creator.creatorProfileData?.tiktokMetrics?.likes ||
-														0,
-													comments:
-														creator.tiktokMetrics?.comments ||
-														creator.creatorProfileData?.tiktokMetrics
-															?.comments ||
-														0,
-													followers:
-														creator.tiktokMetrics?.followers?.count ||
-														creator.creatorProfileData?.tiktokMetrics?.followers
-															?.count ||
-														creator.tiktokData?.tiktokFollowers ||
-														0,
-												},
-												position: 0, // Will be calculated later
-												profileImage:
-													creator.creatorProfileData?.tiktokAvatarUrl ||
-													creator.logoUrl ||
-													"/icons/colina.svg",
-												username:
-													creator.creatorProfileData?.tiktokUsername ||
-													creator.username ||
-													"Unknown",
-												fullName:
-													`${creator.firstName || ""} ${creator.lastName || ""}`.trim() ||
-													creator.creatorProfileData?.tiktokDisplayName ||
-													"Unknown Creator",
-											};
-										}
-									}
-									return null;
-								} catch (err) {
-									console.error(
-										`Error fetching creator data for user ID ${app.userId}:`,
-										err
-									);
-									return null;
-								}
-							}
-						)
-					);
-
-					// Filter out null values and sort by views
-					const validCreators = creatorDataArray
-						.filter((creator) => creator !== null)
-						.sort((a, b) => (b.metrics?.views || 0) - (a.metrics?.views || 0));
-
-					// Assign positions based on sorting
-					const creatorsWithPositions = validCreators.map((creator, index) => ({
-						...creator,
-						position: index + 1,
-					}));
-
-					setLeaderboardData(creatorsWithPositions);
-				} catch (err) {
-					console.error("Error fetching leaderboard data:", err);
-				} finally {
-					setLoadingLeaderboard(false);
-				}
-			};
-
-			// Fetch the latest contest and its data
-			const fetchLatestContest = async () => {
-				try {
-					// Use the contest API to fetch the user's contests, ordered by creation date
-					const response = await fetch(
-						`/api/contests?creatorId=${userId}&orderBy=createdAt&orderDirection=desc&limit=1`
-					);
-
-					if (!response.ok) {
-						throw new Error(
-							`Failed to fetch latest contest: ${response.status}`
-						);
-					}
-
-					const result = await response.json();
-
-					// Check if any contests were returned
-					if (result.success && result.data && result.data.length > 0) {
-						const latestContest = result.data[0];
-						setLatestContest(latestContest);
-
-						// Fetch leaderboard data for the latest contest
-						if (latestContest.contestId) {
-							fetchLeaderboardData(latestContest.contestId);
-						}
-					} else {
-						console.log("No contests found for this user");
-						setLatestContest(null);
-					}
-				} catch (error) {
-					console.error("Error fetching latest contest:", error);
-				}
-			};
-
-			useEffect(() => {
-				fetchCreatorMessages();
-
-				// Listen for new messages via socket if available
-				if (socket) {
-					const handleNewMessage = (message: CreatorMessage) => {
-						// Only refetch if the message is from someone else (a creator)
-						if (message.sender !== userId) {
-							fetchCreatorMessages();
-						}
-					};
-
-					const handleUnreadCountsUpdate = () => {
-						// Refetch messages when unread counts change
-						fetchCreatorMessages();
-					};
-
-					socket.on("new-message", handleNewMessage);
-					socket.on("unread-counts-update", handleUnreadCountsUpdate);
-
-					return () => {
-						socket.off("new-message", handleNewMessage);
-						socket.off("unread-counts-update", handleUnreadCountsUpdate);
-					};
-				}
-			}, [userId, socket]);
-
-			useEffect(() => {
-				const fetchUserData = async () => {
-					try {
-						setLoading(true);
-						const response = await fetch(`/api/user-stats?userId=${userId}`);
-						const data = await response.json();
-
-						if (data.success) {
-							setUserData(data.data);
-						} else {
-							console.error("Error fetching user data:", data.error);
-						}
-					} catch (error) {
-						console.error("Failed to fetch user data:", error);
-					} finally {
-						setLoading(false);
-					}
-				};
-
-				fetchUserData();
-			}, [userId]);
-
-			// Effect to fetch latest contest when userData changes
-			useEffect(() => {
-				if (userData?.contests && userData.contests.length > 0) {
-					fetchLatestContest();
-				}
-			}, [userData]);
-
-			useEffect(() => {
-				fetchSubscriptionStatus();
-			  }, [userId]);
-
-			if (loading) {
-				return (
-					<div className="flex flex-col justify-center items-center h-64">
-						<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
-						<p>Loading dashboard..</p>
-					</div>
-				);
-			}
-
-			if (!userData) {
-				return (
-					<div className="text-center p-8">
-						<EmptyContest userId={userId} />
-					</div>
-				);
-			}
-
-			// Format currency
 			const formatCurrency = (amount: string | number | bigint) => {
 				const numericAmount =
 					typeof amount === "string" ? parseFloat(amount) : amount;
@@ -519,7 +477,6 @@ const UserDashboard = dynamic(
 				}).format(numericAmount);
 			};
 
-			// Format number for metrics (views, likes, comments)
 			const formatNumber = (num: number) => {
 				if (num >= 1000000) {
 					return (num / 1000000).toFixed(1) + "M";
@@ -529,14 +486,48 @@ const UserDashboard = dynamic(
 				return num.toString();
 			};
 
-			// Fix the handleViewProfile function
+			const handleSendReply = async (conversationId: string) => {
+				if (!replyText.trim() || !conversationId || !userId) return;
+
+				try {
+					// Use socket to send message first
+					if (socketSendMessage) {
+						socketSendMessage(conversationId, replyText);
+					} else {
+						// Fallback to mutation if socket not available
+						sendMessageMutation.mutate({
+							conversationId,
+							userId,
+							content: replyText,
+						});
+						return;
+					}
+
+					// Clear reply text and close reply input
+					setReplyText("");
+					setActiveReply(null);
+
+					// Remove the specific message from creatorMessages using query client
+					queryClient.setQueryData(
+						["creatorMessages", userId],
+						(oldData: CreatorMessage[] | undefined) => {
+							if (!oldData) return [];
+							return oldData.filter(
+								(message) => message.conversationId !== conversationId
+							);
+						}
+					);
+				} catch (error) {
+					console.error("Error sending reply:", error);
+				}
+			};
+
 			const handleViewProfile = async (creator: {
 				id: string;
 				name: string;
 				avatar: string;
 				username: string;
 				bio: string;
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				[key: string]: any;
 			}) => {
 				// Create a proper Creators object with required fields
@@ -566,26 +557,12 @@ const UserDashboard = dynamic(
 					contentLinks: [],
 				};
 
-				// Set the initial creator object
 				setSelectedCreator(creatorObj);
 
 				try {
-					// Fetch complete creator details
-					const response = await fetch(
-						`/api/admin/creator-approval?status=approved`
-					);
-					if (!response.ok) throw new Error("Failed to fetch creator details");
-
-					const data = await response.json();
-					// Find the creator with matching ID
-
-					const fullCreatorData = data.creators.find(
-						// eslint-disable-next-line @typescript-eslint/no-explicit-any
-						(c: any) => c.userId === creator.id
-					);
+					const fullCreatorData = await fetchCreatorDetails(creator.id);
 
 					if (fullCreatorData) {
-						// Update the creator with full details
 						setSelectedCreator((prev) => {
 							if (!prev) return null;
 
@@ -612,10 +589,46 @@ const UserDashboard = dynamic(
 				}
 			};
 
-			// Function to close the creator profile modal
 			const handleCloseProfile = () => {
 				setSelectedCreator(null);
 			};
+
+			// Loading states
+			if (userDataLoading) {
+				return (
+					<div className="flex flex-col justify-center items-center h-64">
+						<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+						<p>Loading dashboard..</p>
+					</div>
+				);
+			}
+
+			// Error states
+			if (userDataError) {
+				return (
+					<div className="text-center p-8">
+						<p className="text-red-500">Error loading dashboard data</p>
+						<Button
+							onClick={() =>
+								queryClient.invalidateQueries({
+									queryKey: ["userData", userId],
+								})
+							}
+							className="mt-4"
+						>
+							Retry
+						</Button>
+					</div>
+				);
+			}
+
+			if (!userData) {
+				return (
+					<div className="text-center p-8">
+						<EmptyContest userId={userId} />
+					</div>
+				);
+			}
 
 			return (
 				<div className="max-w-6xl px-4 py-8">
@@ -636,13 +649,16 @@ const UserDashboard = dynamic(
 								</div>
 							</div>
 							<button
-								onClick={() => (window.location.href = "/brand/dashboard/settings")}
+								onClick={() =>
+									(window.location.href = "/brand/dashboard/settings")
+								}
 								className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md text-sm font-medium"
 							>
 								Upgrade Now
 							</button>
 						</div>
 					)}
+
 					{/* Summary Cards */}
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
 						{/* Active Projects Card */}
@@ -661,22 +677,6 @@ const UserDashboard = dynamic(
 							</div>
 						</div>
 
-						{/* Active Contests Card */}
-						{/* <div className="bg-white rounded-lg shadow p-6 relative overflow-hidden">
-							<Image
-								src="/icons/total-contests.svg"
-								alt="Total Contests"
-								width={50}
-								height={50}
-							/>
-							<div className="mt-2">
-								<h3 className="text-gray-600 text-lg">Active Contests</h3>
-								<p className="text-3xl font-bold mt-2">
-									{userData.summary.activeContests}
-								</p>
-							</div>
-						</div> */}
-
 						{/* Total Spend Card */}
 						<div className="bg-white rounded-lg shadow p-6 relative overflow-hidden">
 							<Image
@@ -692,25 +692,11 @@ const UserDashboard = dynamic(
 										{formatCurrency(userData.totalSpend)}
 									</p>
 								</div>
-								<div>
-									{/* <select 
-                className="border border-gray-300 rounded-md px-4 py-2 text-sm text-gray-600"
-                value={dateRange}
-                onChange={(e) => setDateRange(e.target.value)}
-              >
-                <option>Date Range</option>
-                <option>Last 30 Days</option>
-                <option>Last 90 Days</option>
-                <option>This Year</option>
-                <option>All Time</option>
-              </select> */}
-								</div>
 							</div>
 						</div>
 					</div>
 
 					{/* Active Projects Section */}
-
 					<div className="mb-12">
 						<div className="flex justify-between items-center mb-4">
 							<h2 className="text-2xl font-semibold text-gray-800">
@@ -746,16 +732,14 @@ const UserDashboard = dynamic(
 												(project) =>
 													project.status === "active" ||
 													project.status === "accepting pitches" ||
-													project.status === "invite" 
+													project.status === "invite"
 											)
 											.sort((a, b) => {
-												// Sort by creation date (most recent first)
-												// Assuming there's a createdAt, dateCreated, or timestamp field
 												const dateA = new Date(a.createdAt || a.timestamp || 0);
 												const dateB = new Date(b.createdAt || b.timestamp || 0);
-												return dateB.getTime() - dateA.getTime(); // Most recent first
+												return dateB.getTime() - dateA.getTime();
 											})
-											.slice(0, 5) // Take top 5 most recent
+											.slice(0, 5)
 											.map((project, index) => (
 												<tr key={project.projectId || index}>
 													<td className="px-6 py-4 whitespace-nowrap">
@@ -769,13 +753,6 @@ const UserDashboard = dynamic(
 															{project.projectType?.type || "UGC Content Only"}
 														</div>
 													</td>
-													{/* <td className="px-6 py-4 whitespace-nowrap">
-														<div className="text-sm text-gray-900">
-															{formatCurrency(
-																project.creatorPricing?.budgetPerVideo || 0
-															)}
-														</div>
-													</td> */}
 													<td className="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
 														<Link
 															href={`/brand/dashboard/projects/${project.projectId}`}
@@ -795,6 +772,7 @@ const UserDashboard = dynamic(
 							)}
 						</div>
 					</div>
+
 					{/* Latest Contest Section */}
 					{latestContest && (
 						<div className="mb-12">
@@ -829,7 +807,7 @@ const UserDashboard = dynamic(
 
 								{/* Leaderboard */}
 								{loadingLeaderboard ? (
-									<div className="flex flex-col justify-center items-center py-8 h-screen">
+									<div className="flex flex-col justify-center items-center py-8">
 										<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
 										<p className="ml-2">Loading leaderboard...</p>
 									</div>
@@ -934,7 +912,7 @@ const UserDashboard = dynamic(
 					</div>
 
 					<div className="mb-12">
-						{loadingMessages ? (
+						{messagesLoading ? (
 							<div className="flex flex-col justify-center items-center h-32">
 								<div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
 								<p className="mt-2">Loading messages...</p>
@@ -998,19 +976,13 @@ const UserDashboard = dynamic(
 														placeholder="Type your reply..."
 														onKeyDown={(e) => {
 															if (e.key === "Enter") {
-																handleSendReply(
-																	message.conversationId,
-																	message.id
-																);
+																handleSendReply(message.conversationId);
 															}
 														}}
 													/>
 													<Button
 														onClick={() =>
-															handleSendReply(
-																message.conversationId,
-																message.id
-															)
+															handleSendReply(message.conversationId)
 														}
 														className="bg-orange-500 hover:bg-orange-600 text-white rounded-full"
 														disabled={!replyText.trim()}

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useProjectForm } from "@/components/brand/brandProjects/ProjectFormContext";
@@ -23,82 +24,134 @@ import { Button } from "@/components/ui/button";
 import { HelpCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
+// Types for user preferences
+interface UserPreferences {
+	userId: string;
+	projectRequirements: {
+		aspectRatio?: string;
+		duration?: string;
+		brandAssets?: string;
+	};
+	creatorPricing: {
+		selectionMethod: CreatorPricing["selectionMethod"];
+	};
+}
+
+// API functions
+const fetchUserPreferences = async (userId: string): Promise<UserPreferences | null> => {
+	if (!userId) throw new Error("User ID is required");
+
+	const response = await fetch(`/api/user-preferences?userId=${userId}`);
+	
+	if (!response.ok) {
+		throw new Error("Failed to fetch user preferences");
+	}
+
+	const data = await response.json();
+	
+	if (data.success && data.data) {
+		return data.data;
+	}
+	
+	return null;
+};
+
+const saveUserPreferences = async (preferences: UserPreferences): Promise<UserPreferences> => {
+	const response = await fetch("/api/user-preferences", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify(preferences),
+	});
+
+	const result = await response.json();
+
+	if (!result.success) {
+		throw new Error(result.error || "Failed to save preferences");
+	}
+
+	return preferences;
+};
+
 const ProjectPreference = () => {
 	const { formData, updateProjectRequirementsData, updateCreatorPricing } =
 		useProjectForm();
 	const { creatorPricing } = formData;
-
 	const { aspectRatio, duration, brandAssets } = formData.projectRequirements;
+	
 	const [selectionMethod, setSelectionMethod] = useState<
 		CreatorPricing["selectionMethod"]
 	>(creatorPricing.selectionMethod || "Invite Specific Creators");
-	const [isSaving, setIsSaving] = useState(false);
-	const [isLoading, setIsLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
 	const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
 	const { currentUser } = useAuth();
+	const queryClient = useQueryClient();
 
-	// Fetch user preferences when component mounts
-	useEffect(() => {
-		const fetchUserPreferences = async () => {
-			try {
-				const userId = currentUser?.uid || "";
-				if (!userId) {
-					setIsLoading(false);
-					return;
-				}
-
-				const response = await fetch(`/api/user-preferences?userId=${userId}`);
-				if (response.ok) {
-					const data = await response.json();
-					if (data.success && data.data) {
-						// Apply preferences to the form if they exist
-						if (data.data.projectRequirements) {
-							const prefs = data.data.projectRequirements;
-							if (prefs.aspectRatio)
-								updateProjectRequirementsData({
-									aspectRatio: prefs.aspectRatio,
-								});
-							if (prefs.duration)
-								updateProjectRequirementsData({ duration: prefs.duration });
-							if (prefs.brandAssets)
-								updateProjectRequirementsData({
-									brandAssets: prefs.brandAssets,
-								});
-						}
-						if (
-							data.data.creatorPricing &&
-							data.data.creatorPricing.selectionMethod
-						) {
-							setSelectionMethod(data.data.creatorPricing.selectionMethod);
-							updateCreatorPricing({
-								selectionMethod: data.data.creatorPricing.selectionMethod,
-							});
-						}
-					}
-				}
-			} catch (error) {
-				console.error("Error fetching user preferences:", error);
-			} finally {
-				setIsLoading(false);
+	// Query for fetching user preferences
+	const {
+		data: userPreferences,
+		isLoading,
+		error: queryError,
+		isError
+	} = useQuery({
+		queryKey: ["userPreferences", currentUser?.uid],
+		queryFn: () => {
+			if (!currentUser?.uid) {
+				throw new Error("User ID is undefined");
 			}
-		};
+			return fetchUserPreferences(currentUser.uid);
+		},
+		enabled: !!currentUser?.uid,
+		staleTime: 5 * 60 * 1000, // 5 minutes
+		gcTime: 10 * 60 * 1000, // 10 minutes
+	});
 
-		fetchUserPreferences();
-	}, [updateProjectRequirementsData, updateCreatorPricing, currentUser?.uid]);
+	// Mutation for saving user preferences
+	const savePreferencesMutation = useMutation({
+		mutationFn: saveUserPreferences,
+		onSuccess: (data) => {
+			// Update the cache with new data
+			queryClient.setQueryData(["userPreferences", currentUser?.uid], data);
+			setSuccessMessage("Preferences saved successfully!");
+		},
+		onError: (error: Error) => {
+			console.error("Save preferences error:", error);
+		},
+	});
 
-	// Clear error message after 3 seconds
+	// Apply fetched preferences to form when data is loaded
 	useEffect(() => {
-		if (error) {
-			const timer = setTimeout(() => {
-				setError(null);
-			}, 3000);
-			return () => clearTimeout(timer);
+		if (userPreferences) {
+			// Apply preferences to the form if they exist
+			if (userPreferences.projectRequirements) {
+				const prefs = userPreferences.projectRequirements;
+				if (prefs.aspectRatio) {
+					updateProjectRequirementsData({
+						aspectRatio: prefs.aspectRatio,
+					});
+				}
+				if (prefs.duration) {
+					updateProjectRequirementsData({ 
+						duration: prefs.duration 
+					});
+				}
+				if (prefs.brandAssets) {
+					updateProjectRequirementsData({
+						brandAssets: prefs.brandAssets,
+					});
+				}
+			}
+			if (userPreferences.creatorPricing?.selectionMethod) {
+				setSelectionMethod(userPreferences.creatorPricing.selectionMethod);
+				updateCreatorPricing({
+					selectionMethod: userPreferences.creatorPricing.selectionMethod,
+				});
+			}
 		}
-	}, [error]);
+	}, [userPreferences, updateProjectRequirementsData, updateCreatorPricing]);
 
-	// Clear success message after 3 seconds (already implemented but moved to useEffect)
+	// Clear success message after 3 seconds
 	useEffect(() => {
 		if (successMessage) {
 			const timer = setTimeout(() => {
@@ -126,53 +179,29 @@ const ProjectPreference = () => {
 	};
 
 	const handleSavePreferences = async () => {
-		setError(null);
-		setSuccessMessage(null);
-		try {
-			setIsSaving(true);
-
-			const userId = currentUser?.uid || "";
-			if (!userId) {
-				setError("User ID not found. Please log in again.");
-				return;
-			}
-
-			// Prepare the data to save
-			const preferencesData = {
-				userId,
-				projectRequirements: {
-					aspectRatio,
-					duration,
-					brandAssets,
-				},
-				creatorPricing: {
-					selectionMethod,
-				},
-			};
-
-			// Save to your API
-			const response = await fetch("/api/user-preferences", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(preferencesData),
-			});
-
-			const result = await response.json();
-
-			if (result.success) {
-				setSuccessMessage("Preferences saved successfully!");
-			} else {
-				setError(result.error || "Failed to save preferences");
-			}
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to update profile");
-		} finally {
-			setIsSaving(false);
+		const userId = currentUser?.uid || "";
+		if (!userId) {
+			console.error("User ID not found. Please log in again.");
+			return;
 		}
+
+		// Prepare the data to save
+		const preferencesData: UserPreferences = {
+			userId,
+			projectRequirements: {
+				aspectRatio,
+				duration,
+				brandAssets,
+			},
+			creatorPricing: {
+				selectionMethod,
+			},
+		};
+
+		savePreferencesMutation.mutate(preferencesData);
 	};
 
+	// Handle loading state
 	if (isLoading) {
 		return (
 			<div className="flex flex-col justify-center items-center h-screen">
@@ -181,6 +210,10 @@ const ProjectPreference = () => {
 			</div>
 		);
 	}
+
+	// Handle error state
+	const error = isError ? (queryError as Error)?.message : 
+		savePreferencesMutation.error?.message;
 
 	return (
 		<div className=" bg-white border border-[#FFD9C3] flex flex-col rounded-lg p-6">
@@ -324,9 +357,9 @@ const ProjectPreference = () => {
 					<Button
 						className="w-fit bg-[#FD5C02] hover:bg-[#E55202] text-white font-medium py-3 rounded-md"
 						onClick={handleSavePreferences}
-						disabled={isSaving}
+						disabled={savePreferencesMutation.isPending}
 					>
-						{isSaving ? "Saving..." : "Save Preferences"}
+						{savePreferencesMutation.isPending ? "Saving..." : "Save Preferences"}
 					</Button>
 				</div>
 			</div>

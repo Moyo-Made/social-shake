@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	Play,
 	ShoppingCart,
@@ -59,7 +60,15 @@ interface CreatorVideoShowcaseProps {
 	userId: string;
 	creatorName: string;
 	showHeader?: boolean;
-  }
+}
+
+interface VideosResponse {
+	videos: Video[];
+}
+
+interface PurchasesResponse {
+	purchases: Array<{ videoId: string }>;
+}
 
 const CreatorVideoShowcase: React.FC<CreatorVideoShowcaseProps> = ({
 	userId,
@@ -68,19 +77,14 @@ const CreatorVideoShowcase: React.FC<CreatorVideoShowcaseProps> = ({
 }) => {
 	const { currentUser } = useAuth();
 	const searchParams = useSearchParams();
+	const queryClient = useQueryClient();
 
-	const [videos, setVideos] = useState<Video[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
 	const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 	const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
 	const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 	const [isPurchasing, setIsPurchasing] = useState<string | null>(null);
 	const [isDownloading, setIsDownloading] = useState<string | null>(null);
 	const [isSaving, setIsSaving] = useState<string | null>(null);
-	const [purchasedVideos, setPurchasedVideos] = useState<Set<string>>(
-		new Set()
-	);
 	const [showSuccessMessage, setShowSuccessMessage] = useState<string | null>(
 		null
 	);
@@ -90,8 +94,53 @@ const CreatorVideoShowcase: React.FC<CreatorVideoShowcaseProps> = ({
 	const [selectedLicense, setSelectedLicense] = useState<string>("all");
 	const [sortBy, setSortBy] = useState<string>("newest");
 
-	
+	// Fetch creator's videos
+	const fetchCreatorVideos = async (): Promise<VideosResponse> => {
+		const response = await fetch(`/api/videos/creator/${userId}?status=active`);
+		if (!response.ok) throw new Error("Failed to fetch videos");
+		return response.json();
+	};
 
+	// Fetch user's purchased videos
+	const fetchPurchasedVideos = async (): Promise<PurchasesResponse> => {
+		if (!currentUser) return { purchases: [] };
+		const response = await fetch(`/api/purchases/user/${currentUser.uid}`);
+		if (!response.ok) return { purchases: [] };
+		return response.json();
+	};
+
+	const {
+		data: videosData,
+		isLoading: videosLoading,
+		error: videosError,
+		refetch: refetchVideos,
+	} = useQuery({
+		queryKey: ["creator-videos", userId],
+		queryFn: fetchCreatorVideos,
+		enabled: !!userId,
+		staleTime: 5 * 60 * 1000, // 5 minutes
+		refetchOnWindowFocus: false,
+	});
+
+	const {
+		data: purchasesData,
+		isLoading: purchasesLoading,
+		error: purchasesError,
+	} = useQuery({
+		queryKey: ["user-purchases", currentUser?.uid],
+		queryFn: fetchPurchasedVideos,
+		enabled: !!currentUser,
+		staleTime: 5 * 60 * 1000, // 5 minutes
+		refetchOnWindowFocus: false,
+	});
+
+	const videos = videosData?.videos || [];
+	const purchasedVideos = new Set<string>(
+		purchasesData?.purchases.map((p) => p.videoId) || []
+	);
+
+	const loading = videosLoading || purchasesLoading;
+	const error = videosError || purchasesError;
 
 	// Check for purchase success on component mount
 	useEffect(() => {
@@ -101,17 +150,11 @@ const CreatorVideoShowcase: React.FC<CreatorVideoShowcaseProps> = ({
 		if (purchaseSuccess && videoId) {
 			setShowSuccessMessage(purchaseSuccess);
 
-			// Add the purchased video to the set immediately
-			setPurchasedVideos((prev) => new Set([...prev, videoId]));
-
-			// Update the video's purchase count in the local state
-			setVideos((prevVideos) =>
-				prevVideos.map((video) =>
-					video.id === videoId
-						? { ...video, purchases: video.purchases + 1 }
-						: video
-				)
-			);
+			// Invalidate and refetch relevant queries
+			queryClient.invalidateQueries({
+				queryKey: ["user-purchases", currentUser?.uid],
+			});
+			queryClient.invalidateQueries({ queryKey: ["creator-videos", userId] });
 
 			// Clear URL parameters
 			const newUrl = new URL(window.location.href);
@@ -121,49 +164,7 @@ const CreatorVideoShowcase: React.FC<CreatorVideoShowcaseProps> = ({
 
 			setTimeout(() => setShowSuccessMessage(null), 5000);
 		}
-	}, [searchParams]);
-
-	// Fetch creator's videos
-	useEffect(() => {
-		const fetchCreatorVideos = async () => {
-			try {
-				setLoading(true);
-				setError(null);
-
-				const response = await fetch(
-					`/api/videos/creator/${userId}?status=active`
-				);
-				if (!response.ok) throw new Error("Failed to fetch videos");
-
-				const data = await response.json();
-				setVideos(data.videos);
-
-				// Check purchased videos
-				if (currentUser) {
-					const purchasedResponse = await fetch(
-						`/api/purchases/user/${currentUser.uid}`
-					);
-					if (purchasedResponse.ok) {
-						const purchasedData = await purchasedResponse.json();
-						const purchasedIds = new Set<string>(
-							// eslint-disable-next-line @typescript-eslint/no-explicit-any
-							purchasedData.purchases.map((p: any) => p.videoId)
-						);
-						setPurchasedVideos(purchasedIds);
-					}
-				}
-			} catch (err) {
-				console.error("Error fetching videos:", err);
-				setError("Failed to load videos");
-			} finally {
-				setLoading(false);
-			}
-		};
-
-		if (userId) {
-			fetchCreatorVideos();
-		}
-	}, [userId, currentUser, showSuccessMessage]); // Refetch when purchase succeeds
+	}, [searchParams, queryClient, currentUser?.uid, userId]);
 
 	// Simplified handleDownload function - no backend endpoint needed
 	const handleDownload = async (video: Video) => {
@@ -212,8 +213,8 @@ const CreatorVideoShowcase: React.FC<CreatorVideoShowcaseProps> = ({
 		if (!currentUser || !purchasedVideos.has(video.id)) return;
 
 		setIsSaving(video.id);
-			// Add video to saved set
-	setSavedVideos((prev) => new Set([...prev, video.id]));
+		// Add video to saved set
+		setSavedVideos((prev) => new Set([...prev, video.id]));
 
 		try {
 			const response = await fetch("/api/video-library", {
@@ -235,7 +236,6 @@ const CreatorVideoShowcase: React.FC<CreatorVideoShowcaseProps> = ({
 		} catch (error) {
 			console.error("Save error:", error);
 			toast("Video purchased has already been added to your library.");
-
 		} finally {
 			setIsSaving(null);
 		}
@@ -384,8 +384,21 @@ const CreatorVideoShowcase: React.FC<CreatorVideoShowcaseProps> = ({
 			<div className="text-center py-12">
 				<div className="text-red-600 mb-4">
 					<p className="text-lg font-semibold">Error Loading Videos</p>
-					<p className="text-sm mt-1">{error}</p>
+					<p className="text-sm mt-1">
+						{error instanceof Error ? error.message : "An error occurred"}
+					</p>
 				</div>
+				<Button
+					onClick={() => {
+						refetchVideos();
+						queryClient.invalidateQueries({
+							queryKey: ["user-purchases", currentUser?.uid],
+						});
+					}}
+					className="mt-4"
+				>
+					Try Again
+				</Button>
 			</div>
 		);
 	}
@@ -419,7 +432,7 @@ const CreatorVideoShowcase: React.FC<CreatorVideoShowcaseProps> = ({
 				</div>
 			)}
 
-			{/* Filters and Controls - Same as before */}
+			{/* Filters and Controls */}
 			<div className="bg-white p-4 rounded-lg shadow-sm border mb-6">
 				<div className="flex flex-wrap gap-4 items-center justify-between">
 					<div className="flex flex-wrap gap-4 items-center">
@@ -655,7 +668,8 @@ const CreatorVideoShowcase: React.FC<CreatorVideoShowcaseProps> = ({
 													<Button
 														onClick={() => handleSaveToLibrary(video)}
 														disabled={
-															isSaving === video.id || purchasedVideos.has(video.id)
+															isSaving === video.id ||
+															purchasedVideos.has(video.id)
 														}
 														className={`w-full px-3 py-2 rounded text-sm transition-colors ${
 															purchasedVideos.has(video.id)
