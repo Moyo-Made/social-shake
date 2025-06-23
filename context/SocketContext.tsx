@@ -94,11 +94,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       socketInstance.emit('subscribe-verification', currentUser.uid);
       // Subscribe to notifications
       socketInstance.emit('subscribe-notifications', currentUser.uid);
-      
-      // Auto-refresh verification status when connected
-      if (currentUser.uid) {
-        refreshVerificationStatusInternal(currentUser.uid);
-      }
+    
     });
 
     socketInstance.on('disconnect', (reason) => {
