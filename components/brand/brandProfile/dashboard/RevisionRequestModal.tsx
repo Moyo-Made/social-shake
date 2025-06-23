@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { X, MessageSquare, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 interface RevisionRequestModalProps {
   isOpen: boolean;
@@ -99,10 +101,10 @@ const RevisionRequestModal: React.FC<RevisionRequestModalProps> = ({
 
           {/* Revision Notes Input */}
           <div className="mb-6">
-            <label htmlFor="revision-notes" className="block text-sm font-medium text-gray-700 mb-2">
+            <Label htmlFor="revision-notes" className="block text-sm font-medium text-gray-700 mb-2">
               Revision Notes <span className="text-red-500">*</span>
-            </label>
-            <textarea
+            </Label>
+            <Textarea
               id="revision-notes"
               value={revisionNotes}
               onChange={(e) => {
@@ -111,7 +113,7 @@ const RevisionRequestModal: React.FC<RevisionRequestModalProps> = ({
               }}
               disabled={isSubmitting}
               placeholder="Please provide detailed feedback on what needs to be changed or improved in this video..."
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg resize-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               rows={6}
               maxLength={1000}
             />
