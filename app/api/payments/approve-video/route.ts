@@ -15,8 +15,8 @@ export async function POST(request: NextRequest) {
 			paymentId,
 			action: actionFromRequest,
 			reason,
-			deliverableId, // NEW: specific deliverable to approve
-			approveAll = false, // NEW: flag to approve all deliverables in the order
+			deliverableId,
+			approveAll = false,
 		} = await request.json();
 
 		action = actionFromRequest;
@@ -87,7 +87,6 @@ export async function POST(request: NextRequest) {
 						approved_by: getApproverId(),
 						updated_at: new Date().toISOString(),
 					});
-					console.log(`Updated deliverable ${deliverableId} approval status`);
 				}
 			} catch (error) {
 				console.warn("Could not update deliverable approval status:", error);
@@ -115,9 +114,6 @@ export async function POST(request: NextRequest) {
 				});
 
 				await batch.commit();
-				console.log(
-					`Updated ${deliverablesSnapshot.size} deliverables to approved`
-				);
 			} catch (error) {
 				console.warn(
 					"Could not update all deliverables approval status:",
@@ -151,8 +147,6 @@ export async function POST(request: NextRequest) {
 				const capturedPaymentIntent = await stripe.paymentIntents.capture(
 					stripePaymentIntentId
 				);
-
-				console.log(`Payment captured successfully: ${stripePaymentIntentId}`);
 
 				// Update payment status
 				updatedPaymentData = {

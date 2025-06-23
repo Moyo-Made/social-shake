@@ -37,6 +37,58 @@ export async function GET(request: NextRequest) {
       console.log(`Found verification by userId: ${doc.id}`);
       
       const data = doc.data();
+      const profileData = data.profileData || {};
+      
+      // Debug logging
+      console.log('Document data structure found:', {
+        hasProfileData: !!data.profileData,
+        topLevelStatus: data.status,
+        topLevelUserId: data.userId,
+        profileDataKeys: Object.keys(profileData)
+      });
+      
+      // Prepare response with proper field extraction
+      const responseData = {
+        id: doc.id,
+        // Core verification fields (always at root level)
+        status: data.status || 'pending',
+        userId: data.userId,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+        rejectionReason: data.rejectionReason || null,
+        infoRequest: data.infoRequest || null,
+        suspensionReason: data.suspensionReason || null,
+        
+        // Profile fields - check both root and nested locations
+        bio: data.bio || profileData.bio || null,
+        tiktokUrl: data.tiktokUrl || profileData.tiktokUrl || null,
+        ethnicity: data.ethnicity || profileData.ethnicity || null,
+        dateOfBirth: data.dateOfBirth || profileData.dateOfBirth || null,
+        gender: data.gender || profileData.gender || null,
+        country: data.country || profileData.country || null,
+        contentTypes: data.contentTypes || profileData.contentTypes || [],
+        contentLinks: data.contentLinks || profileData.contentLinks || [],
+        socialMedia: data.socialMedia || profileData.socialMedia || {
+          instagram: "",
+          twitter: "",
+          facebook: "",
+          youtube: "",
+          tiktok: ""
+        },
+        pricing: data.pricing || profileData.pricing || {},
+        abnNumber: data.abnNumber || profileData.abnNumber || null,
+        languages: data.languages || profileData.languages || [],
+        
+        // File URLs - check both root and nested locations
+        profilePictureUrl: data.profilePictureUrl || profileData.profilePictureUrl || null,
+        verificationVideoUrl: data.verificationVideoUrl || profileData.verificationVideoUrl || null,
+        verifiableIDUrl: data.verifiableIDUrl || profileData.verifiableIDUrl || null,
+        aboutMeVideoUrl: data.aboutMeVideoUrl || profileData.aboutMeVideoUrl || profileData.aboutMeVideo || null,
+        portfolioVideoUrls: data.portfolioVideoUrls || profileData.portfolioVideoUrls || [],
+        
+        // Keep the original profileData for backwards compatibility
+        profileData: profileData
+      };
       
       // Broadcast real-time update when verification is accessed
       try {
@@ -50,7 +102,7 @@ export async function GET(request: NextRequest) {
             event: 'verification-data-fetched',
             data: {
               verificationId: doc.id,
-              status: data.status,
+              status: responseData.status,
               userId: userId,
               accessedAt: new Date().toISOString()
             }
@@ -60,14 +112,13 @@ export async function GET(request: NextRequest) {
         console.error('Error broadcasting verification access:', broadcastError);
       }
       
-      // Make sure we extract all URL fields explicitly to include in response
-      return NextResponse.json({
-        id: doc.id,
-        ...data,
-        profilePictureUrl: data.profilePictureUrl || null,
-        verificationVideoUrl: data.verificationVideoUrl || null,
-        verifiableIDUrl: data.verifiableIDUrl || null
-      });
+      // Create response with proper headers for Safari
+      const response = NextResponse.json(responseData);
+      response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      response.headers.set('Pragma', 'no-cache');
+      response.headers.set('Expires', '0');
+      
+      return response;
     }
     
     // Original implementation for when id is provided
@@ -94,6 +145,59 @@ export async function GET(request: NextRequest) {
       );
     }
     
+    const profileData = verificationData.profileData || {};
+    
+    // Debug logging
+    console.log('Document data structure found by ID:', {
+      hasProfileData: !!verificationData.profileData,
+      topLevelStatus: verificationData.status,
+      topLevelUserId: verificationData.userId,
+      profileDataKeys: Object.keys(profileData)
+    });
+    
+    // Prepare response with proper field extraction
+    const responseData = {
+      id: docSnap.id,
+      // Core verification fields (always at root level)
+      status: verificationData.status || 'pending',
+      userId: verificationData.userId,
+      createdAt: verificationData.createdAt,
+      updatedAt: verificationData.updatedAt,
+      rejectionReason: verificationData.rejectionReason || null,
+      infoRequest: verificationData.infoRequest || null,
+      suspensionReason: verificationData.suspensionReason || null,
+      
+      // Profile fields - check both root and nested locations
+      bio: verificationData.bio || profileData.bio || null,
+      tiktokUrl: verificationData.tiktokUrl || profileData.tiktokUrl || null,
+      ethnicity: verificationData.ethnicity || profileData.ethnicity || null,
+      dateOfBirth: verificationData.dateOfBirth || profileData.dateOfBirth || null,
+      gender: verificationData.gender || profileData.gender || null,
+      country: verificationData.country || profileData.country || null,
+      contentTypes: verificationData.contentTypes || profileData.contentTypes || [],
+      contentLinks: verificationData.contentLinks || profileData.contentLinks || [],
+      socialMedia: verificationData.socialMedia || profileData.socialMedia || {
+        instagram: "",
+        twitter: "",
+        facebook: "",
+        youtube: "",
+        tiktok: ""
+      },
+      pricing: verificationData.pricing || profileData.pricing || {},
+      abnNumber: verificationData.abnNumber || profileData.abnNumber || null,
+      languages: verificationData.languages || profileData.languages || [],
+      
+      // File URLs - check both root and nested locations
+      profilePictureUrl: verificationData.profilePictureUrl || profileData.profilePictureUrl || null,
+      verificationVideoUrl: verificationData.verificationVideoUrl || profileData.verificationVideoUrl || null,
+      verifiableIDUrl: verificationData.verifiableIDUrl || profileData.verifiableIDUrl || null,
+      aboutMeVideoUrl: verificationData.aboutMeVideoUrl || profileData.aboutMeVideoUrl || profileData.aboutMeVideo || null,
+      portfolioVideoUrls: verificationData.portfolioVideoUrls || profileData.portfolioVideoUrls || [],
+      
+      // Keep the original profileData for backwards compatibility
+      profileData: profileData
+    };
+    
     // Broadcast real-time update when verification is accessed by ID
     try {
       const socketServerUrl = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || 'http://localhost:3001';
@@ -106,7 +210,7 @@ export async function GET(request: NextRequest) {
           event: 'verification-status-update',
           data: {
             verificationId: id,
-            status: verificationData.status,
+            status: responseData.status,
             userId: userId,
             accessedAt: new Date().toISOString()
           }
@@ -116,11 +220,13 @@ export async function GET(request: NextRequest) {
       console.error('Error broadcasting verification access:', broadcastError);
     }
     
-    // Make sure we extract all URL fields explicitly to include in response
-    return NextResponse.json({
-      id: docSnap.id,
-      ...verificationData,
-    });
+    // Create response with proper headers for Safari
+    const response = NextResponse.json(responseData);
+    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    
+    return response;
   } catch (error) {
     console.error("Error fetching verification:", error);
     return NextResponse.json(
@@ -198,7 +304,18 @@ export async function PUT(request: NextRequest) {
     // Update the document
     await verificationRef.update(updateData);
 
-    // Broadcast the status change (this is what was missing!)
+    // Also update the creator profile verification status
+    try {
+      await adminDb.collection("creatorProfiles").doc(userId).update({
+        verificationStatus: status,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (profileUpdateError) {
+      console.error('Error updating creator profile status:', profileUpdateError);
+      // Don't fail the whole request if profile update fails
+    }
+
+    // Broadcast the status change
     try {
       const socketServerUrl = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || 'http://localhost:3001';
       
@@ -207,7 +324,7 @@ export async function PUT(request: NextRequest) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
-          event: 'verification-status-update', // This matches what Socket context expects!
+          event: 'verification-status-update',
           data: {
             status,
             rejectionReason: rejectionReason || null,
@@ -221,11 +338,18 @@ export async function PUT(request: NextRequest) {
       console.error('Error broadcasting verification status update:', broadcastError);
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       message: "Verification status updated successfully",
       id,
       ...updateData
     });
+    
+    // Add headers for Safari compatibility
+    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    
+    return response;
 
   } catch (error) {
     console.error("Error updating verification status:", error);
