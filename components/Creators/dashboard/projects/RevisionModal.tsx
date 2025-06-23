@@ -20,6 +20,8 @@ interface RevisionModalProps {
 	onRevisionSubmit?: (newSubmissionData: { id: string; status: string }) => void;
 }
 
+const CHUNK_SIZE = 3 * 1024 * 1024; // 3MB chunks
+
 const RevisionModal: React.FC<RevisionModalProps> = ({
 	isOpen,
 	onClose,
@@ -31,6 +33,7 @@ const RevisionModal: React.FC<RevisionModalProps> = ({
 	const [fileToUpload, setFileToUpload] = useState<File | null>(null);
 	const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [uploadProgress, setUploadProgress] = useState(0);
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
@@ -49,6 +52,7 @@ const RevisionModal: React.FC<RevisionModalProps> = ({
 			console.log("Fetching revision data for submission:", submissionId);
 			fetchRevisionData();
 		}
+	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isOpen, submissionId]);
 
 	const fetchRevisionData = async () => {
@@ -163,6 +167,31 @@ const RevisionModal: React.FC<RevisionModalProps> = ({
 		}
 	};
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const uploadChunk = async (chunk: Blob, chunkIndex: number, totalChunks: number, file: File): Promise<any> => {
+		const formData = new FormData();
+		formData.append("submissionId", submissionId);
+		formData.append("chunk", chunk);
+		formData.append("chunkIndex", chunkIndex.toString());
+		formData.append("totalChunks", totalChunks.toString());
+		formData.append("fileName", file.name);
+		formData.append("fileSize", file.size.toString());
+		formData.append("fileType", file.type);
+
+		const response = await fetch("/api/project-submissions/revision", {
+			method: "POST",
+			body: formData,
+		});
+
+		const data = await response.json();
+
+		if (!response.ok) {
+			throw new Error(data.error || `Failed to upload chunk ${chunkIndex + 1}`);
+		}
+
+		return data;
+	};
+
 	const handleSubmitRevision = async () => {
 		if (!fileToUpload) {
 			toast.error("Please upload a video file");
@@ -175,40 +204,48 @@ const RevisionModal: React.FC<RevisionModalProps> = ({
 		}
 
 		setIsSubmitting(true);
+		setUploadProgress(0);
 
 		try {
-			// Create FormData object for file upload
-			const formData = new FormData();
-			formData.append("submissionId", submissionId);
-			formData.append("video", fileToUpload);
+			const totalChunks = Math.ceil(fileToUpload.size / CHUNK_SIZE);
+			let uploadedChunks = 0;
 
-			// Send the revised submission to the API
-			const response = await fetch("/api/project-submissions/revision", {
-				method: "POST",
-				body: formData,
-			});
+			console.log(`Starting chunked upload: ${totalChunks} chunks`);
 
-			const data = await response.json();
+			// Upload chunks sequentially
+			for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+				const start = chunkIndex * CHUNK_SIZE;
+				const end = Math.min(start + CHUNK_SIZE, fileToUpload.size);
+				const chunk = fileToUpload.slice(start, end);
 
-			if (!response.ok) {
-				throw new Error(data.error || "Failed to submit revision");
+				console.log(`Uploading chunk ${chunkIndex + 1}/${totalChunks}`);
+
+				const result = await uploadChunk(chunk, chunkIndex, totalChunks, fileToUpload);
+				
+				uploadedChunks++;
+				const progress = Math.round((uploadedChunks / totalChunks) * 100);
+				setUploadProgress(progress);
+
+				// If this is the last chunk and upload is complete
+				if (result.completed) {
+					toast.success("Your revised video has been submitted successfully!");
+
+					// Clear the file state
+					setFileToUpload(null);
+					if (filePreviewUrl) {
+						URL.revokeObjectURL(filePreviewUrl);
+						setFilePreviewUrl(null);
+					}
+
+					// Trigger refresh in parent component if callback exists
+					if (onRevisionSubmit) {
+						onRevisionSubmit(result.data);
+					}
+
+					onClose();
+					return;
+				}
 			}
-
-			toast.success("Your revised video has been submitted successfully!");
-
-			// Clear the file state
-			setFileToUpload(null);
-			if (filePreviewUrl) {
-				URL.revokeObjectURL(filePreviewUrl);
-				setFilePreviewUrl(null);
-			}
-
-			// Trigger refresh in parent component if callback exists
-			if (onRevisionSubmit) {
-				onRevisionSubmit(data);
-			}
-
-			onClose();
 
 		} catch (error) {
 			console.error("Error submitting revision:", error);
@@ -219,6 +256,7 @@ const RevisionModal: React.FC<RevisionModalProps> = ({
 			);
 		} finally {
 			setIsSubmitting(false);
+			setUploadProgress(0);
 		}
 	};
 
@@ -260,6 +298,7 @@ const RevisionModal: React.FC<RevisionModalProps> = ({
 								onClick={onClose}
 								className="absolute top-6 right-6 text-gray-500 hover:text-gray-700"
 								aria-label="Close"
+								disabled={isSubmitting}
 							>
 								<svg
 									xmlns="http://www.w3.org/2000/svg"
@@ -319,8 +358,10 @@ const RevisionModal: React.FC<RevisionModalProps> = ({
 								onDragLeave={handleDragLeave}
 								onDrop={handleDrop}
 								onClick={() => {
-									const input = document.getElementById("fileInput");
-									if (input) input.click();
+									if (!isSubmitting) {
+										const input = document.getElementById("fileInput");
+										if (input) input.click();
+									}
 								}}
 							>
 								<input
@@ -329,6 +370,7 @@ const RevisionModal: React.FC<RevisionModalProps> = ({
 									onChange={handleFileChange}
 									className="hidden"
 									accept="video/mp4,video/x-matroska,video/quicktime,video/x-msvideo,video/x-ms-wmv,video/avi,video/webm,video/3gpp,video/3gpp2,video/ogg"
+									disabled={isSubmitting}
 								/>
 
 								{filePreviewUrl ? (
@@ -375,6 +417,22 @@ const RevisionModal: React.FC<RevisionModalProps> = ({
 								)}
 							</div>
 
+							{/* Progress bar */}
+							{isSubmitting && (
+								<div className="mb-4">
+									<div className="flex justify-between text-sm text-gray-600 mb-1">
+										<span>Uploading...</span>
+										<span>{uploadProgress}%</span>
+									</div>
+									<div className="w-full bg-gray-200 rounded-full h-2">
+										<div
+											className="bg-orange-500 h-2 rounded-full transition-all duration-300"
+											style={{ width: `${uploadProgress}%` }}
+										></div>
+									</div>
+								</div>
+							)}
+
 							{/* Submit button */}
 							<button
 								onClick={handleSubmitRevision}
@@ -385,7 +443,9 @@ const RevisionModal: React.FC<RevisionModalProps> = ({
 										: "bg-orange-500 hover:bg-orange-600"
 								} transition-colors`}
 							>
-								{isSubmitting ? "Submitting..." : "Submit Revision"}
+								{isSubmitting 
+									? `Uploading... ${uploadProgress}%` 
+									: "Submit Revision"}
 							</button>
 						</div>
 					</>
