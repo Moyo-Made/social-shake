@@ -49,7 +49,6 @@ const RevisionModal: React.FC<RevisionModalProps> = ({
 	useEffect(() => {
 		// Fetch revision data when modal opens and submissionId is available
 		if (isOpen && submissionId) {
-			console.log("Fetching revision data for submission:", submissionId);
 			fetchRevisionData();
 		}
 	// eslint-disable-next-line react-hooks/exhaustive-deps
@@ -68,9 +67,6 @@ const RevisionModal: React.FC<RevisionModalProps> = ({
 		setError(null);
 
 		try {
-			console.log(
-				`Making API request to: /api/reviews?submissionId=${submissionId}`
-			);
 			const response = await fetch(`/api/reviews?submissionId=${submissionId}`);
 
 			if (!response.ok) {
@@ -83,7 +79,7 @@ const RevisionModal: React.FC<RevisionModalProps> = ({
 			}
 
 			const data = await response.json();
-			console.log("Fetched revision data:", data);
+
 
 			// Add revision number to each revision
 			const revisionsWithNumber = data.reviews.map(
@@ -210,15 +206,11 @@ const RevisionModal: React.FC<RevisionModalProps> = ({
 			const totalChunks = Math.ceil(fileToUpload.size / CHUNK_SIZE);
 			let uploadedChunks = 0;
 
-			console.log(`Starting chunked upload: ${totalChunks} chunks`);
-
 			// Upload chunks sequentially
 			for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
 				const start = chunkIndex * CHUNK_SIZE;
 				const end = Math.min(start + CHUNK_SIZE, fileToUpload.size);
 				const chunk = fileToUpload.slice(start, end);
-
-				console.log(`Uploading chunk ${chunkIndex + 1}/${totalChunks}`);
 
 				const result = await uploadChunk(chunk, chunkIndex, totalChunks, fileToUpload);
 				
