@@ -84,8 +84,6 @@ async function sendCreatorInvitations(
 	creatorIds: string[]
 ): Promise<void> {
 	try {
-		console.log(`Sending invitations to creators:`, creatorIds);
-
 		const batch = adminDb.batch();
 		const successfulNotifications: Array<{
 			userId: string;
@@ -251,68 +249,129 @@ async function emitNotificationsToCreators(
 	}
 }
 
-// Add this function after your existing helper functions
-async function checkSubscriptionAccess(userId: string): Promise<{
-	canCreateNew: boolean;
-	canModifyExisting: boolean;
-	blockMessage: string;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	subscriptionData: any;
-}> {
+// checkSubscriptionAccess function
+async function checkSubscriptionAccess(userId: string) {
 	try {
-		// Fetch user's subscription data
-		const subscriptionQuery = await adminDb
-			.collection("subscriptions")
-			.where("userId", "==", userId)
-			.where("status", "in", ["active", "trialing", "past_due"])
-			.orderBy("createdAt", "desc")
-			.limit(1)
-			.get();
+		// First, try to get the user's current stripe subscription ID from users collection
+		const userDoc = await adminDb.collection("users").doc(userId).get();
+		let currentStripeSubscriptionId = null;
 
-		let subscriptionData = null;
-		if (!subscriptionQuery.empty) {
-			subscriptionData = subscriptionQuery.docs[0].data();
+		if (userDoc.exists) {
+			const userData = userDoc.data();
+			currentStripeSubscriptionId = userData?.stripeSubscriptionId;
 		}
 
-		// Apply same logic as your hook
-		const isFutureDate = (dateString: string | null | undefined): boolean => {
-			if (!dateString) return false;
+		// If we have a current stripe subscription ID, prioritize that
+		let subscriptionData = null;
+
+		if (currentStripeSubscriptionId) {
+			const stripeIdQuery = await adminDb
+				.collection("subscriptions")
+				.where("stripeSubscriptionId", "==", currentStripeSubscriptionId)
+				.where("userId", "==", userId)
+				.limit(1)
+				.get();
+
+			if (!stripeIdQuery.empty) {
+				subscriptionData = stripeIdQuery.docs[0].data();
+			}
+		}
+
+		// Fallback: If no subscription found by Stripe ID, get the most recent one
+		if (!subscriptionData) {
+			const subscriptionQuery = await adminDb
+				.collection("subscriptions")
+				.where("userId", "==", userId)
+				.orderBy("createdAt", "desc")
+				.limit(5)
+				.get();
+
+			// Get the most recent subscription
+			if (!subscriptionQuery.empty) {
+				subscriptionData = subscriptionQuery.docs[0].data();
+			}
+		}
+
+		if (!subscriptionData) {
+			return {
+				canCreateNew: false,
+				canModifyExisting: false,
+				blockMessage:
+					"No subscription found. Upgrade to Pro to create projects.",
+				subscriptionData: null,
+			};
+		}
+
+		// Improved date comparison function with more debugging
+		const isFutureDate = (
+			dateString: string | number | Date,
+			label: string
+		) => {
+			if (!dateString) {
+				return false;
+			}
 			try {
-				return new Date(dateString) > new Date();
-			} catch {
+				const date = new Date(dateString);
+				const now = new Date();
+				const isFuture = date > now;
+				return isFuture;
+			} catch (error) {
+				console.error(`DEBUG: Error parsing ${label} date:`, dateString, error);
 				return false;
 			}
 		};
 
-		const isActive = subscriptionData?.status === "active";
-		const isInTrial =
-			subscriptionData?.status === "trialing" &&
-			isFutureDate(subscriptionData?.trialEnd);
-		const isTrialExpired =
-			subscriptionData?.status === "trialing" &&
-			!isFutureDate(subscriptionData?.trialEnd);
-		const isPastDue = subscriptionData?.status === "past_due";
+		const status = subscriptionData.status;
 
-		const canAccessPremiumFeatures = isActive || (isInTrial && !isTrialExpired);
-		const canCreateNew = canAccessPremiumFeatures;
+		// Check dates with labels
+		const isActive = status === "active";
+		const isTrialing = status === "trialing";
+		const isPastDue = status === "past_due";
 
-		const blockedStatuses = ["canceled", "incomplete_expired", "unpaid"];
+		const isInActiveTrial =
+			isTrialing && isFutureDate(subscriptionData?.trialEnd, "trialEnd");
+		const hasValidCurrentPeriod = isFutureDate(
+			subscriptionData?.currentPeriodEnd,
+			"currentPeriodEnd"
+		);
+
+		// FIXED: Handle edge case where active subscription doesn't have currentPeriodEnd yet
+		// This can happen right after trial conversion
+		const canCreateNew =
+			isActive ||
+			isInActiveTrial ||
+			(isActive && !subscriptionData.currentPeriodEnd);
+
+		// For modifying existing: same logic
+		const hardBlockedStatuses = [
+			"canceled",
+			"incomplete_expired",
+			"unpaid",
+			"incomplete",
+		];
 		const canModifyExisting =
-			canAccessPremiumFeatures ||
-			isPastDue ||
-			!blockedStatuses.includes(subscriptionData?.status);
+			canCreateNew || !hardBlockedStatuses.includes(status);
 
 		let blockMessage = "";
-		if (!canAccessPremiumFeatures) {
-			if (isTrialExpired) {
+		if (!canCreateNew) {
+			if (isTrialing && !isInActiveTrial) {
 				blockMessage =
 					"Your free trial has ended. Upgrade to continue creating projects.";
+			} else if (
+				isActive &&
+				subscriptionData.currentPeriodEnd &&
+				!hasValidCurrentPeriod
+			) {
+				blockMessage =
+					"Your subscription has expired. Please renew to continue creating projects.";
 			} else if (isPastDue) {
 				blockMessage =
 					"Please update your payment method to continue creating projects.";
-			} else {
+			} else if (status === "canceled") {
 				blockMessage =
-					"Upgrade to Pro to create projects and access premium features.";
+					"Your subscription has been canceled. Reactivate to continue creating projects.";
+			} else {
+				blockMessage = `Current status: ${status}. Upgrade to Pro to create projects.`;
 			}
 		}
 
@@ -323,11 +382,11 @@ async function checkSubscriptionAccess(userId: string): Promise<{
 			subscriptionData,
 		};
 	} catch (error) {
-		console.error("Subscription check error:", error);
+		console.error("❌ DEBUG: Subscription check error:", error);
 		return {
 			canCreateNew: false,
 			canModifyExisting: false,
-			blockMessage: "Unable to verify subscription status.",
+			blockMessage: "Unable to verify subscription status. Please try again.",
 			subscriptionData: null,
 		};
 	}
@@ -421,8 +480,6 @@ export async function GET(request: NextRequest) {
 // POST handler - simplified and focused
 export async function POST(request: NextRequest) {
 	try {
-		console.log("POST: Starting project creation");
-
 		// Check payload size
 		const contentLength = request.headers.get("content-length");
 		if (contentLength && parseInt(contentLength) > MAX_JSON_SIZE) {
@@ -473,8 +530,6 @@ export async function POST(request: NextRequest) {
 			paid = false,
 			paymentId,
 		} = requestData;
-
-		console.log(`POST: Processing for user ${userId}, isDraft: ${isDraft}`);
 
 		if (!userId) {
 			return NextResponse.json(
@@ -528,7 +583,6 @@ export async function POST(request: NextRequest) {
 
 		// Generate project ID
 		const projectId = generateProjectId();
-		console.log(`POST: Generated project ID: ${projectId}`);
 
 		// Process thumbnail
 		let thumbnailUrl: string | null = null;
@@ -609,7 +663,6 @@ export async function POST(request: NextRequest) {
 			creatorPricing?.selectedCreators ||
 			creatorPricing?.creator?.selectedCreators ||
 			[];
-		console.log("Selected creators found:", selectedCreators);
 
 		// Create project data
 		const projectData = {
@@ -644,12 +697,9 @@ export async function POST(request: NextRequest) {
 			paymentAmount: null,
 		};
 
-		console.log("POST: Attempting to save to Firestore");
-
 		// Save to Firestore with better error handling
 		try {
 			await adminDb.collection("projects").doc(projectId).set(projectData);
-			console.log("POST: Successfully saved to Firestore");
 		} catch (firestoreError) {
 			console.error("Firestore save error:", firestoreError);
 
@@ -699,18 +749,12 @@ export async function POST(request: NextRequest) {
 					.filter((id) => id);
 
 				if (creatorIds.length > 0) {
-					console.log("🎯 Sending invitations with real-time notifications...");
-
 					await sendCreatorInvitations(
 						projectId,
 						projectDetails.projectName,
 						brandName,
 						userId,
 						creatorIds
-					);
-
-					console.log(
-						`✅ Successfully sent invitations to ${creatorIds.length} creators`
 					);
 				}
 			} catch (invitationError) {
