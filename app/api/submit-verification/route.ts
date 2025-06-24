@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
 
 		const {
 			userId,
-			verificationId, // Now coming from the client
+			verificationId, // Optional - if provided, we'll validate it matches userId
 			bio,
 			tiktokUrl,
 			ethnicity,
@@ -51,11 +51,12 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		if (!verificationId) {
-			return NextResponse.json(
-				{ error: "Verification ID is required" },
-				{ status: 400 }
-			);
+		// Use userId as document ID - ignore verificationId if it doesn't match
+		const documentId = userId;
+		
+		// If verificationId is provided and doesn't match userId, log a warning
+		if (verificationId && verificationId !== userId) {
+			console.warn(`Warning: verificationId (${verificationId}) doesn't match userId (${userId}). Using userId as document ID.`);
 		}
 
 		// Validate required fields
@@ -123,7 +124,7 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		// ADD: Validate portfolio videos
+		// Validate portfolio videos
 		if (
 			!portfolioVideoUrls ||
 			!Array.isArray(portfolioVideoUrls) ||
@@ -154,13 +155,35 @@ export async function POST(request: NextRequest) {
 
 		console.log("All validations passed, creating verification document");
 
-		// Reference to verification document using the provided verificationId
+		// Reference to verification document using userId as document ID
 		const verificationRef = adminDb
 			.collection("creator_verifications")
-			.doc(verificationId);
+			.doc(documentId);
 
-		// Prepare the complete profile data
-		const profileData = {
+		// Check if document already exists and get current status
+		const existingDoc = await verificationRef.get();
+		const existingData = existingDoc.exists ? existingDoc.data() : null;
+		
+		// Don't allow updates if verification is already approved
+		if (existingData?.status === 'approved') {
+			return NextResponse.json(
+				{
+					error: "Cannot update verification - already approved",
+					currentStatus: existingData.status
+				},
+				{ status: 400 }
+			);
+		}
+
+		// Prepare the verification data (flattened structure)
+		const verificationData = {
+			// Core verification fields
+			userId,
+			status: existingData?.status || "pending", // Keep existing status if updating
+			createdAt: existingData?.createdAt || FieldValue.serverTimestamp(),
+			updatedAt: FieldValue.serverTimestamp(),
+			
+			// Profile fields at root level
 			bio,
 			tiktokUrl,
 			ethnicity,
@@ -178,34 +201,53 @@ export async function POST(request: NextRequest) {
 			},
 			pricing,
 			abnNumber,
-			// File URLs from chunked uploads
+			languages: languages || [],
+			
+			// File URLs
 			verificationVideoUrl,
 			verifiableIDUrl,
 			profilePictureUrl,
 			aboutMeVideoUrl: aboutMeVideo,
 			portfolioVideoUrls: validPortfolioUrls,
-			languages: languages || [],
+			
+			// Keep profileData for backwards compatibility (optional)
+			profileData: {
+				bio,
+				tiktokUrl,
+				ethnicity,
+				dateOfBirth,
+				gender,
+				country,
+				contentTypes,
+				contentLinks,
+				socialMedia: socialMedia || {
+					instagram: "",
+					twitter: "",
+					facebook: "",
+					youtube: "",
+					tiktok: "",
+				},
+				pricing,
+				abnNumber,
+				verificationVideoUrl,
+				verifiableIDUrl,
+				profilePictureUrl,
+				aboutMeVideoUrl: aboutMeVideo,
+				portfolioVideoUrls: validPortfolioUrls,
+				languages: languages || [],
+			}
 		};
 
 		// Create or update verification document in Firestore
-		await verificationRef.set(
-			{
-				createdAt: FieldValue.serverTimestamp(),
-				updatedAt: FieldValue.serverTimestamp(),
-				status: "pending",
-				userId,
-				profileData: profileData,
-			},
-			{ merge: true }
-		);
+		await verificationRef.set(verificationData, { merge: true });
 
 		console.log("Verification document created/updated successfully");
 
-		// Update user record
+		// Update user record - use userId as document ID here too
 		await adminDb.collection("creatorProfiles").doc(userId).set(
 			{
-				verificationStatus: "pending",
-				verificationId,
+				verificationStatus: verificationData.status,
+				verificationId: documentId, // This will be the same as userId
 				updatedAt: FieldValue.serverTimestamp(),
 				// Store some basic profile info for quick access
 				bio,
@@ -221,14 +263,38 @@ export async function POST(request: NextRequest) {
 
 		console.log("Creator profile updated successfully");
 
+		// Broadcast real-time update
+		try {
+			const socketServerUrl = process.env.NEXT_PUBLIC_SOCKET_SERVER_URL || 'http://localhost:3001';
+			
+			await fetch(`${socketServerUrl}/api/broadcast-verification`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					userId,
+					event: 'verification-submitted',
+					data: {
+						verificationId: documentId,
+						status: verificationData.status,
+						userId: userId,
+						submittedAt: new Date().toISOString()
+					}
+				})
+			});
+		} catch (broadcastError) {
+			console.error('Error broadcasting verification submission:', broadcastError);
+		}
+
 		return NextResponse.json(
 			{
 				success: true,
-				message:
+				message: existingData ? 
+					"Verification updated successfully! Your updated application is now under review." :
 					"Verification submitted successfully! Your application is now under review.",
-				verificationId,
-				status: "pending",
+				verificationId: documentId,
+				status: verificationData.status,
 				portfolioVideoCount: validPortfolioUrls.length,
+				isUpdate: !!existingData
 			},
 			{ status: 200 }
 		);

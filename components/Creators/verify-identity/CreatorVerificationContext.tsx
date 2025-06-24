@@ -688,6 +688,15 @@ export const CreatorVerificationProvider = ({
 			errors.contentLinks = "At least one content link is required";
 		}
 
+		if (
+			profileData.languages.length === 0 ||
+			!profileData.languages[0] ||
+			profileData.languages[0].trim() === ""
+		) {
+			missingFields.push("Languages");
+			errors.languages = "At least one language is required";
+		}
+
 		// URL format validation
 		if (
 			profileData.tiktokUrl &&

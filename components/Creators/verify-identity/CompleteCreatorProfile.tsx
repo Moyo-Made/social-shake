@@ -187,6 +187,7 @@ const CompleteCreatorProfile = () => {
 					: profileData.aboutMeVideo || null
 			);
 			setAbnNumber(profileData.abnNumber || "");
+			setLanguages(profileData.languages || []);
 		}
 	}, [profileData]);
 
