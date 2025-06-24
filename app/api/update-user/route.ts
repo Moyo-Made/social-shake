@@ -3,7 +3,7 @@ import { adminDb } from "@/config/firebase-admin";
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, firstName, lastName, userType } = await request.json();
+    const { userId, firstName, lastName } = await request.json();
     
     if (!userId) {
       return NextResponse.json({ error: "User ID is required" }, { status: 400 });
@@ -13,7 +13,6 @@ export async function POST(request: NextRequest) {
     await adminDb.collection("users").doc(userId).update({
       firstName,
       lastName,
-      userType,
       updatedAt: new Date().toISOString()
     });
     

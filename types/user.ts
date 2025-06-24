@@ -16,7 +16,7 @@ export interface User {
 	ADMIN = 'admin',
 	BRAND = 'brand',
 	CREATOR = 'creator',
-  USER = "USER"
+  	USER = "USER"
   }
   
   export enum BrandStatus {

@@ -70,7 +70,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 		email: string,
 		isNewUser: boolean = false,
 		displayName?: string,
-		userType: string = "brand"
 	): Promise<void> => {
 		const userRef = doc(db, "users", uid);
 	
@@ -87,7 +86,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 		const userData = {
 			email,
 			role: UserRole.USER,
-			userType,
 			...(firstName && { firstName }),
 			...(lastName && { lastName }),
 			updatedAt: new Date(),
