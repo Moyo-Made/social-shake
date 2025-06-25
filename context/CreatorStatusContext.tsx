@@ -172,24 +172,41 @@ export function CreatorStatusProvider({
 
 	// Get verification status from WebSocket first, then fall back to profile hook
 	const getCreatorStatus = (): string => {
+		// 1. FIRST: Check WebSocket real-time status (most current)
 		if (realTimeStatus?.status) {
 			return realTimeStatus.status.toLowerCase();
 		}
 
-		if (error) {
+		// 2. SECOND: Check profile hook data (even if there were API errors)
+		if (creatorProfile) {
+			// Try multiple possible status fields in order of preference
+			const status =
+				creatorProfile.status ||
+				creatorProfile.verificationStatus ||
+				(creatorProfile.profileData?.status as string);
+
+			if (status) {
+				return status.toLowerCase();
+			}
+
+			// If we have profile data but no explicit status,
+			// assume it's at least pending (profile exists)
+			return "pending";
+		}
+
+		// 3. ONLY show error if we have NO profile data AND loading is complete
+		// Don't show error for transient API issues if we might have cached data
+		if (error && !loading && !creatorProfile && !realTimeStatus) {
 			return "error";
 		}
 
-		if (!creatorProfile) {
+		// 4. Show missing if we're not loading and have no data
+		if (!loading && !creatorProfile && !realTimeStatus) {
 			return "missing";
 		}
 
-		const status =
-			creatorProfile?.status ||
-			creatorProfile?.verificationStatus ||
-			(creatorProfile?.profileData?.status as string);
-
-		return status?.toLowerCase() || "pending";
+		// 5. Default to pending while loading or in uncertain states
+		return "pending";
 	};
 
 	return (
