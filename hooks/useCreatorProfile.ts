@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { User } from "@/types/user";
 
@@ -15,306 +16,262 @@ export interface CreatorProfile {
 	verifiableIDUrl?: string;
 	status?: string;
 	profileData?: Record<string, unknown>;
-	[key: string]: unknown; // Allow for additional fields
+	id?: string;
+	tiktokConnected?: boolean;
+	tiktokUsername?: string;
+	[key: string]: unknown;
 }
 
 type ProfileMode = "create" | "edit" | "view";
 
-export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
-	const { currentUser } = useAuth();
-	const [creatorProfile, setCreatorProfile] = useState<CreatorProfile | null>(
-		null
-	);
-	const [loading, setLoading] = useState<boolean>(false);
-	const [error, setError] = useState<string | null>(null);
-	const [mode, setMode] = useState<ProfileMode>(initialMode);
+// Query keys
+const creatorProfileKeys = {
+	all: ["creatorProfile"] as const,
+	profile: (userId: string) =>
+		[...creatorProfileKeys.all, "profile", userId] as const,
+};
 
-	const constructProfileApiUrl = (
-		currentUser: User | null,
-		timestamp: number
-	) => {
-		// Start with the base URL
+// API response types
+interface ApiResponse {
+	success: boolean;
+	data?: Record<string, unknown>;
+	error?: string;
+}
+
+interface UpdateProfileResponse {
+	success: boolean;
+	data?: Record<string, unknown>;
+	error?: string;
+}
+
+interface DisconnectTikTokResponse {
+	success: boolean;
+	message?: string;
+	error?: string;
+}
+
+interface VerificationResponse {
+	success: boolean;
+	verificationId?: string;
+	error?: string;
+}
+
+interface UploadResponse {
+	publicUrl: string;
+}
+
+// API functions
+const fetchCreatorProfile = async (
+	currentUser: User | null
+): Promise<CreatorProfile | null> => {
+	if (!currentUser?.uid) {
+		return null;
+	}
+
+	const constructProfileApiUrl = (user: User, timestamp: number): string => {
 		let profileApiUrl = `/api/creator-profile?_t=${timestamp}`;
-
-		// Add userId if available
-		if (currentUser?.uid) {
-			profileApiUrl += `&userId=${currentUser.uid}`;
+		if (user.uid) {
+			profileApiUrl += `&userId=${user.uid}`;
 		}
-
-		// Add email if available
-		if (currentUser?.email) {
-			profileApiUrl += `&email=${encodeURIComponent(currentUser.email)}`;
+		if (user.email) {
+			profileApiUrl += `&email=${encodeURIComponent(user.email)}`;
 		}
-
 		return profileApiUrl;
 	};
 
-	const timestamp = Date.now(); // Current timestamp to prevent caching
+	const timestamp = Date.now();
 	const profileApiUrl = constructProfileApiUrl(currentUser, timestamp);
 
-	// In your useCreatorProfile hook, update the fetchCreatorProfile function:
+	const response = await fetch(profileApiUrl);
 
-	const fetchCreatorProfile = async () => {
-		if (!currentUser?.uid) {
-			setLoading(false);
-			return;
-		}
+	if (!response.ok) {
+		const errorData = (await response.json()) as { error?: string };
+		throw new Error(errorData.error || "Failed to fetch profile");
+	}
 
-		setLoading(true);
-		setError(null);
+	const profileData = (await response.json()) as CreatorProfile;
 
-		try {
-			// First fetch basic profile data
-			const profileResponse = await fetch(profileApiUrl);
-
-			if (!profileResponse.ok) {
-				const errorData = await profileResponse.json();
-				setError(errorData.error || "Failed to fetch profile");
-				setCreatorProfile(null);
-				return;
-			}
-
-			const profileData = await profileResponse.json();
-
-			// Fetch verification data using the auth user ID
-			let verificationData: Partial<CreatorProfile> = {};
-
-			try {
-				const verificationResponse = await fetch(
-					`/api/verification?userId=${currentUser.uid}`
-				);
-
-				if (verificationResponse.ok) {
-					verificationData = await verificationResponse.json();
-					
-				} else {
-					console.warn(
-						"Failed to fetch verification by userId, status:",
-						verificationResponse.status
-					);
-				}
-			} catch (err) {
-				console.error("Error fetching verification by userId:", err);
-			}
-
-			// Merge the data with clear priorities and ID consistency
-			const combinedProfileData: CreatorProfile = {
-				...profileData,
-				...verificationData,
-				// CRITICAL: Use the auth user ID as the primary identifier
-				id: currentUser.uid, // This is what gets used as creator.id
-				userId: currentUser.uid, // Keep consistent
-				verificationId: verificationData.verificationId || currentUser.uid, // Keep the verification ID for reference
-				// Make sure specific properties are properly merged with priorities
-				profilePictureUrl:
-					verificationData.profilePictureUrl ||
-					profileData.profilePictureUrl ||
-					null,
-				verificationVideoUrl:
-					verificationData.verificationVideoUrl ||
-					profileData.verificationVideoUrl ||
-					null,
-				verifiableIDUrl:
-					verificationData.verifiableIDUrl ||
-					profileData.verifiableIDUrl ||
-					null,
-				status:
-					verificationData.status ||
-					profileData.status ||
-					profileData.verificationStatus ||
-					null,
-				// Ensure profileData is preserved if it exists
-				profileData: {
-					...(verificationData.profileData || {}),
-					...(profileData.profileData || {}),
-					// Maintain ID consistency in nested data
-					id: currentUser.uid,
-					userId: currentUser.uid,
-				},
-			};
-
-			setCreatorProfile(combinedProfileData);
-		} catch (err) {
-			console.error("Error fetching creator profile:", err);
-			setError("Failed to fetch creator profile");
-		} finally {
-			setLoading(false);
-		}
+	return {
+		...profileData,
+		id: currentUser.uid,
+		userId: currentUser.uid,
+		status: profileData.verificationStatus || profileData.status || undefined,
 	};
+};
 
-	useEffect(() => {
-		// Only fetch profile data if we're in edit or view mode
-		if (mode !== "create" && currentUser) {
-			fetchCreatorProfile();
-		} else if (mode === "create") {
-			// Clear any existing profile data when in create mode
-			setCreatorProfile(null);
-		}
-	}, [currentUser, mode]);
+const updateCreatorProfile = async (
+	formData: FormData
+): Promise<ApiResponse> => {
+	const response = await fetch("/api/creator-profile", {
+		method: "POST",
+		body: formData,
+	});
 
-	useEffect(() => {
-		// Function to handle global profile update events
-		const handleProfileUpdate = () => {
-			fetchCreatorProfile();
-		};
+	const result = (await response.json()) as ApiResponse;
 
-		// Add event listener
-		window.addEventListener("creator-profile-updated", handleProfileUpdate);
+	if (!response.ok) {
+		throw new Error(result.error || "Failed to update creator profile");
+	}
 
-		// Clean up
-		return () => {
-			window.removeEventListener(
-				"creator-profile-updated",
-				handleProfileUpdate
-			);
-		};
-	}, [currentUser]);
+	return result;
+};
 
-	const updateCreatorProfile = async (formData: FormData) => {
+const disconnectTikTok = async (
+	userId: string
+): Promise<{ message: string }> => {
+	const response = await fetch("/api/auth/tiktok/disconnect", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({ userId }),
+	});
+
+	const result = (await response.json()) as { message: string; error?: string };
+
+	if (!response.ok) {
+		throw new Error(result.error || "Failed to disconnect TikTok account");
+	}
+
+	return result;
+};
+
+export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
+	const { currentUser } = useAuth();
+	const queryClient = useQueryClient();
+	const [mode, setMode] = useState<ProfileMode>(initialMode);
+
+	// Query for fetching profile
+	const {
+		data: creatorProfile,
+		isLoading: loading,
+		error,
+		refetch: refreshCreatorProfile,
+	} = useQuery({
+		queryKey: creatorProfileKeys.profile(currentUser?.uid || ""),
+		queryFn: () => fetchCreatorProfile(currentUser),
+		enabled: mode !== "create" && !!currentUser?.uid, // Only fetch when not in create mode
+		staleTime: 30 * 1000, // Consider data fresh for 30 seconds
+		gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+		retry: 2,
+		refetchOnWindowFocus: false, // Disable refetch on window focus if you don't want it
+	});
+
+	// Mutation for updating profile
+	const updateProfileMutation = useMutation({
+		mutationFn: updateCreatorProfile,
+		onSuccess: () => {
+			// Clear pending signup data if it exists and localStorage is available
+			if (typeof window !== "undefined" && window.localStorage) {
+				const pendingSignupStr = localStorage.getItem("pendingSignup");
+				if (pendingSignupStr) {
+					localStorage.removeItem("pendingSignup");
+				}
+			}
+
+			// Switch to edit mode
+			setMode("edit");
+
+			// Invalidate and refetch profile data
+			queryClient.invalidateQueries({
+				queryKey: creatorProfileKeys.profile(currentUser?.uid || ""),
+			});
+
+			// Dispatch global event if window is available
+			if (typeof window !== "undefined") {
+				window.dispatchEvent(new CustomEvent("creator-profile-updated"));
+			}
+		},
+	});
+
+	// Mutation for disconnecting TikTok
+	const disconnectTikTokMutation = useMutation({
+		mutationFn: () => disconnectTikTok(currentUser?.uid || ""),
+		onSuccess: () => {
+			// Invalidate and refetch profile data
+			queryClient.invalidateQueries({
+				queryKey: creatorProfileKeys.profile(currentUser?.uid || ""),
+			});
+
+			// Dispatch global event if window is available
+			if (typeof window !== "undefined") {
+				window.dispatchEvent(new CustomEvent("creator-profile-updated"));
+			}
+		},
+	});
+
+	// Wrapper functions to maintain the same API
+	const updateCreatorProfileWrapper = async (
+		formData: FormData
+	): Promise<UpdateProfileResponse> => {
 		try {
-			setLoading(true);
+			// Check if localStorage is available
+			const pendingSignupStr =
+				typeof window !== "undefined" && window.localStorage
+					? localStorage.getItem("pendingSignup")
+					: null;
 
-			if (!currentUser?.email && !localStorage.getItem("pendingSignup")) {
-				setError("User not authenticated and no pending signup found");
-				return {
-					success: false,
-					error: "User not authenticated and no pending signup found",
-				};
+			if (!currentUser?.email && !pendingSignupStr) {
+				throw new Error("User not authenticated and no pending signup found");
 			}
 
 			// Add user data to form
 			if (currentUser?.email) {
 				formData.append("email", currentUser.email);
 			}
-
 			if (currentUser?.uid) {
 				formData.append("userId", currentUser.uid);
 			}
 
 			// Add pending signup if available
-			const pendingSignupStr = localStorage.getItem("pendingSignup");
 			if (pendingSignupStr) {
 				formData.append("pendingSignup", pendingSignupStr);
 			}
 
-			const response = await fetch("/api/creator-profile", {
-				method: "POST",
-				body: formData,
-			});
-
-			const result = await response.json();
-
-			if (response.ok) {
-				// Clear pending signup data if processed
-				if (pendingSignupStr) {
-					localStorage.removeItem("pendingSignup");
-				}
-
-				// Switch to edit mode
-				setMode("edit");
-
-				// Refresh profile data
-				await fetchCreatorProfile();
-				return { success: true, data: result.data };
-			} else {
-				setError(result.error || "Failed to update creator profile");
-				return { success: false, error: result.error };
-			}
+			const result = await updateProfileMutation.mutateAsync(formData);
+			return { success: true, data: result.data };
 		} catch (err) {
 			const errorMessage =
 				err instanceof Error ? err.message : "Failed to update creator profile";
-			setError(errorMessage);
 			return { success: false, error: errorMessage };
-		} finally {
-			setLoading(false);
 		}
 	};
 
-	// New function to disconnect TikTok account
-	const disconnectTikTokAccount = async () => {
-		try {
-			setLoading(true);
-			setError(null);
-
-			if (!currentUser?.uid) {
-				setError("User not authenticated");
-				return { success: false, error: "User not authenticated" };
-			}
-
-			const response = await fetch("/api/auth/tiktok/disconnect", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({ userId: currentUser.uid }),
-			});
-
-			const result = await response.json();
-
-			if (response.ok) {
-				// Immediately update local state to reflect the disconnection
-				if (creatorProfile) {
-					const updatedProfile = { ...creatorProfile };
-
-					// Remove TikTok-related fields from the root level
-					delete updatedProfile.tiktokConnected;
-					delete updatedProfile.tiktokId;
-					delete updatedProfile.tiktokUsername;
-					delete updatedProfile.tiktokAvatarUrl;
-
-					// Also clean the nested profileData if it exists
-					if (updatedProfile.profileData) {
-						delete updatedProfile.profileData.tiktokConnected;
-						delete updatedProfile.profileData.tiktokId;
-						delete updatedProfile.profileData.tiktokUsername;
-						delete updatedProfile.profileData.tiktokAvatarUrl;
-					}
-
-					setCreatorProfile(updatedProfile);
+	const disconnectTikTokAccount =
+		async (): Promise<DisconnectTikTokResponse> => {
+			try {
+				if (!currentUser?.uid) {
+					throw new Error("User not authenticated");
 				}
 
-				// Refresh profile data to ensure it's updated
-				await fetchCreatorProfile();
-
-				// Dispatch an event to notify other components
-				window.dispatchEvent(new CustomEvent("creator-profile-updated"));
-
+				const result = await disconnectTikTokMutation.mutateAsync();
 				return { success: true, message: result.message };
-			} else {
-				setError(result.error || "Failed to disconnect TikTok account");
-				return { success: false, error: result.error };
+			} catch (err) {
+				const errorMessage =
+					err instanceof Error
+						? err.message
+						: "Failed to disconnect TikTok account";
+				return { success: false, error: errorMessage };
 			}
-		} catch (err) {
-			const errorMessage =
-				err instanceof Error
-					? err.message
-					: "Failed to disconnect TikTok account";
-			setError(errorMessage);
-			return { success: false, error: errorMessage };
-		} finally {
-			setLoading(false);
-		}
-	};
+		};
 
 	const submitVerification = async (verificationData: {
 		profileData: Record<string, unknown>;
-		verificationVideo?: File; // Changed from verificationVideoUrl
-		verifiableID?: File; // Changed from verifiableIDUrl
-		profilePicture?: File; // Changed from profilePictureUrl
-	}) => {
+		verificationVideo?: File;
+		verifiableID?: File;
+		profilePicture?: File;
+	}): Promise<VerificationResponse> => {
 		try {
-			setLoading(true);
-
 			if (!currentUser?.uid) {
-				setError("User not authenticated");
-				return { success: false, error: "User not authenticated" };
+				throw new Error("User not authenticated");
 			}
 
 			// Upload files in parallel
-			const uploadFile = async (file: File | undefined, uploadType: string) => {
-				if (!file) {
-					return null;
-				}
+			const uploadFile = async (
+				file: File | undefined,
+				uploadType: string
+			): Promise<string | null> => {
+				if (!file) return null;
 
 				const formData = new FormData();
 				formData.append("userId", currentUser.uid);
@@ -327,12 +284,12 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 				});
 
 				if (response.ok) {
-					const result = await response.json();
+					const result = (await response.json()) as UploadResponse;
 					return result.publicUrl;
 				} else {
-					const errorResult = await response
+					const errorResult = (await response
 						.json()
-						.catch(() => ({ error: "Unknown error" }));
+						.catch(() => ({ error: "Unknown error" }))) as { error: string };
 					console.error(`${uploadType} upload failed:`, errorResult);
 					return null;
 				}
@@ -348,10 +305,10 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 			// Submit verification with URLs
 			const requestBody = {
 				userId: currentUser.uid,
-				creatorId: currentUser.uid, // Make sure creator ID matches user ID
+				creatorId: currentUser.uid,
 				profileData: {
 					...verificationData.profileData,
-					creatorId: currentUser.uid, // Ensure consistency
+					creatorId: currentUser.uid,
 				},
 				verificationVideoUrl,
 				verifiableIDUrl,
@@ -366,68 +323,54 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 				body: JSON.stringify(requestBody),
 			});
 
-			const result = await response.json();
+			const result = (await response.json()) as {
+				verificationId?: string;
+				error?: string;
+			};
 
 			if (response.ok) {
-				// Refresh profile after submission
-				await fetchCreatorProfile();
+				// Invalidate profile data to trigger refetch
+				queryClient.invalidateQueries({
+					queryKey: creatorProfileKeys.profile(currentUser.uid),
+				});
 				return { success: true, verificationId: result.verificationId };
 			} else {
-				console.error("Verification submission failed:", result);
-				setError(result.error || "Failed to submit verification");
-				return { success: false, error: result.error };
+				throw new Error(result.error || "Failed to submit verification");
 			}
 		} catch (err) {
-			console.error("Exception during verification submission:", err);
 			const errorMessage =
 				err instanceof Error ? err.message : "Failed to submit verification";
-			setError(errorMessage);
 			return { success: false, error: errorMessage };
-		} finally {
-			setLoading(false);
 		}
 	};
 
-	const setProfileMode = (newMode: ProfileMode) => {
+	const setProfileMode = (newMode: ProfileMode): void => {
 		setMode(newMode);
-
-		if (newMode === "create") {
-			setCreatorProfile(null);
-		} else if (newMode === "edit" && currentUser) {
-			fetchCreatorProfile();
+		if (newMode === "edit" && currentUser) {
+			// This will trigger a refetch if needed
+			queryClient.invalidateQueries({
+				queryKey: creatorProfileKeys.profile(currentUser.uid),
+			});
 		}
 	};
 
-	// Helper functions to get specific URLs
-	const getProfilePictureUrl = () => {
-		if (!creatorProfile) return null;
-		// Check all possible locations for a profile picture URL
-		return creatorProfile.profilePictureUrl || null;
+	// Helper functions
+	const getProfilePictureUrl = (): string | null => {
+		return creatorProfile?.profilePictureUrl || null;
 	};
 
-	// Helper for verification video URL
-	const getVerificationVideoUrl = () => {
-		if (!creatorProfile) return null;
-		return creatorProfile.verificationVideoUrl || null;
+	const getVerificationVideoUrl = (): string | null => {
+		return creatorProfile?.verificationVideoUrl || null;
 	};
 
-	// Helper for ID URL
-	const getVerifiableIDUrl = () => {
-		if (!creatorProfile) return null;
-		return creatorProfile.verifiableIDUrl || null;
+	const getVerifiableIDUrl = (): string | null => {
+		return creatorProfile?.verifiableIDUrl || null;
 	};
 
-	// Helper to check if TikTok is connected
-	const isTikTokConnected = () => {
+	const isTikTokConnected = (): boolean => {
 		if (!creatorProfile) return false;
-
-		// Check root level
 		if (creatorProfile.tiktokConnected === true) return true;
-
-		// Check nested profileData
 		if (creatorProfile.profileData?.tiktokConnected === true) return true;
-
-		// Check for TikTok username as a fallback
 		return !!(
 			creatorProfile.tiktokUsername ||
 			creatorProfile.profileData?.tiktokUsername
@@ -436,17 +379,28 @@ export const useCreatorProfile = (initialMode: ProfileMode = "view") => {
 
 	return {
 		creatorProfile,
-		loading,
-		error,
+		loading:
+			loading ||
+			updateProfileMutation.isPending ||
+			disconnectTikTokMutation.isPending,
+		error:
+			error?.message ||
+			updateProfileMutation.error?.message ||
+			disconnectTikTokMutation.error?.message ||
+			null,
 		mode,
 		setProfileMode,
-		refreshCreatorProfile: fetchCreatorProfile,
-		updateCreatorProfile,
+		refreshCreatorProfile,
+		updateCreatorProfile: updateCreatorProfileWrapper,
 		submitVerification,
-		disconnectTikTokAccount, // New function to disconnect TikTok
+		disconnectTikTokAccount,
 		getProfilePictureUrl,
 		getVerificationVideoUrl,
 		getVerifiableIDUrl,
-		isTikTokConnected, // New helper function
+		isTikTokConnected,
+		// Additional TanStack Query specific states
+		isRefetching: loading,
+		isUpdating: updateProfileMutation.isPending,
+		isDisconnectingTikTok: disconnectTikTokMutation.isPending,
 	};
 };

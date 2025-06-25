@@ -36,12 +36,38 @@ export function CreatorStatusProvider({
 		null
 	);
 	const [isInitialized, setIsInitialized] = useState(false);
+	const [, setSocketConnected] = useState(false);
+	const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+	const [hasApiResponse, setHasApiResponse] = useState(false);
 	const socketRef = useRef<Socket | null>(null);
 	const previousStatusRef = useRef<string | null>(null);
 	const hasShownApprovalToastRef = useRef(false);
 
 	// Use the hook with complete profile data access (as fallback)
 	const { creatorProfile, loading, error } = useCreatorProfile("view");
+
+	// FIXED: Track when we've received any API response (success or failure)
+	useEffect(() => {
+		if (creatorProfile || error) {
+			setHasApiResponse(true);
+		}
+	}, [creatorProfile, error]);
+
+	// Track when initial data fetching is complete
+	useEffect(() => {
+		// Mark initial load as complete after a reasonable delay or when we have data
+		const timer = setTimeout(() => {
+			setInitialLoadComplete(true);
+		}, 5000); // Increased to 5 seconds to account for slower networks
+
+		// Or mark complete immediately if we have data OR confirmed API response
+		if (creatorProfile || realTimeStatus || hasApiResponse) {
+			setInitialLoadComplete(true);
+			clearTimeout(timer);
+		}
+
+		return () => clearTimeout(timer);
+	}, [creatorProfile, realTimeStatus, hasApiResponse]);
 
 	// Initialize socket connection ONCE
 	useEffect(() => {
@@ -61,17 +87,26 @@ export function CreatorStatusProvider({
 				transports: ["polling", "websocket"],
 				reconnection: true,
 				reconnectionDelay: 1000,
-				reconnectionAttempts: 3,
+				reconnectionAttempts: 5,
+				timeout: 10000,
 			}
 		);
 
 		socket.on("connect", () => {
+			console.log("Socket connected for creator status");
+			setSocketConnected(true);
 			socket.emit("subscribe-user", userId);
 			socket.emit("subscribe-verification", userId);
 			setIsInitialized(true);
 		});
 
+		socket.on("disconnect", () => {
+			console.log("Socket disconnected for creator status");
+			setSocketConnected(false);
+		});
+
 		socket.on("verification-status-update", (data: CreatorStatus) => {
+			console.log("Received verification status update:", data);
 			const { status, rejectionReason, infoRequest, suspensionReason } = data;
 			const previousStatus = previousStatusRef.current;
 
@@ -168,12 +203,13 @@ export function CreatorStatusProvider({
 			}
 			socketRef.current = null;
 		};
-	}, [userId]); // Only run when userId changes
+	}, [userId]);
 
-	// Get verification status from WebSocket first, then fall back to profile hook
+	// Improved status detection logic
 	const getCreatorStatus = (): string => {
 		// 1. FIRST: Check WebSocket real-time status (most current)
 		if (realTimeStatus?.status) {
+			console.log("Using real-time status:", realTimeStatus.status);
 			return realTimeStatus.status.toLowerCase();
 		}
 
@@ -186,27 +222,78 @@ export function CreatorStatusProvider({
 				(creatorProfile.profileData?.status as string);
 
 			if (status) {
+				console.log("Using profile status:", status);
 				return status.toLowerCase();
 			}
 
 			// If we have profile data but no explicit status,
 			// assume it's at least pending (profile exists)
+			console.log("Profile exists but no status, defaulting to pending");
 			return "pending";
 		}
 
-		// 3. ONLY show error if we have NO profile data AND loading is complete
-		// Don't show error for transient API issues if we might have cached data
-		if (error && !loading && !creatorProfile && !realTimeStatus) {
-			return "error";
+		// Only show error if it's a REAL API error
+		if (error && hasApiResponse && initialLoadComplete) {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const errorObj = error as any;
+			
+			// Don't treat responses with isTemporary flag as errors
+			if (errorObj?.isTemporary || errorObj?.status === "pending") {
+				return "pending";
+			}
+			
+			// Only show error for real failures
+			if (errorObj?.name === 'TypeError' || errorObj?.message?.includes('fetch')) {
+				return "error";
+			}
 		}
 
-		// 4. Show missing if we're not loading and have no data
-		if (!loading && !creatorProfile && !realTimeStatus) {
+		// 4. Show missing only if we have clear confirmation no profile exists
+		if (
+			!loading && 
+			initialLoadComplete && 
+			hasApiResponse &&
+			!creatorProfile && 
+			!realTimeStatus && 
+			!error
+		) {
+			console.log("No profile found after complete load - missing");
 			return "missing";
 		}
 
 		// 5. Default to pending while loading or in uncertain states
+		console.log("Defaulting to pending - loading or uncertain state");
 		return "pending";
+	};
+
+	// Enhanced loading state that considers both API and WebSocket status
+	const getLoadingState = (): boolean => {
+		// Still loading if:
+		// - API is loading AND we don't have real-time data yet AND haven't completed initial load
+		return (
+			loading && 
+			!realTimeStatus && 
+			!initialLoadComplete &&
+			!hasApiResponse
+		);
+	};
+
+	// FIXED: Better error state detection
+	const getErrorState = (): unknown => {
+		// Only return error if it's a genuine error AND we're not in a loading state
+		if (error && !loading && hasApiResponse && initialLoadComplete) {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const errorObj = error as any;
+			
+			// Don't treat our custom "temporary error" responses as real errors
+			if (errorObj?.status === "pending" || errorObj?.message?.includes("Temporary error")) {
+				return null; // No error state
+			}
+			
+			return error;
+		}
+		
+		return null;
 	};
 
 	return (
@@ -214,8 +301,8 @@ export function CreatorStatusProvider({
 			value={{
 				creatorStatus: getCreatorStatus(),
 				realTimeStatus,
-				loading: loading && !realTimeStatus,
-				error,
+				loading: getLoadingState(),
+				error: getErrorState(),
 				isInitialized,
 			}}
 		>
