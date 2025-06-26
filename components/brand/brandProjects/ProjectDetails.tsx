@@ -58,36 +58,42 @@ const ProjectDetails: React.FC = () => {
 	// Validate fields
 	const validateFields = () => {
 		const newErrors: Record<string, string> = {};
-		
+
 		if (!projectDetails.projectName.trim()) {
-		  newErrors.projectName = "Project name is required";
+			newErrors.projectName = "Project name is required";
 		}
-		
+
 		if (!projectDetails.projectType) {
-		  newErrors.projectType = "Please select a project type";
+			newErrors.projectType = "Please select a project type";
 		}
-		
+
 		if (!projectDetails.productType) {
-		  newErrors.productType = "Please select a product type";
+			newErrors.productType = "Please select a product type";
 		}
-		
-		if (!projectDetails.projectDescription || !projectDetails.projectDescription[0]?.trim()) {
-		  newErrors.projectDescription = "Project description is required";
+
+		if (
+			!projectDetails.projectDescription ||
+			!projectDetails.projectDescription[0]?.trim()
+		) {
+			newErrors.projectDescription = "Project description is required";
 		}
-		
+
 		// Only validate product link for TikTok Shop
-		if (projectDetails.projectType === "TikTok Shop" && !projectDetails.productLink?.trim()) {
-		  newErrors.productLink = "Product link is required for TikTok Shop";
+		if (
+			projectDetails.projectType === "TikTok Shop" &&
+			!projectDetails.productLink?.trim()
+		) {
+			newErrors.productLink = "Product link is required for TikTok Shop";
 		}
-		
+
 		// Validate thumbnail file size if there is a selected file
 		if (selectedFile && selectedFile.size > MAX_FILE_SIZE) {
-		  newErrors.projectThumbnail = "File size exceeds 1MB limit";
+			newErrors.projectThumbnail = "File size exceeds 1MB limit";
 		}
-		
+
 		setErrors(newErrors);
 		return Object.keys(newErrors).length === 0;
-	  };
+	};
 
 	// Mark field as touched when user interacts with it
 	const handleBlur = (field: string) => {
@@ -112,12 +118,12 @@ const ProjectDetails: React.FC = () => {
 		validateFields();
 	};
 
-	const handleProductLinkChange = (
-		e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-	) => {
-		updateProjectDetails({ productLink: e.target.value });
-		if (touched.productLink) validateFields();
-	};
+	// const handleProductLinkChange = (
+	// 	e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+	// ) => {
+	// 	updateProjectDetails({ productLink: e.target.value });
+	// 	if (touched.productLink) validateFields();
+	// };
 
 	const handleProjectDescriptionChange = (
 		e: React.ChangeEvent<HTMLTextAreaElement>
@@ -232,7 +238,7 @@ const ProjectDetails: React.FC = () => {
 				{errors.projectType && touched.projectType && (
 					<p className="text-red-500 text-sm mb-2">{errors.projectType}</p>
 				)}
-				<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+				<div className="grid grid-cols-2 md:grid-cols-3 gap-4">
 					{/* UGC Contest Only */}
 					<div
 						className={cn(
@@ -367,7 +373,7 @@ const ProjectDetails: React.FC = () => {
 					</div>
 
 					{/* TikTok Shop*/}
-					<div
+					{/* <div
 						className={cn(
 							"relative rounded-2xl p-5 cursor-pointer transition-all duration-200",
 							projectDetails.projectType === "TikTok Shop"
@@ -407,10 +413,10 @@ const ProjectDetails: React.FC = () => {
 								earns affiliate commissions, and you receive the video files.
 							</p>
 						</div>
-					</div>
+					</div> */}
 				</div>
 				{/* Product Link field - only show for TikTok Shop */}
-				{projectDetails.projectType === "TikTok Shop" && (
+				{/* {projectDetails.projectType === "TikTok Shop" && (
 					<div className="mt-4">
 						<label className="block text-base font-medium text-gray-700">
 							Product Link <span className="text-red-500">*</span>
@@ -431,7 +437,7 @@ const ProjectDetails: React.FC = () => {
 							<p className="text-red-500 text-sm mt-1">{errors.productLink}</p>
 						)}
 					</div>
-				)}
+				)} */}
 			</div>
 
 			<div className="mt-4">

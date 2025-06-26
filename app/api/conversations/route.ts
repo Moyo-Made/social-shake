@@ -1,5 +1,7 @@
-import { adminDb } from "@/config/firebase-admin";
+import { getFirestore } from "firebase-admin/firestore";
 import { NextRequest, NextResponse } from "next/server";
+
+const db = getFirestore();
 
 export async function GET(request: NextRequest) {
 	try {
@@ -15,10 +17,8 @@ export async function GET(request: NextRequest) {
 			);
 		}
 
-		console.log(`Fetching conversations for user: ${userId}`);
-
 		// Query conversations where the user is a participant
-		const conversationsRef = adminDb.collection("conversations");
+		const conversationsRef = db.collection("conversations");
 		const baseQuery = conversationsRef.where(
 			"participants",
 			"array-contains",
@@ -28,8 +28,6 @@ export async function GET(request: NextRequest) {
 		// Fetch the conversations
 		const snapshot = await baseQuery.get();
 
-		console.log(`Found ${snapshot.docs.length} conversations`);
-
 		if (snapshot.empty) {
 			return NextResponse.json({ conversations: [] }, { status: 200 });
 		}
@@ -37,100 +35,104 @@ export async function GET(request: NextRequest) {
 		// Transform the conversation documents and fetch creator profiles
 		const conversationsWithCreatorPromises = snapshot.docs.map(async (doc) => {
 			const data = doc.data();
-			console.log(`Processing conversation ${doc.id}`);
 
-			// Find the other participant (not the current user)
-			const otherParticipants = data.participants?.filter(
-				(participantId: string) => participantId !== userId
-			) || [];
-
+			// Find the creator ID from participants array
 			let creatorId = null;
-			let isCreatorConversation = false;
-			
-			// Check if any other participant is a creator by checking creatorProfiles collection
-			for (const participantId of otherParticipants) {
-				try {
-					// Check if this participant has a creator profile
-					const creatorProfileQuery = await adminDb
-						.collection("creatorProfiles")
-						.where("userId", "==", participantId)
-						.limit(1)
-						.get();
+			const isCreatorConversation = data.participants?.some(
+				(participantUserId: string) => {
+					const participantInfo = data.participantsInfo?.[participantUserId];
+					const isCreator = participantInfo?.role === "creator";
 
-					if (!creatorProfileQuery.empty) {
-						creatorId = participantId;
-						isCreatorConversation = true;
-						console.log(`Found creator: ${participantId}`);
-						break; // Found a creator, break the loop
+					if (isCreator) {
+						creatorId = participantUserId; // This will be the actual user ID
+						return true;
 					}
-				} catch (error) {
-					console.error(`Error checking creator status for ${participantId}:`, error);
+					return false;
 				}
-			}
+			);
 
 			// If creatorOnly is true, only return creator conversations
 			if (creatorOnly && !isCreatorConversation) {
-				console.log(`Filtering out non-creator conversation ${doc.id}`);
 				return null;
 			}
 
 			// Fetch creator profile if this is a creator conversation
 			let creatorProfile = null;
 			if (isCreatorConversation && creatorId) {
-				try {
-					// Query creatorProfiles by userId field
-					const creatorProfilesQuery = await adminDb
-						.collection("creatorProfiles")
-						.where("userId", "==", creatorId)
-						.limit(1)
-						.get();
+				// Only fetch profile if the creator is NOT the current user
+				if (creatorId !== userId) {
+					try {
+						let profilePictureUrl = null;
+						let displayName = null;
 
-					if (!creatorProfilesQuery.empty) {
-						const profileData = creatorProfilesQuery.docs[0].data();
-						creatorProfile = {
-							avatarUrl: profileData?.tiktokAvatarUrl || null,
-							displayName: profileData?.tiktokDisplayName || null,
-							userId: creatorId,
-						};
-						console.log(`Found creator profile for ${creatorId}: ${creatorProfile.displayName}`);
-					} else {
-						// Fallback: Try to get profile by email if userId lookup fails
-						try {
-							const userDoc = await adminDb.collection("users").doc(creatorId).get();
-							if (userDoc.exists && userDoc.data()?.email) {
-								const creatorEmail = userDoc.data()?.email;
-								const creatorDoc = await adminDb
-									.collection("creatorProfiles")
-									.doc(creatorEmail)
-									.get();
-								if (creatorDoc.exists) {
-									const profileData = creatorDoc.data();
-									creatorProfile = {
-										avatarUrl: profileData?.tiktokAvatarUrl || null,
-										displayName: profileData?.tiktokDisplayName || null,
-										userId: creatorId,
-									};
-									console.log(`Found creator profile by email for ${creatorId}: ${creatorProfile.displayName}`);
-								}
-							}
-						} catch (emailError) {
-							console.error(`Error fetching creator by email for ${creatorId}:`, emailError);
+						// 1. Get profile picture from creator_verifications collection
+						const creatorVerificationQuery = await db
+							.collection("creator_verifications")
+							.where("userId", "==", creatorId)
+							.limit(1)
+							.get();
+
+						if (!creatorVerificationQuery.empty) {
+							const verificationData = creatorVerificationQuery.docs[0].data();
+							profilePictureUrl = verificationData?.profilePictureUrl;
 						}
+
+						// 2. Get display name from creatorProfiles collection
+						const creatorProfileQuery = await db
+							.collection("creatorProfiles")
+							.where("userId", "==", creatorId)
+							.limit(1)
+							.get();
+
+						if (!creatorProfileQuery.empty) {
+							const profileData = creatorProfileQuery.docs[0].data();
+							const firstName = profileData?.firstName || "";
+							const lastName = profileData?.lastName || "";
+							displayName = `${firstName} ${lastName}`.trim();
+						}
+
+						// If no name found, try to get from users collection
+						if (!displayName) {
+							const userDoc = await db.collection("users").doc(creatorId).get();
+
+							if (userDoc.exists) {
+								const userData = userDoc.data();
+								// Check if user has displayUsername or email
+								displayName =
+									userData?.displayUsername ||
+									userData?.email?.split("@")[0] ||
+									"Creator";
+							} else {
+								console.warn(
+									`No user document found for creatorId: ${creatorId}`
+								);
+							}
+						}
+
+						// Set creator profile with fetched data
+						creatorProfile = {
+							avatarUrl: profilePictureUrl,
+							displayName: displayName,
+						};
+
+					} catch (error) {
+						console.error(
+							`Error fetching creator profile for ${creatorId}:`,
+							error
+						);
 					}
-				} catch (error) {
-					console.error(`Error fetching creator profile for ${creatorId}:`, error);
 				}
 			}
 
 			// Convert Firebase timestamps to ISO strings
 			const updatedAt = data.updatedAt
 				? data.updatedAt.toDate().toISOString()
-				: new Date().toISOString();
+				: null;
 
 			// Get unread count for this user (default to 0 if not present)
 			const unreadCount = data.unreadCounts?.[userId] || 0;
 
-			const conversation = {
+			return {
 				id: doc.id,
 				participants: data.participants || [],
 				participantsInfo: data.participantsInfo || {},
@@ -138,17 +140,8 @@ export async function GET(request: NextRequest) {
 				updatedAt: updatedAt,
 				unreadCount: unreadCount,
 				isCreatorConversation,
-				creatorProfile,
+				creatorProfile, // Include the creator profile information
 			};
-
-			console.log(`Processed conversation ${doc.id}:`, {
-				isCreatorConversation,
-				hasCreatorProfile: !!creatorProfile,
-				unreadCount,
-				lastMessage: data.lastMessage?.substring(0, 50) + "..." || "No message"
-			});
-
-			return conversation;
 		});
 
 		// Resolve all promises
@@ -167,30 +160,9 @@ export async function GET(request: NextRequest) {
 				);
 			});
 
-		console.log(`Returning ${conversations.length} conversations`);
-		console.log('Conversations summary:', conversations.map(c => {
-			if (!c) return null; // Ensure c is not null
-			return {
-				id: c.id,
-				isCreator: c.isCreatorConversation,
-				hasProfile: !!c.creatorProfile,
-				lastMessage: c.lastMessage?.substring(0, 30) + "..." || "No message"
-			};
-		}).filter(Boolean)); // Filter out null values after mapping
-
 		return NextResponse.json({ conversations }, { status: 200 });
-		
 	} catch (error: unknown) {
 		console.error("Error fetching conversations:", error);
-		
-		if (error instanceof Error) {
-			console.error("Error details:", {
-				message: error.message,
-				stack: error.stack,
-				name: error.name
-			});
-		}
-		
 		const errorMessage =
 			error instanceof Error ? error.message : "An unknown error occurred";
 		return NextResponse.json({ error: errorMessage }, { status: 500 });

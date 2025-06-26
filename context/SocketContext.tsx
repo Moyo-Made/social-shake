@@ -71,7 +71,6 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       return;
     }
 
-    console.log('Connecting to socket server:', socketServerUrl);
 
     // Connect to WebSocket server with additional options for reliability
     const socketInstance = io(socketServerUrl, {
@@ -85,7 +84,6 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     socketInstance.on('connect', () => {
-      console.log('Socket connected successfully');
       setIsConnected(true);
       
       // Subscribe to user-specific updates
@@ -97,8 +95,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     
     });
 
-    socketInstance.on('disconnect', (reason) => {
-      console.log('Socket disconnected:', reason);
+    socketInstance.on('disconnect', () => {
       setIsConnected(false);
     });
 
@@ -113,7 +110,6 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Listen for unread counts updates
     socketInstance.on('unread-counts-update', (data: UnreadCounts) => {
-      console.log('Received unread counts update:', data);
       setUnreadCounts(data);
       
       // Notify all listeners using ref
@@ -128,7 +124,6 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Listen for verification status updates
     socketInstance.on('verification-status-update', (data: VerificationStatus) => {
-      console.log('Socket: Received verification update:', data);
       setVerificationStatus(data);
       
       // Notify all listeners using ref to avoid stale closures
@@ -142,14 +137,12 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     // Listen for new messages
-    socketInstance.on('new-message', (message) => {
-      console.log('Received new message:', message);
+    socketInstance.on('new-message', () => {
       // You can handle new messages here if needed
     });
 
     // Listen for conversation updates
-    socketInstance.on('conversation-updated', (update) => {
-      console.log('Received conversation update:', update);
+    socketInstance.on('conversation-updated', () => {
       // You can handle conversation updates here if needed
     });
 
@@ -160,7 +153,6 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Cleanup on unmount
     return () => {
-      console.log('Cleaning up socket connection');
       socketInstance.disconnect();
       setSocket(null);
       setIsConnected(false);
@@ -172,11 +164,10 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   // Internal refresh function that doesn't depend on callbacks
   const refreshVerificationStatusInternal = useCallback(async (userId: string) => {
     try {
-      console.log('Refreshing verification status for user:', userId);
+
       const response = await fetch(`/api/verification?userId=${userId}`);
       if (response.ok) {
         const data = await response.json();
-        console.log('Fetched verification status:', data);
         setVerificationStatus(data);
         
         // Notify all subscribers using ref to avoid stale closures
@@ -197,21 +188,18 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
   const joinConversation = useCallback((conversationId: string) => {
     if (socket && conversationId) {
-      console.log(`Joining conversation: ${conversationId}`);
       socket.emit('join-conversation', conversationId);
     }
   }, [socket]);
 
   const leaveConversation = useCallback((conversationId: string) => {
     if (socket && conversationId) {
-      console.log(`Leaving conversation: ${conversationId}`);
       socket.emit('leave-conversation', conversationId);
     }
   }, [socket]);
 
   const sendMessage = useCallback((conversationId: string, content: string) => {
     if (socket && currentUser && conversationId && content.trim()) {
-      console.log(`Sending message to conversation: ${conversationId}`);
       socket.emit('send-message', {
         conversationId,
         senderId: currentUser.uid,
@@ -222,7 +210,6 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   
   const markAsRead = useCallback((conversationId: string, userId: string) => {
     if (socket && conversationId && userId) {
-      console.log(`Marking conversation as read: ${conversationId} for user: ${userId}`);
       socket.emit('mark-read', {
         conversationId,
         userId,
@@ -232,7 +219,6 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
   const subscribeToVerification = useCallback((userId: string) => {
     if (socket && userId) {
-      console.log(`Subscribing to verification updates for: ${userId}`);
       socket.emit('subscribe-verification', userId);
       // Also refresh the current status
       refreshVerificationStatusInternal(userId);
@@ -241,13 +227,12 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Event listener management using refs
   const onVerificationUpdate = useCallback((callback: (data: VerificationStatus) => void) => {
-    console.log('Adding verification callback');
     
     verificationCallbacksRef.current.add(callback);
 
     // Return unsubscribe function
     return () => {
-      console.log('Removing verification callback');
+
       verificationCallbacksRef.current.delete(callback);
     };
   }, []);

@@ -232,7 +232,7 @@ const uniqueUserIds = React.useMemo(() => {
 										<div className="flex items-center justify-center mb-1">
 											<DollarSign className="w-4 h-4 text-gray-600 mr-1" />
 											<span className="text-sm font-medium text-gray-900">
-												${order.totalPrice.toLocaleString()}
+												{order.totalPrice.toLocaleString()}
 											</span>
 										</div>
 										<p className="text-xs text-gray-500">Value</p>

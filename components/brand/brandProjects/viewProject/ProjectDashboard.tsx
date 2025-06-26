@@ -217,6 +217,7 @@ const ProjectDashboard = () => {
 		enabled: !!currentUserId, // Only run query when we have a user ID
 		staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
 		gcTime: 10 * 60 * 1000, // Keep data in cache for 10 minutes
+		refetchOnWindowFocus: true, 
 	});
 
 	// Apply filters whenever filter states or projects change
@@ -259,13 +260,14 @@ const ProjectDashboard = () => {
 		};
 
 		applyFilters();
+	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [
 		searchTerm,
 		statusFilter,
 		budgetFilter,
 		projectTypeFilter,
 		projects.length,
-	]); // Changed: Use projects.length instead of projects
+	]);
 
 	const handleCreateNew = () => {
 		startNewProject();

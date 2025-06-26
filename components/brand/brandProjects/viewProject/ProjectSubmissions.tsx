@@ -26,6 +26,7 @@ import { toast } from "react-hot-toast";
 import Link from "next/link";
 import { useProjectForm } from "../ProjectFormContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/context/AuthContext";
 
 interface ProjectSubmissionsProps {
 	projectFormData: ProjectFormData;
@@ -34,15 +35,19 @@ interface ProjectSubmissionsProps {
 }
 
 // API functions
-const fetchSubmissions = async (projectId: string): Promise<CreatorSubmission[]> => {
-	const response = await fetch(`/api/project-submissions?projectId=${projectId}`);
-	
+const fetchSubmissions = async (
+	projectId: string
+): Promise<CreatorSubmission[]> => {
+	const response = await fetch(
+		`/api/project-submissions?projectId=${projectId}`
+	);
+
 	if (!response.ok) {
 		throw new Error(`Error fetching submissions: ${response.statusText}`);
 	}
 
 	const data = await response.json();
-	
+
 	if (!data.success || !data.submissions) {
 		throw new Error(data.error || "Failed to fetch submissions");
 	}
@@ -55,7 +60,9 @@ const fetchSubmissions = async (projectId: string): Promise<CreatorSubmission[]>
 	await Promise.all(
 		userIds.map(async (userId) => {
 			try {
-				const creatorRes = await fetch(`/api/admin/creator-approval?userId=${userId}`);
+				const creatorRes = await fetch(
+					`/api/admin/creator-approval?userId=${userId}`
+				);
 				if (creatorRes.ok) {
 					const response = await creatorRes.json();
 					if (response.creators && response.creators.length > 0) {
@@ -63,7 +70,10 @@ const fetchSubmissions = async (projectId: string): Promise<CreatorSubmission[]>
 					}
 				}
 			} catch (err) {
-				console.error(`Error fetching creator data for user ID ${userId}:`, err);
+				console.error(
+					`Error fetching creator data for user ID ${userId}:`,
+					err
+				);
 			}
 		})
 	);
@@ -71,16 +81,21 @@ const fetchSubmissions = async (projectId: string): Promise<CreatorSubmission[]>
 	// Transform submissions with creator data
 	return data.submissions.map((submission: any, index: number) => {
 		const creatorData = creatorDataMap.get(submission.userId);
-		
+
 		return {
 			id: submission.id,
 			userId: submission.userId,
 			projectId: submission.projectId,
 			creatorName: creatorData?.username || submission.creatorName || "Creator",
-			creatorIcon: creatorData?.logoUrl || submission.creatorIcon || "/placeholder-profile.jpg",
+			creatorIcon:
+				creatorData?.logoUrl ||
+				submission.creatorIcon ||
+				"/placeholder-profile.jpg",
 			videoUrl: submission.videoUrl || "/placeholder-video.jpg",
 			videoNumber: submission.videoNumber || `#${index + 1}`,
-			revisionNumber: submission.revisionNumber ? `#${submission.revisionNumber}` : "",
+			revisionNumber: submission.revisionNumber
+				? `#${submission.revisionNumber}`
+				: "",
 			status: submission.status || "new",
 			createdAt: new Date(submission.createdAt).toLocaleDateString(),
 			sparkCode: submission.sparkCode || "",
@@ -94,7 +109,7 @@ const fetchSubmissions = async (projectId: string): Promise<CreatorSubmission[]>
 const updateSubmissionStatus = async ({
 	submissionId,
 	status,
-	additionalData = {}
+	additionalData = {},
 }: {
 	submissionId: string;
 	status: string;
@@ -127,7 +142,7 @@ const updateSubmissionStatus = async ({
 	}
 
 	const data = await response.json();
-	
+
 	if (!data.success) {
 		throw new Error(data.error || "Failed to update status");
 	}
@@ -149,7 +164,7 @@ const fetchSparkCode = async (submissionId: string) => {
 	}
 
 	const data = await response.json();
-	
+
 	if (!data.success || !data.data.sparkCode) {
 		throw new Error("No spark code found");
 	}
@@ -171,7 +186,7 @@ const fetchTikTokLink = async (submissionId: string) => {
 	}
 
 	const data = await response.json();
-	
+
 	if (!data.success || !data.data.tiktokLink) {
 		throw new Error("No TikTok link found");
 	}
@@ -179,34 +194,43 @@ const fetchTikTokLink = async (submissionId: string) => {
 	return data.data.tiktokLink;
 };
 
+
 export default function ProjectSubmissions({
 	projectFormData,
 	projectId,
 }: ProjectSubmissionsProps) {
+	// Moved useQueryClient hook inside the component
 	const queryClient = useQueryClient();
 	const projectType = projectFormData?.projectDetails?.projectType;
 
-	const [activeView, setActiveView] = useState<"project" | "creator">("project");
+	const [activeView, setActiveView] = useState<"project" | "creator">(
+		"project"
+	);
 	const [openReviewDialog, setOpenReviewDialog] = useState(false);
 	const [openApproveDialog, setOpenApproveDialog] = useState(false);
 	const [openVerifySparkDialog, setOpenVerifySparkDialog] = useState(false);
-	const [openVerifyTiktokLinkDialog, setOpenVerifyTiktokLinkDialog] = useState(false);
-	const [currentSubmission, setCurrentSubmission] = useState<CreatorSubmission | null>(null);
+	const [openVerifyTiktokLinkDialog, setOpenVerifyTiktokLinkDialog] =
+		useState(false);
+	const [currentSubmission, setCurrentSubmission] =
+		useState<CreatorSubmission | null>(null);
 	const [revisionUsed, setRevisionUsed] = useState<number>(1);
-	const [expandedCreators, setExpandedCreators] = useState<Record<string, boolean>>({});
+	const [expandedCreators, setExpandedCreators] = useState<
+		Record<string, boolean>
+	>({});
 	const [statusFilter, setStatusFilter] = useState<string>("all");
 	const [sortBy, setSortBy] = useState<string>("newest");
 
 	const { triggerPaymentIntent } = useProjectForm();
+	const {currentUser} = useAuth();
 
 	// Query for submissions
 	const {
 		data: submissionsList = [],
 		isLoading: loading,
 		error,
-		refetch
+		refetch,
 	} = useQuery({
-		queryKey: ['project-submissions', projectId],
+		queryKey: ["project-submissions", projectId],
 		queryFn: () => fetchSubmissions(projectId),
 		staleTime: 30000, // 30 seconds
 		refetchOnWindowFocus: false,
@@ -215,37 +239,106 @@ export default function ProjectSubmissions({
 	// Mutation for updating submission status
 	const updateStatusMutation = useMutation({
 		mutationFn: updateSubmissionStatus,
-		onSuccess: (data, variables) => {
-			// Update the cache optimistically
-			queryClient.setQueryData(['project-submissions', projectId], (old: CreatorSubmission[] = []) => {
-				return old.map(sub => 
-					sub.id === variables.submissionId 
-						? { ...sub, status: variables.status as CreatorSubmission["status"], ...variables.additionalData }
-						: sub
-				);
-			});
-			toast.success(`Status updated to ${variables.status}`);
+		onSuccess: async (data, variables) => {
+		  // Existing cache update logic...
+		  queryClient.setQueryData(
+			["project-submissions", projectId],
+			(old: CreatorSubmission[] = []) => {
+			  const updated = old.map((sub) =>
+				sub.id === variables.submissionId
+				  ? {
+					  ...sub,
+					  status: variables.status as CreatorSubmission["status"],
+					  ...variables.additionalData,
+					}
+				  : sub
+			  );
+			  
+			  // Check if project should be completed after this update
+			  checkAndUpdateProjectStatus(projectId, projectFormData, updated);
+			  queryClient.invalidateQueries({ queryKey: ["projects", currentUser?.uid] });
+  
+			  
+			  return updated;
+			}
+		  );
+		  toast.success(`Status updated to ${variables.status}`);
 		},
+	  
 		onError: (error) => {
 			console.error("Error updating submission status:", error);
 			toast.error("Failed to update submission status");
-		}
+		},
 	});
+
+	useEffect(() => {
+		if (submissionsList.length > 0 && projectFormData) {
+		  checkAndUpdateProjectStatus(projectId, projectFormData, submissionsList);
+		}
+	  }, [submissionsList, projectFormData, projectId]);
+
+	const checkAndUpdateProjectStatus = async (projectId: string, projectFormData: ProjectFormData, submissions: CreatorSubmission[]) => {
+		try {
+		  // Calculate required videos
+		  const totalVideosRequired = projectFormData?.creatorPricing?.videosPerCreator
+			? projectFormData.creatorPricing.videosPerCreator * (projectFormData.creatorPricing.creatorCount || 1)
+			: submissions.length;
+	  
+		  // Count approved videos (including all completion states)
+		  const approvedVideos = submissions.filter(sub => 
+			sub.status === "approved" || 
+			sub.status === "spark_verified" || 
+			sub.status === "tiktokLink_verified" || 
+			sub.status === "payment_confirmed"
+		  ).length;
+	  
+		  // Check if project should be marked as completed
+		  if (approvedVideos >= totalVideosRequired && projectFormData.status !== "completed") {
+			const auth = getAuth();
+			const currentUser = auth.currentUser;
+			
+			if (!currentUser) return;
+			
+			const token = await currentUser.getIdToken();
+			
+			const response = await fetch("/api/projects/update-status", {
+			  method: "POST",
+			  headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${token}`,
+			  },
+			  body: JSON.stringify({
+				projectId,
+				status: "completed"
+			  }),
+			});
+	  
+			if (response.ok) {
+			  toast.success("Project automatically marked as completed!");
+			  // Optionally refresh project data
+			  queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+			  queryClient.invalidateQueries({ queryKey: ["projects"] }); 
+			}
+		  }
+		} catch (error) {
+		  console.error("Error checking project completion status:", error);
+		}
+	  };
 
 	// Mutation for requesting spark code
 	const requestSparkCodeMutation = useMutation({
 		mutationFn: async (submissionId: string) => {
 			// First update status to spark_requested
 			await updateSubmissionStatus({ submissionId, status: "spark_requested" });
-			
+
 			try {
 				// Try to fetch the spark code
 				const sparkCode = await fetchSparkCode(submissionId);
 				// If successful, update status to spark_received
-				await updateSubmissionStatus({ 
-					submissionId, 
-					status: "spark_received", 
-					additionalData: { sparkCode } 
+				await updateSubmissionStatus({
+					submissionId,
+					status: "spark_received",
+					additionalData: { sparkCode },
 				});
 				return { sparkCode };
 			} catch (error) {
@@ -254,28 +347,33 @@ export default function ProjectSubmissions({
 			}
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['project-submissions', projectId] });
+			queryClient.invalidateQueries({
+				queryKey: ["project-submissions", projectId],
+			});
 		},
 		onError: (error) => {
 			console.error("Error requesting spark code:", error);
 			// Don't show error toast as the status is still updated to requested
-		}
+		},
 	});
 
 	// Mutation for requesting TikTok link
 	const requestTikTokLinkMutation = useMutation({
 		mutationFn: async (submissionId: string) => {
 			// First update status to tiktokLink_requested
-			await updateSubmissionStatus({ submissionId, status: "tiktokLink_requested" });
-			
+			await updateSubmissionStatus({
+				submissionId,
+				status: "tiktokLink_requested",
+			});
+
 			try {
 				// Try to fetch the TikTok link
 				const tiktokLink = await fetchTikTokLink(submissionId);
 				// If successful, update status to tiktokLink_received
-				await updateSubmissionStatus({ 
-					submissionId, 
-					status: "tiktokLink_received", 
-					additionalData: { tiktokLink } 
+				await updateSubmissionStatus({
+					submissionId,
+					status: "tiktokLink_received",
+					additionalData: { tiktokLink },
 				});
 				return { tiktokLink };
 			} catch (error) {
@@ -284,20 +382,25 @@ export default function ProjectSubmissions({
 			}
 		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['project-submissions', projectId] });
+			queryClient.invalidateQueries({
+				queryKey: ["project-submissions", projectId],
+			});
 		},
 		onError: (error) => {
 			console.error("Error requesting TikTok link:", error);
 			// Don't show error toast as the status is still updated to requested
-		}
+		},
 	});
 
 	// Initialize expanded creators when data loads
-useEffect(() => {
+	useEffect(() => {
 		if (submissionsList.length > 0) {
 			const creatorExpandState: Record<string, boolean> = {};
 			submissionsList.forEach((submission: CreatorSubmission) => {
-				if (submission.creatorName && !creatorExpandState[submission.creatorName]) {
+				if (
+					submission.creatorName &&
+					!creatorExpandState[submission.creatorName]
+				) {
 					creatorExpandState[submission.creatorName] = true;
 				}
 			});
@@ -319,8 +422,12 @@ useEffect(() => {
 	};
 
 	const getCreatorPaymentAmount = (submission: CreatorSubmission) => {
-		if (projectFormData.creatorPricing.selectionMethod === "Invite Specific Creators") {
-			const creatorPaymentData = projectFormData.creatorPricing.creatorPayments?.[submission.userId];
+		if (
+			projectFormData.creatorPricing.selectionMethod ===
+			"Invite Specific Creators"
+		) {
+			const creatorPaymentData =
+				projectFormData.creatorPricing.creatorPayments?.[submission.userId];
 
 			if (!creatorPaymentData) {
 				return 0;
@@ -330,8 +437,10 @@ useEffect(() => {
 				return creatorPaymentData.pricePerVideo || 0;
 			}
 
-			const videosPerCreator = projectFormData.creatorPricing.videosPerCreator || 1;
-			const pricePerVideo = (creatorPaymentData.totalAmount || 0) / videosPerCreator;
+			const videosPerCreator =
+				projectFormData.creatorPricing.videosPerCreator || 1;
+			const pricePerVideo =
+				(creatorPaymentData.totalAmount || 0) / videosPerCreator;
 			return Math.round(pricePerVideo * 100) / 100;
 		} else {
 			return projectFormData.creatorPricing.budgetPerVideo || 0;
@@ -342,19 +451,28 @@ useEffect(() => {
 		if (currentSubmission) {
 			let creatorPaymentPerVideo = 0;
 
-			if (projectFormData.creatorPricing.selectionMethod === "Invite Specific Creators") {
-				const creatorPaymentData = projectFormData.creatorPricing.creatorPayments?.[currentSubmission.userId];
+			if (
+				projectFormData.creatorPricing.selectionMethod ===
+				"Invite Specific Creators"
+			) {
+				const creatorPaymentData =
+					projectFormData.creatorPricing.creatorPayments?.[
+						currentSubmission.userId
+					];
 
 				if (creatorPaymentData) {
 					if (creatorPaymentData.pricingTier === "bulk rate") {
 						creatorPaymentPerVideo = creatorPaymentData.pricePerVideo || 0;
 					} else {
-						const videosPerCreator = projectFormData.creatorPricing.videosPerCreator || 1;
-						creatorPaymentPerVideo = (creatorPaymentData.totalAmount || 0) / videosPerCreator;
+						const videosPerCreator =
+							projectFormData.creatorPricing.videosPerCreator || 1;
+						creatorPaymentPerVideo =
+							(creatorPaymentData.totalAmount || 0) / videosPerCreator;
 					}
 				}
 			} else {
-				creatorPaymentPerVideo = projectFormData.creatorPricing.budgetPerVideo || 0;
+				creatorPaymentPerVideo =
+					projectFormData.creatorPricing.budgetPerVideo || 0;
 			}
 
 			try {
@@ -397,7 +515,7 @@ useEffect(() => {
 		if (currentSubmission) {
 			updateStatusMutation.mutate({
 				submissionId: currentSubmission.id,
-				status: "spark_verified"
+				status: "spark_verified",
 			});
 			setOpenVerifySparkDialog(false);
 		}
@@ -407,7 +525,7 @@ useEffect(() => {
 		if (currentSubmission) {
 			updateStatusMutation.mutate({
 				submissionId: currentSubmission.id,
-				status: "tiktokLink_verified"
+				status: "tiktokLink_verified",
 			});
 			setOpenVerifyTiktokLinkDialog(false);
 		}
@@ -420,7 +538,7 @@ useEffect(() => {
 		setIsModalOpen(false);
 		updateStatusMutation.mutate({
 			submissionId: submission.id,
-			status: "spark_requested"
+			status: "spark_requested",
 		});
 		toast.success("New spark code requested successfully");
 	};
@@ -432,7 +550,7 @@ useEffect(() => {
 		setIsModalOpen(false);
 		updateStatusMutation.mutate({
 			submissionId: submission.id,
-			status: "tiktokLink_requested"
+			status: "tiktokLink_requested",
 		});
 		toast.success("New TikTok link requested successfully");
 	};
@@ -452,7 +570,7 @@ useEffect(() => {
 					feedback,
 					issues,
 					videoTimestamps,
-				}
+				},
 			});
 		}
 		setOpenReviewDialog(false);
@@ -481,9 +599,13 @@ useEffect(() => {
 	const sortedSubmissions = [...filteredSubmissions].sort((a, b) => {
 		switch (sortBy) {
 			case "newest":
-				return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+				return (
+					new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+				);
 			case "oldest":
-				return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+				return (
+					new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+				);
 			case "creator":
 				return a.createdAt.localeCompare(b.createdAt);
 			default:
@@ -505,7 +627,8 @@ useEffect(() => {
 
 	// Calculate progress metrics
 	const totalVideosRequested = projectFormData?.creatorPricing?.videosPerCreator
-		? projectFormData.creatorPricing.videosPerCreator * (projectFormData.creatorPricing.creatorCount || 1)
+		? projectFormData.creatorPricing.videosPerCreator *
+			(projectFormData.creatorPricing.creatorCount || 1)
 		: submissionsList.length;
 
 	const completedVideos = submissionsList.filter(
@@ -522,13 +645,21 @@ useEffect(() => {
 			sub.status === "payment_confirmed"
 	).length;
 
-	const completionPercentage = totalVideosRequested > 0 ? (completedVideos / totalVideosRequested) * 100 : 0;
+	const completionPercentage =
+		totalVideosRequested > 0
+			? (completedVideos / totalVideosRequested) * 100
+			: 0;
 
 	// Render buttons based on submission status
 	const renderSubmissionButtons = (submission: CreatorSubmission) => {
-		const isUpdating = updateStatusMutation.isPending && currentSubmission?.id === submission.id;
-		const isRequestingSparkCode = requestSparkCodeMutation.isPending && requestSparkCodeMutation.variables === submission.id;
-		const isRequestingTikTokLink = requestTikTokLinkMutation.isPending && requestTikTokLinkMutation.variables === submission.id;
+		const isUpdating =
+			updateStatusMutation.isPending && currentSubmission?.id === submission.id;
+		const isRequestingSparkCode =
+			requestSparkCodeMutation.isPending &&
+			requestSparkCodeMutation.variables === submission.id;
+		const isRequestingTikTokLink =
+			requestTikTokLinkMutation.isPending &&
+			requestTikTokLinkMutation.variables === submission.id;
 
 		switch (submission.status) {
 			case "submitted":
@@ -569,7 +700,10 @@ useEffect(() => {
 				);
 
 			case "approved":
-				if (projectType === "UGC Content Only" || projectType === "TikTok Shop") {
+				if (
+					projectType === "UGC Content Only" ||
+					projectType === "TikTok Shop"
+				) {
 					return (
 						<Button
 							variant="secondary"
@@ -728,8 +862,8 @@ useEffect(() => {
 				<div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
 					<strong className="font-bold">Error: </strong>
 					<span className="block sm:inline">{error.message}</span>
-					<Button 
-						onClick={() => refetch()} 
+					<Button
+						onClick={() => refetch()}
 						className="mt-2 bg-red-600 hover:bg-red-700 text-white"
 					>
 						Retry
@@ -748,7 +882,10 @@ useEffect(() => {
 					<p className="text-gray-500 mb-4">
 						There are no submissions for this project currently.
 					</p>
-					<Button onClick={() => refetch()} className="bg-orange-500 hover:bg-orange-600 text-white">
+					<Button
+						onClick={() => refetch()}
+						className="bg-orange-500 hover:bg-orange-600 text-white"
+					>
 						Refresh
 					</Button>
 				</div>

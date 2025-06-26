@@ -30,6 +30,77 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { commonEmojis } from "@/types/emojis";
 
+// Skeleton Loading Components
+const ConversationSkeleton = () => (
+	<div className="flex items-center p-2.5 sm:p-3 md:p-4 mx-1 sm:mx-2 rounded-lg animate-pulse">
+		<div className="relative flex-shrink-0">
+			<div className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 bg-gray-200 rounded-full ring-2 ring-gray-100" />
+		</div>
+		<div className="ml-2 sm:ml-3 flex-1 overflow-hidden min-w-0">
+			<div className="flex justify-between items-start mb-0.5 sm:mb-1">
+				<div className="flex gap-1.5 sm:gap-2 items-center min-w-0 flex-1">
+					<div className="h-4 sm:h-5 bg-gray-200 rounded w-24 sm:w-32" />
+				</div>
+				<div className="h-3 bg-gray-200 rounded w-8 sm:w-10 flex-shrink-0 ml-2" />
+			</div>
+			<div className="space-y-1">
+				<div className="h-3 bg-gray-200 rounded w-full" />
+				<div className="h-3 bg-gray-200 rounded w-3/4" />
+			</div>
+		</div>
+	</div>
+);
+
+// const MessagesSkeleton = () => (
+// 	<div className="p-3 sm:p-4 md:p-6 space-y-4">
+// 		{[...Array(3)].map((_, i) => (
+// 			<div key={i} className="flex justify-start">
+// 				<div className="max-w-[90%] sm:max-w-[85%] md:max-w-[75%] lg:max-w-[65%] xl:max-w-[60%]">
+// 					<div className="flex items-start animate-pulse">
+// 						<div className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 mt-1 mr-2 sm:mr-3 flex-shrink-0">
+// 							<div className="h-full w-full bg-gray-200 rounded-full" />
+// 						</div>
+// 						<div className="space-y-1 min-w-0 flex-1">
+// 							<div className="bg-gray-200 rounded-lg h-12 sm:h-16 w-48 sm:w-64 md:w-80" />
+// 							<div className="h-3 bg-gray-200 rounded w-16" />
+// 						</div>
+// 					</div>
+// 				</div>
+// 			</div>
+// 		))}
+// 	</div>
+// );
+
+const HeaderSkeleton = () => (
+	<div className="py-2 sm:py-3 px-3 sm:px-4 border-b flex items-center flex-shrink-0 bg-white shadow-sm">
+		<div className="relative flex-shrink-0 animate-pulse">
+			<div className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 bg-gray-200 rounded-full ring-2 ring-gray-100" />
+		</div>
+		<div className="ml-2 sm:ml-3 min-w-0 flex-1 animate-pulse">
+			<div className="space-y-1">
+				<div className="h-4 sm:h-5 md:h-6 bg-gray-200 rounded w-32 sm:w-40 md:w-48" />
+				<div className="h-3 sm:h-4 bg-gray-200 rounded w-20 sm:w-24 md:w-28" />
+			</div>
+		</div>
+	</div>
+);
+
+const LoadingSpinner = ({ size = "md" }: { size?: "sm" | "md" | "lg" }) => {
+	const sizeClasses = {
+		sm: "h-4 w-4",
+		md: "h-5 w-5 sm:h-6 sm:w-6",
+		lg: "h-6 w-6 sm:h-8 sm:w-8",
+	};
+
+	return (
+		<div className="flex justify-center p-4 sm:p-6">
+			<div
+				className={`${sizeClasses[size]} border-2 border-t-transparent border-orange-500 rounded-full animate-spin`}
+			/>
+		</div>
+	);
+};
+
 const ChatPage = () => {
 	const { currentUser } = useAuth();
 	const searchParams = useSearchParams();
@@ -283,9 +354,8 @@ const ChatPage = () => {
 				return newMessages;
 			});
 
-			// NEW: If this is a new conversation, refresh the conversations list
+			//  If this is a new conversation, refresh the conversations list
 			if (message.isNewConversation) {
-				console.log("New conversation detected, refreshing conversations...");
 				refreshConversations();
 			}
 
@@ -346,7 +416,6 @@ const ChatPage = () => {
 		};
 
 		const handleConversationCreated = (data: any) => {
-			console.log("New conversation created:", data);
 
 			// Refresh conversations to include the new one
 			refreshConversations();
@@ -389,10 +458,9 @@ const ChatPage = () => {
 		}
 	}, [selectedConversation, currentUser, fetchInitialMessages]);
 
-
-		useEffect(() => {
-			fetchTotalUnreadCount();
-		}, [currentUser]);
+	useEffect(() => {
+		fetchTotalUnreadCount();
+	}, [currentUser]);
 
 	// Auto-scroll to bottom when messages change
 	useEffect(() => {
@@ -421,10 +489,6 @@ const ChatPage = () => {
 
 		try {
 			setSendingMessage(true);
-
-			if (selectedFiles.length > 0) {
-				console.log("Files to upload:", selectedFiles);
-			}
 
 			socketSendMessage(selectedConversation, messageInput);
 			setMessageInput("");
@@ -547,8 +611,10 @@ const ChatPage = () => {
 				{/* User list */}
 				<ScrollArea className="flex-1 overflow-hidden">
 					{loading ? (
-						<div className="flex justify-center p-4 sm:p-6">
-							<div className="animate-spin rounded-full h-5 w-5 sm:h-6 sm:w-6 border-t-2 border-b-2 border-orange-500"></div>
+						<div className="space-y-0.5 sm:space-y-1 px-2 sm:px-3">
+							{[...Array(5)].map((_, i) => (
+								<ConversationSkeleton key={i} />
+							))}
 						</div>
 					) : filteredUsers.length === 0 ? (
 						<div className="p-4 sm:p-6 text-center text-gray-500 text-sm sm:text-base">
@@ -649,19 +715,19 @@ const ChatPage = () => {
 			<div className="flex-1 flex flex-col h-full min-w-0 relative">
 				{/* Chat header - fixed height */}
 				{selectedUser ? (
-					<div className="py-2 sm:py-3 px-3 sm:px-4 border-b flex items-center flex-shrink-0 bg-white shadow-sm">
-						{/* Mobile menu button */}
-						<button
-							onClick={() => setShowSidebar(true)}
-							className="md:hidden mr-2 sm:mr-3 p-1.5 sm:p-2 hover:bg-gray-100 rounded-full transition-colors"
-						>
-							<Menu className="h-4 w-4 sm:h-5 sm:w-5" />
-						</button>
+					imageLoadingStates[selectedUser.id] ? (
+						<HeaderSkeleton />
+					) : (
+						<div className="py-2 sm:py-3 px-3 sm:px-4 border-b flex items-center flex-shrink-0 bg-white shadow-sm">
+							{/* Mobile menu button */}
+							<button
+								onClick={() => setShowSidebar(true)}
+								className="md:hidden mr-2 sm:mr-3 p-1.5 sm:p-2 hover:bg-gray-100 rounded-full transition-colors"
+							>
+								<Menu className="h-4 w-4 sm:h-5 sm:w-5" />
+							</button>
 
-						<div className="relative flex-shrink-0">
-							{imageLoadingStates[selectedUser.id] ? (
-								<div className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 bg-gray-200 animate-pulse rounded-full ring-2 ring-gray-100" />
-							) : (
+							<div className="relative flex-shrink-0">
 								<Avatar className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 ring-2 ring-gray-100">
 									<Image
 										src={
@@ -677,36 +743,24 @@ const ChatPage = () => {
 										className="transition-opacity duration-300"
 									/>
 								</Avatar>
-							)}
-							{selectedUser.isActive &&
-								!imageLoadingStates[selectedUser.id] && (
+								{selectedUser.isActive && (
 									<div className="absolute -bottom-0.5 -right-0.5 h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-green-500 border-2 border-white shadow-sm"></div>
 								)}
-						</div>
+							</div>
 
-						<div className="ml-2 sm:ml-3 min-w-0 flex-1">
-							{imageLoadingStates[selectedUser.id] ? (
-								<div className="space-y-1">
-									<div className="h-4 sm:h-5 md:h-6 bg-gray-200 animate-pulse rounded w-32 sm:w-40 md:w-48" />
-									{selectedUser.username && (
-										<div className="h-3 sm:h-4 bg-gray-200 animate-pulse rounded w-20 sm:w-24 md:w-28" />
-									)}
-								</div>
-							) : (
-								<>
-									<p className="text-sm sm:text-base md:text-lg font-medium truncate text-gray-900">
-										{selectedUser.creatorProfile?.displayName ||
-											selectedUser.name}
+							<div className="ml-2 sm:ml-3 min-w-0 flex-1">
+								<p className="text-sm sm:text-base md:text-lg font-medium truncate text-gray-900">
+									{selectedUser.creatorProfile?.displayName ||
+										selectedUser.name}
+								</p>
+								{selectedUser.username && (
+									<p className="text-xs sm:text-sm text-orange-500 truncate">
+										@{selectedUser.username}
 									</p>
-									{selectedUser.username && (
-										<p className="text-xs sm:text-sm text-orange-500 truncate">
-											@{selectedUser.username}
-										</p>
-									)}
-								</>
-							)}
+								)}
+							</div>
 						</div>
-					</div>
+					)
 				) : (
 					<div className="py-2 sm:py-3 px-3 sm:px-4 border-b flex-shrink-0 bg-white shadow-sm flex items-center z-10">
 						{/* Mobile menu button */}
@@ -736,12 +790,7 @@ const ChatPage = () => {
 								</div>
 							)}
 
-							{/* Loading indicator for messages */}
-							{loading && (
-								<div className="flex justify-center p-6 sm:p-8">
-									<div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-t-2 border-b-2 border-orange-500"></div>
-								</div>
-							)}
+							
 
 							{messages.map((message) => (
 								<div key={message.id} className="space-y-1 sm:space-y-2">
@@ -962,7 +1011,7 @@ const ChatPage = () => {
 							}
 						>
 							{sendingMessage ? (
-								<div className="h-4 w-4 sm:h-5 sm:w-5 animate-spin rounded-full border-2 border-t-transparent border-white"></div>
+								<LoadingSpinner size="sm" />
 							) : (
 								<Send className="h-4 w-4 sm:h-5 sm:w-5" />
 							)}

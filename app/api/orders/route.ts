@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
 		}
 
 		const creatorDoc = await adminDb
-			.collection("creators")
+			.collection("creatorProfiles")
 			.doc(creatorId)
 			.get();
 
@@ -677,7 +677,7 @@ export async function PUT(request: NextRequest) {
 		const creatorMessage =
 			orderData?.paymentType === "escrow"
 				? `You have a new order! Payment is held in escrow and will be released upon completion of the order.`
-				: `OYou have a new order! Payment is held in escrow and will be released upon completion of the order.`;
+				: `You have a new order! Payment is held in escrow and will be released upon completion of the order.`;
 
 		await Promise.all([
 			adminDb.collection("notifications").add({
@@ -835,7 +835,7 @@ export async function GET(request: NextRequest) {
 		let creatorInfo = null;
 		try {
 			const creatorDoc = await adminDb
-				.collection("creators")
+				.collection("creatorProfiles")
 				.doc(orderData?.creator_id)
 				.get();
 			if (creatorDoc.exists) {

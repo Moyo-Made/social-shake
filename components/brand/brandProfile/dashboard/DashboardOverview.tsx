@@ -288,13 +288,13 @@ const fetchLeaderboardData = async (
 	return creatorsWithPositions;
 };
 
-const fetchCreatorDetails = async (creatorId: string): Promise<any> => {
-	const response = await fetch(`/api/admin/creator-approval?status=approved`);
-	if (!response.ok) throw new Error("Failed to fetch creator details");
+// const fetchCreatorDetails = async (creatorId: string): Promise<any> => {
+// 	const response = await fetch(`/api/admin/creator-approval?status=approved`);
+// 	if (!response.ok) throw new Error("Failed to fetch creator details");
 
-	const data = await response.json();
-	return data.creators.find((c: any) => c.userId === creatorId);
-};
+// 	const data = await response.json();
+// 	return data.creators.find((c: any) => c.userId === creatorId);
+// };
 
 const sendMessage = async ({
 	conversationId,
@@ -522,72 +522,72 @@ const UserDashboard = dynamic(
 				}
 			};
 
-			const handleViewProfile = async (creator: {
-				id: string;
-				name: string;
-				avatar: string;
-				username: string;
-				bio: string;
-				[key: string]: any;
-			}) => {
-				// Create a proper Creators object with required fields
-				const creatorObj: Creators = {
-					id: creator.id,
-					name: creator.name,
-					avatar: creator.avatar,
-					username: creator.username || "",
-					bio: creator.bio || "",
-					totalGMV: 0,
-					avgGMVPerVideo: 0,
-					pricing: {
-						oneVideo: 0,
-						threeVideos: 0,
-						fiveVideos: 0,
-						bulkVideos: 0,
-						bulkVideosNote: "",
-					},
-					profilePictureUrl: "",
-					contentTypes: [],
-					country: "",
-					tiktokUrl: "",
-					status: "",
-					dateOfBirth: "",
-					gender: "",
-					ethnicity: "",
-					contentLinks: [],
-				};
+			// const handleViewProfile = async (creator: {
+			// 	id: string;
+			// 	name: string;
+			// 	avatar: string;
+			// 	username: string;
+			// 	bio: string;
+			// 	[key: string]: any;
+			// }) => {
+			// 	// Create a proper Creators object with required fields
+			// 	const creatorObj: Creators = {
+			// 		id: creator.id,
+			// 		name: creator.name,
+			// 		avatar: creator.avatar,
+			// 		username: creator.username || "",
+			// 		bio: creator.bio || "",
+			// 		totalGMV: 0,
+			// 		avgGMVPerVideo: 0,
+			// 		pricing: {
+			// 			oneVideo: 0,
+			// 			threeVideos: 0,
+			// 			fiveVideos: 0,
+			// 			bulkVideos: 0,
+			// 			bulkVideosNote: "",
+			// 		},
+			// 		profilePictureUrl: "",
+			// 		contentTypes: [],
+			// 		country: "",
+			// 		tiktokUrl: "",
+			// 		status: "",
+			// 		dateOfBirth: "",
+			// 		gender: "",
+			// 		ethnicity: "",
+			// 		contentLinks: [],
+			// 	};
 
-				setSelectedCreator(creatorObj);
+			// 	setSelectedCreator(creatorObj);
 
-				try {
-					const fullCreatorData = await fetchCreatorDetails(creator.id);
+			// 	try {
+			// 		const fullCreatorData = await fetchCreatorDetails(creator.id);
 
-					if (fullCreatorData) {
-						setSelectedCreator((prev) => {
-							if (!prev) return null;
+			// 		if (fullCreatorData) {
+			// 			setSelectedCreator((prev) => {
+			// 				if (!prev) return null;
 
-							return {
-								...prev,
-								bio: fullCreatorData.bio || prev.bio,
-								contentTypes: fullCreatorData.contentTypes || [],
-								pricing: {
-									oneVideo: fullCreatorData.pricing?.oneVideo || 0,
-									threeVideos: fullCreatorData.pricing?.threeVideos || 0,
-									fiveVideos: fullCreatorData.pricing?.fiveVideos || 0,
-									bulkVideos: fullCreatorData.pricing?.bulkVideos || 0,
-									bulkVideosNote: fullCreatorData.pricing?.bulkVideosNote || "",
-								},
-								socialMedia: fullCreatorData.socialMedia || {},
-								country: fullCreatorData.country || "",
-								gender: fullCreatorData.gender || "",
-								ethnicity: fullCreatorData.ethnicity || "",
-							};
-						});
-					}
-				} catch (error) {
-					console.error("Error fetching creator details:", error);
-				}
-			};
+			// 				return {
+			// 					...prev,
+			// 					bio: fullCreatorData.bio || prev.bio,
+			// 					contentTypes: fullCreatorData.contentTypes || [],
+			// 					pricing: {
+			// 						oneVideo: fullCreatorData.pricing?.oneVideo || 0,
+			// 						threeVideos: fullCreatorData.pricing?.threeVideos || 0,
+			// 						fiveVideos: fullCreatorData.pricing?.fiveVideos || 0,
+			// 						bulkVideos: fullCreatorData.pricing?.bulkVideos || 0,
+			// 						bulkVideosNote: fullCreatorData.pricing?.bulkVideosNote || "",
+			// 					},
+			// 					socialMedia: fullCreatorData.socialMedia || {},
+			// 					country: fullCreatorData.country || "",
+			// 					gender: fullCreatorData.gender || "",
+			// 					ethnicity: fullCreatorData.ethnicity || "",
+			// 				};
+			// 			});
+			// 		}
+			// 	} catch (error) {
+			// 		console.error("Error fetching creator details:", error);
+			// 	}
+			// };
 
 			const handleCloseProfile = () => {
 				setSelectedCreator(null);
@@ -928,7 +928,7 @@ const UserDashboard = dynamic(
 									className="bg-[#FFF4EE] border border-[#6670854D] rounded-xl px-7 py-6 mb-4"
 								>
 									<div className="flex justify-between mb-4">
-										<div className="flex gap-2">
+										<div className="flex gap-3">
 											<Image
 												src={message.senderInfo?.avatar || "/icons/colina.svg"}
 												alt="Profile Icon"
@@ -936,10 +936,13 @@ const UserDashboard = dynamic(
 												height={40}
 												className="rounded-full"
 											/>
-											<div className="flex flex-col">
+											<div className="flex items-center">
 												<p className="text-sm font-medium text-gray-800">
 													{message.senderInfo?.name || "Unknown Creator"}
 												</p>
+											</div>
+											{/* <div className="flex flex-col">
+												
 												<button
 													onClick={() =>
 														message.senderInfo &&
@@ -955,7 +958,7 @@ const UserDashboard = dynamic(
 												>
 													View profile
 												</button>
-											</div>
+											</div> */}
 										</div>
 										<p className="text-xs text-gray-800">
 											{timeAgo(message.timestamp)}

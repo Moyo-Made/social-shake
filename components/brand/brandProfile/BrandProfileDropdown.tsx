@@ -253,7 +253,7 @@ const BrandProfileDropdown: React.FC<BrandProfileDropdownProps> = ({
 
 			{isOpen && (
 				<div
-					className={`absolute z-10 ${
+					className={`absolute z-50 ${
 						dropdownPosition === "header"
 							? "right-0 mt-2 w-56 bg-white shadow-lg rounded-lg"
 							: "left-0 bottom-full w-full bg-[#222] shadow-lg rounded-lg border border-gray-700"

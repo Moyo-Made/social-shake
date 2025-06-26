@@ -26,27 +26,53 @@ export async function POST(req: NextRequest) {
 			);
 		}
 
-		// Check for existing conversations using array queries only
-		// This is more reliable than deterministic IDs
-		const existingConversations = await db
-			.collection("conversations")
-			.where("participants", "array-contains", currentUserId)
-			.get();
+		// Create a deterministic conversation ID based on sorted user IDs
+		const sortedParticipants = [currentUserId, targetUserId].sort();
+		const conversationId = `${sortedParticipants[0]}_${sortedParticipants[1]}`;
 
-		// Check if any of these conversations include the target user
-		let existingConversation = null;
-		for (const doc of existingConversations.docs) {
-			const participants = doc.data().participants || [];
-			if (participants.includes(targetUserId)) {
-				existingConversation = doc;
-				break;
-			}
-		}
+		// Check if conversation with this exact ID already exists
+		const existingConvRef = db.collection("conversations").doc(conversationId);
+		const existingConvDoc = await existingConvRef.get();
 
-		if (existingConversation) {
+		if (existingConvDoc.exists) {
 			return new Response(
 				JSON.stringify({
-					conversationId: existingConversation.id,
+					conversationId: existingConvDoc.id,
+					message: "Existing conversation found",
+				}),
+				{ status: 200, headers: { "Content-Type": "application/json" } }
+			);
+		}
+
+		// Alternative approach: Query both directions to ensure we catch existing conversations
+		const existingConversation1 = await db
+			.collection("conversations")
+			.where("participants", "==", [currentUserId, targetUserId])
+			.limit(1)
+			.get();
+
+		const existingConversation2 = await db
+			.collection("conversations")
+			.where("participants", "==", [targetUserId, currentUserId])
+			.limit(1)
+			.get();
+
+		if (!existingConversation1.empty) {
+			const doc = existingConversation1.docs[0];
+			return new Response(
+				JSON.stringify({
+					conversationId: doc.id,
+					message: "Existing conversation found",
+				}),
+				{ status: 200, headers: { "Content-Type": "application/json" } }
+			);
+		}
+
+		if (!existingConversation2.empty) {
+			const doc = existingConversation2.docs[0];
+			return new Response(
+				JSON.stringify({
+					conversationId: doc.id,
 					message: "Existing conversation found",
 				}),
 				{ status: 200, headers: { "Content-Type": "application/json" } }
@@ -57,37 +83,68 @@ export async function POST(req: NextRequest) {
 		let targetProfile = null;
 		try {
 			if (targetUserType === "creator") {
-				// Existing creator profile logic
-				const creatorProfilesQuery = await db
-					.collection("creatorProfiles")
-					.where("userId", "==", targetUserId)
-					.limit(1)
-					.get();
+				let profilePictureUrl = null;
+				let displayName = null;
 
-				if (!creatorProfilesQuery.empty) {
-					const profileData = creatorProfilesQuery.docs[0].data();
-					targetProfile = {
-						avatarUrl: profileData?.tiktokAvatarUrl || targetUserData.avatar,
-						displayName: profileData?.tiktokDisplayName || targetUserData.name,
-					};
-				} else {
-					const userDoc = await db.collection("users").doc(targetUserId).get();
-					if (userDoc.exists && userDoc.data()?.email) {
-						const creatorEmail = userDoc.data()?.email;
-						const creatorDoc = await db
-							.collection("creatorProfiles")
-							.doc(creatorEmail)
+				try {
+					// 1. Get profile picture from creator_verifications collection
+					const creatorVerificationQuery = await db
+						.collection("creator_verifications")
+						.where("userId", "==", targetUserId)
+						.limit(1)
+						.get();
+
+					if (!creatorVerificationQuery.empty) {
+						const verificationData = creatorVerificationQuery.docs[0].data();
+						profilePictureUrl = verificationData?.profilePictureUrl;
+					}
+
+					// 2. Get display name from creatorProfiles collection
+					const creatorProfileQuery = await db
+						.collection("creatorProfiles")
+						.where("userId", "==", targetUserId)
+						.limit(1)
+						.get();
+
+					if (!creatorProfileQuery.empty) {
+						const profileData = creatorProfileQuery.docs[0].data();
+						const firstName = profileData?.firstName || "";
+						const lastName = profileData?.lastName || "";
+						displayName = `${firstName} ${lastName}`.trim();
+					}
+
+					// If no name found, try to get from users collection
+					if (!displayName) {
+						const userDoc = await db
+							.collection("users")
+							.doc(targetUserId)
 							.get();
-						if (creatorDoc.exists) {
-							const profileData = creatorDoc.data();
-							targetProfile = {
-								avatarUrl:
-									profileData?.tiktokAvatarUrl || targetUserData.avatar,
-								displayName:
-									profileData?.tiktokDisplayName || targetUserData.name,
-							};
+
+						if (userDoc.exists) {
+							const userData = userDoc.data();
+							// Check if user has displayUsername or email
+							displayName =
+								userData?.displayUsername ||
+								userData?.email?.split("@")[0] ||
+								"Creator";
+						} else {
+							console.warn(
+								`No user document found for targetUserId: ${targetUserId}`
+							);
 						}
 					}
+
+					// Set the target profile with fetched data
+					targetProfile = {
+						avatarUrl: profilePictureUrl || targetUserData.avatar,
+						displayName: displayName || targetUserData.name,
+					};
+				} catch (error) {
+					console.error("Error fetching creator profile:", error);
+					targetProfile = {
+						avatarUrl: targetUserData.avatar,
+						displayName: targetUserData.name,
+					};
 				}
 			} else if (targetUserType === "brand") {
 				// For brands, use the provided brandData directly
@@ -111,30 +168,97 @@ export async function POST(req: NextRequest) {
 		const targetAvatarUrl = targetProfile?.avatarUrl || targetUserData.avatar;
 		const targetDisplayName = targetProfile?.displayName || targetUserData.name;
 
-		// Determine roles based on user type
-		const determineRole = (userId: string) => {
-			if (userId === targetUserId) {
-				return targetUserType; // 'creator' or 'brand'
-			}
-			return "user";
+		// FIXED: Need to determine the current user's role properly too
+		// First, check if the current user is a creator
+		let currentUserRole = "user"; // Default to user
+		let currentUserProfile = {
+			name: userData.name,
+			avatar: userData.avatar,
 		};
 
-		// Create new conversation - let Firestore generate the ID
-		const sortedParticipants = [currentUserId, targetUserId].sort();
+		// Check if current user is a creator by looking in creator_verifications or creatorProfiles
+		try {
+			const currentUserCreatorCheck = await db
+				.collection("creator_verifications")
+				.where("userId", "==", currentUserId)
+				.limit(1)
+				.get();
+
+			if (!currentUserCreatorCheck.empty) {
+				currentUserRole = "creator";
+
+				// Fetch current user's creator profile data
+				let currentUserDisplayName = userData.name;
+				let currentUserAvatar = userData.avatar;
+
+				// Get profile picture from creator_verifications
+				const currentUserVerificationData =
+					currentUserCreatorCheck.docs[0].data();
+				if (currentUserVerificationData?.profilePictureUrl) {
+					currentUserAvatar = currentUserVerificationData.profilePictureUrl;
+				}
+
+				// Get display name from creatorProfiles
+				const currentUserProfileQuery = await db
+					.collection("creatorProfiles")
+					.where("userId", "==", currentUserId)
+					.limit(1)
+					.get();
+
+				if (!currentUserProfileQuery.empty) {
+					const profileData = currentUserProfileQuery.docs[0].data();
+					const firstName = profileData?.firstName || "";
+					const lastName = profileData?.lastName || "";
+					const fullName = `${firstName} ${lastName}`.trim();
+					if (fullName) {
+						currentUserDisplayName = fullName;
+					}
+				}
+
+				// If still no name, try users collection
+				if (
+					!currentUserDisplayName ||
+					currentUserDisplayName === userData.name
+				) {
+					const currentUserDoc = await db
+						.collection("users")
+						.doc(currentUserId)
+						.get();
+					if (currentUserDoc.exists) {
+						const currentUserData = currentUserDoc.data();
+						currentUserDisplayName =
+							currentUserData?.displayUsername ||
+							currentUserData?.email?.split("@")[0] ||
+							userData.name;
+					}
+				}
+
+				currentUserProfile = {
+					name: currentUserDisplayName,
+					avatar: currentUserAvatar,
+				};
+			}
+		} catch (error) {
+			console.error("Error checking current user creator status:", error);
+		}
+
+		const targetUserRole = targetUserType; // This will be "creator" or "brand"
+
+		// Create new conversation with deterministic ID and sorted participants
 		const conversationData = {
 			participants: sortedParticipants, // Always store in sorted order
 			participantsInfo: {
 				[currentUserId]: {
-					name: userData.name,
-					avatar: userData.avatar,
+					name: currentUserProfile.name,
+					avatar: currentUserProfile.avatar,
 					username: userData.username || "",
-					role: determineRole(currentUserId),
+					role: currentUserRole, // Now properly determined as "user" or "creator"
 				},
 				[targetUserId]: {
 					name: targetDisplayName,
 					avatar: targetAvatarUrl,
 					username: targetUserData.username || "",
-					role: determineRole(targetUserId),
+					role: targetUserRole, // This will be "creator" or "brand"
 					...(targetUserType === "creator" && {
 						tiktokAvatarUrl: targetProfile?.avatarUrl || targetUserData.avatar,
 						tiktokDisplayName:
@@ -156,10 +280,8 @@ export async function POST(req: NextRequest) {
 			},
 		};
 
-		// FIXED: Use add() instead of set() with custom ID to avoid conflicts
-		const newConversationRef = await db
-			.collection("conversations")
-			.add(conversationData);
+		// Use the deterministic conversation ID
+		await existingConvRef.set(conversationData);
 
 		// Create welcome message to initialize the conversation
 		const welcomeMessage = {
@@ -172,11 +294,11 @@ export async function POST(req: NextRequest) {
 			},
 		};
 
-		await newConversationRef.collection("messages").add(welcomeMessage);
+		await existingConvRef.collection("messages").add(welcomeMessage);
 
 		return new Response(
 			JSON.stringify({
-				conversationId: newConversationRef.id,
+				conversationId: conversationId,
 				message: "Conversation created successfully",
 			}),
 			{ status: 201, headers: { "Content-Type": "application/json" } }

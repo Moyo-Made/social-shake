@@ -93,7 +93,6 @@ export function CreatorStatusProvider({
 		);
 
 		socket.on("connect", () => {
-			console.log("Socket connected for creator status");
 			setSocketConnected(true);
 			socket.emit("subscribe-user", userId);
 			socket.emit("subscribe-verification", userId);
@@ -101,12 +100,10 @@ export function CreatorStatusProvider({
 		});
 
 		socket.on("disconnect", () => {
-			console.log("Socket disconnected for creator status");
 			setSocketConnected(false);
 		});
 
 		socket.on("verification-status-update", (data: CreatorStatus) => {
-			console.log("Received verification status update:", data);
 			const { status, rejectionReason, infoRequest, suspensionReason } = data;
 			const previousStatus = previousStatusRef.current;
 
@@ -209,7 +206,6 @@ export function CreatorStatusProvider({
 	const getCreatorStatus = (): string => {
 		// 1. FIRST: Check WebSocket real-time status (most current)
 		if (realTimeStatus?.status) {
-			console.log("Using real-time status:", realTimeStatus.status);
 			return realTimeStatus.status.toLowerCase();
 		}
 
@@ -222,13 +218,11 @@ export function CreatorStatusProvider({
 				(creatorProfile.profileData?.status as string);
 
 			if (status) {
-				console.log("Using profile status:", status);
 				return status.toLowerCase();
 			}
 
 			// If we have profile data but no explicit status,
 			// assume it's at least pending (profile exists)
-			console.log("Profile exists but no status, defaulting to pending");
 			return "pending";
 		}
 
@@ -257,12 +251,10 @@ export function CreatorStatusProvider({
 			!realTimeStatus && 
 			!error
 		) {
-			console.log("No profile found after complete load - missing");
 			return "missing";
 		}
 
 		// 5. Default to pending while loading or in uncertain states
-		console.log("Defaulting to pending - loading or uncertain state");
 		return "pending";
 	};
 
