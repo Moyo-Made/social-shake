@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, DollarSign } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import NotificationSystem from "../notifications/NotificationSystem";
@@ -229,13 +229,13 @@ const SideNav: React.FC = () => {
 						}
 						text="Transactions"
 					/>
-					<MenuItem
+					{/* <MenuItem
 						href="/admin/contest-payouts"
 						icon={
 							<DollarSign size={20} />
 						}
 						text="Contest Payouts"
-					/>
+					/> */}
 				</div>
 			</nav>
 		</div>

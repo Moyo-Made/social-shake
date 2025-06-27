@@ -204,7 +204,7 @@ export default function AdminDashboard() {
 									</Link>
 								</div>
 							</div>
-							<div className="bg-white overflow-hidden shadow rounded-lg">
+							<div className="bg-white overflow-hidden shadow rounded-lg mb-5">
 								<div className="p-5">
 									<div className="flex items-center">
 										<div className="flex-shrink-0 bg-yellow-500 rounded-md p-3">
@@ -224,7 +224,7 @@ export default function AdminDashboard() {
 									</div>
 								</div>
 							</div>
-							<div className="bg-white overflow-hidden shadow rounded-lg">
+							{/* <div className="bg-white overflow-hidden shadow rounded-lg">
 								<div className="p-5">
 									<div className="flex items-center">
 										<div className="flex-shrink-0 bg-red-500 rounded-md p-3">
@@ -248,8 +248,8 @@ export default function AdminDashboard() {
 										Process payouts
 									</Link>
 								</div>
-							</div>
-							<div className="bg-white overflow-hidden shadow rounded-lg">
+							</div> */}
+							{/* <div className="bg-white overflow-hidden shadow rounded-lg">
 								<div className="p-5">
 									<div className="flex items-center">
 										<div className="flex-shrink-0 bg-green-500 rounded-md p-3">
@@ -265,7 +265,7 @@ export default function AdminDashboard() {
 										</div>
 									</div>
 								</div>
-							</div>
+							</div> */}
 						</div>
 
 						{/* Main content area */}

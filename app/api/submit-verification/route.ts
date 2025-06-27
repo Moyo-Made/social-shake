@@ -19,7 +19,6 @@ export async function POST(request: NextRequest) {
 	try {
 		// Parse the JSON request body
 		const body = await request.json();
-		console.log("Received verification submission:", Object.keys(body));
 
 		const {
 			userId,
@@ -153,8 +152,6 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		console.log("All validations passed, creating verification document");
-
 		// Reference to verification document using userId as document ID
 		const verificationRef = adminDb
 			.collection("creator_verifications")
@@ -241,7 +238,6 @@ export async function POST(request: NextRequest) {
 		// Create or update verification document in Firestore
 		await verificationRef.set(verificationData, { merge: true });
 
-		console.log("Verification document created/updated successfully");
 
 		// Update user record - use userId as document ID here too
 		await adminDb.collection("creatorProfiles").doc(userId).set(
@@ -260,8 +256,6 @@ export async function POST(request: NextRequest) {
 			},
 			{ merge: true }
 		);
-
-		console.log("Creator profile updated successfully");
 
 		// Broadcast real-time update
 		try {
