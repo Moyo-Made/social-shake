@@ -484,7 +484,7 @@ const CreatorManagement: React.FC = () => {
 								<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
 									{getTikTokProfileUrl(creator) ? (
 										<Link
-											href={getTikTokProfileUrl(creator) || ""}
+											href={`https://${getTikTokProfileUrl(creator) || ""}`}
 											className="text-blue-500 hover:underline"
 											target="_blank"
 											rel="noopener noreferrer"

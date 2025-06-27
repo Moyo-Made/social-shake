@@ -1,44 +1,44 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { Button } from "../../ui/button";
 import Image from "next/image";
 import Link from "next/link";
-import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "next/navigation";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+// import { useAuth } from "@/context/AuthContext";
+// import { useRouter } from "next/navigation";
+// import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const BusinessSignup = () => {
-	const { loginWithGoogle } = useAuth();
-	const router = useRouter();
-	const [error, setError] = useState("");
-	const [isLoading, setIsLoading] = useState(false);
+	// const { loginWithGoogle } = useAuth();
+	// const router = useRouter();
+	// const [error, setError] = useState("");
+	// const [isLoading, setIsLoading] = useState(false);
 
-	const handleGoogleSignup = async () => {
-		try {
-		  setError(""); 
-		  setIsLoading(true);
+	// const handleGoogleSignup = async () => {
+	// 	try {
+	// 	  setError(""); 
+	// 	  setIsLoading(true);
 		  
-		  // Wait for the Google login to complete
-		  const { isExistingAccount } = await loginWithGoogle();
+	// 	  // Wait for the Google login to complete
+	// 	  const { isExistingAccount } = await loginWithGoogle();
 		  
-		  // Add a small delay to ensure auth state is fully processed
-		  setTimeout(() => {
-			// Navigate based on whether it's a new user or existing user
-			if (!isExistingAccount) {
-			  router.push("/brand/account-created");
-			} else {
-			  router.push("/brand/dashboard");
-			}
-			setIsLoading(false);
-		  }, 500);
+	// 	  // Add a small delay to ensure auth state is fully processed
+	// 	  setTimeout(() => {
+	// 		// Navigate based on whether it's a new user or existing user
+	// 		if (!isExistingAccount) {
+	// 		  router.push("/brand/account-created");
+	// 		} else {
+	// 		  router.push("/brand/dashboard");
+	// 		}
+	// 		setIsLoading(false);
+	// 	  }, 500);
 		  
-		} catch (error) {
-		  console.error("Google signup error:", error);
-		  setIsLoading(false);
-		  // Your existing error handling...
-		}
-	};
+	// 	} catch (error) {
+	// 	  console.error("Google signup error:", error);
+	// 	  setIsLoading(false);
+	// 	  // Your existing error handling...
+	// 	}
+	// };
 
 	const testimonials = [
 		{
@@ -144,7 +144,7 @@ const BusinessSignup = () => {
 
 						<div className="space-y-4">
 							{/* Error Alert */}
-							{error && (
+							{/* {error && (
 								<Alert variant="destructive" className="mb-4">
 									<AlertDescription className="flex items-center">
 										{error}
@@ -155,7 +155,7 @@ const BusinessSignup = () => {
 										)}
 									</AlertDescription>
 								</Alert>
-							)}
+							)} */}
 
 							{/* Sign up with Email */}
 							<Button className="w-full bg-[#FD5C02] hover:bg-orange-600 text-white py-4 rounded-lg">
@@ -174,7 +174,7 @@ const BusinessSignup = () => {
 							</Button>
 
 							{/* Sign up with Google */}
-							<Button
+							{/* <Button
 								variant="outline"
 								className="w-full py-4 rounded-lg border border-gray-300 hover:bg-gray-50"
 								onClick={handleGoogleSignup}
@@ -188,7 +188,7 @@ const BusinessSignup = () => {
 									height={20}
 								/>
 								Sign up with Google
-							</Button>
+							</Button> */}
 
 							{/* Sign up with Facebook */}
 							{/* <Button

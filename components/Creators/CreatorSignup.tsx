@@ -5,28 +5,28 @@ import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader } from "../ui/card";
 import Image from "next/image";
 import Link from "next/link";
-import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "next/navigation";
+// import { useAuth } from "@/context/AuthContext";
+// import { useRouter } from "next/navigation";
 
 const CreatorSignup = () => {
-	const { loginWithGoogle, isLoading } = useAuth();
-	const router = useRouter();
+	// const { loginWithGoogle, isLoading } = useAuth();
+	// const router = useRouter();
 
-	const handleGoogleSignup = async () => {
-		try {
-		  const { isExistingAccount } = await loginWithGoogle();
+	// const handleGoogleSignup = async () => {
+	// 	try {
+	// 	  const { isExistingAccount } = await loginWithGoogle();
 		  
-		  // Navigate based on whether it's a new user or existing user
-		  if (!isExistingAccount) {
-			router.push("/creator/account-created");
-		  } else {
-			router.push("/creator/dashboard");
-		  }
-		} catch (error) {
-		  console.error("Google signup error:", error);
-		  // Handle any errors here
-		}
-	  };
+	// 	  // Navigate based on whether it's a new user or existing user
+	// 	  if (!isExistingAccount) {
+	// 		router.push("/creator/account-created");
+	// 	  } else {
+	// 		router.push("/creator/dashboard");
+	// 	  }
+	// 	} catch (error) {
+	// 	  console.error("Google signup error:", error);
+	// 	  // Handle any errors here
+	// 	}
+	//   };
 	return (
 		<main className="relative overflow-hidden min-h-screen">
 			<div className="absolute inset-0">
@@ -91,7 +91,7 @@ const CreatorSignup = () => {
 								/>
 							</Link>
 						</Button>
-						<Button
+						{/* <Button
 							variant="outline"
 							className="w-full text-base md:text-[17px] py-5 font-normal border border-gray-300"
 							onClick={handleGoogleSignup}
@@ -105,7 +105,7 @@ const CreatorSignup = () => {
 								height={20}
 							/>
 							Sign up with Google
-						</Button>
+						</Button> */}
 
 						<p className="text-sm md:text-base text-center text-[#000] pt-2">
 							By signing up, you confirm that you have read and agree to our{" "}
