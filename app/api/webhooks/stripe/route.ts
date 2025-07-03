@@ -36,7 +36,8 @@ const sendNotification = async (userId: string, notification: Notification) => {
 const logWebhookEvent = async (
 	event: Stripe.Event,
 	status: "processed" | "failed",
-	error?: string
+	error?: string,
+	userAgent?: string // Add user agent tracking
 ) => {
 	try {
 		await adminDb.collection("webhook_events").add({
@@ -44,6 +45,7 @@ const logWebhookEvent = async (
 			type: event.type,
 			status,
 			error: error || null,
+			userAgent: userAgent || null, // Track if request came from Safari
 			timestamp: new Date().toISOString(),
 			data: {
 				objectId: "id" in event.data.object ? event.data.object.id : null,
@@ -599,8 +601,10 @@ async function handleSubscriptionDeleted(event: Stripe.Event) {
 }
 
 export async function POST(request: NextRequest) {
+	const userAgent = request.headers.get("user-agent") || "";
+	const isSafariRequest = userAgent.includes("Safari") && !userAgent.includes("Chrome");
+	
 	try {
-		// Get raw body as buffer - this is crucial for signature verification
 		const body = await request.text();
 		const sig = request.headers.get("stripe-signature");
 
@@ -623,15 +627,13 @@ export async function POST(request: NextRequest) {
 		let event;
 
 		try {
-			// Stripe signature verification
 			event = stripe.webhooks.constructEvent(body, sig, endpointSecret);
 		} catch (err) {
-			console.error("Webhook signature verification failed:");
-			console.error(
-				"- Error message:",
-				err instanceof Error ? err.message : err
-			);
-			console.error("- Body preview:", body.substring(0, 100) + "...");
+			console.error("Webhook signature verification failed:", {
+				error: err instanceof Error ? err.message : err,
+				userAgent,
+				isSafariRequest
+			});
 
 			return NextResponse.json(
 				{ error: "Webhook signature verification failed" },
@@ -639,11 +641,20 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		// Check for idempotency - prevent duplicate processing
+		// Check for idempotency
 		const alreadyProcessed = await isEventProcessed(event.id);
 		if (alreadyProcessed) {
 			return NextResponse.json({ received: true });
 		}
+
+		// ADD: Log Safari-specific events
+		// if (isSafariRequest) {
+		// 	console.log("Processing Safari webhook event:", {
+		// 		type: event.type,
+		// 		id: event.id,
+		// 		userAgent
+		// 	});
+		// }
 
 		try {
 			// Handle different event types
@@ -694,31 +705,34 @@ export async function POST(request: NextRequest) {
 
 			// Mark event as processed for idempotency
 			await markEventAsProcessed(event.id, event.type);
-
-			// Log successful processing
-			await logWebhookEvent(event, "processed");
+			await logWebhookEvent(event, "processed", undefined, userAgent);
 
 			return NextResponse.json({ received: true });
 		} catch (processingError) {
-			console.error(`Error processing ${event.type}:`, processingError);
+			console.error(`Error processing ${event.type}:`, {
+				error: processingError,
+				userAgent,
+				isSafariRequest
+			});
 
-			// Log failed processing
 			await logWebhookEvent(
 				event,
 				"failed",
-				processingError instanceof Error
-					? processingError.message
-					: "Unknown error"
+				processingError instanceof Error ? processingError.message : "Unknown error",
+				userAgent
 			);
 
-			// Don't mark as processed if it failed - allow retry
 			return NextResponse.json(
 				{ error: "Event processing failed" },
 				{ status: 500 }
 			);
 		}
 	} catch (error) {
-		console.error("Error in webhook handler:", error);
+		console.error("Error in webhook handler:", {
+			error,
+			userAgent,
+			isSafariRequest
+		});
 		return NextResponse.json(
 			{ error: "Webhook handler failed" },
 			{ status: 500 }
@@ -731,34 +745,55 @@ async function handleCheckoutCompleted(event: Stripe.Event) {
 	const session = event.data.object as Stripe.Checkout.Session;
 
 	if (session.payment_status !== "paid") {
+		console.log("Payment not completed, status:", session.payment_status);
 		return;
 	}
 
-	// Determine payment type based on metadata
+	// ADD: Enhanced metadata validation for Safari
 	const contestId = session.metadata?.contestId;
 	const paymentType = session.metadata?.paymentType;
 	const orderId = session.metadata?.orderId;
 	const videoId = session.metadata?.videoId;
 	const submissionId = session.metadata?.submissionId;
 
+	// ADD: Log metadata for debugging Safari issues
+	// console.log("Processing checkout completion:", {
+	// 	sessionId: session.id,
+	// 	paymentType,
+	// 	contestId,
+	// 	orderId,
+	// 	videoId,
+	// 	submissionId,
+	// 	customerEmail: session.customer_email,
+	// 	paymentStatus: session.payment_status
+	// });
+
 	try {
-		// Handle different payment types
+		await new Promise(resolve => setTimeout(resolve, 100));
+
+		// Handle different payment types with enhanced error handling
 		if (contestId) {
-			// Contest payment
 			await handleContestPayment(session, contestId);
 		} else if (paymentType === "order_escrow" && orderId) {
-			// Order escrow payment
 			await handleOrderEscrowPayment(session, orderId);
 		} else if (paymentType === "video" && videoId) {
-			// Video payment - NEW ESCROW FLOW
 			await handleVideoEscrowPayment(session, videoId);
 		} else if (paymentType === "submission_approval" && submissionId) {
-			// Submission approval payment
 			await handleSubmissionApprovalPayment(session, submissionId);
 		} else {
+			console.error("Unknown payment type or missing metadata:", {
+				paymentType,
+				metadata: session.metadata
+			});
 		}
 	} catch (error) {
 		console.error("Error processing checkout session:", error);
+	
+		console.error("Session details:", {
+			id: session.id,
+			payment_status: session.payment_status,
+			metadata: session.metadata
+		});
 		throw error;
 	}
 }
@@ -824,83 +859,114 @@ async function handleOrderEscrowPayment(
 		});
 }
 
-// NEW: Separate handler for video escrow payments
 async function handleVideoEscrowPayment(
 	session: Stripe.Checkout.Session,
 	videoId: string
 ) {
 	const buyerId = session.metadata?.buyerId;
-	const brandId = session.metadata?.brandId || buyerId; // fallback for backward compatibility
+	const brandId = session.metadata?.brandId || buyerId;
 	const creatorId = session.metadata?.creatorId;
 	const paymentId = session.metadata?.paymentId;
 
+	// Enhanced validation for Safari
 	if (!paymentId) {
-		console.error("PaymentId missing from session metadata");
+		console.error("PaymentId missing from session metadata", {
+			sessionId: session.id,
+			metadata: session.metadata
+		});
 		throw new Error("PaymentId required for video escrow payments");
 	}
 
-	await adminDb.runTransaction(async (transaction) => {
-		// Update video purchase record
-		const purchaseRef = adminDb.collection("video_purchases").doc(paymentId);
-		const purchaseDoc = await transaction.get(purchaseRef);
+	// Retry mechanism for Safari's slower processing
+	const maxRetries = 3;
+	let retryCount = 0;
 
-		if (!purchaseDoc.exists) {
-			throw new Error(`Video purchase record not found: ${paymentId}`);
-		}
+	while (retryCount < maxRetries) {
+		try {
+			await adminDb.runTransaction(async (transaction) => {
+				// ADD: Small delay to prevent Safari race conditions
+				await new Promise(resolve => setTimeout(resolve, 50));
 
-		// Update purchase record - payment received by platform, waiting for brand approval
-		transaction.update(purchaseRef, {
-			status: "paid_to_platform", // ESCROW STATUS
-			platformPaymentStatus: "completed",
-			platformPaymentDate: new Date().toISOString(),
-			checkoutSessionId: session.id,
-			paymentAmount: session.amount_total ? session.amount_total / 100 : null,
-			updatedAt: new Date().toISOString(),
-		});
+				const purchaseRef = adminDb.collection("video_purchases").doc(paymentId);
+				const purchaseDoc = await transaction.get(purchaseRef);
 
-		// Update main payment record
-		const paymentRef = adminDb.collection("payments").doc(paymentId);
-		transaction.update(paymentRef, {
-			status: "paid_to_platform", // ESCROW STATUS
-			paidAt: new Date().toISOString(),
-			checkoutSessionId: session.id,
-			updatedAt: new Date().toISOString(),
-		});
+				if (!purchaseDoc.exists) {
+					throw new Error(`Video purchase record not found: ${paymentId}`);
+				}
 
-		// Update video stats (optional)
-		const videoRef = adminDb.collection("videos").doc(videoId);
-		const videoDoc = await transaction.get(videoRef);
+				const updateData = {
+					status: "paid_to_platform",
+					platformPaymentStatus: "completed",
+					platformPaymentDate: new Date().toISOString(),
+					checkoutSessionId: session.id,
+					paymentAmount: session.amount_total ? session.amount_total / 100 : null,
+					updatedAt: new Date().toISOString(),
+					// ADD: Safari-specific tracking
+					processedFrom: "safari_compatible_webhook"
+				};
 
-		if (videoDoc.exists) {
-			const videoData = videoDoc.data();
-			const currentPendingPurchases = videoData?.pendingPurchaseCount || 0;
+				transaction.update(purchaseRef, updateData);
 
-			transaction.update(videoRef, {
-				pendingPurchaseCount: currentPendingPurchases + 1,
-				lastPendingPurchaseAt: new Date().toISOString(),
+				// Update main payment record
+				const paymentRef = adminDb.collection("payments").doc(paymentId);
+				transaction.update(paymentRef, {
+					status: "paid_to_platform",
+					paidAt: new Date().toISOString(),
+					checkoutSessionId: session.id,
+					updatedAt: new Date().toISOString(),
+				});
+
+				// Update video stats
+				const videoRef = adminDb.collection("videos").doc(videoId);
+				const videoDoc = await transaction.get(videoRef);
+
+				if (videoDoc.exists) {
+					const videoData = videoDoc.data();
+					const currentPendingPurchases = videoData?.pendingPurchaseCount || 0;
+
+					transaction.update(videoRef, {
+						pendingPurchaseCount: currentPendingPurchases + 1,
+						lastPendingPurchaseAt: new Date().toISOString(),
+					});
+				}
 			});
-		}
-	});
 
-	// Send notifications (outside transaction)
-	if (brandId) {
-		await sendNotification(brandId, {
-			type: "video_payment_received",
-			videoId: videoId,
-			paymentId: paymentId,
-			message:
-				"Payment received! Please review and approve the video purchase to release payment to creator.",
-		});
+			// If we reach here, transaction succeeded
+			break;
+		} catch (error) {
+			retryCount++;
+			console.error(`Transaction attempt ${retryCount} failed:`, error);
+			
+			if (retryCount >= maxRetries) {
+				throw error;
+			}
+			
+			// Wait before retrying
+			await new Promise(resolve => setTimeout(resolve, 100 * retryCount));
+		}
 	}
 
-	// Notify creator that payment is in escrow (optional)
-	if (creatorId) {
-		await sendNotification(creatorId, {
-			type: "video_payment_pending",
-			videoId: videoId,
-			message:
-				"A brand has paid for your video! Payment is being held and will be released once they approve the purchase.",
-		});
+	// Send notifications (outside transaction) with error handling
+	try {
+		if (brandId) {
+			await sendNotification(brandId, {
+				type: "video_payment_received",
+				videoId: videoId,
+				paymentId: paymentId,
+				message: "Payment received! Please review and approve the video purchase to release payment to creator.",
+			});
+		}
+
+		if (creatorId) {
+			await sendNotification(creatorId, {
+				type: "video_payment_pending",
+				videoId: videoId,
+				message: "A brand has paid for your video! Payment is being held and will be released once they approve the purchase.",
+			});
+		}
+	} catch (notificationError) {
+		console.error("Failed to send notifications:", notificationError);
+		// Don't throw here - payment processing succeeded
 	}
 }
 
