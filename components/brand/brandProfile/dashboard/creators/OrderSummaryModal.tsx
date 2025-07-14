@@ -232,7 +232,18 @@ const OrderSummaryModal: React.FC<OrderSummaryModalProps> = ({
 				return;
 			}
 
-			// Step 1: Create draft order first
+			// Step 1: Check creator's Stripe connection
+			const stripeStatusResponse = await fetch(
+				`/api/creator/stripe-status?userId=${selectedCreator.id}`
+			);
+
+			const stripeStatus = await stripeStatusResponse.json();
+			if (!stripeStatus.connected) {
+				setError("CREATOR_ACCOUNT_NOT_CONNECTED");
+				return;
+			}
+
+			// Step 2: Create draft order after checking creator's Stripe connection
 			const orderRequirements = {
 				scripts: scriptFormData.scripts,
 				generalRequirements: scriptFormData.generalRequirements,
@@ -317,16 +328,7 @@ const OrderSummaryModal: React.FC<OrderSummaryModalProps> = ({
 				}),
 			});
 
-			// Step 2: Check creator's Stripe connection
-			const stripeStatusResponse = await fetch(
-				`/api/creator/stripe-status?userId=${selectedCreator.id}`
-			);
-
-			const stripeStatus = await stripeStatusResponse.json();
-			if (!stripeStatus.connected) {
-				setError("CREATOR_ACCOUNT_NOT_CONNECTED");
-				return;
-			}
+			
 
 			// Step 3: Create payment intent for escrow
 			const paymentFormData = new FormData();

@@ -15,45 +15,53 @@ const removeUndefined = (
 // Helper function to check subscription access
 const checkSubscriptionAccess = async (userId: string) => {
 	try {
-	  const subscriptionDoc = await adminDb!.collection("subscriptions")
-		.where("userId", "==", userId)
-		.limit(1)
-		.get();
-  
-	  if (subscriptionDoc.empty) {
-		return { hasAccess: false, message: "No active subscription found" };
-	  }
-  
-	  const subscriptionData = subscriptionDoc.docs[0].data();
-	  const status = subscriptionData.status;
-	  
-	  // Allow access for active subscriptions or valid trials
-	  const hasValidTrial = status === 'trialing' && 
-		subscriptionData.trialEnd && 
-		new Date(subscriptionData.trialEnd) > new Date();
-  
-	  if (status === 'active' || hasValidTrial) {
-		return { hasAccess: true };
-	  }
-  
-	  // Custom messages for different states
-	  const statusMessages = {
-		'past_due': 'Please update your payment method to create new orders',
-		'canceled': 'Your subscription has been canceled. Please reactivate to create orders',
-		'trialing': 'Your free trial has ended. Please upgrade to continue',
-		'incomplete': 'Please complete your subscription setup',
-		'unpaid': 'Payment failed. Please update your payment method'
-	  };
-  
-	  return { 
-		hasAccess: false, 
-		message: statusMessages[status as keyof typeof statusMessages] || 'Subscription required to create orders'
-	  };
+		const subscriptionDoc = await adminDb!
+			.collection("subscriptions")
+			.where("userId", "==", userId)
+			.limit(1)
+			.get();
+
+		if (subscriptionDoc.empty) {
+			return { hasAccess: false, message: "No active subscription found" };
+		}
+
+		const subscriptionData = subscriptionDoc.docs[0].data();
+		const status = subscriptionData.status;
+
+		// Allow access for active subscriptions or valid trials
+		const hasValidTrial =
+			status === "trialing" &&
+			subscriptionData.trialEnd &&
+			new Date(subscriptionData.trialEnd) > new Date();
+
+		if (status === "active" || hasValidTrial) {
+			return { hasAccess: true };
+		}
+
+		// Custom messages for different states
+		const statusMessages = {
+			past_due: "Please update your payment method to create new orders",
+			canceled:
+				"Your subscription has been canceled. Please reactivate to create orders",
+			trialing: "Your free trial has ended. Please upgrade to continue",
+			incomplete: "Please complete your subscription setup",
+			unpaid: "Payment failed. Please update your payment method",
+		};
+
+		return {
+			hasAccess: false,
+			message:
+				statusMessages[status as keyof typeof statusMessages] ||
+				"Subscription required to create orders",
+		};
 	} catch (error) {
-	  console.error('Error checking subscription:', error);
-	  return { hasAccess: false, message: "Unable to verify subscription status" };
+		console.error("Error checking subscription:", error);
+		return {
+			hasAccess: false,
+			message: "Unable to verify subscription status",
+		};
 	}
-  };
+};
 
 // POST endpoint - Create Draft Order (minimal required fields only)
 export async function POST(request: NextRequest) {
@@ -109,6 +117,19 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
+		// Check subscription access
+		const subscriptionCheck = await checkSubscriptionAccess(userId);
+		if (!subscriptionCheck.hasAccess) {
+			return NextResponse.json(
+				{
+					error: "Subscription required",
+					message: subscriptionCheck.message,
+					errorCode: "SUBSCRIPTION_REQUIRED",
+				},
+				{ status: 402 } 
+			);
+		}
+
 		// Verify creator exists
 		if (!adminDb) {
 			throw new Error("Firebase admin database is not initialized");
@@ -122,18 +143,6 @@ export async function POST(request: NextRequest) {
 		if (!creatorDoc.exists) {
 			return NextResponse.json({ error: "Creator not found" }, { status: 404 });
 		}
-
-		const subscriptionCheck = await checkSubscriptionAccess(userId);
-if (!subscriptionCheck.hasAccess) {
-  return NextResponse.json(
-    {
-      error: "Subscription required",
-      message: subscriptionCheck.message,
-      errorCode: "SUBSCRIPTION_REQUIRED"
-    },
-    { status: 402 } // 402 Payment Required
-  );
-}
 
 		const creatorData = creatorDoc.data();
 		const stripeAccountId = creatorData?.stripeAccountId;
@@ -184,7 +193,7 @@ if (!subscriptionCheck.hasAccess) {
 			metadata: metadata || {},
 		});
 
-		// Create the order document
+		// NOW CREATE THE ORDER (after all validations pass)
 		const orderRef = adminDb.collection("orders").doc(orderId);
 		await orderRef.set(orderData);
 
@@ -237,7 +246,7 @@ export async function PATCH(request: NextRequest) {
 			userId,
 			section, // 'scripts', 'requirements', 'project_brief', 'basic_info'
 			data,
-			action
+			action,
 		} = body;
 
 		// Validate required fields
@@ -253,9 +262,9 @@ export async function PATCH(request: NextRequest) {
 		}
 
 		// Handle brand acceptance
-		if (action === 'accept_project') {
+		if (action === "accept_project") {
 			return await handleBrandAcceptProject(orderId, userId);
-		  }
+		}
 
 		// Get and verify order exists
 		const orderRef = adminDb.collection("orders").doc(orderId);
@@ -524,98 +533,97 @@ async function updateBasicOrderInfo(orderRef: any, basicInfoData: any) {
 
 async function handleBrandAcceptProject(orderId: string, userId: string) {
 	try {
-	  if (!adminDb) {
-		throw new Error("Firebase admin database is not initialized");
-	  }
-  
-	  // Get and verify order exists
-	  const orderRef = adminDb.collection("orders").doc(orderId);
-	  const orderDoc = await orderRef.get();
-  
-	  if (!orderDoc.exists) {
-		return NextResponse.json({ error: "Order not found" }, { status: 404 });
-	  }
-  
-	  const orderData = orderDoc.data();
-  
-	  // Verify user is the brand (order owner)
-	  if (orderData?.user_id !== userId) {
-		return NextResponse.json(
-		  { error: "Only the brand can accept this project" },
-		  { status: 403 }
-		);
-	  }
-  
-	  // Verify order is in the right state to be accepted
-	  const acceptableStatuses = ['payment_confirmed', 'pending'];
-	  if (!acceptableStatuses.includes(orderData?.status)) {
-		return NextResponse.json(
-		  { error: `Cannot accept project in status: ${orderData?.status}` },
-		  { status: 400 }
-		);
-	  }
-  
-	  // Update order status to active/in-progress
-	  await orderRef.update({
-		status: "in_progress", // or "active" - choose your preferred status
-		accepted_at: FieldValue.serverTimestamp(),
-		updated_at: FieldValue.serverTimestamp(),
-	  });
-  
-	  // Create milestone for project acceptance
-	  const milestoneData = {
-		order_id: orderId,
-		milestone_type: "project_accepted",
-		status: "completed",
-		description: "Project accepted by brand and moved to active status",
-		completed_at: FieldValue.serverTimestamp(),
-		created_at: FieldValue.serverTimestamp(),
-	  };
-	  await adminDb.collection("project_milestones").add(milestoneData);
-  
-	  // Create notifications for both brand and creator
-	  await Promise.all([
-		// Notification for brand
-		adminDb.collection("notifications").add({
-		  userId: orderData?.user_id,
-		  message: `You have successfully accepted project #${orderId}. The creator will now begin working on your videos.`,
-		  status: "unread",
-		  type: "project_accepted",
-		  createdAt: FieldValue.serverTimestamp(),
-		  relatedTo: "order",
-		  orderId,
-		}),
-		// Notification for creator
-		adminDb.collection("notifications").add({
-		  userId: orderData?.creator_id,
-		  message: `Great news! Your project #${orderId} has been accepted by the brand. You can now start working on the videos.`,
-		  status: "unread",
-		  type: "project_accepted_creator",
-		  createdAt: FieldValue.serverTimestamp(),
-		  relatedTo: "order",
-		  orderId,
-		})
-	  ]);
-  
-	  return NextResponse.json({
-		success: true,
-		message: "Project accepted successfully",
-		orderId,
-		status: "in_progress",
-		acceptedAt: new Date().toISOString(),
-	  });
-  
+		if (!adminDb) {
+			throw new Error("Firebase admin database is not initialized");
+		}
+
+		// Get and verify order exists
+		const orderRef = adminDb.collection("orders").doc(orderId);
+		const orderDoc = await orderRef.get();
+
+		if (!orderDoc.exists) {
+			return NextResponse.json({ error: "Order not found" }, { status: 404 });
+		}
+
+		const orderData = orderDoc.data();
+
+		// Verify user is the brand (order owner)
+		if (orderData?.user_id !== userId) {
+			return NextResponse.json(
+				{ error: "Only the brand can accept this project" },
+				{ status: 403 }
+			);
+		}
+
+		// Verify order is in the right state to be accepted
+		const acceptableStatuses = ["payment_confirmed", "pending"];
+		if (!acceptableStatuses.includes(orderData?.status)) {
+			return NextResponse.json(
+				{ error: `Cannot accept project in status: ${orderData?.status}` },
+				{ status: 400 }
+			);
+		}
+
+		// Update order status to active/in-progress
+		await orderRef.update({
+			status: "in_progress", // or "active" - choose your preferred status
+			accepted_at: FieldValue.serverTimestamp(),
+			updated_at: FieldValue.serverTimestamp(),
+		});
+
+		// Create milestone for project acceptance
+		const milestoneData = {
+			order_id: orderId,
+			milestone_type: "project_accepted",
+			status: "completed",
+			description: "Project accepted by brand and moved to active status",
+			completed_at: FieldValue.serverTimestamp(),
+			created_at: FieldValue.serverTimestamp(),
+		};
+		await adminDb.collection("project_milestones").add(milestoneData);
+
+		// Create notifications for both brand and creator
+		await Promise.all([
+			// Notification for brand
+			adminDb.collection("notifications").add({
+				userId: orderData?.user_id,
+				message: `You have successfully accepted project #${orderId}. The creator will now begin working on your videos.`,
+				status: "unread",
+				type: "project_accepted",
+				createdAt: FieldValue.serverTimestamp(),
+				relatedTo: "order",
+				orderId,
+			}),
+			// Notification for creator
+			adminDb.collection("notifications").add({
+				userId: orderData?.creator_id,
+				message: `Great news! Your project #${orderId} has been accepted by the brand. You can now start working on the videos.`,
+				status: "unread",
+				type: "project_accepted_creator",
+				createdAt: FieldValue.serverTimestamp(),
+				relatedTo: "order",
+				orderId,
+			}),
+		]);
+
+		return NextResponse.json({
+			success: true,
+			message: "Project accepted successfully",
+			orderId,
+			status: "in_progress",
+			acceptedAt: new Date().toISOString(),
+		});
 	} catch (error) {
-	  console.error("Error accepting project:", error);
-	  return NextResponse.json(
-		{
-		  error: "Failed to accept project",
-		  details: error instanceof Error ? error.message : String(error),
-		},
-		{ status: 500 }
-	  );
+		console.error("Error accepting project:", error);
+		return NextResponse.json(
+			{
+				error: "Failed to accept project",
+				details: error instanceof Error ? error.message : String(error),
+			},
+			{ status: 500 }
+		);
 	}
-  }
+}
 
 // PUT endpoint - Finalize Order (move from draft to ready for payment)
 export async function PUT(request: NextRequest) {
