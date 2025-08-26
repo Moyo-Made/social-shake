@@ -5,7 +5,7 @@ import { adminDb } from "@/config/firebase-admin";
 export async function GET(request: NextRequest) {
 	try {
 		const { searchParams } = new URL(request.url);
-		const userId = searchParams.get("userId");
+		const userId = searchParams.get("userId"); // Changed from creatorId to userId
 		const limit = searchParams.get("limit");
 		const offset = searchParams.get("offset");
 
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
 		let query = adminDb
 			.collection("users")
-			.doc(userId)
+			.doc(userId) // This is the user whose saved creators we want
 			.collection("savedCreators")
 			.orderBy("savedAt", "desc"); // Most recent first
 
@@ -74,14 +74,14 @@ export async function GET(request: NextRequest) {
 // POST - Save a creator
 export async function POST(request: NextRequest) {
 	try {
-		const { creatorId, userId, action, metadata } = await request.json();
+		const { creatorId, action, metadata } = await request.json();
 
 		// Validate required fields
-		if (!creatorId || !userId) {
+		if (!creatorId) {
 			return NextResponse.json(
 				{
 					success: false,
-					error: "Missing required fields: creatorId and userId",
+					error: "Missing required fields: creatorId",
 				},
 				{ status: 400 }
 			);
@@ -93,8 +93,6 @@ export async function POST(request: NextRequest) {
 		if (actionType === "save") {
 			// Check if creator is already saved
 			const existingDoc = await adminDb
-				.collection("users")
-				.doc(userId)
 				.collection("savedCreators")
 				.doc(creatorId)
 				.get();
@@ -118,8 +116,6 @@ export async function POST(request: NextRequest) {
 
 			// Save the creator
 			await adminDb
-				.collection("users")
-				.doc(userId)
 				.collection("savedCreators")
 				.doc(creatorId)
 				.set(savedCreatorData);
@@ -135,8 +131,6 @@ export async function POST(request: NextRequest) {
 		} else if (actionType === "remove") {
 			// Check if creator exists in saved list
 			const existingDoc = await adminDb
-				.collection("users")
-				.doc(userId)
 				.collection("savedCreators")
 				.doc(creatorId)
 				.get();
@@ -153,8 +147,6 @@ export async function POST(request: NextRequest) {
 
 			// Remove the saved creator
 			await adminDb
-				.collection("users")
-				.doc(userId)
 				.collection("savedCreators")
 				.doc(creatorId)
 				.delete();
@@ -194,14 +186,14 @@ export async function POST(request: NextRequest) {
 // DELETE - Remove a saved creator
 export async function DELETE(request: NextRequest) {
 	try {
-		const { creatorId, userId } = await request.json();
+		const { creatorId } = await request.json();
 
 		// Validate required fields
-		if (!creatorId || !userId) {
+		if (!creatorId) {
 			return NextResponse.json(
 				{
 					success: false,
-					error: "Missing required fields: creatorId and userId",
+					error: "Missing required fields: creatorId",
 				},
 				{ status: 400 }
 			);
@@ -209,8 +201,6 @@ export async function DELETE(request: NextRequest) {
 
 		// Check if creator exists in saved list
 		const existingDoc = await adminDb
-			.collection("users")
-			.doc(userId)
 			.collection("savedCreators")
 			.doc(creatorId)
 			.get();
@@ -227,8 +217,6 @@ export async function DELETE(request: NextRequest) {
 
 		// Remove the saved creator
 		await adminDb
-			.collection("users")
-			.doc(userId)
 			.collection("savedCreators")
 			.doc(creatorId)
 			.delete();

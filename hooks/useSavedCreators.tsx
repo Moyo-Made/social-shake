@@ -1,34 +1,45 @@
-// hooks/useSavedCreators.js
-import { Creators } from '@/components/brand/brandProfile/dashboard/creators/AllCreators';
+import { Creators } from '@/types/Creator';
 import { useState, useEffect } from 'react';
 
-export const useSavedCreators = () => {
+export const useSavedCreators = (userId: string) => {
   const [savedCreators, setSavedCreators] = useState<Creators[]>([]);
   const [allCreators, setAllCreators] = useState<Creators[]>([]);
   const [isLoadingSaved, setIsLoadingSaved] = useState(true);
   const [isLoadingAll, setIsLoadingAll] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load saved creators from localStorage on mount
+  // Load saved creators from database on mount
   useEffect(() => {
-    const loadSavedCreators = () => {
+    const loadSavedCreators = async () => {
+      if (!userId) {
+        setIsLoadingSaved(false);
+        return;
+      }
+
       setIsLoadingSaved(true);
+      setError(null);
+      
       try {
-        const savedData = localStorage.getItem('savedCreators');
-        if (savedData) {
-          setSavedCreators(JSON.parse(savedData));
+        // Pass the userId as a query parameter
+        const response = await fetch(`/api/saved-creators?userId=${userId}`);
+        
+        if (!response.ok) {
+          throw new Error(`Error loading saved creators: ${response.status}`);
         }
+        
+        const data = await response.json();
+        setSavedCreators(data.data || []); // Note: your API returns data.data, not data.savedCreators
       } catch (error) {
         console.error('Error loading saved creators:', error);
-        // Reset localStorage if there's an error parsing the data
-        localStorage.removeItem('savedCreators');
+        setError('Failed to load saved creators');
+        setSavedCreators([]); // Fallback to empty array
       } finally {
         setIsLoadingSaved(false);
       }
     };
 
     loadSavedCreators();
-  }, []);
+  }, [userId]); // Add userId as dependency
 
   // Fetch all creators from API
   useEffect(() => {
@@ -146,44 +157,76 @@ export const useSavedCreators = () => {
     fetchAllCreators();
   }, []);
 
-  // Save to localStorage whenever savedCreators changes
-  useEffect(() => {
-    if (!isLoadingSaved) {
-      localStorage.setItem('savedCreators', JSON.stringify(savedCreators));
-    }
-  }, [savedCreators, isLoadingSaved]);
-
   // Check if a creator is saved
   const isCreatorSaved = (creatorId: string | number) => {
     return savedCreators.some((creator) => creator.id === creatorId);
   };
 
-  // Save a creator
-  const saveCreator = (creator: Creators) => {
-    if (!isCreatorSaved(creator.id)) {
+  // Save a creator to database
+  const saveCreator = async (creator: Creators) => {
+    if (isCreatorSaved(creator.id)) {
+      return false; // Already saved
+    }
+    
+    try {
+      const response = await fetch('/api/saved-creators', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          creatorId: creator.id,
+          userId: userId // Pass the current user ID
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error saving creator: ${response.status}`);
+      }
+      
+      // Update local state on successful save
       setSavedCreators([...savedCreators, creator]);
       return true;
+    } catch (error) {
+      console.error('Error saving creator:', error);
+      setError('Failed to save creator');
+      return false;
     }
-    return false;
   };
 
-  // Remove a creator
-  const removeCreator = (creatorId: string | number) => {
-    if (isCreatorSaved(creatorId)) {
+  // Remove a creator from database
+  const removeCreator = async (creatorId: string | number) => {
+    if (!isCreatorSaved(creatorId)) {
+      return false; // Not saved
+    }
+    
+    try {
+      const response = await fetch(`/api/saved-creators/${creatorId}?userId=${userId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error removing creator: ${response.status}`);
+      }
+      
+      // Update local state on successful removal
       setSavedCreators(savedCreators.filter((creator) => creator.id !== creatorId));
       return true;
+    } catch (error) {
+      console.error('Error removing creator:', error);
+      setError('Failed to remove creator');
+      return false;
     }
-    return false;
   };
 
   // Toggle saved status
-  const toggleSavedStatus = (creator: Creators) => {
+  const toggleSavedStatus = async (creator: Creators) => {
     if (isCreatorSaved(creator.id)) {
-      removeCreator(creator.id);
-      return false;
+      const success = await removeCreator(creator.id);
+      return !success; // Return false if successfully removed
     } else {
-      saveCreator(creator);
-      return true;
+      const success = await saveCreator(creator);
+      return success; // Return true if successfully saved
     }
   };
 

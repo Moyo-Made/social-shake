@@ -17,10 +17,12 @@ import { useSavedCreators } from "@/hooks/useSavedCreators";
 import { categories } from "@/types/categories";
 import { countries as allCountries } from "@/types/countries";
 import { topLanguages } from "@/types/languages";
+import { useAuth } from "@/context/AuthContext";
 
 export default function CreatorPricingTab() {
 	const { formData, updateCreatorPricing } = useProjectForm();
 	const { creatorPricing } = formData;
+	const { currentUser } = useAuth();
 	const {
 		savedCreators,
 		allCreators,
@@ -28,7 +30,7 @@ export default function CreatorPricingTab() {
 		isLoadingAll,
 		error,
 		searchCreators,
-	} = useSavedCreators();
+	} = useSavedCreators(currentUser?.uid || "");
 
 	// Initialize state from context or use default values
 	const [selectionMethod, setSelectionMethod] = useState<

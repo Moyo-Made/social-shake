@@ -1,7 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Heart, Send, ArrowLeft, Video, X } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
@@ -30,95 +29,8 @@ import PerformanceStatsCard from "./PerformanceStatsCard";
 import PricingCard from "./PricingCard";
 import { CONTENT_TYPES } from "@/types/contentTypes";
 import { NATIONALITIES } from "@/types/nationalities";
-
-// Define types
-export interface Creators {
-	language: string;
-	portfolioVideoUrls: string[] | undefined;
-	id: string;
-	name: string;
-	username: string;
-	bio: string;
-	email: string;
-	avatar: string;
-	totalGMV: number;
-	avgGMVPerVideo: number;
-	avgImpressions?: string;
-	pricing: {
-		oneVideo: number;
-		threeVideos: number;
-		fiveVideos: number;
-		bulkVideos: number;
-		bulkVideosNote?: string;
-		aiActorPricing?: number;
-	};
-	profilePictureUrl: string;
-	contentTypes: string[];
-	country: string;
-	socialMedia?: {
-		instagram: string;
-		twitter: string;
-		facebook: string;
-		youtube: string;
-	};
-
-	tiktokUrl: string;
-	status: string;
-	dateOfBirth: string;
-	gender: string;
-	ethnicity: string;
-	contentLinks: string[];
-	verificationVideoUrl?: string;
-	verifiableIDUrl?: string;
-	aboutMeVideoUrl?: string;
-	abnNumber?: string;
-	creatorProfileData?: {
-		createdAt: string;
-		firstName: string;
-		lastName: string;
-		displayUsername: string;
-		userType: string;
-		userId: string;
-		email: string;
-		username: string;
-		tiktokConnected?: boolean;
-		tiktokFollowerCount?: number;
-		tiktokUsername?: string;
-		tiktokDisplayName?: string;
-		tiktokId?: string;
-		tiktokProfileLink?: string;
-		tiktokEngagementRate?: number;
-		tiktokAvatarUrl?: string;
-		tiktokMetrics?: {
-			followers: {
-				count: number;
-				insights: any | null;
-			};
-			videos: {
-				count: number;
-				recentVideos: any[];
-			};
-			engagement: {
-				rate: number;
-				averageLikes: number;
-				averageComments: number;
-				averageShares: number;
-				averageViews: number;
-			};
-			views: number;
-			likes: number;
-			comments: number;
-			shares: number;
-		};
-		updatedAt:
-			| {
-					_seconds: number;
-					_nanoseconds: number;
-			  }
-			| string;
-		[key: string]: any; // To allow for any additional fields in creatorProfileData
-	};
-}
+import { useSavedCreators } from "@/hooks/useSavedCreators";
+import { Creators } from "@/types/Creator";
 
 const defaultProfileImg = "";
 
@@ -265,52 +177,32 @@ const createConversation = async ({
 	return data;
 };
 
-// Custom hooks for localStorage operations
-const useSavedCreators = () => {
-	const [isClient, setIsClient] = useState(false);
-
-	useEffect(() => {
-		setIsClient(true);
-	}, []);
-
-	const getSavedCreators = (): Creators[] => {
-		if (!isClient) return [];
-		const savedCreatorsData = localStorage.getItem("savedCreators");
-		if (savedCreatorsData) {
-			try {
-				return JSON.parse(savedCreatorsData);
-			} catch (e) {
-				console.error("Error parsing saved creators:", e);
-				localStorage.removeItem("savedCreators");
-				return [];
-			}
-		}
-		return [];
-	};
-
-	const setSavedCreators = (creators: Creators[]) => {
-		if (!isClient) return;
-		localStorage.setItem("savedCreators", JSON.stringify(creators));
-	};
-
-	return {
-		getSavedCreators,
-		setSavedCreators,
-		isClient,
-	};
-};
-
 const CreatorMarketplace = () => {
 	const router = useRouter();
 	const pathname = usePathname();
 	const { currentUser } = useAuth();
-	const { getSavedCreators, setSavedCreators, isClient } = useSavedCreators();
+
+	const { savedCreators, isCreatorSaved, toggleSavedStatus } = useSavedCreators(
+		currentUser?.uid || ""
+	);
+
+	// Debug logging
+	useEffect(() => {
+		console.log('SavedCreators updated:', savedCreators);
+		console.log('SavedCreators length:', savedCreators.length);
+	  }, [savedCreators]);
+	
+	  // Add this to debug the save status
+	//   const debugSaveStatus = (creatorId: string) => {
+	// 	const isSaved = isCreatorSaved(creatorId);
+	// 	console.log(`Creator ${creatorId} is saved:`, isSaved);
+	// 	return isSaved;
+	//   };
 
 	const isSavedCreatorsPage = pathname === "/brand/dashboard/creators/saved";
 
 	const [selectedCreator, setSelectedCreator] = useState<Creators | null>(null);
 	const [showAlert, setShowAlert] = useState<boolean>(false);
-	const [savedCreators, setSavedCreatorsState] = useState<Creators[]>([]);
 	const [alertMessage, setAlertMessage] = useState<string>("");
 	const [currentPlayingVideo, setCurrentPlayingVideo] = useState<string | null>(
 		null
@@ -359,13 +251,6 @@ const CreatorMarketplace = () => {
 			alert("Failed to start conversation. Please try again.");
 		},
 	});
-
-	// Initialize saved creators from localStorage
-	useEffect(() => {
-		if (isClient) {
-			setSavedCreatorsState(getSavedCreators());
-		}
-	}, [isClient]);
 
 	const handleSearchChange = (e: {
 		target: { value: React.SetStateAction<string> };
@@ -419,31 +304,35 @@ const CreatorMarketplace = () => {
 		});
 	};
 
-	const isCreatorSaved = (creatorId: string): boolean => {
-		return savedCreators.some((creator) => creator.id === creatorId);
-	};
+	const [isSavingCreator, setIsSavingCreator] = useState<string | null>(null);
 
-	const handleSaveCreator = (creator: Creators): void => {
-		let newSavedCreators;
+	const handleSaveCreator = async (creator: Creators): Promise<void> => {
+		if (isSavingCreator === creator.id) return;
 
-		if (!isCreatorSaved(creator.id)) {
-			newSavedCreators = [...savedCreators, creator];
-			setAlertMessage("Profile saved to your favorites!");
-		} else {
-			newSavedCreators = savedCreators.filter(
-				(saved) => saved.id !== creator.id
-			);
-			setAlertMessage("Profile removed from your favorites!");
+		setIsSavingCreator(creator.id);
+
+		try {
+
+			// Toggle the saved status
+			const newSavedStatus = await toggleSavedStatus(creator);
+
+			// Show appropriate message based on the action taken
+			if (newSavedStatus) {
+				setAlertMessage("Profile saved to your favorites!");
+			} else {
+				setAlertMessage("Profile removed from your favorites!");
+			}
+
+			setShowAlert(true);
+			setTimeout(() => setShowAlert(false), 3000);
+		} catch (error) {
+			console.error("Error toggling creator save status:", error);
+			setAlertMessage("Something went wrong. Please try again.");
+			setShowAlert(true);
+			setTimeout(() => setShowAlert(false), 3000);
+		} finally {
+			setIsSavingCreator(null);
 		}
-
-		// Update both state and localStorage in one place
-		setSavedCreatorsState(newSavedCreators);
-		if (isClient) {
-			setSavedCreators(newSavedCreators); // This updates localStorage
-		}
-
-		setShowAlert(true);
-		setTimeout(() => setShowAlert(false), 3000);
 	};
 
 	const handleNavigateToSaved = (): void => {
@@ -643,6 +532,7 @@ const CreatorMarketplace = () => {
 									variant="outline"
 									size="icon"
 									onClick={() => handleSaveCreator(selectedCreator)}
+									
 									className={
 										isCreatorSaved(selectedCreator.id)
 											? "bg-pink-500 border-pink-500 hover:bg-pink-600"
@@ -848,7 +738,7 @@ const CreatorMarketplace = () => {
 			<div className="container mx-auto p-3 md:p-4">
 				{showAlert && <AlertNotification />}
 
-				{!isClient || savedCreators.length === 0 ? (
+				{savedCreators.length === 0 ? (
 					<EmptyState message="No Saved Creators" />
 				) : (
 					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 ">

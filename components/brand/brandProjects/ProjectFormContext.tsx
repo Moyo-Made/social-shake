@@ -22,7 +22,7 @@ import { toast } from "sonner";
 
 // Define stripePromise
 const stripePromise = loadStripe(
-	process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY || ""
+	process.env.STRIPE_PUBLISHABLE_KEY || ""
 );
 
 // Add API response types

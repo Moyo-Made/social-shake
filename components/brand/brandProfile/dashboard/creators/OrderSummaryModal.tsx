@@ -179,12 +179,19 @@ const OrderSummaryModal: React.FC<OrderSummaryModalProps> = ({
 	// Resume incomplete orders on page load
 	useEffect(() => {
 		const checkSubscriptionAndPendingOrder = async () => {
-			if (typeof window !== "undefined" && window.localStorage && isOpen && currentUser) {
+			if (
+				typeof window !== "undefined" &&
+				window.localStorage &&
+				isOpen &&
+				currentUser
+			) {
 				// Check subscription first
 				try {
-					const subscriptionResponse = await fetch(`/api/subscription/status?userId=${currentUser.uid}`);
+					const subscriptionResponse = await fetch(
+						`/api/subscription/status?userId=${currentUser.uid}`
+					);
 					const subscriptionData = await subscriptionResponse.json();
-					
+
 					if (!subscriptionData.hasActiveSubscription) {
 						setShowSubscriptionModal(true);
 						return;
@@ -218,14 +225,16 @@ const OrderSummaryModal: React.FC<OrderSummaryModalProps> = ({
 			setLoading(true);
 			setError(null);
 
-			const subscriptionResponse = await fetch(`/api/subscription/status?userId=${currentUser?.uid}`);
-		
+			const subscriptionResponse = await fetch(
+				`/api/subscription/status?userId=${currentUser?.uid}`
+			);
+
 			if (!subscriptionResponse.ok) {
 				throw new Error("Failed to check subscription status");
 			}
-	
+
 			const subscriptionData = await subscriptionResponse.json();
-			
+
 			// If user doesn't have an active subscription, show modal and return
 			if (!subscriptionData.hasActiveSubscription) {
 				setShowSubscriptionModal(true);
@@ -327,8 +336,6 @@ const OrderSummaryModal: React.FC<OrderSummaryModalProps> = ({
 					userId: currentUser?.uid,
 				}),
 			});
-
-			
 
 			// Step 3: Create payment intent for escrow
 			const paymentFormData = new FormData();
